@@ -15,6 +15,11 @@ from mlflow.utils.file_utils import TempDir, _copy_project
 
 DEFAULT_IMAGE_NAME = "mlflow_sage"
 
+PYFUNC_IMAGE_URL = "707343435239.dkr.ecr.us-west-2.amazonaws.com/mlflow-pyfunc-test:latest"
+DEFAULT_IMAGE_URL = PYFUNC_IMAGE_URL
+
+DEFAULT_BUCKET_NAME_PREFIX = "mlflow-sagemaker" 
+
 _DOCKERFILE_TEMPLATE = """
 # Build an image that can serve pyfunc model in SageMaker
 FROM ubuntu:16.04
@@ -134,8 +139,8 @@ def push_image_to_ecr(image=DEFAULT_IMAGE_NAME):
     os.system(cmd)
 
 
-def deploy(app_name, model_path, execution_role_arn, bucket, run_id=None,
-           image="mlflow_sage", region_name="us-west-2"):
+def deploy(app_name, model_path, bucket=None, image_url=DEFAULT_IMAGE_URL, run_id=None, 
+           region_name="us-west-2", execution_role_arn=None):
     """
     Deploy model on Sagemaker.
     Current active AWS account needs to have correct permissions setup.
@@ -146,22 +151,27 @@ def deploy(app_name, model_path, execution_role_arn, bucket, run_id=None,
     :param execution_role_arn: Amazon execution role with sagemaker rights
     :param bucket: S3 bucket where model artifacts are gonna be stored
     :param run_id: MLflow run id.
-    :param image: name of the Docker image to be used.
+    :param image_url: URL of the ECR-hosted docker image to be used 
     :param region_name: Name of the AWS region to deploy to.
     """
     prefix = model_path
     if run_id:
         model_path = _get_model_log_dir(model_path, run_id)
-        prefix = run_id + "/" + prefix
-    run_id = _check_compatible(model_path)
+        prefix = os.path.join(run_id, prefix)
+        run_id = _check_compatible(model_path)
+
+    if bucket is None:
+        # Attempt to create a default bucket
+        eprint("No model data bucket specified, using the default bucket") 
+        bucket = _get_default_s3_bucket()
+
     model_s3_path = _upload_s3(local_model_path=model_path, bucket=bucket, prefix=prefix)
     _deploy(role=execution_role_arn,
-            image=image,
+            image_url=image_url,
             app_name=app_name,
             model_s3_path=model_s3_path,
             run_id=run_id,
             region_name=region_name)
-
 
 def run_local(model_path, run_id=None, port=5000, image=DEFAULT_IMAGE_NAME):
     """
@@ -212,6 +222,47 @@ def _make_tarfile(output_filename, source_dir):
         for f in os.listdir(source_dir):
             tar.add(os.path.join(source_dir, f), arcname=f)
 
+def _get_account_id():
+    sess = boto3.Session()
+    sts_client = sess.client("sts")
+    identity_info = sts_client.get_caller_identity()
+    account_id = identity_info["Account"]
+    return account_id 
+
+def _get_assumed_role_arn():
+    """
+    :return: ARN of the user's current IAM role 
+    """
+    sess = boto3.Session()
+    sts_client = sess.client("sts")
+    identity_info = sts_client.get_caller_identity()
+    sts_arn = identity_info["Arn"]
+    role_name = sts_arn.split("/")[1]
+    iam_client = sess.client("iam")
+    role_response = iam_client.get_role(RoleName=role_name)
+    return role_response["Role"]["Arn"]
+
+def _get_default_s3_bucket():
+    # create bucket if it does not exist
+    account_id = _get_account_id(sess)
+    bucket_name = "{pfx}-{aid}".format(pfx=DEFAULT_BUCKET_NAME_PREFIX, aid=account_id)
+    sess = boto3.Session()
+    s3 = sess.client('s3')
+    response = s3.list_buckets()
+    buckets = [b['Name'] for b in response["Buckets"]]
+    if not bucket_name in buckets:
+        print("Default bucket `%s` not found. Creating..." % bucket_name)
+        response = s3.create_bucket(
+            ACL='bucket-owner-full-control',
+            Bucket=bucket_name,
+            CreateBucketConfiguration={
+                'LocationConstraint': _get_region(),
+            },
+        )
+        print(response)
+    else:
+        print("Default bucket `%s` already exists. Skipping creation." % bucket_name)
+    return bucket_name
 
 def _upload_s3(local_model_path, bucket, prefix):
     """
@@ -236,28 +287,24 @@ def _upload_s3(local_model_path, bucket, prefix):
                 Tagging={'TagSet': [{'Key': 'SageMaker', 'Value': 'true'}, ]}
             )
             eprint('tag response', response)
-            return '{}/{}/{}'.format(s3.meta.endpoint_url, bucket, key)
+            return os.path.join(s3.meta.endpoint_url, bucket, key)
 
-
-def _deploy(role, image, app_name, model_s3_path, run_id, region_name):
+def _deploy(role, image_url, app_name, model_s3_path, run_id, region_name):
     """
     Deploy model on sagemaker.
     :param role: SageMaker execution ARN role
-    :param image: Name of the Docker image the model is being deployed into
+    :param image_url: URL of the ECR-hosted docker image the model is being deployed into
     :param app_name: Name of the deployed app
     :param model_s3_path: s3 path where we stored the model artifacts
     :param run_id: RunId that generated this model
     """
     sage_client = boto3.client('sagemaker', region_name=region_name)
-    ecr_client = boto3.client("ecr")
-    repository_conf = ecr_client.describe_repositories(
-        repositoryNames=[image])['repositories'][0]
     model_name = app_name + '-model'
     model_response = sage_client.create_model(
         ModelName=model_name,
         PrimaryContainer={
             'ContainerHostname': 'mlflow-serve-%s' % model_name,
-            'Image': repository_conf["repositoryUri"],
+            'Image': image_url, 
             'ModelDataUrl': model_s3_path,
             'Environment': {},
         },
