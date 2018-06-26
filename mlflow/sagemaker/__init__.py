@@ -163,7 +163,7 @@ def deploy(app_name, model_path, bucket=None, image_url=DEFAULT_IMAGE_URL, run_i
     if bucket is None:
         # Attempt to create a default bucket
         eprint("No model data bucket specified, using the default bucket") 
-        bucket = _get_default_s3_bucket()
+        bucket = _get_default_s3_bucket(region_name)
 
     model_s3_path = _upload_s3(local_model_path=model_path, bucket=bucket, prefix=prefix)
     _deploy(role=execution_role_arn,
@@ -242,7 +242,7 @@ def _get_assumed_role_arn():
     role_response = iam_client.get_role(RoleName=role_name)
     return role_response["Role"]["Arn"]
 
-def _get_default_s3_bucket():
+def _get_default_s3_bucket(region_name):
     # create bucket if it does not exist
     account_id = _get_account_id()
     bucket_name = "{pfx}-{aid}".format(pfx=DEFAULT_BUCKET_NAME_PREFIX, aid=account_id)
@@ -256,7 +256,7 @@ def _get_default_s3_bucket():
             ACL='bucket-owner-full-control',
             Bucket=bucket_name,
             CreateBucketConfiguration={
-                'LocationConstraint': _get_region(),
+                'LocationConstraint': region_name, 
             },
         )
         print(response)
