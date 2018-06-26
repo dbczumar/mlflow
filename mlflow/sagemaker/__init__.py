@@ -244,7 +244,7 @@ def _get_assumed_role_arn():
 
 def _get_default_s3_bucket():
     # create bucket if it does not exist
-    account_id = _get_account_id(sess)
+    account_id = _get_account_id()
     bucket_name = "{pfx}-{aid}".format(pfx=DEFAULT_BUCKET_NAME_PREFIX, aid=account_id)
     sess = boto3.Session()
     s3 = sess.client('s3')
