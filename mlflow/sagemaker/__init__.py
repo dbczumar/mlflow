@@ -18,7 +18,7 @@ DEFAULT_IMAGE_NAME = "mlflow_sage"
 PYFUNC_IMAGE_URL = "707343435239.dkr.ecr.us-west-2.amazonaws.com/mlflow-pyfunc-test:latest"
 DEFAULT_IMAGE_URL = PYFUNC_IMAGE_URL
 
-DEFAULT_BUCKET_NAME_PREFIX = "mlflow-sagemaker" 
+DEFAULT_BUCKET_NAME_PREFIX = "mlflow-sagemaker"
 
 _DOCKERFILE_TEMPLATE = """
 # Build an image that can serve pyfunc model in SageMaker
@@ -164,6 +164,9 @@ def deploy(app_name, model_path, bucket=None, image_url=DEFAULT_IMAGE_URL, run_i
         # Attempt to create a default bucket
         eprint("No model data bucket specified, using the default bucket") 
         bucket = _get_default_s3_bucket(region_name)
+
+    if execution_role_arn is None:
+        execution_role_arn = _get_assumed_role_arn()
 
     model_s3_path = _upload_s3(local_model_path=model_path, bucket=bucket, prefix=prefix)
     _deploy(role=execution_role_arn,
