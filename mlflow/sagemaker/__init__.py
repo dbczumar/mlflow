@@ -247,9 +247,10 @@ def _get_assumed_role_arn():
 
 def _get_default_s3_bucket(region_name):
     # create bucket if it does not exist
-    account_id = _get_account_id()
-    bucket_name = "{pfx}-{aid}".format(pfx=DEFAULT_BUCKET_NAME_PREFIX, aid=account_id)
     sess = boto3.Session()
+    account_id = _get_account_id()
+    region_name = sess.region_name or "us-west-2"
+    bucket_name = "{pfx}-{rn}-{aid}".format(pfx=DEFAULT_BUCKET_NAME_PREFIX, rn=region_name, aid=account_id)
     s3 = sess.client('s3')
     response = s3.list_buckets()
     buckets = [b['Name'] for b in response["Buckets"]]
