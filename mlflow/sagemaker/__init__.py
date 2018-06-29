@@ -255,7 +255,7 @@ def _get_default_s3_bucket(region_name):
     response = s3.list_buckets()
     buckets = [b['Name'] for b in response["Buckets"]]
     if not bucket_name in buckets:
-        print("Default bucket `%s` not found. Creating..." % bucket_name)
+        eprint("Default bucket `%s` not found. Creating..." % bucket_name)
         response = s3.create_bucket(
             ACL='bucket-owner-full-control',
             Bucket=bucket_name,
@@ -263,9 +263,9 @@ def _get_default_s3_bucket(region_name):
                 'LocationConstraint': region_name, 
             },
         )
-        print(response)
+        eprint(response)
     else:
-        print("Default bucket `%s` already exists. Skipping creation." % bucket_name)
+        eprint("Default bucket `%s` already exists. Skipping creation." % bucket_name)
     return bucket_name
 
 def _upload_s3(local_model_path, bucket, prefix):
