@@ -158,7 +158,7 @@ def deploy(app_name, model_path, bucket=None, image_url=DEFAULT_IMAGE_URL, run_i
     if run_id:
         model_path = _get_model_log_dir(model_path, run_id)
         prefix = os.path.join(run_id, prefix)
-        run_id = _check_compatible(model_path)
+    run_id = _check_compatible(model_path)
 
     if bucket is None:
         # Attempt to create a default bucket
@@ -291,7 +291,7 @@ def _upload_s3(local_model_path, bucket, prefix):
                 Tagging={'TagSet': [{'Key': 'SageMaker', 'Value': 'true'}, ]}
             )
             eprint('tag response', response)
-            return os.path.join(s3.meta.endpoint_url, bucket, key)
+            return "/".join(map(lambda x: str(x).rstrip('/'), [s3.meta.endpoint_url, bucket, key]))
 
 def _deploy(role, image_url, app_name, model_s3_path, run_id, region_name):
     """
