@@ -19,6 +19,8 @@ import mlflow.version
 from mlflow import pyfunc, mleap
 from mlflow.models import Model
 from mlflow.tracking.utils import _get_model_log_dir
+from mlflow.utils.docker import get_template, push_image
+from mlflow.utils.docker import build_image as build_image_from_path 
 from mlflow.utils.logging_utils import eprint
 from mlflow.utils.file_utils import TempDir, _copy_project
 from mlflow.sagemaker.container import SUPPORTED_FLAVORS as SUPPORTED_DEPLOYMENT_FLAVORS
@@ -42,42 +44,6 @@ DEFAULT_BUCKET_NAME_PREFIX = "mlflow-sagemaker"
 
 DEFAULT_SAGEMAKER_INSTANCE_TYPE = "ml.m4.xlarge"
 DEFAULT_SAGEMAKER_INSTANCE_COUNT = 1
-
-_DOCKERFILE_TEMPLATE = """
-# Build an image that can serve pyfunc model in SageMaker
-FROM ubuntu:16.04
-
-RUN apt-get -y update && apt-get install -y --no-install-recommends \
-         wget \
-         curl \
-         nginx \
-         ca-certificates \
-         bzip2 \
-         build-essential \
-         cmake \
-         openjdk-8-jdk \
-         git-core \
-         maven \
-    && rm -rf /var/lib/apt/lists/*
-
-# Download and setup miniconda
-RUN curl https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh >> miniconda.sh
-RUN bash ./miniconda.sh -b -p /miniconda; rm ./miniconda.sh;
-ENV PATH="/miniconda/bin:${PATH}"
-ENV JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
-
-RUN conda install -c anaconda gunicorn;\
-    conda install -c anaconda gevent;\
-
-%s
-
-# Set up the program in the image
-WORKDIR /opt/mlflow
-
-# start mlflow scoring
-ENTRYPOINT ["python", "-c", "import sys; from mlflow.sagemaker import container as C; \
-C._init(sys.argv[1])"]
-"""
 
 
 def _docker_ignore(mlflow_root):
@@ -114,33 +80,12 @@ def build_image(name=DEFAULT_IMAGE_NAME, mlflow_home=None):
     :param name: image name
     """
     with TempDir() as tmp:
-        install_mlflow = "RUN pip install mlflow=={version}".format(
-            version=mlflow.version.VERSION)
         cwd = tmp.path()
-        if mlflow_home:
-            mlflow_dir = _copy_project(
-                src_path=mlflow_home, dst_path=tmp.path())
-            install_mlflow = ("COPY {mlflow_dir} /opt/mlflow\n"
-                              "RUN cd /opt/mlflow/mlflow/java/scoring &&"
-                              " mvn --batch-mode package -DskipTests \n"
-                              "RUN pip install /opt/mlflow\n")
-            install_mlflow = install_mlflow.format(mlflow_dir=mlflow_dir)
-        else:
-            eprint("`mlflow_home` was not specified. The image will install"
-                   " MLflow from pip instead. As a result, the container will"
-                   " not support the MLeap flavor.")
-
-        with open(os.path.join(cwd, "Dockerfile"), "w") as f:
-            f.write(_DOCKERFILE_TEMPLATE % install_mlflow)
-        eprint("building docker image")
-        os.system('find {cwd}/'.format(cwd=cwd))
-        proc = Popen(["docker", "build", "-t", name, "-f", "Dockerfile", "."],
-                     cwd=cwd,
-                     stdout=PIPE,
-                     stderr=STDOUT,
-                     universal_newlines=True)
-        for x in iter(proc.stdout.readline, ""):
-            eprint(x, end='')
+        dockerfile_template = get_template(image_resources_path=cwd, mlflow_home=mlflow_home)
+        template_path = os.path.join(cwd, "Dockerfile")
+        with open(template_path, "w") as f:
+            f.write(dockerfile_template)
+        build_image_from_path(image_name=name, template_path=template_path)
 
 
 _full_template = "{account}.dkr.ecr.{region}.amazonaws.com/{image}:{version}"
@@ -174,9 +119,9 @@ def push_image_to_ecr(image=DEFAULT_IMAGE_NAME):
     docker_login_cmd = "$(aws ecr get-login --no-include-email)"
     docker_tag_cmd = "docker tag {image} {fullname}".format(
         image=image, fullname=fullname)
-    docker_push_cmd = "docker push {}".format(fullname)
-    cmd = ";\n".join([docker_login_cmd, docker_tag_cmd, docker_push_cmd])
+    cmd = ";\n".join([docker_login_cmd, docker_tag_cmd])
     os.system(cmd)
+    push_image(image_uri=fullname)
 
 
 def deploy(app_name, model_path, execution_role_arn=None, bucket=None, run_id=None,
