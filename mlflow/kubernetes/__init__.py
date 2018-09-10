@@ -117,7 +117,7 @@ def build_model_server(model_path, run_id=None, model_name=None, pyfunc_image_ur
         image_name = "mlflow-model-{model_name}".format(model_name=model_name)
         image_uri = "/".join([target_registry_uri.strip("/"), image_name])
         
-        # build_image(image_name=image_uri, template_path=template_path)
+        build_image(image_name=image_uri, template_path=template_path)
         if push_image:
             push_docker_image(image_uri=image_uri)
 
