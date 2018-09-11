@@ -204,9 +204,11 @@ def _get_image_template(image_resources_path, model_path, run_id=None, pyfunc_ur
         model_resource_path = _copy_file_or_tree(
                 src=model_path, dst=image_resources_path, dst_dir="model")
          
-
+    container_model_path = "/opt/ml/model"
+    dockerfile_cmds.append("RUN rm -rf {container_model_path}".format(
+        container_model_path=container_model_path))
     dockerfile_cmds.append("COPY {host_model_path} {container_model_path}".format(
-        host_model_path=model_resource_path, container_model_path="/opt/ml/model")) 
+        host_model_path=model_resource_path, container_model_path=container_model_path)) 
     return "\n".join(dockerfile_cmds)
 
     
