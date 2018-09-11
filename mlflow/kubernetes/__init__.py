@@ -11,6 +11,16 @@ from mlflow.utils.docker import push_image as push_docker_image
 MODEL_SERVER_INTERNAL_PORT = 8080
 DEFAULT_SERVICE_PORT = 5001
 
+SERVICE_TYPE_LOAD_BALANCER = "LoadBalancer"
+SERVICE_TYPE_NODE_PORT = "NodePort"
+SERVICE_TYPE_CLUSTER_IP = "ClusterIP"
+
+SERVICE_TYPES = [
+    SERVICE_TYPE_LOAD_BALANCER,
+    SERVICE_TYPE_NODE_PORT,
+    SERVICE_TYPE_CLUSTER_IP
+]
+
 SERVER_CONFIG_SUBPATH = "server_config.yaml"
 
 DEPLOYMENT_CONFIG_TEMPLATE = """\
@@ -44,7 +54,7 @@ kind: Service
 metadata:
   name: {model_name}-server
 spec:
-  type: NodePort
+  type: {service_type}
   selector:
     app: {model_name} 
   ports:
@@ -111,7 +121,8 @@ def run_model_server(server_path, replicas=1):
 
 def build_model_server(model_path, run_id=None, model_name=None, pyfunc_image_uri=None, 
                        mlflow_home=None, target_registry_uri=None, push_image=False, 
-                       image_pull_secret=None, service_port=None, output_directory=None):
+                       image_pull_secret=None, service_type=SERVICE_TYPE_LOAD_BALANCER, 
+                       service_port=None, output_directory=None):
     """
     :param model_path: The path to the Mlflow model for which to build a server.
                        If `run_id` is not `None`, this should be an absolute path. Otherwise,
@@ -138,6 +149,11 @@ def build_model_server(model_path, run_id=None, model_name=None, pyfunc_image_ur
                        pushed to a registry.
     :param image_pull_secret: The name of a Kubernetes secret that will be used to pull images
                               from the Docker registry specified by `target_registry_uri`.
+    :param service_type: The type of Kubernetes service to use for exposing the model. This must be
+                         one of the values specified `mlflow.kubernetes.SERVICE_TYPES`, which
+                         correspond to Kubernetes service types outlined here:
+                         https://kubernetes.io/docs/concepts/services-networking/service/
+                         #publishing-services-service-types.
     :param service_port: The cluster node port on which to expose the Kubernetes service for model 
                          serving. This value will be used for the `port` field of the Kubernetes
                          service spec (see mlflow.kubernetes.SERVICE_CONFIG_TEMPLATE for reference).
@@ -147,6 +163,12 @@ def build_model_server(model_path, run_id=None, model_name=None, pyfunc_image_ur
                              model server. If `None`, the working directory from which this function 
                              was invoked will be used.
     """
+    if service_type not in SERVICE_TYPES:
+        raise Exception("The specified `service_type` value: `{specified_service_type}` is not"
+                         " supported. the value must be one of: {supported_service_types}".format(
+                             specified_service_type=service_type,
+                             supported_service_types=SERVICE_TYPES)) 
+
     with TempDir() as tmp:
         cwd = tmp.path()
         dockerfile_template = _get_image_template(image_resources_path=cwd, 
@@ -189,8 +211,9 @@ def build_model_server(model_path, run_id=None, model_name=None, pyfunc_image_ur
         f.write(deployment_config)
 
     service_port = service_port if service_port is not None else DEFAULT_SERVICE_PORT 
-    service_config = _get_service_config(model_name=model_name, service_port=service_port,
-                internal_port=MODEL_SERVER_INTERNAL_PORT)
+    service_config = _get_service_config(
+            model_name=model_name, service_type=service_type, 
+            service_port=service_port, internal_port=MODEL_SERVER_INTERNAL_PORT)
     with open(service_config_fullpath, "w") as f:
         f.write(service_config)
 
@@ -233,9 +256,10 @@ def _get_deployment_config(model_name, image_uri, internal_port):
             internal_port=internal_port)
 
 
-def _get_service_config(model_name, service_port, internal_port):
-    return SERVICE_CONFIG_TEMPLATE.format(model_name=model_name, service_port=service_port, 
-            internal_port=internal_port)
+def _get_service_config(model_name, service_type, service_port, internal_port):
+    return SERVICE_CONFIG_TEMPLATE.format(
+            model_name=model_name, service_type=service_type, 
+            service_port=service_port, internal_port=internal_port)
 
 
 def _add_image_pull_secret(deployment_config, secret_name):

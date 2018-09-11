@@ -54,16 +54,23 @@ def run_model_server(server_path, replicas):
                     " service spec (see mlflow.kubernetes.SERVICE_CONFIG_TEMPLATE for reference)."
                     " If `None`, the port defined by `mlflow.kubernetes.DEFAULT_SERVICE_PORT`"
                     " will be used."))
+@click.option("--service-type", default=mlflow.kubernetes.SERVICE_TYPE_LOAD_BALANCER,
+              help=("The type of Kubernetes service to use for exposing the model. This must be"
+                     " one of the following values: {supported_service_types}, which"
+                     " correspond to Kubernetes service types outlined here:"
+                     " https://kubernetes.io/docs/concepts/services-networking/service/"
+                     "#publishing-services-service-types.".format(
+                         supported_service_types=mlflow.kubernetes.SERVICE_TYPES)))
 @click.option("--output-directory", "-o", default=None,
               help=("The directory to which to write configuration files for the model server."
                     " If `None`, the working directory from which this function was invoked will"
                     " be used."))
 def build_model_server(model_path, run_id, model_name, pyfunc_image_uri, mlflow_home, 
-                       target_registry_uri, push_image, image_pull_secret, service_port, 
-                       output_directory):
+                       target_registry_uri, push_image, image_pull_secret, service_type,
+                       service_port, output_directory):
     mlflow.kubernetes.build_model_server(
             model_path=model_path, run_id=run_id, model_name=model_name, 
             pyfunc_image_uri=pyfunc_image_uri, mlflow_home=mlflow_home, 
             target_registry_uri=target_registry_uri, push_image=push_image,
-            image_pull_secret=image_pull_secret, service_port=service_port, 
-            output_directory=output_directory) 
+            image_pull_secret=image_pull_secret, service_type=service_type, 
+            service_port=service_port, output_directory=output_directory) 
