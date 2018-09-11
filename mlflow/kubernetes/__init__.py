@@ -109,9 +109,32 @@ def run_model_server(server_path, num_replicas=1):
 
 
 def build_model_server(model_path, run_id=None, model_name=None, pyfunc_image_uri=None, 
-                       target_registry_uri=None, push_image=False, mlflow_home=None, 
-                       service_port=None, output_directory=None):
+                       mlflow_home=None, target_registry_uri=None, push_image=False, 
+                       image_pull_secret=None, service_port=None, output_directory=None):
     """
+    :param model_name: The name of the model; this will be used for naming within the 
+                       Kubernetes deployment and service configurations.
+    :param pyfunc_image_uri: URI of an `mlflow-pyfunc` base Docker image from which the model server 
+                             Docker image will be built. If `None`, the base image will be
+                             built from scratch.
+    :param mlflow_home: Path to the Mlflow root directory. This will only be used if the container
+                        base image is being built from scratch (if `pyfunc_image_uri` is `None`).
+                        If `mlflow_home` is `None`, the base image will install Mlflow from pip
+                        during the build. Otherwise, it will install Mlflow from the specified
+                        directory.
+    :param target_registry_uri: The URI of the docker registry that Kubernetes will use to
+                                pull the model server Docker image. If `None`, the default
+                                docker registry (docker.io) will be used. Otherwise, the model 
+                                server image will be tagged using the specified registry uri.
+    :param push_image: If `True`, the model server Docker image will be pushed to the registry
+                       specified by `target_registry_uri` (or docker.io if `target_registry_uri` is
+                       `None`). If `False`, the model server Docker image will not be
+                       pushed to a registry.
+    :param image_pull_secret: The name of a Kubernetes secret that will be used to pull images
+                              from the Docker registry specified by `target_registry_uri`.
+    :param service_port: The cluster node port on which to expose the Kubernetes service for model 
+                         serving. This value will be used for the `port` field of the Kubernetes
+                         service spec (see mlflow.kubernetes.SERVICE_CONFIG_TEMPLATE for reference).
     :param output_directory: The directory to which to write configuration files and scripts
                              for the model server. If `None`, the working directory
                              from which this function was invoked will be used.
@@ -131,9 +154,9 @@ def build_model_server(model_path, run_id=None, model_name=None, pyfunc_image_ur
         image_name = "mlflow-model-{model_name}".format(model_name=model_name)
         image_uri = "/".join([target_registry_uri.strip("/"), image_name])
         
-        build_image(image_name=image_uri, template_path=template_path)
-        if push_image:
-            push_docker_image(image_uri=image_uri)
+        # build_image(image_name=image_uri, template_path=template_path)
+        # if push_image:
+        #     push_docker_image(image_uri=image_uri)
 
     output_directory = output_directory if output_directory is not None else os.getcwd()
     os.makedirs(output_directory)
@@ -143,15 +166,18 @@ def build_model_server(model_path, run_id=None, model_name=None, pyfunc_image_ur
     deployment_config_fullpath = os.path.join(output_directory, deployment_config_subpath)
     service_config_fullpath = os.path.join(output_directory, service_config_subpath)
 
+    deployment_config = _get_deployment_config(model_name=model_name, image_uri=image_uri, 
+            internal_port=MODEL_SERVER_INTERNAL_PORT)
+    if image_pull_secret is not None:
+        deployment_config = _add_image_pull_secret(
+                deployment_config=deployment_config, secret_name=image_pull_secret)
     with open(deployment_config_fullpath, "w") as f:
-        deployment_config = _get_deployment_config(model_name=model_name, image_uri=image_uri, 
-                internal_port=MODEL_SERVER_INTERNAL_PORT)
         f.write(deployment_config)
 
     service_port = service_port if service_port is not None else DEFAULT_SERVICE_PORT 
-    with open(service_config_fullpath, "w") as f:
-        service_config = _get_service_config(model_name=model_name, service_port=service_port,
+    service_config = _get_service_config(model_name=model_name, service_port=service_port,
                 internal_port=MODEL_SERVER_INTERNAL_PORT)
+    with open(service_config_fullpath, "w") as f:
         f.write(service_config)
 
     model_server_config_fullpath = os.path.join(output_directory, SERVER_CONFIG_SUBPATH)
@@ -193,6 +219,19 @@ def _get_deployment_config(model_name, image_uri, internal_port):
 def _get_service_config(model_name, service_port, internal_port):
     return SERVICE_CONFIG_TEMPLATE.format(model_name=model_name, service_port=service_port, 
             internal_port=internal_port)
+
+
+def _add_image_pull_secret(deployment_config, secret_name):
+    """
+    :param deployment_config: The deployment configuration string.
+    :param secret_name: The name of the secret to add. 
+
+    :return: The deployment configuration with the specified image pull secret.
+    """
+    parsed_config = yaml.safe_load(deployment_config)
+    container_template_spec = parsed_config["spec"]["template"]["spec"]
+    container_template_spec["imagePullSecrets"] = [{"name" : secret_name}]
+    return yaml.dump(parsed_config, default_flow_style=False)
 
 
 def _load_kubernetes_config(config_path):
