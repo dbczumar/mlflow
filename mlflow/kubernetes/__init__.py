@@ -112,6 +112,10 @@ def build_model_server(model_path, run_id=None, model_name=None, pyfunc_image_ur
                        mlflow_home=None, target_registry_uri=None, push_image=False, 
                        image_pull_secret=None, service_port=None, output_directory=None):
     """
+    :param model_path: The path to the Mlflow model for which to build a server.
+                       If `run_id` is not `None`, this should be an absolute path. Otherwise,
+                       it should be a run-relative path.
+    :param run_id: The run id of the Mlflow model for which to build a server.
     :param model_name: The name of the model; this will be used for naming within the 
                        Kubernetes deployment and service configurations.
     :param pyfunc_image_uri: URI of an `mlflow-pyfunc` base Docker image from which the model server 
@@ -154,9 +158,9 @@ def build_model_server(model_path, run_id=None, model_name=None, pyfunc_image_ur
         image_name = "mlflow-model-{model_name}".format(model_name=model_name)
         image_uri = "/".join([target_registry_uri.strip("/"), image_name])
         
-        # build_image(image_name=image_uri, template_path=template_path)
-        # if push_image:
-        #     push_docker_image(image_uri=image_uri)
+        build_image(image_name=image_uri, template_path=template_path)
+        if push_image:
+            push_docker_image(image_uri=image_uri)
 
     output_directory = output_directory if output_directory is not None else os.getcwd()
     os.makedirs(output_directory)
