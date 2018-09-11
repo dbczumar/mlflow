@@ -67,10 +67,10 @@ spec:
 
 class ModelServerConfig:
 
-    def __init__(self, deployment_config_subpath, service_config_subpath):
+    def __init__(self, image_uri, deployment_config_subpath, service_config_subpath):
         self.deployment_config_subpath = deployment_config_subpath
         self.service_config_subpath = service_config_subpath
-
+        self.image_uri = image_uri
         
     def to_yaml(self, stream=None):
         return yaml.safe_dump(self.__dict__, stream=stream, default_flow_style=False)
@@ -218,8 +218,9 @@ def build_model_server(model_path, run_id=None, model_name=None, pyfunc_image_ur
         f.write(service_config)
 
     model_server_config_fullpath = os.path.join(output_directory, SERVER_CONFIG_SUBPATH)
-    model_server_config = ModelServerConfig(deployment_config_subpath=deployment_config_subpath,
-                                             service_config_subpath=service_config_subpath)
+    model_server_config = ModelServerConfig(image_uri=image_uri,
+                                            deployment_config_subpath=deployment_config_subpath,
+                                            service_config_subpath=service_config_subpath,
     model_server_config.save(path=model_server_config_fullpath)
     print("Wrote model server files to: {output_path}".format(output_path=output_directory))
 
