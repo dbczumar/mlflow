@@ -110,14 +110,15 @@ def run_model_server(server_path, num_replicas=1):
 
 def build_model_server(model_path, run_id=None, model_name=None, pyfunc_image_uri=None, 
                        mlflow_home=None, target_registry_uri=None, push_image=False, 
-                       image_pull_secret=None, service_port=None, output_directory=None):
+                       image_pull_secret=None, port=None, output_directory=None):
     """
     :param model_path: The path to the Mlflow model for which to build a server.
                        If `run_id` is not `None`, this should be an absolute path. Otherwise,
                        it should be a run-relative path.
     :param run_id: The run id of the Mlflow model for which to build a server.
     :param model_name: The name of the model; this will be used for naming within the 
-                       Kubernetes deployment and service configurations.
+                       Kubernetes deployment and service configurations. If `None`,
+                       a name will be created using the specified model path and run id.
     :param pyfunc_image_uri: URI of an `mlflow-pyfunc` base Docker image from which the model server 
                              Docker image will be built. If `None`, the base image will be
                              built from scratch.
@@ -136,12 +137,14 @@ def build_model_server(model_path, run_id=None, model_name=None, pyfunc_image_ur
                        pushed to a registry.
     :param image_pull_secret: The name of a Kubernetes secret that will be used to pull images
                               from the Docker registry specified by `target_registry_uri`.
-    :param service_port: The cluster node port on which to expose the Kubernetes service for model 
-                         serving. This value will be used for the `port` field of the Kubernetes
-                         service spec (see mlflow.kubernetes.SERVICE_CONFIG_TEMPLATE for reference).
-    :param output_directory: The directory to which to write configuration files and scripts
-                             for the model server. If `None`, the working directory
-                             from which this function was invoked will be used.
+    :param port: The cluster node port on which to expose the Kubernetes service for model 
+                 serving. This value will be used for the `port` field of the Kubernetes
+                 service spec (see mlflow.kubernetes.SERVICE_CONFIG_TEMPLATE for reference).
+                 If `None`, the port defined by `mlflow.kubernetes.DEFAULT_SERVICE_PORT`
+                 will be used.
+    :param output_directory: The directory to which to write configuration files for the model 
+                             model server. If `None`, the working directory from which this function 
+                             was invoked will be used.
     """
     with TempDir() as tmp:
         cwd = tmp.path()
@@ -178,7 +181,7 @@ def build_model_server(model_path, run_id=None, model_name=None, pyfunc_image_ur
     with open(deployment_config_fullpath, "w") as f:
         f.write(deployment_config)
 
-    service_port = service_port if service_port is not None else DEFAULT_SERVICE_PORT 
+    service_port = port if port is not None else DEFAULT_SERVICE_PORT 
     service_config = _get_service_config(model_name=model_name, service_port=service_port,
                 internal_port=MODEL_SERVER_INTERNAL_PORT)
     with open(service_config_fullpath, "w") as f:
