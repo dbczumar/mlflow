@@ -12,6 +12,7 @@ import mlflow.data
 import mlflow.experiments
 import mlflow.pyfunc.cli
 import mlflow.sagemaker.cli
+import mlflow.kubernetes.cli
 
 from mlflow.entities.experiment import Experiment
 from mlflow.utils.process import ShellCommandException
@@ -196,6 +197,7 @@ cli.add_command(mlflow.sagemaker.cli.commands)
 cli.add_command(mlflow.azureml.cli.commands)
 cli.add_command(mlflow.experiments.commands)
 cli.add_command(mlflow.store.cli.commands)
+cli.add_command(mlflow.kubernetes.cli.commands)
 
 if __name__ == '__main__':
     cli()
