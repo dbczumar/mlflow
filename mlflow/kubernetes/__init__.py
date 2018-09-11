@@ -159,12 +159,18 @@ def build_model_server(model_path, run_id=None, model_name=None, pyfunc_image_ur
         if model_name is None:
             model_name = _get_model_name(model_path=model_path, run_id=run_id)
         image_name = "mlflow-model-{model_name}".format(model_name=model_name)
-        image_uri = "/".join([target_registry_uri.strip("/"), image_name])
+        if target_registry_uri is not None:
+            image_uri = "/".join([target_registry_uri.strip("/"), image_name])
+        else:
+            image_uri = image_name
         
         build_image(image_name=image_uri, template_path=template_path)
         if push_image:
             push_docker_image(image_uri=image_uri)
 
+    if output_directory is None:
+        output_directory = os.path.join(
+                os.getcwd(), "{model_name}-server".format(model_name=model_name))
     output_directory = output_directory if output_directory is not None else os.getcwd()
     os.makedirs(output_directory)
 
@@ -191,6 +197,7 @@ def build_model_server(model_path, run_id=None, model_name=None, pyfunc_image_ur
     model_server_config = ModelServerConfig(deployment_config_subpath=deployment_config_subpath,
                                              service_config_subpath=service_config_subpath)
     model_server_config.save(path=model_server_config_fullpath)
+    print("Wrote model server files to: {output_path}".format(output_path=output_directory))
 
         
 def _get_image_template(image_resources_path, model_path, run_id=None, pyfunc_uri=None, 
