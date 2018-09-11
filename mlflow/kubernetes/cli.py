@@ -12,8 +12,8 @@ def commands():
               help=("The path to the model server directory output by" 
                     "`mlflow.kubernetes.build_model_server`."))
 @click.option("--replicas", "-r", help="The number of model replicas to serve.", default=1)
-def run_model_server(server_path, num_replicas):
-    mlflow.kubernetes.run_model_server(server_path, num_replicas)
+def run_model_server(server_path, replicas):
+    mlflow.kubernetes.run_model_server(server_path=server_path, replicas=replicas)
 
 @commands.command("build-server")
 @click.option("--model-path", "-m", required=True, 
@@ -48,7 +48,7 @@ def run_model_server(server_path, num_replicas):
 @click.option("--image-pull-secret", "-s", default=None,
               help=("The name of a Kubernetes secret that will be used to pull images from the "
                     " Docker registry specified by `target_registry_uri`"))
-@click.option("--port", default=None,
+@click.option("--service-port", default=None,
               help=("The cluster node port on which to expose the Kubernetes service for model"
                     " serving. This value will be used for the `port` field of the Kubernetes"
                     " service spec (see mlflow.kubernetes.SERVICE_CONFIG_TEMPLATE for reference)."
@@ -59,10 +59,11 @@ def run_model_server(server_path, num_replicas):
                     " If `None`, the working directory from which this function was invoked will"
                     " be used."))
 def build_model_server(model_path, run_id, model_name, pyfunc_image_uri, mlflow_home, 
-                       target_registry_uri, push_image, image_pull_secret, port, output_directory):
+                       target_registry_uri, push_image, image_pull_secret, service_port, 
+                       output_directory):
     mlflow.kubernetes.build_model_server(
             model_path=model_path, run_id=run_id, model_name=model_name, 
             pyfunc_image_uri=pyfunc_image_uri, mlflow_home=mlflow_home, 
             target_registry_uri=target_registry_uri, push_image=push_image,
-            image_pull_secret=image_pull_secret, port=port, 
+            image_pull_secret=image_pull_secret, service_port=service_port, 
             output_directory=output_directory) 
