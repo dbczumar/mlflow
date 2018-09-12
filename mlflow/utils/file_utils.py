@@ -302,9 +302,11 @@ def _copy_project(src_path, dst_path=""):
 
 
 def _copy_file_or_tree(src, dst, dst_dir):
-    name = os.path.join(dst_dir, os.path.basename(os.path.abspath(src)))
     if dst_dir:
         os.mkdir(os.path.join(dst, dst_dir))
+    else:
+        dst_dir = "."
+    name = os.path.join(dst_dir, os.path.basename(os.path.abspath(src)))
     if os.path.isfile(src):
         shutil.copy(src=src, dst=os.path.join(dst, name))
     else:
