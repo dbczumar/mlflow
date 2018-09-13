@@ -31,15 +31,20 @@ def commands():
                     " service spec (see mlflow.kubernetes.SERVICE_CONFIG_TEMPLATE for reference)."
                     " If `None`, the port defined by `mlflow.kubernetes.DEFAULT_SERVICE_PORT`"
                     " will be used."))
+@click.option("--mode", "-m", default=mlflow.kubernetes.DEPLOYMENT_MODE_CREATE,
+              help=("The mode in which to deploy the application."
+                    " Must be one of the following: {mds}".format(
+                        mds=", ".join(mlflow.kubernetes.DEPLOYMENT_MODES))))
 @click.option("--log-directory", "-l", default=None,
               help=("If specified, Kubernetes configuration files generated during deployment"
                     " will be logged to this directory. The directory must not already exist."))
-def deploy(app_name, config_path, replicas, image_pull_secret, service_type, service_port, 
+def deploy(app_name, config_path, replicas, image_pull_secret, service_type, service_port, mode,
            log_directory):
     mlflow.kubernetes.deploy(
             app_name=app_name, config_path=config_path, replicas=replicas, 
             image_pull_secret=image_pull_secret, service_type=service_type, 
-            service_port=service_port, log_directory=log_directory)
+            service_port=service_port, mode=mode, log_directory=log_directory)
+
 
 @commands.command("build-app")
 @click.option("--model-path", "-m", required=True, 
@@ -57,11 +62,14 @@ def deploy(app_name, config_path, replicas, image_pull_secret, service_type, ser
                      " If `mlflow_home` is `None`, the base image will install Mlflow from pip"
                      " during the build. Otherwise, it will install Mlflow from the specified"
                      " directory."))
+@click.option("--image-name", "-i", default=None,
+              help=("The name to give the application's model server Docker image. This may"
+                    " include a version tag. If `None`, a name will be generated.")) 
 @click.option("--target-registry-uri", "-t", default=None,
-              help=("The URI of the docker registry that Kubernetes will use to pull the model"
-                     " server Docker image. If `None`, the default docker registry (docker.io) will"
-                     " be used. Otherwise, the model server image will be tagged using the"
-                     " specified registry uri."))
+              help=("The URI of the docker registry that Kubernetes will use to pull the" 
+                     " application's model server Docker image. If `None`, the default docker"
+                     " registry (docker.io) will be used. Otherwise, the model server image will be" 
+                     " tagged using the specified registry uri."))
 @click.option("--push-image", is_flag=True,
               help=("If specified, the model server Docker image will be pushed to the registry"
                     " specified by `target_registry_uri` (or docker.io if `target_registry_uri` is"
@@ -69,11 +77,10 @@ def deploy(app_name, config_path, replicas, image_pull_secret, service_type, ser
                     " a registry."))
 @click.option("--output-file", "-o", default=None,
               help=("The name of the configuration file containing application information."
-                    " If `None`, a name will be generated using the specified `model_path` and"
-                    " `run_id`."))
-def build_serving_application(model_path, run_id, pyfunc_image_uri, mlflow_home, 
+                    " If `None`, a name will be generated"))
+def build_serving_application(model_path, run_id, pyfunc_image_uri, mlflow_home, image_name, 
                               target_registry_uri, push_image, output_file):
     mlflow.kubernetes.build_serving_application(
             model_path=model_path, run_id=run_id, pyfunc_image_uri=pyfunc_image_uri, 
-            mlflow_home=mlflow_home, target_registry_uri=target_registry_uri, push_image=push_image,
-            output_file=output_file) 
+            mlflow_home=mlflow_home, image_name=image_name, target_registry_uri=target_registry_uri, 
+            push_image=push_image, output_file=output_file) 

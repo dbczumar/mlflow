@@ -1,12 +1,11 @@
 import os
 import yaml
-from subprocess import Popen 
 
 import mlflow
 from mlflow.tracking.utils import _get_model_log_dir
 from mlflow.utils.file_utils import TempDir, _copy_file_or_tree 
-from mlflow.utils.docker import get_template, build_image 
-from mlflow.utils.docker import push_image as push_docker_image
+from mlflow.utils.process import exec_cmd 
+import mlflow.utils.docker as docker_utils
 
 MODEL_SERVER_INTERNAL_PORT = 8080
 DEFAULT_SERVICE_PORT = 5001
@@ -19,6 +18,14 @@ SERVICE_TYPES = [
     SERVICE_TYPE_LOAD_BALANCER,
     SERVICE_TYPE_NODE_PORT,
     SERVICE_TYPE_CLUSTER_IP
+]
+
+DEPLOYMENT_MODE_CREATE = "create"
+DEPLOYMENT_MODE_REPLACE = "replace"
+
+DEPLOYMENT_MODES = [
+    DEPLOYMENT_MODE_CREATE,
+    DEPLOYMENT_MODE_REPLACE
 ]
 
 APPLICATION_CONFIG_SUBPATH = "server_config.yaml"
@@ -64,6 +71,20 @@ spec:
     targetPort: {internal_port} 
 """
 
+class DockerImage:
+
+    def __init__(self, name, tag=None):
+        self.name = name
+        self.tag = tag
+
+    def get_uri(self):
+        if self.tag is None:
+            return self.name
+        else:
+            return "{name}:{tag}".format(name=self.name, tag=self.tag)
+
+    def __str__(self):
+        return self.get_uri()
 
 class ApplicationConfig:
 
@@ -88,7 +109,8 @@ class ApplicationConfig:
 
 
 def deploy(app_name, config_path, replicas=1, image_pull_secret=None, 
-           service_type=SERVICE_TYPE_LOAD_BALANCER, service_port=None, log_directory=None):
+           service_type=SERVICE_TYPE_LOAD_BALANCER, service_port=None, mode=DEPLOYMENT_MODE_CREATE, 
+           log_directory=None):
     """
     :param app_name: The name to give the deployed application. This will be used for naming the 
                      Kubernetes services and deployments that are created.
@@ -107,6 +129,17 @@ def deploy(app_name, config_path, replicas=1, image_pull_secret=None,
                          service spec (see mlflow.kubernetes.SERVICE_CONFIG_TEMPLATE for reference).
                          If `None`, the port defined by `mlflow.kubernetes.DEFAULT_SERVICE_PORT`
                          will be used.
+    :param mode: the mode in which to deploy the application. must be one of the following:
+
+                 ``mlflow.kubernetes.DEPLOYMENT_MODE_CREATE``
+                     create an application with the specified name and model. this fails if an
+                     application of the same name already exists.
+
+                 ``mlflow.kubernetes.DEPLOYMENT_MODE_REPLACE``
+                     if an application of the specified name exists, its model replaced with
+                     the specified model. if no such application exists, it is created with the
+                     specified name and model.
+
     :param log_directory: If specified, Kubernetes configuration files generated during deployment
                           will be logged to this directory. The directory must not already exist. 
     """
@@ -114,7 +147,11 @@ def deploy(app_name, config_path, replicas=1, image_pull_secret=None,
         raise Exception("The specified `service_type` value: `{specified_service_type}` is not"
                          " supported. the value must be one of: {supported_service_types}".format(
                              specified_service_type=service_type,
-                             supported_service_types=SERVICE_TYPES)) 
+                             supported_service_types=SERVICE_TYPES))
+
+    if mode not in DEPLOYMENT_MODES:
+        raise ValueError("`mode` must be one of: {mds}".format(
+            mds=DEPLOYMENT_MODES))
 
     application_config = ApplicationConfig.load(config_path)
     with TempDir() as tmp:
@@ -140,26 +177,18 @@ def deploy(app_name, config_path, replicas=1, image_pull_secret=None,
         with open(service_config_path, "w") as f:
             f.write(service_config)
 
-        base_cmd = "kubectl apply -f {config_path}"
-        deployment_cmd = base_cmd.format(config_path=deployment_config_path)
-        service_cmd = base_cmd.format(config_path=service_config_path)
-
-        print(deployment_cmd)
-        deployment_proc = Popen(deployment_cmd.split(" "))
-        deployment_proc.wait()
-
-        print(service_cmd)
-        service_proc = Popen(service_cmd.split(" "))
-        service_proc.wait()
+        if mode == DEPLOYMENT_MODE_CREATE:
+            _create_app_deployment(deployment_config_path=deployment_config_path,
+                                   service_config_path=service_config_path)
+        elif mode == DEPLOYMENT_MODE_REPLACE:
+            _update_app_deployment(deployment_config_path=deployment_config_path,
+                                   service_config_path=service_config_path)
 
         deployment_config = _load_kubernetes_config(config_path=deployment_config_path)
         deployment_name = deployment_config["metadata"]["name"]
-        autoscale_cmd = ("kubectl scale deployment {deployment_name}" 
-                         " --replicas={num_replicas}").format(
-                                deployment_name=deployment_name, num_replicas=replicas)
-        print(autoscale_cmd)
-        autoscale_proc = Popen(autoscale_cmd.split(" "))
-        autoscale_proc.wait()
+        _execute_kubectl_command(
+                "kubectl scale deployment {deployment_name} --replicas={num_replicas}",
+                deployment_name=deployment_name, num_replicas=replicas, stream_output=True)
 
         if log_directory is not None:
             log_directory = os.path.abspath(log_directory)
@@ -170,8 +199,86 @@ def deploy(app_name, config_path, replicas=1, image_pull_secret=None,
             _copy_file_or_tree(service_config_path, log_directory, None)
 
 
+def _create_app_deployment(deployment_config_path, service_config_path):
+    base_cmd = "kubectl create -f {config_path}"
+    _execute_kubectl_command(
+            cmd_template=base_cmd, config_path=deployment_config_path, stream_output=True)
+    _execute_kubectl_command(
+            cmd_template=base_cmd, config_path=service_config_path, stream_output=True)
+
+
+def _update_app_deployment(deployment_config_path, service_config_path):
+    base_cmd = "kubectl apply -f {config_path}"
+    _execute_kubectl_command(
+            cmd_template=base_cmd, config_path=deployment_config_path, stream_output=True)
+    _execute_kubectl_command(
+            cmd_template=base_cmd, config_path=service_config_path, stream_output=True)
+
+
+# def _update_app_deployment(app_name, app_config, deployment_config_path, service_config_path):
+#     active_image = _get_active_container_image(app_name=app_name)
+#     active_image_uri = active_image.get_uri()
+#     if active_image is None or active_image.tag is None:
+#         new_version = 1
+#     else:
+#         new_version = int(active_image.tag) + 1
+#
+#     new_image_uri = DockerImage(name=active_image.name, tag=new_version).get_uri()
+#
+#     docker_utils.pull_image(active_image_uri)
+#     docker_utils.tag_image(image_uri=active_image_uri, tag_uri=new_image_uri)
+#     docker_utils.push_image(new_image_uri)
+#
+#     with open(deployment_config_path, "r") as f:
+#         deployment_config = f.read()
+#     _set_image_uri(deployment_config, new_image_uri)
+#     with open(deployment_config_path, "w") as f:
+#         f.write(deployment_config)
+#
+#     base_cmd = "kubectl apply -f {config_path}"
+#     _execute_kubectl_command(
+#             cmd_template=base_cmd, config_path=deployment_config_path, stream_output=True)
+#     _execute_kubectl_command(
+#             cmd_template=base_cmd, config_path=service_config_path, stream_output=True)
+
+
+def _get_active_container_image(app_name):
+    _, active_deployments, _ = _execute_kubectl_command(
+            "kubectl get deployment -o=yaml --export", stream_output=False)
+    active_deployments = yaml.load(active_deployments)["items"]
+    app_deployment = filter(
+            lambda deployment_info : deployment_info["metadata"]["name"] == app_name, 
+            active_deployments)
+    if len(app_deployment) == 0:
+        return None
+    elif len(app_deployment) > 1:
+        raise Exception("Unexpectedly found multiple deployments for the application named:" 
+                        " {app_name}".format(app_name=app_name))
+    else:
+        app_deployment = app_deployment[0]
+    
+    app_containers = app_deployment["spec"]["template"]["spec"]["containers"]
+    if len(app_containers) != 1:
+        raise Exception(
+                "Expected to find a single deployed container during update procedure." 
+                " Found {active_containers} instead.".format(active_containers=len(app_containers)))
+    active_image = app_containers[0]["image"]
+    active_image = active_image.split(":")
+    if len(active_image) > 1:
+        return DockerImage(name=active_image[0], tag=active_image[1])
+    else:
+        return DockerImage(name=active_image[0], tag=None)
+
+
+def _execute_kubectl_command(cmd_template, stream_output=False, **kwargs):
+    cmd = cmd_template.format(**kwargs)
+    print(cmd)
+    return exec_cmd(cmd=cmd.split(" "), stream_output=stream_output)
+
+
 def build_serving_application(model_path, run_id=None, pyfunc_image_uri=None, mlflow_home=None, 
-                              target_registry_uri=None, push_image=False, output_file=None):
+                              image_name=None, target_registry_uri=None, push_image=False, 
+                              output_file=None):
     """
     :param model_path: The path to the Mlflow model for which to build a server.
                        If `run_id` is not `None`, this should be an absolute path. Otherwise,
@@ -185,17 +292,18 @@ def build_serving_application(model_path, run_id=None, pyfunc_image_uri=None, ml
                         If `mlflow_home` is `None`, the base image will install Mlflow from pip
                         during the build. Otherwise, it will install Mlflow from the specified
                         directory.
+    :param image_name: The name to give the application's model server Docker image. This may
+                       include a version tag. If `None`, a name will be generated. 
     :param target_registry_uri: The URI of the docker registry that Kubernetes will use to
-                                pull the model server Docker image. If `None`, the default
-                                docker registry (docker.io) will be used. Otherwise, the model 
-                                server image will be tagged using the specified registry uri.
+                                pull the application's model server Docker image. If `None`, the 
+                                default docker registry (docker.io) will be used. Otherwise, the 
+                                model server image will be tagged using the specified registry uri.
     :param push_image: If `True`, the model server Docker image will be pushed to the registry
                        specified by `target_registry_uri` (or docker.io if `target_registry_uri` is
                        `None`). If `False`, the model server Docker image will not be
                        pushed to a registry.
     :param output_file: The name of the configuration file containing application information.
-                        If `None`, a name will be generated using the specified `model_path` and
-                        `run_id`.
+                        If `None`, a name will be generated. 
     """
     with TempDir() as tmp:
         cwd = tmp.path()
@@ -208,15 +316,16 @@ def build_serving_application(model_path, run_id=None, pyfunc_image_uri=None, ml
             f.write(dockerfile_template)
         
         model_id = _get_model_id(run_id=run_id)
-        image_name = "mlflow-model-{model_id}".format(model_id=model_id)
+        image_name = (image_name if image_name is not None else 
+            "mlflow-model-{model_id}".format(model_id=model_id))
         if target_registry_uri is not None:
             image_uri = "/".join([target_registry_uri.strip("/"), image_name])
         else:
             image_uri = image_name
         
-        build_image(image_name=image_uri, template_path=template_path)
+        docker_utils.build_image(image_name=image_uri, template_path=template_path)
         if push_image:
-            push_docker_image(image_uri=image_uri)
+            docker_utils.push_image(image_uri=image_uri)
 
     config_file_name = (
             output_file if output_file is not None else "mlflow-serving-app-{model_id}.yaml".format(
@@ -233,7 +342,7 @@ def _get_image_template(image_resources_path, model_path, run_id=None, pyfunc_ur
     if pyfunc_uri is not None:
         dockerfile_cmds = ["FROM {base_uri}".format(base_uri=pyfunc_uri)]
     else:
-        dockerfile_template = get_template(
+        dockerfile_template = docker_utils.get_template(
                 image_resources_path=image_resources_path, mlflow_home=mlflow_home)
         dockerfile_cmds = dockerfile_template.split("\n")
 
@@ -277,8 +386,21 @@ def _add_image_pull_secret(deployment_config, secret_name):
     :return: The deployment configuration with the specified image pull secret.
     """
     parsed_config = yaml.safe_load(deployment_config)
-    container_template_spec = parsed_config["spec"]["template"]["spec"]
-    container_template_spec["imagePullSecrets"] = [{"name" : str(secret_name)}]
+    deployment_template_spec = parsed_config["spec"]["template"]["spec"]
+    deployment_template_spec["imagePullSecrets"] = [{"name" : str(secret_name)}]
+    return yaml.dump(parsed_config, default_flow_style=False)
+
+
+def _set_image_uri(deployment_config, image_uri):
+    """
+    :param deployment_config: The deployment configuration string.
+    :param image_uri: The URI of the container image to set. 
+
+    :return: The deployment configuration with the specified container image URI.
+    """
+    parsed_config = yaml.safe_load(deployment_config)
+    app_container_spec = parsed_config["spec"]["template"]["spec"]["containers"][0]
+    app_container_spec["image"] = image_uri
     return yaml.dump(parsed_config, default_flow_style=False)
 
 

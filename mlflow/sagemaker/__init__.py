@@ -143,15 +143,15 @@ def deploy(app_name, model_path, execution_role_arn=None, bucket=None, run_id=No
     :param image: Name of the Docker image to be used. if not specified, uses a
         publicly-available pre-built image.
     :param region_name: Name of the AWS region to which to deploy the application.
-    :param mode: The mode in which to deploy the application. Must be one of the following:
+    :param mode: the mode in which to deploy the application. must be one of the following:
 
                  ``mlflow.sagemaker.DEPLOYMENT_MODE_CREATE``
-                     Create an application with the specified name and model. This fails if an
+                     create an application with the specified name and model. this fails if an
                      application of the same name already exists.
 
                  ``mlflow.sagemaker.DEPLOYMENT_MODE_REPLACE``
-                     If an application of the specified name exists, its model(s) is replaced with
-                     the specified model. If no such application exists, it is created with the
+                     if an application of the specified name exists, its model(s) is replaced with
+                     the specified model. if no such application exists, it is created with the
                      specified name and model.
 
                  ``mlflow.sagemaker.DEPLOYMENT_MODE_ADD``

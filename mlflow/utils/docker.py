@@ -77,3 +77,14 @@ def build_image(image_name, template_path):
 def push_image(image_uri):
     proc = Popen(["docker", "push", image_uri])
     proc.wait()
+
+
+def pull_image(image_uri):
+    proc = Popen(["docker", "pull", image_uri])
+    proc.wait()
+
+
+def tag_image(image_uri, tag_uri):
+    cmd = "docker tag {image_uri} {tag_uri}".format(image_uri=image_uri, tag_uri=tag_uri)
+    proc = Popen(cmd.split(" "))
+    proc.wait()
