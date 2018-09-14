@@ -52,7 +52,11 @@ spec:
         image: {image_uri} 
         args: ["serve"]
         ports:
-        - containerPort: {internal_port} 
+        - containerPort: {internal_port}
+      readinessProbe:
+        httpGet:
+            path: /ping
+            port: {internal_port} 
 """
 
 SERVICE_CONFIG_TEMPLATE = """\
