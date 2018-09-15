@@ -38,7 +38,7 @@ metadata:
   labels:
     app: {app_name} 
 spec:
-  replicas: 1 
+  replicas: {num_replicas} 
   selector:
     matchLabels:
       app: {app_name} 
@@ -53,10 +53,15 @@ spec:
         args: ["serve"]
         ports:
         - containerPort: {internal_port}
-      readinessProbe:
-        httpGet:
-            path: /ping
-            port: {internal_port} 
+        imagePullPolicy: Always
+        readinessProbe:
+            httpGet:
+                path: /ping
+                port: {internal_port}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: {max_unavailable}
 """
 
 SERVICE_CONFIG_TEMPLATE = """\
@@ -165,7 +170,7 @@ def deploy(app_name, config_path, replicas=1, image_pull_secret=None,
                 cwd, "{app_name}_deployment_config.yaml".format(app_name=app_name))
         deployment_config = _get_deployment_config(
                 app_name=app_name, image_uri=application_config.image_uri, 
-                internal_port=MODEL_SERVER_INTERNAL_PORT)
+                internal_port=MODEL_SERVER_INTERNAL_PORT, num_replicas=replicas)
         if image_pull_secret is not None:
             _add_image_pull_secret(
                     deployment_config=deployment_config, secret_name=image_pull_secret)
@@ -187,12 +192,6 @@ def deploy(app_name, config_path, replicas=1, image_pull_secret=None,
         elif mode == DEPLOYMENT_MODE_REPLACE:
             _update_app_deployment(deployment_config_path=deployment_config_path,
                                    service_config_path=service_config_path)
-
-        deployment_config = _load_kubernetes_config(config_path=deployment_config_path)
-        deployment_name = deployment_config["metadata"]["name"]
-        _execute_kubectl_command(
-                "kubectl scale deployment {deployment_name} --replicas={num_replicas}",
-                deployment_name=deployment_name, num_replicas=replicas, stream_output=True)
 
         if log_directory is not None:
             log_directory = os.path.abspath(log_directory)
@@ -217,33 +216,6 @@ def _update_app_deployment(deployment_config_path, service_config_path):
             cmd_template=base_cmd, config_path=deployment_config_path, stream_output=True)
     _execute_kubectl_command(
             cmd_template=base_cmd, config_path=service_config_path, stream_output=True)
-
-
-# def _update_app_deployment(app_name, app_config, deployment_config_path, service_config_path):
-#     active_image = _get_active_container_image(app_name=app_name)
-#     active_image_uri = active_image.get_uri()
-#     if active_image is None or active_image.tag is None:
-#         new_version = 1
-#     else:
-#         new_version = int(active_image.tag) + 1
-#
-#     new_image_uri = DockerImage(name=active_image.name, tag=new_version).get_uri()
-#
-#     docker_utils.pull_image(active_image_uri)
-#     docker_utils.tag_image(image_uri=active_image_uri, tag_uri=new_image_uri)
-#     docker_utils.push_image(new_image_uri)
-#
-#     with open(deployment_config_path, "r") as f:
-#         deployment_config = f.read()
-#     _set_image_uri(deployment_config, new_image_uri)
-#     with open(deployment_config_path, "w") as f:
-#         f.write(deployment_config)
-#
-#     base_cmd = "kubectl apply -f {config_path}"
-#     _execute_kubectl_command(
-#             cmd_template=base_cmd, config_path=deployment_config_path, stream_output=True)
-#     _execute_kubectl_command(
-#             cmd_template=base_cmd, config_path=service_config_path, stream_output=True)
 
 
 def _get_active_container_image(app_name):
@@ -280,9 +252,9 @@ def _execute_kubectl_command(cmd_template, stream_output=False, **kwargs):
     return exec_cmd(cmd=cmd.split(" "), stream_output=stream_output)
 
 
-def build_serving_application(model_path, run_id=None, pyfunc_image_uri=None, mlflow_home=None, 
-                              image_name=None, target_registry_uri=None, push_image=False, 
-                              output_file=None):
+def stage_model_for_serving(model_path, run_id=None, pyfunc_image_uri=None, mlflow_home=None, 
+                            image_name=None, target_registry_uri=None, push_image=False, 
+                            output_file=None):
     """
     :param model_path: The path to the Mlflow model for which to build a server.
                        If `run_id` is not `None`, this should be an absolute path. Otherwise,
@@ -338,7 +310,7 @@ def build_serving_application(model_path, run_id=None, pyfunc_image_uri=None, ml
     application_config = ApplicationConfig(
             model_path=model_path, image_uri=image_uri, run_id=run_id)
     application_config.save(path=config_file_path)
-    print("Wrote application configuration to: {output_path}".format(output_path=config_file_path))
+    print("Wrote staged model configuration to: {output_path}".format(output_path=config_file_path))
 
         
 def _get_image_template(image_resources_path, model_path, run_id=None, pyfunc_uri=None, 
@@ -360,7 +332,11 @@ def _get_image_template(image_resources_path, model_path, run_id=None, pyfunc_ur
     dockerfile_cmds.append("RUN rm -rf {container_model_path}".format(
         container_model_path=container_model_path))
     dockerfile_cmds.append("COPY {host_model_path} {container_model_path}".format(
-        host_model_path=model_resource_path, container_model_path=container_model_path)) 
+        host_model_path=model_resource_path, container_model_path=container_model_path))
+    dockerfile_cmds.append(
+            "RUN python -c" 
+            "\"import mlflow.kubernetes.container;"
+            " mlflow.kubernetes.container.create_conda_env_if_necessary()\"")
     return "\n".join(dockerfile_cmds)
 
     
@@ -371,9 +347,10 @@ def _get_model_id(run_id=None):
                                ts=datetime.now().strftime(timestamp_format))
 
 
-def _get_deployment_config(app_name, image_uri, internal_port):
+def _get_deployment_config(app_name, image_uri, internal_port, num_replicas):
     return DEPLOYMENT_CONFIG_TEMPLATE.format(
-            image_uri=image_uri, internal_port=internal_port, app_name=app_name)
+            image_uri=image_uri, internal_port=internal_port, app_name=app_name, 
+            num_replicas=num_replicas, max_unavailable=num_replicas - 1)
 
 
 def _get_service_config(app_name, service_type, service_port, internal_port):

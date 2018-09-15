@@ -29,10 +29,12 @@ RUN bash ./miniconda.sh -b -p /miniconda; rm ./miniconda.sh;
 ENV PATH="/miniconda/bin:${PATH}"
 ENV JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
 
-RUN conda install -c anaconda gunicorn;\
-    conda install -c anaconda gevent;\
-
 %s
+
+RUN python -c \"import mlflow.sagemaker.container;\
+        import mlflow.sagemaker.container.utils as container_utils;\
+        container_utils.create_conda_env(mlflow.sagemaker.container.DEFAULT_ENV_NAME)\"
+
 
 # Set up the program in the image
 WORKDIR /opt/mlflow

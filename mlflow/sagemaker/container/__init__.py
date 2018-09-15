@@ -13,18 +13,22 @@ import signal
 from subprocess import check_call, Popen
 import sys
 import yaml
+import json 
 
 from pkg_resources import resource_filename
 
 import mlflow
 import mlflow.version
-
+from mlflow.sagemaker.container import utils as container_utils
 from mlflow import pyfunc, mleap
 from mlflow.models import Model
 from mlflow.utils.logging_utils import eprint
-from mlflow.version import VERSION as MLFLOW_VERSION
+from mlflow.utils.process import exec_cmd 
+
 
 MODEL_PATH = "/opt/ml/model"
+DEFAULT_ENV_NAME = "default_env"
+CUSTOM_ENV_NAME = "custom_env"
 
 DEPLOYMENT_CONFIG_KEY_FLAVOR_NAME = "deployment_flavor_name"
 
@@ -51,19 +55,6 @@ def _init(cmd):
                                                                                 args=str(sys.argv)))
 
 
-def _server_dependencies_cmds():
-    """
-    Get commands required to install packages required to serve the model with MLflow. These are
-    packages outside of the user-provided environment, except for the MLflow itself.
-
-    :return: List of commands.
-    """
-    # TODO: Should we reinstall MLflow? What if there is MLflow in the user's conda environment?
-    return ["conda install -c anaconda gunicorn", "conda install -c anaconda gevent",
-            "pip install /opt/mlflow/." if _container_includes_mlflow_source()
-            else "pip install mlflow=={}".format(MLFLOW_VERSION)]
-
-
 def _serve():
     """
     Serve the model.
@@ -72,7 +63,17 @@ def _serve():
     """
     model_config_path = os.path.join(MODEL_PATH, "MLmodel")
     m = Model.load(model_config_path)
+    runtime_flavor = _get_runtime_flavor(m)
+    if runtime_flavor == pyfunc.FLAVOR_NAME:
+        _serve_pyfunc(m)
+    elif runtime_flavor == mleap.FLAVOR_NAME:
+        _serve_mleap()
+    else:
+        raise Exception("Unrecognized runtime flavor: {runtime_flavor}".format(
+            runtime_flavor=runtime_flavor))
 
+
+def _get_runtime_flavor(model):
     if DEPLOYMENT_CONFIG_KEY_FLAVOR_NAME in os.environ:
         serving_flavor = os.environ[DEPLOYMENT_CONFIG_KEY_FLAVOR_NAME]
     else:
@@ -82,34 +83,43 @@ def _serve():
     if serving_flavor == mleap.FLAVOR_NAME:
         # TODO(dbczumar): Host the scoring Java package on Maven Central so that we no
         # longer require the container source for this flavor.
-        if _container_includes_mlflow_source():
-            _serve_mleap()
+        if container_utils.container_includes_mlflow_source():
+            return mleap.FLAVOR_NAME
         else:
             raise Exception("The container does not support the specified deployment flavor:"
                             " `{mleap_flavor}`. Please build the container with the `mlflow_home`"
                             " parameter specified to enable this feature.".format(
                                 mleap_flavor=mleap.FLAVOR_NAME))
-    elif pyfunc.FLAVOR_NAME in m.flavors:
-        _serve_pyfunc(m)
+    elif pyfunc.FLAVOR_NAME in model.flavors:
+        return pyfunc.FLAVOR_NAME
     else:
         raise Exception("This container only supports models with the MLeap or PyFunc flavors.")
 
 
+
 def _serve_pyfunc(model):
     conf = model.flavors[pyfunc.FLAVOR_NAME]
-    bash_cmds = []
     if pyfunc.ENV in conf:
-        print("activating custom environment")
-        env = conf[pyfunc.ENV]
-        env_path_dst = os.path.join("/opt/mlflow/", env)
+        env_path = conf[pyfunc.ENV]
+        if not _has_conda_env(env_name=CUSTOM_ENV_NAME):
+            print("creating custom environment")
+
+        env_path_dst = os.path.join("/opt/mlflow/", env_path)
         env_path_dst_dir = os.path.dirname(env_path_dst)
         if not os.path.exists(env_path_dst_dir):
             os.makedirs(env_path_dst_dir)
         # TODO: should we test that the environment does not include any of the server dependencies?
         # Those are gonna be reinstalled. should probably test this on the client side
-        shutil.copyfile(os.path.join(MODEL_PATH, env), env_path_dst)
-        os.system("conda env create -n custom_env -f {}".format(env_path_dst))
-        bash_cmds += ["source /miniconda/bin/activate custom_env"] + _server_dependencies_cmds()
+        shutil.copyfile(os.path.join(MODEL_PATH, env_path), env_path_dst)
+        container_utils.create_conda_env(env_name=CUSTOM_ENV_NAME, env_path=env_path)
+        
+        runtime_env_name = CUSTOM_ENV_NAME
+    else:
+        runtime_env_name = DEFAULT_ENV_NAME
+
+    print("activating custom environment")
+    container_utils.activate_environment(env_name=runtime_env_name)
+
     nginx_conf = resource_filename(mlflow.sagemaker.__name__, "container/scoring_server/nginx.conf")
     nginx = Popen(['nginx', '-c', nginx_conf])
     # link the log streams to stdout/err so they will be logged to the container logs
@@ -121,8 +131,7 @@ def _serve_pyfunc(model):
     os.system('python -c"from mlflow.version import VERSION as V; print(V)"')
     cmd = ("gunicorn --timeout 60 -k gevent -b unix:/tmp/gunicorn.sock -w {nworkers} " +
            "mlflow.sagemaker.container.scoring_server.wsgi:app").format(nworkers=cpu_count)
-    bash_cmds.append(cmd)
-    gunicorn = Popen(["/bin/bash", "-c", "; ".join(bash_cmds)])
+    gunicorn = Popen(cmd.split(" "))
     signal.signal(signal.SIGTERM, lambda a, b: _sigterm_handler(pids=[nginx.pid, gunicorn.pid]))
     # If either subprocess exits, so do we.
     awaited_pids = _await_subprocess_exit_any(procs=[nginx, gunicorn])
@@ -144,8 +153,12 @@ def _serve_mleap():
     _sigterm_handler(awaited_pids)
 
 
-def _container_includes_mlflow_source():
-    return os.path.isdir("/opt/mlflow")
+def _has_conda_env(env_name):
+    cmd = "conda env list --json"
+    _, available_envs, _ = exec_cmd(cmd=cmd.split(" "), stream_output=False)
+    available_envs = json.loads(available_envs)["envs"]
+    return (env_name in 
+            [os.path.basename(available_env_name) for available_env_name in available_envs])
 
 
 def _train():
