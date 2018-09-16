@@ -117,6 +117,8 @@ def _serve_pyfunc(model):
     else:
         runtime_env_name = DEFAULT_ENV_NAME
 
+    bash_cmds = ["source /miniconda/bin/activate {env_name}".format(env_name=runtime_env_name)]
+
     print("activating custom environment")
     container_utils.activate_environment(env_name=runtime_env_name)
 
@@ -129,9 +131,9 @@ def _serve_pyfunc(model):
     os.system("pip -V")
     os.system("python -V")
     os.system('python -c"from mlflow.version import VERSION as V; print(V)"')
-    cmd = ("gunicorn --timeout 60 -k gevent -b unix:/tmp/gunicorn.sock -w {nworkers} " +
-           "mlflow.sagemaker.container.scoring_server.wsgi:app").format(nworkers=cpu_count)
-    gunicorn = Popen(cmd.split(" "))
+    bash_cmds.append(("gunicorn --timeout 60 -k gevent -b unix:/tmp/gunicorn.sock -w {nworkers} " +
+           "mlflow.sagemaker.container.scoring_server.wsgi:app").format(nworkers=cpu_count))
+    gunicorn = Popen(["/bin/bash", "-c", "; ".join(bash_cmds)])
     signal.signal(signal.SIGTERM, lambda a, b: _sigterm_handler(pids=[nginx.pid, gunicorn.pid]))
     # If either subprocess exits, so do we.
     awaited_pids = _await_subprocess_exit_any(procs=[nginx, gunicorn])
