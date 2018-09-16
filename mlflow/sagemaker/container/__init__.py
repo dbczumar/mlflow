@@ -104,14 +104,14 @@ def _serve_pyfunc(model):
         if not _has_conda_env(env_name=CUSTOM_ENV_NAME):
             print("creating custom environment")
 
-        env_path_dst = os.path.join("/opt/mlflow/", env_path)
-        env_path_dst_dir = os.path.dirname(env_path_dst)
-        if not os.path.exists(env_path_dst_dir):
-            os.makedirs(env_path_dst_dir)
-        # TODO: should we test that the environment does not include any of the server dependencies?
-        # Those are gonna be reinstalled. should probably test this on the client side
-        shutil.copyfile(os.path.join(MODEL_PATH, env_path), env_path_dst)
-        container_utils.create_conda_env(env_name=CUSTOM_ENV_NAME, env_path=env_path)
+            env_path_dst = os.path.join("/opt/mlflow/", env_path)
+            env_path_dst_dir = os.path.dirname(env_path_dst)
+            if not os.path.exists(env_path_dst_dir):
+                os.makedirs(env_path_dst_dir)
+            # TODO: should we test that the environment does not include any of the server dependencies?
+            # Those are gonna be reinstalled. should probably test this on the client side
+            shutil.copyfile(os.path.join(MODEL_PATH, env_path), env_path_dst)
+            container_utils.create_conda_env(env_name=CUSTOM_ENV_NAME, env_path=env_path)
         
         runtime_env_name = CUSTOM_ENV_NAME
     else:
