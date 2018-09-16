@@ -117,10 +117,8 @@ def _serve_pyfunc(model):
     else:
         runtime_env_name = DEFAULT_ENV_NAME
 
-    bash_cmds = ["source /miniconda/bin/activate {env_name}".format(env_name=runtime_env_name)]
-
     print("activating custom environment")
-    container_utils.activate_environment(env_name=runtime_env_name)
+    bash_cmds = ["source /miniconda/bin/activate {env_name}".format(env_name=runtime_env_name)]
 
     nginx_conf = resource_filename(mlflow.sagemaker.__name__, "container/scoring_server/nginx.conf")
     nginx = Popen(['nginx', '-c', nginx_conf])

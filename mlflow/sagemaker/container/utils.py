@@ -11,11 +11,13 @@ def create_conda_env(env_name, env_path=None):
 
     exec_cmd("conda install -n {env_name} -c anaconda gunicorn gevent".format(
      env_name=env_name).split(" "), stream_output=True)
-    
-    activate_environment(env_name=env_name)
-    exec_cmd("pip install /opt/mlflow" if container_includes_mlflow_source()\
+
+    activate_cmd = "source /miniconda/bin/activate {env_name}".format(env_name=env_name)
+    install_cmd = ("pip install /opt/mlflow" if container_includes_mlflow_source()\
         else "pip install mlflow=={mlflow_version}".format(
-            mlflow_version=MLFLOW_VERSION).split(" "), stream_output=True, shell=True)
+            mlflow_version=MLFLOW_VERSION))
+
+    exec_cmd(["/bin/bash", "-c", "; ".join([activate_cmd, install_cmd])], stream_output=True)
 
 
 def container_includes_mlflow_source():
