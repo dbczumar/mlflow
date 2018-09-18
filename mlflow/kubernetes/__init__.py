@@ -252,9 +252,9 @@ def _execute_kubectl_command(cmd_template, stream_output=False, **kwargs):
     return exec_cmd(cmd=cmd.split(" "), stream_output=stream_output)
 
 
-def stage_model_for_serving(model_path, run_id=None, pyfunc_image_uri=None, mlflow_home=None, 
-                            image_name=None, target_registry_uri=None, push_image=False, 
-                            output_file=None):
+def register_model_for_serving(model_path, run_id=None, pyfunc_image_uri=None, mlflow_home=None, 
+                               image_name=None, target_registry_uri=None, push_image=False, 
+                               output_file=None):
     """
     :param model_path: The path to the Mlflow model for which to build a server.
                        If `run_id` is not `None`, this should be an absolute path. Otherwise,
@@ -310,7 +310,8 @@ def stage_model_for_serving(model_path, run_id=None, pyfunc_image_uri=None, mlfl
     application_config = ApplicationConfig(
             model_path=model_path, image_uri=image_uri, run_id=run_id)
     application_config.save(path=config_file_path)
-    print("Wrote staged model configuration to: {output_path}".format(output_path=config_file_path))
+    print("Wrote registered model configuration to: {output_path}".format(
+        output_path=config_file_path))
 
         
 def _get_image_template(image_resources_path, model_path, run_id=None, pyfunc_uri=None, 

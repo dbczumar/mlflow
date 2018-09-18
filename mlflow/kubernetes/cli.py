@@ -46,7 +46,7 @@ def deploy(app_name, config_path, replicas, image_pull_secret, service_type, ser
             service_port=service_port, mode=mode, log_directory=log_directory)
 
 
-@commands.command("stage")
+@commands.command("register")
 @click.option("--model-path", "-m", required=True, 
               help=("The path to the Mlflow model for which to build a server. If `run_id` is not" 
                     " `None`, this should be an absolute path. Otherwise, it should be a" 
@@ -67,7 +67,7 @@ def deploy(app_name, config_path, replicas, image_pull_secret, service_type, ser
                     " include a version tag. If `None`, a name will be generated.")) 
 @click.option("--target-registry-uri", "-t", default=None,
               help=("The URI of the docker registry that Kubernetes will use to pull the" 
-                     " application's model server Docker image. If `None`, the default docker"
+                     " model server Docker image. If `None`, the default docker"
                      " registry (docker.io) will be used. Otherwise, the model server image will be" 
                      " tagged using the specified registry uri."))
 @click.option("--push-image", is_flag=True,
@@ -76,11 +76,11 @@ def deploy(app_name, config_path, replicas, image_pull_secret, service_type, ser
                     " `None`). If unspecified, the model server Docker image will not be pushed to"
                     " a registry."))
 @click.option("--output-file", "-o", default=None,
-              help=("The name of the configuration file containing application information."
+              help=("The name of the configuration file containing registered model  information."
                     " If `None`, a name will be generated"))
-def stage_model_for_serving(model_path, run_id, pyfunc_image_uri, mlflow_home, image_name, 
-                            target_registry_uri, push_image, output_file):
-    mlflow.kubernetes.stage_model_for_serving(
+def register_model_for_serving(model_path, run_id, pyfunc_image_uri, mlflow_home, image_name, 
+                               target_registry_uri, push_image, output_file):
+    mlflow.kubernetes.register_model_for_serving(
             model_path=model_path, run_id=run_id, pyfunc_image_uri=pyfunc_image_uri, 
             mlflow_home=mlflow_home, image_name=image_name, target_registry_uri=target_registry_uri, 
             push_image=push_image, output_file=output_file) 
