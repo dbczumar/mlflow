@@ -172,7 +172,7 @@ def deploy(app_name, config_path, replicas=1, image_pull_secret=None,
                 app_name=app_name, image_uri=application_config.image_uri, 
                 internal_port=MODEL_SERVER_INTERNAL_PORT, num_replicas=replicas)
         if image_pull_secret is not None:
-            _add_image_pull_secret(
+            deployment_config = _add_image_pull_secret(
                     deployment_config=deployment_config, secret_name=image_pull_secret)
         with open(deployment_config_path, "w") as f:
             f.write(deployment_config)
@@ -313,6 +313,9 @@ def register_model_for_serving(model_path, run_id=None, pyfunc_image_uri=None, m
     print("Wrote registered model configuration to: {output_path}".format(
         output_path=config_file_path))
 
+def _create_registry_for_image_if_necessary(image_uri):
+    registry_uri = image_uri.split(":")[0]
+
         
 def _get_image_template(image_resources_path, model_path, run_id=None, pyfunc_uri=None, 
         mlflow_home=None):
@@ -351,7 +354,7 @@ def _get_model_id(run_id=None):
 def _get_deployment_config(app_name, image_uri, internal_port, num_replicas):
     return DEPLOYMENT_CONFIG_TEMPLATE.format(
             image_uri=image_uri, internal_port=internal_port, app_name=app_name, 
-            num_replicas=num_replicas, max_unavailable=num_replicas - 1)
+            num_replicas=num_replicas, max_unavailable=1)
 
 
 def _get_service_config(app_name, service_type, service_port, internal_port):
