@@ -194,15 +194,9 @@ def save_model(spark_model, path, mlflow_model=Model(), conda_env=None, jars=Non
     if not isinstance(spark_model, PipelineModel):
         raise Exception("Not a PipelineModel. SparkML can only save PipelineModels.")
 
-    # Spark ML stores the model on DFS if running on a cluster
-    # Save it to a DFS temp dir first and copy it to local path
-    if dfs_tmpdir is None:
-        dfs_tmpdir = DFS_TMP
-    tmp_path = _tmp_path(dfs_tmpdir)
-    spark_model.save(tmp_path)
     sparkml_data_path_sub = "sparkml"
     sparkml_data_path = os.path.abspath(os.path.join(path, sparkml_data_path_sub))
-    _HadoopFileSystem.copy_to_local_file(tmp_path, sparkml_data_path, remove_src=True)
+    _save_model(spark_model=spark_model, path=sparkml_data_path, dfs_tmpdir=dfs_tmpdir)
     pyspark_version = pyspark.version.__version__
     model_conda_env = None
     if conda_env:
@@ -213,6 +207,16 @@ def save_model(spark_model, path, mlflow_model=Model(), conda_env=None, jars=Non
     pyfunc.add_to_model(mlflow_model, loader_module="mlflow.spark", data=sparkml_data_path_sub,
                         env=model_conda_env)
     mlflow_model.save(os.path.join(path, "MLmodel"))
+
+
+def _save_model(spark_model, path, dfs_tmpdir=None):
+    # Spark ML stores the model on DFS if running on a cluster
+    # Save it to a DFS temp dir first and copy it to local path
+    if dfs_tmpdir is None:
+        dfs_tmpdir = DFS_TMP
+    tmp_path = _tmp_path(dfs_tmpdir)
+    spark_model.save(tmp_path)
+    _HadoopFileSystem.copy_to_local_file(tmp_path, path, remove_src=True)
 
 
 def _load_model(model_path, dfs_tmpdir=None):
@@ -230,7 +234,7 @@ def load_model(path, run_id=None, dfs_tmpdir=None):
     """
     Load the Spark MLlib model from the path.
 
-    :param path: Local filesystem path or run-relative artifact path to the model.
+    :param path: local filesystem path or run-relative artifact path to the model.
     :param run_id: Run ID. If provided, combined with ``path`` to identify the model.
     :param dfs_tmpdir: Temporary directory path on Distributed (Hadoop) File System (DFS) or local
                        filesystem if running in local mode. The model will be loaded from this
