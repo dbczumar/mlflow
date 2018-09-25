@@ -152,14 +152,12 @@ if __name__ == "__main__":
 
         # Preprocess the input dataframe here.
         print("Did some preprocessing!")
-        pass
-
+        
         model_result = spark_model.predict(pandas_df)
         print("Model result: {}".format(model_result))
 
         # Postprocess the prediction result here.
         print("Did some postprocessing!")
-        pass
 
         return model_result
 
