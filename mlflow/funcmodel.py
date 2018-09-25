@@ -4,7 +4,7 @@ import shutil
 
 import mlflow
 import mlflow.spark as mspark
-import mlflow.pyfunc as pyfunc 
+import mlflow.pyfunc as pyfunc
 from mlflow.models import Model
 from mlflow.tracking.utils import _get_model_log_dir
 
@@ -13,7 +13,7 @@ FLAVOR_NAME = "FUNCTION_MODEL"
 
 class Predictor(object):
     """
-    A wrapper around a Spark model and a function that uses the model to evaluate a query. 
+    A wrapper around a Spark model and a function that uses the model to evaluate a query.
     """
 
     def __init__(self, function, model):
@@ -51,7 +51,7 @@ class Predictor(object):
     def save(self, function_path, model_path):
         """
         :param function_path: The path to which to save the predictor's function
-        :param model_path: The path to which to save the predictor's model 
+        :param model_path: The path to which to save the predictor's model
         """
         with open(function_path, "w") as f:
             pickle.dump(self.function, f)
@@ -152,7 +152,7 @@ if __name__ == "__main__":
 
         # Preprocess the input dataframe here.
         print("Did some preprocessing!")
-        
+
         model_result = spark_model.predict(pandas_df)
         print("Model result: {}".format(model_result))
 
@@ -169,7 +169,7 @@ if __name__ == "__main__":
         mlflow.funcmodel.log_model(model=predictor, artifact_path=model_path)
         run_id = mlflow.active_run().info.run_uuid
 
-    # Load the predictor as a generic python function wrapper. This is what the Docker container 
+    # Load the predictor as a generic python function wrapper. This is what the Docker container
     # will do when serving the model.
     pyfunc_predictor = mlflow.pyfunc.load_pyfunc(path=model_path, run_id=run_id)
 
