@@ -35,13 +35,24 @@ SUPPORTED_FLAVORS = [
     mleap.FLAVOR_NAME
 ]
 
+ENV_CONTAINER_CMD = "CONTAINER_CMD"
 
-def _init(cmd):
+
+def _init():
     """
     Initialize the container and execute command.
 
     :param cmd: Command param passed by Sagemaker. Can be  "serve" or "train" (unimplemented).
     """
+    if len(sys.argv) > 1:
+        cmd = sys.argv[1]
+    elif ENV_CONTAINER_CMD in os.environ:
+        cmd = os.environ[ENV_CONTAINER_CMD]
+    else:
+        raise Exception(
+                "The container command must be specified as a command line argument or an"
+                " environment variable.") 
+
     if cmd == 'serve':
         _serve()
     elif cmd == 'train':

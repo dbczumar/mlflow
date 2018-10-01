@@ -75,8 +75,7 @@ RUN conda install -c anaconda gunicorn;\
 WORKDIR /opt/mlflow
 
 # start mlflow scoring
-ENTRYPOINT ["python", "-c", "import sys; from mlflow.sagemaker import container as C; \
-C._init(sys.argv[1])"]
+ENTRYPOINT ["python", "-c", "import sys; from mlflow.sagemaker import container as C; C._init()"]
 """
 
 
