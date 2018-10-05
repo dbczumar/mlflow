@@ -1,5 +1,5 @@
 import os
-import pickle
+import cloudpickle 
 import shutil
 
 import mlflow
@@ -42,7 +42,7 @@ class Predictor(object):
         :param model_path: The path to the serialized model.
         """
         with open(function_path, "r") as f:
-            function = pickle.load(f)
+            function = cloudpickle.load(f)
 
         model = mspark._load_pyfunc(model_path)
         return cls(function=function, model=model)
@@ -53,8 +53,8 @@ class Predictor(object):
         :param function_path: The path to which to save the predictor's function
         :param model_path: The path to which to save the predictor's model
         """
-        with open(function_path, "w") as f:
-            pickle.dump(self.function, f)
+        with open(function_path, "wb") as f:
+            cloudpickle.dump(self.function, f)
 
         mspark._save_model(self.model, model_path)
 
