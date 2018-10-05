@@ -41,7 +41,7 @@ class Predictor(object):
         :param function_path: The path to the serialized function.
         :param model_path: The path to the serialized model.
         """
-        with open(function_path, "r") as f:
+        with open(function_path, "rb") as f:
             function = cloudpickle.load(f)
 
         model = mspark._load_pyfunc(model_path)
