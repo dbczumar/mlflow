@@ -92,10 +92,11 @@ MAIN = "loader_module"
 CODE = "code"
 DATA = "data"
 ENV = "env"
+KWARGS = "kwargs"
 PY_VERSION = "python_version"
 
 
-def add_to_model(model, loader_module, data=None, code=None, env=None):
+def add_to_model(model, loader_module, data=None, code=None, env=None, **kwargs):
     """
     Add a pyfunc spec to the model configuration.
 
@@ -116,6 +117,7 @@ def add_to_model(model, loader_module, data=None, code=None, env=None):
     """
     parms = {MAIN: loader_module}
     parms[PY_VERSION] = PYTHON_VERSION
+    parms[KWARGS] = kwargs
     if code:
         parms[CODE] = code
     if data:
@@ -166,7 +168,7 @@ def load_pyfunc(path, run_id=None, suppress_warnings=False):
         code_path = os.path.join(path, conf[CODE])
         sys.path = [code_path] + _get_code_dirs(code_path) + sys.path
     data_path = os.path.join(path, conf[DATA]) if (DATA in conf) else path
-    return importlib.import_module(conf[MAIN])._load_pyfunc(data_path)
+    return importlib.import_module(conf[MAIN])._load_pyfunc(data_path, **conf[KWARGS])
 
 
 def _warn_potentially_incompatible_py_version_if_necessary(model_py_version):
