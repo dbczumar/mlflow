@@ -160,7 +160,7 @@ if __name__ == "__main__":
     from mlflow.utils.environment import _mlflow_conda_env
 
     conda_path = "conda.yaml"
-    _mlflow_conda_env(conda_path, additional_pip_deps=["wandb"])
+    _mlflow_conda_env(conda_path, additional_pip_deps=["scikit-learn"])
 
     flavor_module = FlavorModule("sklearncustom", save_model, load_model, load_pyfunc, conda_path)
 
