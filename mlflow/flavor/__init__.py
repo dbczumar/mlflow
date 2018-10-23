@@ -1,7 +1,10 @@
+from __future__ import absolute_import
+
 import os
 
 import cloudpickle
 import yaml
+import tempfile
 
 from mlflow import pyfunc
 from mlflow.exceptions import MlflowException 
@@ -144,6 +147,8 @@ class FlavorModule:
                    conda_env=conda_env_path)
 
 if __name__ == "__main__":
+    # Define a custom flavor by implementing `save_fn`, `load_fn`, and `load_pyfunc_fn`
+    # In this case, we are re-implementing the sklearn flavor
     def save_model(path, sk_model):
         import cloudpickle
         with open(os.path.join(path, "skmodel.pkl"), "wb") as f:
@@ -164,20 +169,24 @@ if __name__ == "__main__":
 
     flavor_module = FlavorModule("sklearncustom", save_model, load_model, load_pyfunc, conda_path)
 
+    # Use the custom flavor to save a scikit-learn model
     from sklearn.pipeline import Pipeline as SKPipeline
     from sklearn.preprocessing import FunctionTransformer as SKFunctionTransformer
     def transform(vec):
         return vec + 1
     pipeline = SKPipeline([("name", SKFunctionTransformer(transform, validate=True))])
-    flavor_module.save_model(path="/tmp/cat", sk_model=pipeline)
 
-    # sk_model = FlavorModule.load("sklearncustom", "/tmp/cat").load_model("/tmp/cat")
-    # print(sk_model)
-    #
-    sk_pyfunc = pyfunc.load_pyfunc("/tmp/cat")
+    model_path = tempfile.mktemp()
+    flavor_module.save_model(path=model_path, sk_model=pipeline)
+
+    # Load the custom flavor from the serialized model and use it to deserialize the
+    # the model in native format as well as pyfunc format
+    flavor_module = FlavorModule.load("sklearncustom", model_path)
+
+    sk_model = flavor_module.load_model(model_path)
+
+    sk_pyfunc = pyfunc.load_pyfunc(model_path)
+
     print(sk_pyfunc)
-
-    flavor = FlavorModule.load("sklearncustom", "/tmp/cat")
-    print(flavor.get_conda_env("/tmp/cat"))
-    #
+    print(flavor_module.get_conda_env(model_path))
 
