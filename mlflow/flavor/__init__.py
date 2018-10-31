@@ -99,6 +99,15 @@ class FlavorModule:
         with open(os.path.join(path, model_config.flavors[self.name]["conda_env_path"]), "r") as f:
             return f.read()
 
+    def to_py_module(self, output_path):
+        import inspect
+        save_fn_source = inspect.getsource(self.save_fn)
+        load_fn_source = inspect.getsource(self.load_fn)
+
+        module_text = "\n\n".join([save_fn_source, load_fn_source])
+        with open(output_path, "w") as f:
+            f.write(module_text)
+
     def _parse_conda_env(self, conda_env_path):
         with open(conda_env_path, "r") as f:
             return yaml.safe_load(f)
