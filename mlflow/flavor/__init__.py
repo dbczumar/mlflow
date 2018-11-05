@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 
 import os
+from functools import update_wrapper
 
 import cloudpickle
 import yaml
@@ -14,8 +15,8 @@ from mlflow.tracking.utils import _get_model_log_dir
 
 
 def _load_pyfunc(path, **kwargs):
-    flavor_module = Flavor.from_model(name=kwargs["flavor_module_name"], model_path=path)
-    return flavor_module.load_pyfunc(path=path)
+    flavor_module = Flavor.from_model(flavor_name=kwargs["flavor_name"], model_path=path)
+    return flavor_module._load_pyfunc(path=path)
 
 
 class Chdir:
@@ -25,7 +26,7 @@ class Chdir:
         self.prev_dir = None
 
     def __enter__(self):
-        self.prev_dir = os.path.abspath(os.getcwd())
+        self.prev_dir = os.getcwd()
         os.chdir(self.dir_path)
 
     def __exit__(self, *args, **kwargs): 
@@ -34,203 +35,165 @@ class Chdir:
 
 class Flavor:
 
-    def __init__(self, name, save_fn, load_fn, load_pyfunc_fn=None, conda_env=None, simplified=True):
-        self.name = name
-        self.save_fn = save_fn
-        self.load_fn = load_fn
-        self.load_pyfunc_fn = load_pyfunc_fn
-        self.conda_env = (self._parse_conda_env(conda_env_path=conda_env) 
-                if conda_env is not None else None)
-        self.simplified = simplified
+    def __init__(self, name, save_fn, load_fn, load_pyfunc_fn=None, simple=True):
+        if simple:
+            save_fn, load_fn, load_pyfunc_fn = Flavor._convert_simple_functions(
+                    flavor_name=name, save_fn=save_fn, load_fn=load_fn, 
+                    load_pyfunc_fn=load_pyfunc_fn)
 
-    def save_model(self, path, mlflow_model=Model(), conda_env=None, **kwargs):
-        if os.path.exists(path):
-            raise MlflowException("Path '{}' already exists".format(path))
+        self.save_model = Flavor._wrap_save_function(
+                flavor_name=name, save_fn=save_fn, load_fn=load_fn, load_pyfunc_fn=load_pyfunc_fn)
+        update_wrapper(self.save_model, save_fn)
+        self.load_model = load_fn
+        self._load_pyfunc = load_pyfunc_fn
 
-        data_subpath = "data"
-        data_path = os.path.join(path, data_subpath)
-        os.makedirs(data_path)
-        self.save_fn(path=data_path, **kwargs)
+    @staticmethod
+    def _convert_simple_functions(flavor_name, save_fn, load_fn, load_pyfunc_fn=None):
+        def save_model(path, mlflow_model=Model(), conda_env=None, **kwargs):
+            if os.path.exists(path):
+                raise MlflowException("Path '{}' already exists".format(path))
 
-        flavor_module_subpath = os.path.join("flavor_modules", self.name)
-        os.makedirs(os.path.join(path, flavor_module_subpath))
-        save_fn_subpath = os.path.join(flavor_module_subpath, "save.pkl") 
-        with open(os.path.join(path, save_fn_subpath), "wb") as save_out:
-            cloudpickle.dump(self.save_fn, save_out)
-        load_fn_subpath = os.path.join(flavor_module_subpath, "load.pkl")
-        with open(os.path.join(path, load_fn_subpath), "wb") as load_out:
-            cloudpickle.dump(self.load_fn, load_out)
+            data_subpath = "data"
+            data_path = os.path.join(path, data_subpath)
+            os.makedirs(data_path)
+            save_fn(path=data_path, **kwargs)
 
-        flavor_kwargs = {
-                "data": data_subpath,
-                "flavor_saver_path": save_fn_subpath,
-                "flavor_loader_path": load_fn_subpath,
-        }
+            model_conda_env = None
+            if conda_env:
+                model_conda_env = os.path.basename(os.path.abspath(conda_env))
+                shutil.copyfile(conda_env, os.path.join(path, model_conda_env))
+            
+            mlflow_model.add_flavor(flavor_name, data=data_subpath)
+            if load_pyfunc_fn is not None:
+                pyfunc.add_to_model(mlflow_model, 
+                                    loader_module="mlflow.flavor", 
+                                    flavor_name=flavor_name,
+                                    env=model_conda_env)
 
-        if conda_env is not None:
-            conda_env_subpath = os.path.basename(os.path.abspath(conda_env))
-            shutil.copyfile(conda_env, os.path.join(path, conda_env_subpath))
-        elif self.conda_env is not None:
-            conda_env_subpath = "conda.yaml"
-            with open(os.path.join(path, conda_env_subpath), "w") as f:
-                yaml.safe_dump(self.conda_env, f, default_flow_style=False)
-            flavor_kwargs["conda_env_path"] = conda_env_subpath
+            mlflow_model.save(os.path.join(path, "MLmodel"))
+
+        def load_model(path, run_id=None):
+            if run_id is not None:
+                path = _get_model_log_dir(path, run_id)
+            model_config = Model.load(os.path.join(path, "MLmodel"))
+            return load_fn(os.path.join(path, model_config.flavors[flavor_name]["data"]))
+
+        if load_pyfunc_fn is not None:
+            def _load_pyfunc(path, run_id=None):
+                if run_id is not None:
+                    path = _get_model_log_dir(path, run_id)
+                model_config = Model.load(os.path.join(path, "MLmodel"))
+                return load_pyfunc_fn(
+                        os.path.join(path, model_config.flavors[flavor_name]["data"]))
         else:
-            conda_env_subpath = None
-        
+            _load_pyfunc = None
 
-        if self.load_pyfunc_fn is not None:
-            load_pyfunc_fn_subpath = os.path.join(flavor_module_subpath, "load_pyfunc.pkl")
-            with open(os.path.join(path, load_pyfunc_fn_subpath), "wb") as load_pyfunc_out:
-                cloudpickle.dump(self.load_pyfunc_fn, load_pyfunc_out)
-            flavor_kwargs["flavor_load_pyfunc_path"] = load_pyfunc_fn_subpath 
 
-            pyfunc.add_to_model(mlflow_model, 
-                                loader_module="mlflow.flavor", 
-                                flavor_module_name=self.name,
-                                env=conda_env_subpath)
+        return save_model, load_model, _load_pyfunc
 
-        mlflow_model.add_flavor(self.name, **flavor_kwargs)
-        mlflow_model.save(os.path.join(path, "MLmodel"))
 
-    def log_model(self, artifact_path, **kwargs):
-        Model.log(artifact_path=artifact_path, flavor=self, **kwargs)
+    @staticmethod
+    def _wrap_save_function(flavor_name, save_fn, load_fn, load_pyfunc_fn=None):
+        def save_model(path, *args, **kwargs):
+            result = save_fn(path=path, *args, **kwargs)
 
-    def load_model(self, path, run_id=None):
-        if run_id is not None:
-            path = _get_model_log_dir(path, run_id)
-        model_config = Model.load(os.path.join(path, "MLmodel"))
-        return self.load_fn(os.path.join(path, model_config.flavors[self.name]["data"]))
+            # Override the model configuration's `pyfunc` configuration so that the pickled
+            # `load_pyfunc_fn` can be used to load the model as a python function
+            model_conf = Model.load(os.path.join(path, "MLmodel"))
+            flavor_conf = model_conf.flavors.get(pyfunc.FLAVOR_NAME, None)
+            if flavor_conf is not None:
+                flavor_conf["loader_module"] = "mlflow.flavor"
+                flavor_kwargs = flavor_conf["kwargs"] if "kwargs" in flavor_conf else {}
+                flavor_kwargs["flavor_name"] = flavor_name
+                flavor_conf["kwargs"] = flavor_kwargs
 
-    def load_pyfunc(self, path, run_id=None):
-        if self.load_pyfunc_fn is None:
-            raise MlflowException("This flavor does not support being loaded as a python function.")
 
-        if run_id is not None:
-            path = _get_model_log_dir(path, run_id)
-        model_config = Model.load(os.path.join(path, "MLmodel"))
-        return self.load_pyfunc_fn(os.path.join(path, model_config.flavors[self.name]["data"]))
+            # Save the flavor's `save`, `load`, and `load_pyfunc` functions with the model
+            flavor_module_subpath = os.path.join("flavor_modules", "python", flavor_name)
+            os.makedirs(os.path.join(path, flavor_module_subpath))
 
-    def get_conda_env(self, path, run_id=None):
-        if run_id is not None:
-            path = _get_model_log_dir(path, run_id)
-        model_config = Model.load(os.path.join(path, "MLmodel"))
-        with open(os.path.join(path, model_config.flavors[self.name]["conda_env_path"]), "r") as f:
-            return f.read()
+            save_fn_subpath = os.path.join(flavor_module_subpath, "save.pkl")
+            with open(os.path.join(path, save_fn_subpath), "wb") as save_out:
+                cloudpickle.dump(save_fn, save_out)
+            load_fn_subpath = os.path.join(flavor_module_subpath, "load.pkl")
+            with open(os.path.join(path, load_fn_subpath), "wb") as load_out:
+                cloudpickle.dump(load_fn, load_out)
+            if load_pyfunc_fn is not None:
+                load_pyfunc_subpath = os.path.join(flavor_module_subpath, "load_pyfunc.pkl")
+                with open(os.path.join(path, load_pyfunc_subpath), "wb") as load_pyfunc_out:
+                    cloudpickle.dump(load_pyfunc_fn, load_pyfunc_out)
 
-    def to_py_module(self, output_path):
-        import inspect
-        save_fn_source = inspect.getsource(self.save_fn)
-        load_fn_source = inspect.getsource(self.load_fn)
+            return result
 
-        module_text = "\n\n".join([save_fn_source, load_fn_source])
-        with open(output_path, "w") as f:
-            f.write(module_text)
+        return save_model
 
-    def _parse_conda_env(self, conda_env_path):
-        with open(conda_env_path, "r") as f:
-            return yaml.safe_load(f)
+    @staticmethod
+    def _validate_source_module(flavor_module):
+        if not hasattr(flavor_module, "save_model"):
+            raise MlflowException("Flavor source module must define a `save_model` method!")
+        if not hasattr(flavor_module, "load_model"):
+            raise MlflowException("Flavor source module must define a `load_model` method!")
 
     @classmethod
-    def from_model(cls, name, model_path, run_id=None):
+    def from_source(cls, module_name, uri=None, flavor_name=None, git_username=None, 
+                    git_password=None):
+        import importlib
+
+        if uri is None:
+            uri = os.getcwd()
+        uri = os.path.abspath(uri)
+        with Chdir(uri):
+            flavor_module = importlib.import_module(module_name)
+        Flavor._validate_source_module(flavor_module=flavor_module)
+
+        if flavor_name is None:
+            flavor_name = module_name
+
+        return cls(name=flavor_name, 
+                   save_fn=flavor_module.save_model, 
+                   load_fn=flavor_module.load_model,
+                   load_pyfunc_fn=(
+                       flavor_module._load_pyfunc if hasattr(flavor_module, "_load_pyfunc") 
+                       else None),
+                   simple=False)
+
+    @classmethod
+    def from_model(cls, flavor_name, model_path, run_id=None):
         if run_id is not None:
             model_path = _get_model_log_dir(model_path, run_id)
+        flavor_module_path = os.path.join(model_path, "flavor_modules", "python", flavor_name)
 
-        model_config = Model.load(os.path.join(model_path, "MLmodel"))
-        flavor_config = model_config.flavors.get(name, None)
-        if flavor_config is None:
+        if not os.path.exists(flavor_module_path):
             raise MlflowException(
-                    "The model at the specified path does not contain a flavor with name:"
-                    " {flavor_name}".format(flavor_name=name))
+                    "The specified model does not contain a serialized Flavor with name:"
+                    " {flavor_name}".format(flavor_name=flavor_name))
 
-        save_fn_subpath = flavor_config.get("flavor_saver_path", None)
-        if save_fn_subpath is None:
+        save_fn_subpath = os.path.join(flavor_module_path, "save.pkl")
+        if not os.path.exists(save_fn_subpath):
             raise MlflowException(
-                    "The configuration for the specified flavor does not contain a `load_model`"
+                    "The configuration for the specified flavor does not contain a `save_model`"
                     " function.")
         with open(os.path.join(model_path, save_fn_subpath), "rb") as save_in:
             save_fn = cloudpickle.load(save_in)
 
-        load_fn_subpath = flavor_config.get("flavor_loader_path", None)
-        if load_fn_subpath is None:
+        load_fn_subpath = os.path.join(flavor_module_path, "load.pkl")
+        if not os.path.exists(load_fn_subpath):
             raise MlflowException(
-                    "The configuration for the specified flavor does not contain a `save_model`"
+                    "The configuration for the specified flavor does not contain a `load_model`"
                     " function.")
         with open(os.path.join(model_path, load_fn_subpath), "rb") as load_in:
             load_fn = cloudpickle.load(load_in)
 
-        conda_env_path = flavor_config.get("conda_env_path", None)
-        if conda_env_path is not None:
-            conda_env_path = os.path.join(model_path, conda_env_path)
-            
-
-        load_pyfunc_fn_subpath = flavor_config.get("flavor_load_pyfunc_path", None)
-        if load_pyfunc_fn_subpath is not None:
+        load_pyfunc_fn_subpath = os.path.join(flavor_module_path, "load_pyfunc.pkl")
+        if os.path.exists(load_pyfunc_fn_subpath):
             with open(os.path.join(model_path, load_pyfunc_fn_subpath), "rb") as load_pyfunc_in:
                 load_pyfunc_fn = cloudpickle.load(load_pyfunc_in)
         else:
             load_pyfunc_fn = None
 
-        return cls(name=name, save_fn=save_fn, load_fn=load_fn, load_pyfunc_fn=load_pyfunc_fn, 
-                   conda_env=conda_env_path)
 
-    @classmethod
-    def from_source(cls, uri, module_name, git_username=None, git_password=None):
-        """
-        :param path: The path to code defining the flavor. If `git_repo` is specified,
-                     this path should be relative to the repository root. Otherwise,
-                     it should be a local path.
-        """
-        import importlib
-
-        uri = os.path.abspath(uri)
-        with Chdir(uri):
-            flavor_module = importlib.import_module(module_name)
-        
-        return Flavor(name=module_name, save_fn=flavor_module.save_model, load_fn=flavor_module.load_model)
-
-
-if __name__ == "__main__":
-    # Define a custom flavor by implementing `save_fn`, `load_fn`, and `load_pyfunc_fn`
-    # In this case, we are re-implementing the sklearn flavor
-    def save_model(path, sk_model):
-        import cloudpickle
-        with open(os.path.join(path, "skmodel.pkl"), "wb") as f:
-            cloudpickle.dump(sk_model, f)
-
-    def load_model(path):
-        import cloudpickle
-        with open(os.path.join(path, "skmodel.pkl"), "rb") as f:
-            return cloudpickle.load(f)
-
-    def load_pyfunc(path):
-        return load_model(path)
-
-    from mlflow.utils.environment import _mlflow_conda_env
-
-    conda_path = "conda.yaml"
-    _mlflow_conda_env(conda_path, additional_pip_deps=["scikit-learn"])
-
-    flavor_module = Flavor("sklearncustom", save_model, load_model, load_pyfunc, conda_path)
-
-    # Use the custom flavor to save a scikit-learn model
-    from sklearn.pipeline import Pipeline as SKPipeline
-    from sklearn.preprocessing import FunctionTransformer as SKFunctionTransformer
-    def transform(vec):
-        return vec + 1
-    pipeline = SKPipeline([("name", SKFunctionTransformer(transform, validate=True))])
-
-    model_path = tempfile.mktemp()
-    flavor_module.save_model(path=model_path, sk_model=pipeline)
-
-    # Load the custom flavor from the serialized model and use it to deserialize the
-    # the model in native format as well as pyfunc format
-    flavor_module = Flavor.from_model("sklearncustom", model_path)
-
-    sk_model = flavor_module.load_model(model_path)
-
-    sk_pyfunc = pyfunc.load_pyfunc(model_path)
-
-    print(sk_pyfunc)
-    print(flavor_module.get_conda_env(model_path))
-
+        return cls(name=flavor_name, 
+                   save_fn=save_fn, 
+                   load_fn=load_fn, 
+                   load_pyfunc_fn=load_pyfunc_fn,
+                   simple=False)
