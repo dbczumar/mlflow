@@ -88,7 +88,6 @@ class Flavor:
         else:
             _load_pyfunc = None
 
-
         return save_model, load_model, _load_pyfunc
 
 
