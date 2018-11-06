@@ -1,5 +1,6 @@
 from __future__ import absolute_import
 
+import sys
 import os
 from functools import update_wrapper
 
@@ -11,6 +12,8 @@ import shutil
 from mlflow import pyfunc
 from mlflow.exceptions import MlflowException 
 from mlflow.models import Model
+from mlflow.projects import _fetch_project
+from mlflow.utils.file_utils import TempDir
 from mlflow.tracking.utils import _get_model_log_dir
 
 
@@ -31,6 +34,18 @@ class Chdir:
 
     def __exit__(self, *args, **kwargs): 
         os.chdir(self.prev_dir)
+
+
+class SysPath:
+    
+    def __init__(self, path):
+        self.path = path
+
+    def __enter__(self):
+        sys.path.append(self.path)
+
+    def __exit__(self, *args, **kwargs):
+        sys.path.remove(self.path)
 
 
 class Flavor:
@@ -123,7 +138,6 @@ class Flavor:
     def log_model(self, path, **kwargs):
         return Model.log(artifact_path=path, flavor=self, **kwargs) 
 
-
     @staticmethod
     def _convert_simple_functions(flavor_name, save_fn, load_fn, load_pyfunc_fn=None):
         def save_model(path, mlflow_model=Model(), conda_env=None, **kwargs):
@@ -213,13 +227,25 @@ class Flavor:
     @classmethod
     def from_source(cls, module_name, uri=None, flavor_name=None, git_username=None, 
                     git_password=None):
+        """
+        :param module_name: The name of the module defining flavor methods: `save_model`,
+                            `load_model`, and, optionally, `_load_pyfunc`.
+        :param uri: The uri of the project containing the module. If unspecified, the current
+                    working directory will be used.
+        :param flavor_name: The name of the flavor module. If unspecified, the module name
+                            will be used as the flavor name.
+        """
         import importlib
 
         if uri is None:
             uri = os.getcwd()
         uri = os.path.abspath(uri)
-        with Chdir(uri):
+        project_location = _fetch_project(
+                uri=uri, force_tempdir=False, version=None, git_username=git_username,
+                git_password=git_password)
+        with SysPath(project_location):
             flavor_module = importlib.import_module(module_name)
+        
         Flavor._validate_source_module(flavor_module=flavor_module)
 
         if flavor_name is None:

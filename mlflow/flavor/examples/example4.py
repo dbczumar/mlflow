@@ -66,25 +66,33 @@ def save_tf_iris_model(dst_dir):
 
 
 if __name__ == "__main__":
+    # Train and save a Tensorflow model in Tensorflow's `SavedModel` format
     model_dst_dir = tempfile.mkdtemp()
     tf_saved_model = save_tf_iris_model(dst_dir=model_dst_dir)
 
+    # Load the tensorflow flavor from source 
+    flavor_module = Flavor.from_source("mlflow.tensorflow", flavor_name="tensorflow")
+   
+    # Use the flavor to save the tensorflow model in MLflow format
     mlflow_model_path = tempfile.mkdtemp()
     os.rmdir(mlflow_model_path)
-    flavor_module = Flavor.from_source("mlflow.tensorflow", flavor_name="tensorflow")
     flavor_module.save_model(
             path=mlflow_model_path, tf_saved_model_dir=tf_saved_model.path, 
             tf_meta_graph_tags=tf_saved_model.meta_graph_tags, 
             tf_signature_def_key=tf_saved_model.signature_def_key)
 
+    # Load the flavor from the serialized model and use it to deserialize the
+    # the model in native format as well as pyfunc format
+    flavor_module = Flavor.from_model("tensorflow", mlflow_model_path)
+
+    # Use the loaded flavor to load the orginal model in a Tensorflow graph
     tf_graph = tf.Graph()
     tf_sess = tf.Session(graph=tf_graph)
     with tf_graph.as_default():
-        flavor_module = Flavor.from_model("tensorflow", mlflow_model_path)
         sigdef = flavor_module.load_model(path=mlflow_model_path, tf_sess=tf_sess)
         print(sigdef)
 
-
+    # Use the loaded flavor to load the model as a python function
     tf_pyfunc = pyfunc.load_pyfunc(mlflow_model_path)
     print(tf_pyfunc)
         
