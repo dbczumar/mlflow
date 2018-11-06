@@ -36,6 +36,79 @@ class Chdir:
 class Flavor:
 
     def __init__(self, name, save_fn, load_fn, load_pyfunc_fn=None, simple=True):
+        """
+        :param save_fn: A `save_model` function that persists a model to a specified location.
+                        If `simple` is True, this function only needs to output serialized
+                        model data. If `simple` is False, this function also needs to construct
+                        an "MLmodel" configuration, (optionally) add the `pyfunc` flavor to the
+                        configuration, and persist the configuration to the specified location.
+                        Required function arguments:
+                            - `path`: The absolute path to which to persist the specified model
+
+        :param load_fn: A `load_model` function that loads a persisted model MLflow from a specified
+                        location. If `simple` is True, this function only needs to load serialized
+                        model data. If `simple` is False, this function first needs to parse the 
+                        model's "MLmodel" configuration, perform all the necessary work to resolve 
+                        serialized model data paths, and load the serialized data.
+                        Required function arguments:
+                            - `path`: The run-relative path to the MLflow model 
+                            - (If `simple` is `False`) `run_id`: The run id of the MLflow model 
+
+        :param load_pyfunc_fn: A `_load_pyfunc` function that loads a persisted model as a python
+                               function from a specified location. If `simple` is True, this
+                               function only needs to load serialized model data as a python 
+                               function wrapper. If `simple` is False, this function first needs to
+                               parse the model's "MLmodel" configuration, perform all the necessary 
+                               work to resolve serialized model data paths, and load the serialized 
+                               data.        
+                               Required function arguments:
+                                    - `path`: If `simple` is `True`, this is the path to the
+                                              serialized model data. If `simple` is `False`,
+                                              the path will depend on the model's pyfunc
+                                              configuration format, as defined by `save_fn`.
+
+        :param simple: If `True`, interprets `save_fn`, `load_fn`, and `load_pyfunc_fn` as functions
+                       that only operate on model data; these functions will be wrapped to 
+                       produce complete `save_model`, `load_model`, and `_load_pyfunc` functions
+                       that also output "MLmodel" configurations and provide portability guarantees.
+                       If `False`, interpets `save_fn`, `load_fn`, and `load_pyfunc_fn` as complete
+                       `save_model`, `load_model`, and `_load_pyfunc` functions respectively; these
+                       functions are assumed to produce "MLmodle" configurations and provide
+                       model portability.
+        
+        >>> ### `simple=True` example ###
+        >>> def save_model(path, sk_model):
+        >>>     import cloudpickle
+        >>>     with open(os.path.join(path, "skmodel.pkl"), "wb") as f:
+        >>>         cloudpickle.dump(sk_model, f)
+        >>>
+        >>> def load_model(path):
+        >>>     import cloudpickle
+        >>>     with open(os.path.join(path, "skmodel.pkl"), "rb") as f:
+        >>>         return cloudpickle.load(f)
+        >>>
+        >>> def load_pyfunc(path):
+        >>>     return load_model(path)
+        >>> 
+        >>> # These functions only operate on model data. Their `path` arguments are assumed
+        >>> # to be direct input/output paths referencing sklearn model data. Therefore, they
+        >>> # conform to the `simple` format.
+        >>> simple_flavor = Flavor(name="sklearnsimple", save_fn=save_model, load_fn=load_model,
+        >>>                        load_pyfunc_fn=load_pyfunc, simple=True)
+        >>>
+        >>> ### `simple=False` example ###
+        >>> import mlflow.sklearn
+        >>>
+        >>> # The `save_model`, `load_model`, and `_load_pyfunc` functions in the `mlflow.sklearn`
+        >>> # model are "complete" in the sense that, in addition to serializing model data, they 
+        >>> # produce model configurations, handle absolute path resolution from run_ids /
+        >>> # run-relative paths, and provide portability. Therefore, they do not conform to the
+        >>> # `simple` format.
+        >>> complete_flavor = Flavor(
+        >>>     name="sklearncomplete", save_fn=mlflow.sklearn.save_model,
+        >>>     load_fn=mlflow.sklearn.load_model, load_pyfunc_fn=mlflow.sklearn._load_pyfunc,
+        >>>     simple=False)
+        """
         if simple:
             save_fn, load_fn, load_pyfunc_fn = Flavor._convert_simple_functions(
                     flavor_name=name, save_fn=save_fn, load_fn=load_fn, 
@@ -46,6 +119,10 @@ class Flavor:
         update_wrapper(self.save_model, save_fn)
         self.load_model = load_fn
         self._load_pyfunc = load_pyfunc_fn
+
+    def log_model(self, path, **kwargs):
+        return Model.log(artifact_path=path, flavor=self, **kwargs) 
+
 
     @staticmethod
     def _convert_simple_functions(flavor_name, save_fn, load_fn, load_pyfunc_fn=None):
