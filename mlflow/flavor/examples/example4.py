@@ -7,6 +7,7 @@ import numpy as np
 import tensorflow as tf
 import sklearn.datasets as datasets
 
+import mlflow
 import mlflow.pyfunc as pyfunc
 from mlflow.flavor import Flavor
 from mlflow.utils.environment import _mlflow_conda_env
@@ -74,26 +75,27 @@ if __name__ == "__main__":
     flavor_module = Flavor.from_source("mlflow.tensorflow", flavor_name="tensorflow")
    
     # Use the flavor to save the tensorflow model in MLflow format
-    mlflow_model_path = tempfile.mkdtemp()
-    os.rmdir(mlflow_model_path)
-    flavor_module.save_model(
-            path=mlflow_model_path, tf_saved_model_dir=tf_saved_model.path, 
-            tf_meta_graph_tags=tf_saved_model.meta_graph_tags, 
-            tf_signature_def_key=tf_saved_model.signature_def_key)
+    mlflow_model_path = "model"
+    with mlflow.start_run():
+        flavor_module.log_model(
+                path=mlflow_model_path, tf_saved_model_dir=tf_saved_model.path, 
+                tf_meta_graph_tags=tf_saved_model.meta_graph_tags, 
+                tf_signature_def_key=tf_saved_model.signature_def_key)
+        run_id = mlflow.active_run().info.run_uuid
 
     # Load the flavor from the serialized model and use it to deserialize the
     # the model in native format as well as pyfunc format
-    flavor_module = Flavor.from_model("tensorflow", mlflow_model_path)
+    flavor_module = Flavor.from_model("tensorflow", model_path=mlflow_model_path, run_id=run_id)
 
     # Use the loaded flavor to load the orginal model in a Tensorflow graph
     tf_graph = tf.Graph()
     tf_sess = tf.Session(graph=tf_graph)
     with tf_graph.as_default():
-        sigdef = flavor_module.load_model(path=mlflow_model_path, tf_sess=tf_sess)
+        sigdef = flavor_module.load_model(path=mlflow_model_path, run_id=run_id, tf_sess=tf_sess)
         print(sigdef)
 
     # Use the loaded flavor to load the model as a python function
-    tf_pyfunc = pyfunc.load_pyfunc(mlflow_model_path)
+    tf_pyfunc = pyfunc.load_pyfunc(path=mlflow_model_path, run_id=run_id)
     print(tf_pyfunc)
         
 

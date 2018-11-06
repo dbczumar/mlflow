@@ -136,6 +136,9 @@ class Flavor:
         self._load_pyfunc = load_pyfunc_fn
 
     def log_model(self, path, **kwargs):
+        """
+        Logs a model to the specified path 
+        """
         return Model.log(artifact_path=path, flavor=self, **kwargs) 
 
     @staticmethod
@@ -226,14 +229,18 @@ class Flavor:
 
     @classmethod
     def from_source(cls, module_name, uri=None, flavor_name=None, git_username=None, 
-                    git_password=None):
+                    git_password=None, git_version=None):
         """
+        Loads a Flavor from Python source files.
+
         :param module_name: The name of the module defining flavor methods: `save_model`,
                             `load_model`, and, optionally, `_load_pyfunc`.
         :param uri: The uri of the project containing the module. If unspecified, the current
                     working directory will be used.
         :param flavor_name: The name of the flavor module. If unspecified, the module name
                             will be used as the flavor name.
+        :param git_version: If `uri` specifies a Git project, the project will be fetched 
+                            with this version.
         """
         import importlib
 
@@ -241,7 +248,7 @@ class Flavor:
             uri = os.getcwd()
         uri = os.path.abspath(uri)
         project_location = _fetch_project(
-                uri=uri, force_tempdir=False, version=None, git_username=git_username,
+                uri=uri, force_tempdir=False, version=git_version, git_username=git_username,
                 git_password=git_password)
         with SysPath(project_location):
             flavor_module = importlib.import_module(module_name)
@@ -261,6 +268,13 @@ class Flavor:
 
     @classmethod
     def from_model(cls, flavor_name, model_path, run_id=None):
+        """
+        Loads a Flavor from a serialized MLflow model.
+
+        :param flavor_name: The name of the flavor module to load.
+        :param model_path: The run-relative path to the serialized model.
+        :param run_id: The run id of the serialized model.
+        """
         if run_id is not None:
             model_path = _get_model_log_dir(model_path, run_id)
         flavor_module_path = os.path.join(model_path, "flavor_modules", "python", flavor_name)
