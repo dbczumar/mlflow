@@ -86,7 +86,7 @@ class Flavor:
                        that only operate on model data; these functions will be wrapped to 
                        produce complete `save_model`, `load_model`, and `_load_pyfunc` functions
                        that also output "MLmodel" configurations and provide portability guarantees.
-                       If `False`, interpets `save_fn`, `load_fn`, and `load_pyfunc_fn` as complete
+                       If `False`, interprets `save_fn`, `load_fn`, and `load_pyfunc_fn` as complete
                        `save_model`, `load_model`, and `_load_pyfunc` functions respectively; these
                        functions are assumed to produce "MLmodle" configurations and provide
                        model portability.
