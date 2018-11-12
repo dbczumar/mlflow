@@ -59,7 +59,7 @@ def _server_dependencies_cmds():
     :return: List of commands.
     """
     # TODO: Should we reinstall MLflow? What if there is MLflow in the user's conda environment?
-    return ["conda install -c anaconda gunicorn", "conda install -c anaconda gevent",
+    return ["conda install gunicorn", "conda install gevent",
             "pip install /opt/mlflow/." if _container_includes_mlflow_source()
             else "pip install mlflow=={}".format(MLFLOW_VERSION)]
 
@@ -134,7 +134,7 @@ def _serve_mleap():
 
 
 def _container_includes_mlflow_source():
-    return os.path.isdir("/opt/mlflow")
+    return os.path.exists("/opt/mlflow/setup.py")
 
 
 def _train():

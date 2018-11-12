@@ -18,6 +18,7 @@ from mlflow.exceptions import ExecutionException
 from mlflow.entities import RunStatus, SourceType, Param
 import mlflow.tracking as tracking
 from mlflow.tracking.fluent import _get_experiment_id, _get_git_commit
+import mlflow.tracking.fluent as fluent
 
 
 import mlflow.projects.databricks
@@ -113,8 +114,8 @@ def run(uri, entry_point="main", version=None, parameters=None, experiment_id=No
     :param version: For Git-based projects, either a commit hash or a branch name.
     :param experiment_id: ID of experiment under which to launch the run.
     :param mode: Execution mode of the run: "local" or "databricks".
-    :param cluster_spec: When ``mode`` is "databricks", path to a JSON file containing a
-                         `Databricks cluster specification
+    :param cluster_spec: When ``mode`` is "databricks", dictionary or path to a JSON file
+                         containing a `Databricks cluster specification
                          <https://docs.databricks.com/api/latest/jobs.html#clusterspec>`_
                          to use when launching a run.
     :param git_username: Username for HTTP(S) authentication with Git.
@@ -137,9 +138,19 @@ def run(uri, entry_point="main", version=None, parameters=None, experiment_id=No
     :return: :py:class:`mlflow.projects.SubmittedRun` exposing information (e.g. run ID)
              about the launched run.
     """
+    cluster_spec_dict = cluster_spec
+    if (cluster_spec and type(cluster_spec) != dict
+            and os.path.splitext(cluster_spec)[-1] == ".json"):
+        with open(cluster_spec, 'r') as handle:
+            try:
+                cluster_spec_dict = json.load(handle)
+            except ValueError:
+                eprint("Error when attempting to load and parse JSON cluster spec from file "
+                       "%s. " % cluster_spec)
+                raise
     submitted_run_obj = _run(
         uri=uri, entry_point=entry_point, version=version, parameters=parameters,
-        experiment_id=experiment_id, mode=mode, cluster_spec=cluster_spec,
+        experiment_id=experiment_id, mode=mode, cluster_spec=cluster_spec_dict,
         git_username=git_username, git_password=git_password, use_conda=use_conda,
         storage_dir=storage_dir, block=block, run_id=run_id)
     if block:
@@ -416,12 +427,18 @@ def _create_run(uri, experiment_id, work_dir, entry_point):
         source_name = tracking.utils._get_git_url_if_present(_expand_uri(uri))
     else:
         source_name = _expand_uri(uri)
+    existing_run = fluent.active_run()
+    if existing_run:
+        parent_run_id = existing_run.info.run_uuid
+    else:
+        parent_run_id = None
     active_run = tracking.MlflowClient().create_run(
         experiment_id=experiment_id,
         source_name=source_name,
         source_version=_get_git_commit(work_dir),
         entry_point_name=entry_point,
-        source_type=SourceType.PROJECT)
+        source_type=SourceType.PROJECT,
+        parent_run_id=parent_run_id)
     return active_run
 
 

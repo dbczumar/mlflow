@@ -9,6 +9,8 @@ from mlflow.data import is_uri
 from mlflow.entities import ViewType
 from mlflow.tracking import _get_store
 
+EXPERIMENT_ID = click.argument("experiment_id", type=click.INT)
+
 
 @click.group("experiments")
 def commands():
@@ -53,7 +55,7 @@ def list_experiments(view):
 
 
 @commands.command("delete")
-@click.argument("experiment_id")
+@EXPERIMENT_ID
 def delete_experiment(experiment_id):
     """
     Mark an experiment for deletion. Return an error if the experiment does not exist or
@@ -66,7 +68,7 @@ def delete_experiment(experiment_id):
 
 
 @commands.command("restore")
-@click.argument("experiment_id")
+@EXPERIMENT_ID
 def restore_experiment(experiment_id):
     """
     Restore a deleted experiment.
@@ -75,3 +77,16 @@ def restore_experiment(experiment_id):
     store = _get_store()
     store.restore_experiment(experiment_id)
     print("Experiment with id %s has been restored." % str(experiment_id))
+
+
+@commands.command("rename")
+@EXPERIMENT_ID
+@click.argument("new_name")
+def rename_experiment(experiment_id, new_name):
+    """
+    Renames an active experiment.
+    Returns an error if the experiment is inactive.
+    """
+    store = _get_store()
+    store.rename_experiment(experiment_id, new_name)
+    print("Experiment with id %s has been renamed to '%s'." % (experiment_id, new_name))

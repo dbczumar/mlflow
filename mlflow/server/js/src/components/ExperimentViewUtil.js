@@ -20,7 +20,7 @@ export default class ExperimentViewUtil {
       fontSize: 20,
     },
     headerCellText: {
-      verticalAlign: "middle"
+      verticalAlign: "middle",
     },
     sortIconContainer: {
       marginLeft: 2,
@@ -29,7 +29,10 @@ export default class ExperimentViewUtil {
     },
     expander: {
       pointer: 'cursor',
-    }
+    },
+    runInfoCell: {
+      maxWidth: 250
+    },
   };
 
   /**
@@ -40,6 +43,7 @@ export default class ExperimentViewUtil {
     const user = Utils.formatUser(runInfo.user_id);
     const sourceType = Utils.renderSource(runInfo, tags);
     const startTime = runInfo.start_time;
+    const runName = Utils.getRunName(tags);
     const childLeftMargin = isParent ? {} : {paddingLeft: '16px'};
     return [
       <td key="meta-link" className="run-table-container" style={{whiteSpace: "inherit"}}>
@@ -50,18 +54,23 @@ export default class ExperimentViewUtil {
         </div>
       </td>,
       <td key="meta-user" className="run-table-container" title={user}>
-        <div>
+        <div className="truncate-text single-line" style={ExperimentViewUtil.styles.runInfoCell}>
           {user}
         </div>
       </td>,
+      <td key="meta-run-name" className="run-table-container" title={runName}>
+        <div className="truncate-text single-line" style={ExperimentViewUtil.styles.runInfoCell}>
+          {runName}
+        </div>
+      </td>,
       <td className="run-table-container" key="meta-source" title={sourceType}>
-        <div>
+        <div className="truncate-text single-line" style={ExperimentViewUtil.styles.runInfoCell}>
           {Utils.renderSourceTypeIcon(runInfo.source_type)}
           {sourceType}
         </div>
       </td>,
       <td className="run-table-container" key="meta-version">
-        <div>
+        <div className="truncate-text single-line" style={ExperimentViewUtil.styles.runInfoCell}>
           {Utils.renderVersion(runInfo)}
         </div>
       </td>,
@@ -112,6 +121,7 @@ export default class ExperimentViewUtil {
     return [
       getHeaderCell("start_time", <span>{"Date"}</span>),
       getHeaderCell("user_id", <span>{"User"}</span>),
+      getHeaderCell("run_name", <span>{"Run Name"}</span>),
       getHeaderCell("source", <span>{"Source"}</span>),
       getHeaderCell("source_version", <span>{"Version"}</span>),
     ];
@@ -123,6 +133,57 @@ export default class ExperimentViewUtil {
       className={"bottom-row run-table-container"}
       style={{width: '5px'}}
     />;
+  }
+
+
+  /**
+   * Returns a table cell corresponding to a single metric value. The metric is assumed to be
+   * unbagged (marked to be displayed in its own column).
+   * @param metricKey The key of the desired metric
+   * @param metricsMap Object mapping metric keys to their latest values for a single run
+   * @param metricRanges Object mapping metric keys to objects of the form {min: ..., max: ...}
+   *                     containing min and max values of the metric across all visible runs.
+   */
+  static getUnbaggedMetricCell(metricKey, metricsMap, metricRanges) {
+    const className = "left-border run-table-container";
+    const keyName = "metric-" + metricKey;
+    if (metricsMap[metricKey]) {
+      const metric = metricsMap[metricKey].getValue();
+      const range = metricRanges[metricKey];
+      let fraction = 1.0;
+      if (range.max > range.min) {
+        fraction = (metric - range.min) / (range.max - range.min);
+      }
+      const percent = (fraction * 100) + "%";
+      return (
+        <td className={className} key={keyName}>
+          {/* We need the extra div because metric-filler-bg is inline-block */}
+          <div>
+            <div className="metric-filler-bg">
+              <div className="metric-filler-fg" style={{width: percent}}/>
+              <div className="metric-text">
+                {Utils.formatMetric(metric)}
+              </div>
+            </div>
+          </div>
+        </td>
+      );
+    }
+    return <td className={className} key={keyName}/>;
+  }
+
+  static getUnbaggedParamCell(paramKey, paramsMap) {
+    const className = "left-border run-table-container";
+    const keyName = "param-" + paramKey;
+    if (paramsMap[paramKey]) {
+      return <td className={className} key={keyName}>
+        <div>
+          {paramsMap[paramKey].getValue()}
+        </div>
+      </td>;
+    } else {
+      return <td className={className} key={keyName}/>;
+    }
   }
 
   static isSortedBy(sortState, isMetric, isParam, key) {
@@ -219,20 +280,20 @@ export default class ExperimentViewUtil {
     return expanderOpen;
   }
 
-  static getExpander(hasExpander, expanderOpen, onExpandBound) {
+  static getExpander(hasExpander, expanderOpen, onExpandBound, runUuid) {
     if (!hasExpander) {
-      return <td>
+      return <td key={'Expander-' + runUuid}>
       </td>;
     }
     if (expanderOpen) {
       return (
-        <td onClick={onExpandBound}>
+        <td onClick={onExpandBound} key={'Expander-' + runUuid}>
           <i className="ExperimentView-expander far fa-minus-square"/>
         </td>
       );
     } else {
       return (
-        <td onClick={onExpandBound}>
+        <td onClick={onExpandBound} key={'Expander-' + runUuid}>
           <i className="ExperimentView-expander far fa-plus-square"/>
         </td>
       );
