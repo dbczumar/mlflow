@@ -11,12 +11,26 @@ SpaCy (native) format
 from __future__ import absolute_import
 
 import os
+import shutil
 
 import pandas as pd
+import spacy
+import yaml
 
+import mlflow.tracking
 from mlflow import pyfunc
 from mlflow.models import Model
-import mlflow.tracking
+from mlflow.utils.environment import _mlflow_conda_env 
+from mlflow.utils.model_utils import _get_flavor_configuration
+
+
+DEFAULT_CONDA_ENV = _mlflow_conda_env(
+    additional_conda_deps=[
+        "spacy={}".format(spacy.__version__),
+    ],
+    additional_pip_deps=None,
+    additional_conda_channels=None,
+)
 
 
 FLAVOR_NAME = "spacy"
@@ -51,8 +65,6 @@ def save_model(spacy_model, path, conda_env=None, mlflow_model=Model(), **kwargs
     :param mlflow_model: :py:mod:`mlflow.models.Model` this flavor is being added to.
     :param kwargs: kwargs to pass to ``spacy_model.to_disk`` method.
     """
-    import spacy
-
     path = os.path.abspath(path)
     if os.path.exists(path):
         raise RuntimeError("Path '{}' already exists".format(path))
@@ -63,35 +75,21 @@ def save_model(spacy_model, path, conda_env=None, mlflow_model=Model(), **kwargs
     spacy_model.to_disk(model_path, **kwargs)
     model_file = os.path.basename(model_path)
 
+    conda_env_subpath = "conda.yaml"
+    if conda_env is not None:
+        shutil.copyfile(conda_env, os.path.join(path, conda_env_subpath))
+    else:
+        with open(os.path.join(path, conda_env_subpath), "w") as f:
+            yaml.safe_dump(DEFAULT_CONDA_ENV, stream=f, default_flow_style=False)
+
     mlflow_model.add_flavor(FLAVOR_NAME, model_data=model_file,
                             spacy_version=spacy.__version__)
     pyfunc.add_to_model(mlflow_model, loader_module="mlflow.spacy",
-                        data=model_file, env=conda_env)
+                        data=model_file, env=conda_env_subpath)
     mlflow_model.save(os.path.join(path, "MLmodel"))
 
 
 def _load_model(path, **kwargs):
-    import spacy
-
-    mlflow_model_path = os.path.join(path, "MLmodel")
-    if not os.path.exists(mlflow_model_path):
-        raise RuntimeError("MLmodel is not found at '{}'".format(path))
-
-    mlflow_model = Model.load(mlflow_model_path)
-
-    if FLAVOR_NAME not in mlflow_model.flavors:
-        raise ValueError("Could not find flavor '{}' amongst available flavors {}, "
-                         "unable to load stored model"
-                         .format(FLAVOR_NAME, list(mlflow_model.flavors.keys())))
-
-    flavor = mlflow_model.flavors[FLAVOR_NAME]
-    if spacy.__version__ != flavor["spacy_version"]:
-        raise ValueError("Stored model version '{}' does not match "
-                         "installed SpaCy version '{}'"
-                         .format(flavor["spacy_version"], spacy.__version__))
-
-    path = os.path.abspath(path)
-    path = os.path.join(path, mlflow_model.flavors[FLAVOR_NAME]['model_data'])
     return spacy.load(path, **kwargs)
 
 
@@ -106,83 +104,73 @@ def load_model(path, run_id=None, **kwargs):
     """
     if run_id is not None:
         path = mlflow.tracking.utils._get_model_log_dir(model_name=path, run_id=run_id)
-
-    return _load_model(path, **kwargs)
+    path = os.path.abspath(path)
+    flavor_conf = _get_flavor_configuration(model_path=path, flavor_name=FLAVOR_NAME)
+    spacy_model_artifacts_path = os.path.join(path, flavor_conf['model_data'])
+    return _load_model(path=spacy_model_artifacts_path, **kwargs)
 
 
 def _load_pyfunc(path, **kwargs):
     """
     Load PyFunc implementation. Called by ``pyfunc.load_pyfunc``.
     """
-    return _SpaCyWrapper(_load_model(os.path.dirname(path), **kwargs))
+    return _SpaCyWrapper(_load_model(os.path.abspath(path), **kwargs))
 
 
 class _SpaCyWrapper(object):
     """
     Wrapper class that creates a predict function such that
     predict(data: pd.DataFrame) -> model's output as pd.DataFrame (pandas DataFrame)
-
-    Be sure to pass an additional row with a "mode" column that specifies the
-    kind of model.
-
-    Possible modes:
-        - classification: text classification, eg. positive v. negative
-        - ner: named entity recognition, eg. identify animals "I see a [dog]"
-        - parser: dependency parsing; how to parse a sentence into a tree
-        - tagger: part-of-speech tagging
-
-    For example,
-    $ curl -d '[{"text": "That movie sucked. It was so awful. I hated every moment of it."}, {"text": "That movie was fantastic! So amazing!! 10/10 would recommend"}, {"mode": "classification"}]' -H 'Content-Type: application/json' -X POST localhost:5000/invocations
-    [{"predictions": {"POSITIVE": 0.0586448609828949}}, {"predictions": {"POSITIVE": 0.6672934889793396}}]
     """
     def __init__(self, spacy_model):
         self.spacy_model = spacy_model
 
     def predict(self, data):
-        if not isinstance(data, pd.DataFrame):
-            raise TypeError("Input data should be pandas.DataFrame")
-
-        if "mode" not in data:
-            raise ValueError(
-                "Please specify an additional column called mode with one "
-                "of the following values: classification, ner, parsing, tagging",
-            )
-        mode = data["mode"][data["mode"].notna()].tolist()
-        if not mode:
-            raise ValueError(
-                "Please specify a value for \"mode\". You can choose one "
-                "of the following values: classification, ner, parsing, tagging",
-            )
-        mode = mode[0]
-
-        if set(data.columns) != {"text", "mode"}:
-            raise ValueError(
-                "Data has columns that are not only \"text\" and \"mode\"."
-                "Found columns: {}".format(set(data.columns)),
-            )
-
-        # Drop the extra row from the "mode" column
-        texts = data[data["mode"].isna()]["text"]
-
-        if mode == "classification":
-            return pd.DataFrame({
-                "predictions": texts.apply(lambda text: self.spacy_model(text).cats)
-            })
-        if mode == "ner":
-            entities = texts.apply(lambda text: self.spacy_model(text).ents)
-            return pd.DataFrame({
-                "predictions": entities.apply(lambda ents: [{
-                    "text": ent.text,
-                    "label": ent.label_,
-                    "start_char": ent.start_char,
-                    "end_char": ent.end_char,
-                } for ent in ents])
-            })
-        if mode == "parser":
-            # TODO
-            return
-        if mode == "tagger":
-            # TODO
-            return
-
-        raise ValueError("{} is not a supported mode".format(mode))
+        pass
+        # if not isinstance(data, pd.DataFrame):
+        #     raise TypeError("Input data should be pandas.DataFrame")
+        #
+        # if "mode" not in data:
+        #     raise ValueError(
+        #         "Please specify an additional column called mode with one "
+        #         "of the following values: classification, ner, parsing, tagging",
+        #     )
+        # mode = data["mode"][data["mode"].notna()].tolist()
+        # if not mode:
+        #     raise ValueError(
+        #         "Please specify a value for \"mode\". You can choose one "
+        #         "of the following values: classification, ner, parsing, tagging",
+        #     )
+        # mode = mode[0]
+        #
+        # if set(data.columns) != {"text", "mode"}:
+        #     raise ValueError(
+        #         "Data has columns that are not only \"text\" and \"mode\"."
+        #         "Found columns: {}".format(set(data.columns)),
+        #     )
+        #
+        # # Drop the extra row from the "mode" column
+        # texts = data[data["mode"].isna()]["text"]
+        #
+        # if mode == "classification":
+        #     return pd.DataFrame({
+        #         "predictions": texts.apply(lambda text: self.spacy_model(text).cats)
+        #     })
+        # if mode == "ner":
+        #     entities = texts.apply(lambda text: self.spacy_model(text).ents)
+        #     return pd.DataFrame({
+        #         "predictions": entities.apply(lambda ents: [{
+        #             "text": ent.text,
+        #             "label": ent.label_,
+        #             "start_char": ent.start_char,
+        #             "end_char": ent.end_char,
+        #         } for ent in ents])
+        #     })
+        # if mode == "parser":
+        #     # TODO
+        #     return
+        # if mode == "tagger":
+        #     # TODO
+        #     return
+        #
+        # raise ValueError("{} is not a supported mode".format(mode))
