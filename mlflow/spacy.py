@@ -72,7 +72,7 @@ def save_model(spacy_model, path, conda_env=None, mlflow_model=Model(), **kwargs
     model_path = os.path.join(path, "model.pth")
 
     # Save spacy model
-    spacy_model.to_disk(model_path, **kwargs)
+    _save_model(spacy_model, model_path, **kwargs)
     model_file = os.path.basename(model_path)
 
     conda_env_subpath = "conda.yaml"
@@ -87,6 +87,10 @@ def save_model(spacy_model, path, conda_env=None, mlflow_model=Model(), **kwargs
     pyfunc.add_to_model(mlflow_model, loader_module="mlflow.spacy",
                         data=model_file, env=conda_env_subpath)
     mlflow_model.save(os.path.join(path, "MLmodel"))
+
+
+def _save_model(spacy_model, model_path, **kwargs):
+    spacy_model.to_disk(model_path, **kwargs)
 
 
 def _load_model(path, **kwargs):
