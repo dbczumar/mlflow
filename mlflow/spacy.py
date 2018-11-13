@@ -126,51 +126,7 @@ class _SpaCyWrapper(object):
         self.spacy_model = spacy_model
 
     def predict(self, data):
-        pass
-        # if not isinstance(data, pd.DataFrame):
-        #     raise TypeError("Input data should be pandas.DataFrame")
-        #
-        # if "mode" not in data:
-        #     raise ValueError(
-        #         "Please specify an additional column called mode with one "
-        #         "of the following values: classification, ner, parsing, tagging",
-        #     )
-        # mode = data["mode"][data["mode"].notna()].tolist()
-        # if not mode:
-        #     raise ValueError(
-        #         "Please specify a value for \"mode\". You can choose one "
-        #         "of the following values: classification, ner, parsing, tagging",
-        #     )
-        # mode = mode[0]
-        #
-        # if set(data.columns) != {"text", "mode"}:
-        #     raise ValueError(
-        #         "Data has columns that are not only \"text\" and \"mode\"."
-        #         "Found columns: {}".format(set(data.columns)),
-        #     )
-        #
-        # # Drop the extra row from the "mode" column
-        # texts = data[data["mode"].isna()]["text"]
-        #
-        # if mode == "classification":
-        #     return pd.DataFrame({
-        #         "predictions": texts.apply(lambda text: self.spacy_model(text).cats)
-        #     })
-        # if mode == "ner":
-        #     entities = texts.apply(lambda text: self.spacy_model(text).ents)
-        #     return pd.DataFrame({
-        #         "predictions": entities.apply(lambda ents: [{
-        #             "text": ent.text,
-        #             "label": ent.label_,
-        #             "start_char": ent.start_char,
-        #             "end_char": ent.end_char,
-        #         } for ent in ents])
-        #     })
-        # if mode == "parser":
-        #     # TODO
-        #     return
-        # if mode == "tagger":
-        #     # TODO
-        #     return
-        #
-        # raise ValueError("{} is not a supported mode".format(mode))
+        def tokenize(pandas_series):
+            return pd.Series(self.spacy_model.tokenizer(pandas_series.to_string(index=False)))
+
+        return data.apply(func=tokenize, axis=1)
