@@ -72,7 +72,7 @@ def parse_csv_input(csv_input):
     """
     # pylint: disable=broad-except
     try:
-        return pd.read_csv(csv_input)
+        return pd.read_csv(csv_input, index_col=0)
     except Exception:
         _handle_serving_error(
                 error_message=(
@@ -170,6 +170,7 @@ def init(model):
 
         # Do the prediction
         # pylint: disable=broad-except
+        print("DATA", data)
         try:
             raw_predictions = model.predict(data)
         except Exception:
