@@ -288,6 +288,39 @@ def log_model(artifact_path, **kwargs):
         log_artifacts(local_path, artifact_path)
 
 
+# def from_model(models, predict_fn, code=None, data=None):
+#     """
+#     :param models: A list of model specification dictionaries of the form
+#                    {
+#                      "model_path": "<model_path>",
+#                      "run_id": "<run_id>",
+#                      "flavor": "<flavor_name>",
+#                    }
+#     :param predict_fn: A function that evaluates a Pandas DataFrame input and produces a
+#                        pyfunc-compatible output using models loaded from definitions in the
+#                        `models` specification and data loaded from definitions specified via  the
+#                        `data` parameter.
+#     :param code: Paths to code dependencies.
+#     :param data: A collection of `mlflow.data.Data` objects that will be loaded with the model.
+#     """
+#     pass
+
+
+def from_model(model_path, flavor, run_id=None, code=None, data=None, conda_env=None):
+    """
+    :param model_path: The path of the base model from which to create a pyfunc model.
+    :param flavor: The flavor of the base model from which to create a pyfunc model.
+    :param run_id: The run id of the base model from which to create a pyfunc model.
+    :param code: Paths to additional code dependencies for the pyfunc model. Paths to any routines
+                 required to load the base model or load data dependencies should be included here.
+    :param data: Model data specifications - we need to know how to LOAD the data.
+                 This could be [ { "path": <path>, "loader_module": <loader_module> } ].
+    :param conda_env: Path to a conda environment specification to use when loading the model.
+                      If unspecified, the conda environment of the base model will be used.
+    """
+    pass
+
+
 def get_module_loader_src(src_path, dst_path):
     """
     Generate Python source of the model loader.
