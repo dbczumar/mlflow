@@ -30,3 +30,5 @@ def _get_flavor_configuration(model_path, flavor_name):
                 RESOURCE_DOES_NOT_EXIST)
     conf = model_conf.flavors[flavor_name]
     return conf
+
+

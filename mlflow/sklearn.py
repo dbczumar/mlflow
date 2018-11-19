@@ -168,7 +168,8 @@ def _load_pyfunc(path):
     Load PyFunc implementation. Called by ``pyfunc.load_pyfunc``.
     """
     with open(path, "rb") as f:
-        return pickle.load(f)
+        sk_model = pickle.load(f)
+    return SKLearnWrapper(sk_model=sk_model)
 
 
 def _save_model(sk_model, output_path, serialization_format):
@@ -212,3 +213,19 @@ def load_model(path, run_id=None):
     flavor_conf = _get_flavor_configuration(model_path=path, flavor_name=FLAVOR_NAME)
     sklearn_model_artifacts_path = os.path.join(path, flavor_conf['pickled_model'])
     return _load_model_from_local_file(path=sklearn_model_artifacts_path)
+
+
+class SKLearnWrapper:
+
+    def __init__(self, sk_model):
+        self.sk_model = sk_model
+        self.predict = self.sk_model.predict
+
+    def base_model(self):
+        """
+        :return: A scikit-learn model instance.
+        """
+        return self.sk_model
+
+    def base_flavor(self):
+        return FLAVOR_NAME

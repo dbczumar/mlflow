@@ -79,6 +79,7 @@ import os
 import shutil
 import sys
 import pandas
+from abc import ABCMeta, abstractmethod 
 
 from mlflow.tracking.fluent import active_run, log_artifacts
 from mlflow import tracking
@@ -86,6 +87,7 @@ from mlflow.models import Model
 from mlflow.utils import PYTHON_VERSION, get_major_minor_py_version
 from mlflow.utils.file_utils import TempDir, _copy_file_or_tree
 from mlflow.utils.logging_utils import eprint
+from mlflow.utils.model_utils import _get_flavor_configuration
 
 FLAVOR_NAME = "python_function"
 MAIN = "loader_module"
@@ -93,6 +95,21 @@ CODE = "code"
 DATA = "data"
 ENV = "env"
 PY_VERSION = "python_version"
+
+
+class BaseModelWrapper(object):
+    __metaclass__ = ABCMeta
+
+    @abstractmethod
+    @property
+    def base_model(self):
+        pass
+
+
+    @abstractmethod
+    @property
+    def base_flavor(self):
+        pass
 
 
 def add_to_model(model, loader_module, data=None, code=None, env=None):
@@ -288,37 +305,62 @@ def log_model(artifact_path, **kwargs):
         log_artifacts(local_path, artifact_path)
 
 
-# def from_model(models, predict_fn, code=None, data=None):
-#     """
-#     :param models: A list of model specification dictionaries of the form
-#                    {
-#                      "model_path": "<model_path>",
-#                      "run_id": "<run_id>",
-#                      "flavor": "<flavor_name>",
-#                    }
-#     :param predict_fn: A function that evaluates a Pandas DataFrame input and produces a
-#                        pyfunc-compatible output using models loaded from definitions in the
-#                        `models` specification and data loaded from definitions specified via  the
-#                        `data` parameter.
-#     :param code: Paths to code dependencies.
-#     :param data: A collection of `mlflow.data.Data` objects that will be loaded with the model.
-#     """
-#     pass
+def extend_model(path, run_id, predict_fn):
 
 
-def from_model(model_path, flavor, run_id=None, code=None, data=None, conda_env=None):
-    """
-    :param model_path: The path of the base model from which to create a pyfunc model.
-    :param flavor: The flavor of the base model from which to create a pyfunc model.
-    :param run_id: The run id of the base model from which to create a pyfunc model.
-    :param code: Paths to additional code dependencies for the pyfunc model. Paths to any routines
-                 required to load the base model or load data dependencies should be included here.
-    :param data: Model data specifications - we need to know how to LOAD the data.
-                 This could be [ { "path": <path>, "loader_module": <loader_module> } ].
-    :param conda_env: Path to a conda environment specification to use when loading the model.
-                      If unspecified, the conda environment of the base model will be used.
-    """
-    pass
+
+# def extend_model(path, base_model_path, predict_fn, run_id=None, code=None, data=None, 
+#                  conda_env=None):
+#     """
+#     :param base_model_path: The path of the pyfunc model to wrap.
+#     :param predict_fn: A function that uses the specified base model and data objects to evaluate
+#                        pyfunc-compatible inputs and produce pyfunc-compatible outputs.
+#     :param run_id: The run id of the pyfunc model to wrap.
+#     :param code: Paths to additional code dependencies for the wrapped model. Paths to any routines
+#                  required to load the base pyfunc model or load data dependencies should be 
+#                  included here.
+#     :param data: Model data specifications - we need to know how to LOAD the data.
+#                  This could be [ { "path": <path>, "loader_module": <loader_module> } ].
+#     :param conda_env: Path to a conda environment specification to use when loading the wrapped 
+#                       model. If unspecified, the conda environment of the base pyfunc model will 
+#                       be used.
+#     """
+#     if data is not None:
+#         raise Exception
+#
+#     path = os.path.abspath(path)
+#     if os.path.exists(path):
+#         raise Exception
+#
+#     if run_id is not None:
+#         base_model_path = tracking.utils._get_model_log_dir(base_model_path, run_id)
+#
+#     base_pyfunc_conf = _get_flavor_configuration(
+#             model_path=base_model_path, flavor_name=FLAVOR_NAME)
+#
+#     os.makedirs(path)
+#     base_model_subpath = _copy_file_or_tree(src=base_model_path, dst=path, dst_dir="base_model")
+#     base_model_path = os.path.join(path, base_model_subpath)
+#
+#     if conda_env is None and ENV in base_pyfunc_conf:
+#         conda_env = os.path.join(base_model_path, ENV)
+#     if conda_env is not None:
+#         conda_env_subpath = "conda_env.yaml"
+#         shutil.copy(src=conda_env, dst=os.path.join(path, conda_env_subpath))
+#     else:
+#         conda_env_subpath = None
+#
+#     if code is not None:
+#         code_subpath = "code"
+#         for code_path in code:
+#             _copy_file_or_tree(src=code_path, dst=path, dst_dir=code_subpath)
+#     else:
+#         code_subpath = None
+#
+#     model_conf = Model()
+#     add_to_model(model=model_conf, loader_module="mlflow.pyfunc.wrapped_model", 
+#                  env=conda_env_subpath, code=code_subpath, data=None)
+#     model_conf.save(os.path.join(path, "MLmodel"))
 
 
 def get_module_loader_src(src_path, dst_path):
