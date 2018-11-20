@@ -117,22 +117,100 @@ class ExtendedModel(BaseModelWrapper):
 def extend_model(model_path, run_id=None):
     return ModelExtender(model_path, run_id)
 
+import os
+
+from mlflow.tracking.utils import _get_model_log_dir
+from mlflow.utils.file_utils import TempDir 
+from mlflow.utils.file_utils import _copy_file_or_tree 
+from mlflow.utils.model_utils import _get_flavor_configuration
 
 class ModelExtender:
 
     _contexts = 0
 
     def __init__(self, model_path, run_id=None):
+        if run_id:
+            model_path = _get_model_log_dir(model_path, run_id)
+        else:
+            model_path = os.path.abspath(model_path)
+
         self.model_path = model_path
         self.run_id = run_id
+        self.pyfunc_model = None
+        
+        self.entered = False 
+        self.model_dir = TempDir()
+
+        self.predict_fn = None
+        self.data = {}
 
     def __enter__(self):
-        # Create a temporary directory housing model artifacts
         if ModelExtender._contexts > 0:
             raise Exception("Nested extension is not supported")
         ModelExtender._contexts += 1
+
+        if self.entered:
+            raise Exception("Context cannot be re-entered!")
+        self.entered = True
+
+        # Load the pyfunc model
+        self.pyfunc_model = mlflow.pyfunc.load_pyfunc(self.model_path)
+        self.predict_fn = lambda model, data, input_data: self.pyfunc_model.predict(input_data)
+
+        # Create a temporary directory housing model artifacts
+        self.model_dir.__enter__()
+        _copy_file_or_tree(src=self.model_path, dst=self.model_dir.path(), dst_dir="base_model")
+
         return self
+
 
     def __exit__(self, *args, **kwargs):
         ModelExtender._contexts -= 1
+        self.model_dir.__exit__(*args, **kwargs)
+
+    def set_predict(self, predict_fn):
+        self.predict_fn = predict_fn
+
+    def add_data(self, name, path, loader_module):
+        self.data[name] = { "path": path, "loader_module": loader_module}
+
+    def predict(self, input_data):
+        if not self.predict_fn:
+            raise Exception
+        
+        return predict_fn(self.model, self.data, input_data)
+
+    def save(self, path, code=None, conda_env=None):
+        path = os.path.abspath(path)
+        if os.path.exists(path):
+            raise Exception
+
+        base_pyfunc_conf = _get_flavor_configuration(
+                model_path=base_model_path, flavor_name=FLAVOR_NAME)
+
+        os.makedirs(path)
+        base_model_subpath = _copy_file_or_tree(src=base_model_path, dst=path, dst_dir="base_model")
+        base_model_path = os.path.join(path, base_model_subpath)
+
+        if conda_env is None and ENV in base_pyfunc_conf:
+            conda_env = os.path.join(base_model_path, ENV)
+        if conda_env is not None:
+            conda_env_subpath = "conda_env.yaml"
+            shutil.copy(src=conda_env, dst=os.path.join(path, conda_env_subpath))
+        else:
+            conda_env_subpath = None
+
+        if code is not None:
+            code_subpath = "code"
+            for code_path in code:
+                _copy_file_or_tree(src=code_path, dst=path, dst_dir=code_subpath)
+        else:
+            code_subpath = None
+
+        model_conf = Model()
+        add_to_model(model=model_conf, loader_module="mlflow.pyfunc.wrapped_model", 
+                     env=conda_env_subpath, code=code_subpath, data=None)
+        model_conf.save(os.path.join(path, "MLmodel"))
+
+    def log(self, artifact_path):
         pass
