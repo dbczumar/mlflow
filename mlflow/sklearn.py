@@ -22,6 +22,7 @@ from mlflow import pyfunc
 from mlflow.exceptions import MlflowException
 from mlflow.models import Model
 from mlflow.protos.databricks_pb2 import INVALID_PARAMETER_VALUE, INTERNAL_ERROR
+from mlflow.pyfunc.wrappers import BaseModelWrapper
 import mlflow.tracking
 from mlflow.utils.environment import _mlflow_conda_env
 from mlflow.utils.model_utils import _get_flavor_configuration
@@ -215,17 +216,20 @@ def load_model(path, run_id=None):
     return _load_model_from_local_file(path=sklearn_model_artifacts_path)
 
 
-class SKLearnWrapper:
+class SKLearnWrapper(BaseModelWrapper):
 
     def __init__(self, sk_model):
+        super(SKLearnWrapper, self).__init__()
         self.sk_model = sk_model
         self.predict = self.sk_model.predict
 
+    @property
     def base_model(self):
         """
         :return: A scikit-learn model instance.
         """
         return self.sk_model
 
+    @property
     def base_flavor(self):
         return FLAVOR_NAME

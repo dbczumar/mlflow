@@ -79,7 +79,6 @@ import os
 import shutil
 import sys
 import pandas
-from abc import ABCMeta, abstractmethod 
 
 from mlflow.tracking.fluent import active_run, log_artifacts
 from mlflow import tracking
@@ -95,21 +94,6 @@ CODE = "code"
 DATA = "data"
 ENV = "env"
 PY_VERSION = "python_version"
-
-
-class BaseModelWrapper(object):
-    __metaclass__ = ABCMeta
-
-    @abstractmethod
-    @property
-    def base_model(self):
-        pass
-
-
-    @abstractmethod
-    @property
-    def base_flavor(self):
-        pass
 
 
 def add_to_model(model, loader_module, data=None, code=None, env=None):
@@ -174,16 +158,21 @@ def load_pyfunc(path, run_id=None, suppress_warnings=False):
                               will be emitted.
     """
     if run_id:
-        path = tracking.utils._get_model_log_dir(path, run_id)
-    conf = _load_model_conf(path)
+        model_path = tracking.utils._get_model_log_dir(path, run_id)
+    else:
+        model_path = os.path.abspath(path)
+    conf = _load_model_conf(model_path)
     model_py_version = conf.get(PY_VERSION)
     if not suppress_warnings:
         _warn_potentially_incompatible_py_version_if_necessary(model_py_version=model_py_version)
     if CODE in conf and conf[CODE]:
         code_path = os.path.join(path, conf[CODE])
         sys.path = [code_path] + _get_code_dirs(code_path) + sys.path
-    data_path = os.path.join(path, conf[DATA]) if (DATA in conf) else path
-    return importlib.import_module(conf[MAIN])._load_pyfunc(data_path)
+    data_path = os.path.join(path, conf[DATA]) if (DATA in conf) else model_path
+    pyfunc_wrapper = importlib.import_module(conf[MAIN])._load_pyfunc(data_path)
+    pyfunc_wrapper._set_model_path(model_path=path)
+    pyfunc_wrapper._set_run_id(run_id=run_id)
+    return pyfunc_wrapper
 
 
 def _warn_potentially_incompatible_py_version_if_necessary(model_py_version):
@@ -305,7 +294,8 @@ def log_model(artifact_path, **kwargs):
         log_artifacts(local_path, artifact_path)
 
 
-def extend_model(path, run_id, predict_fn):
+# def extend_model(path, run_id, predict_fn, run_id=None, code=None, data=None, conda_env=None):
+#     pass 
 
 
 
