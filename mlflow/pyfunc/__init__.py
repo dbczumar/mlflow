@@ -96,7 +96,7 @@ ENV = "env"
 PY_VERSION = "python_version"
 
 
-def add_to_model(model, loader_module, data=None, code=None, env=None):
+def add_to_model(model, loader_module, data=None, code=None, env=None, **kwargs):
     """
     Add a pyfunc spec to the model configuration.
 
@@ -123,6 +123,9 @@ def add_to_model(model, loader_module, data=None, code=None, env=None):
         parms[DATA] = data
     if env:
         parms[ENV] = env
+
+    parms.update(kwargs)
+
     return model.add_flavor(FLAVOR_NAME, **parms)
 
 

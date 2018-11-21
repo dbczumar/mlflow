@@ -19,12 +19,6 @@ class BaseModelWrapper(object):
     def base_flavor(self):
         pass
 
-    def extend(self, predict_fn):
-        if self.model_path is None:
-            raise ValueError("Model path must be specified!")
-        return ExtendedModel(parent_model=self, predict_fn=predict_fn, 
-                             parent_model_path=self.model_path, parent_run_id=self.run_id)
-
     def _set_model_path(self, model_path):
         self.model_path = model_path
 
@@ -37,6 +31,8 @@ def extend_model(model_path, run_id=None):
 
 import os
 import shutil
+
+import cloudpickle
 
 from mlflow.models import Model
 from mlflow.tracking.utils import _get_model_log_dir
@@ -112,7 +108,7 @@ class ModelExtender:
 
         os.makedirs(path)
         parent_model_subpath = _copy_file_or_tree(
-                src=self.tmp_model_path, dst=path, dst_dir="base_model")
+                src=self.tmp_model_path, dst=path, dst_dir="parent_model")
         parent_model_path = os.path.join(path, parent_model_subpath)
 
         if conda_env is None and mlflow.pyfunc.ENV in parent_pyfunc_conf:
@@ -131,11 +127,50 @@ class ModelExtender:
         else:
             code_subpath = None
 
+        predict_fn_subpath = "predict.pkl"
+        with open(os.path.join(path, predict_fn_subpath), "wb") as f:
+            cloudpickle.dump(self.predict_fn, f)
+
         model_conf = Model()
         mlflow.pyfunc.add_to_model(
-                model=model_conf, loader_module=__name__, 
-                env=conda_env_subpath, code=code_subpath, data=None)
+                model=model_conf, loader_module=__name__, parent_model=parent_model_subpath,
+                predict_fn=predict_fn_subpath, env=conda_env_subpath, code=code_subpath, data=None)
         model_conf.save(os.path.join(path, "MLmodel"))
 
     def log(self, artifact_path):
         pass
+
+
+class WrappedPyfuncModel(BaseModelWrapper):
+
+    def __init__(self, parent_model, data, predict_fn):
+        super(WrappedPyfuncModel, self).__init__()
+        self.parent_model = parent_model 
+        self.data = data
+        self.predict_fn = predict_fn
+
+    def predict(self, input_data):
+        return self.predict_fn(self.parent_model, self.data, input_data)
+
+    @property
+    def base_model(self):
+        return self.parent_model
+
+    @property
+    def base_flavor(self):
+        return mlflow.pyfunc.FLAVOR_NAME
+
+
+def _load_pyfunc(model_root_path):
+    pyfunc_conf = _get_flavor_configuration(model_root_path, mlflow.pyfunc.FLAVOR_NAME)
+
+    assert "parent_model" in pyfunc_conf
+    parent_model_path = os.path.join(model_root_path, pyfunc_conf["parent_model"])
+    parent_model = mlflow.pyfunc.load_pyfunc(parent_model_path)
+
+    assert "predict_fn" in pyfunc_conf
+    predict_fn_path = os.path.join(model_root_path, pyfunc_conf["predict_fn"])
+    with open(predict_fn_path, "rb") as f:
+        predict_fn = cloudpickle.load(f)
+
+    return WrappedPyfuncModel(parent_model=parent_model, data=None, predict_fn=predict_fn)
