@@ -4,21 +4,19 @@ conda_env: conda.yaml
 
 entry_points:
   # train Keras DL model
-  train:
+  main:
     parameters:
       training_data: {type: string, default: "./flower_photos"}
       epochs: {type: int, default: 1}
+      image_width: {type: int, default: 224}
+      image_height: {type: int, default: 224}
       batch_size: {type: int, default: 16}
       test_ratio: {type: float, default: 0.2}
-      pretrained_weights: {type: string, default: "None"}
       seed: {type: int, default: 97531}
-      model_type: {type: string, default: "VGG16"}
     command: "python train.py --training-data {training_data}
                               --batch-size {batch_size}
                               --epochs {epochs}
-                              --test-ratio {test_ratio}
-                              --pretrained-weights {pretrained_weights}
-                              --model-type {model_type}"
+                              --image-width {image_width}
+                              --image-height {image_height}
+                              --test-ratio {test_ratio}"
 
-  run_many:
-    command: "python train_many.py"
