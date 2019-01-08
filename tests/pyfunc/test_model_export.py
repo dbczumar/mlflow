@@ -1,228 +1,719 @@
 from __future__ import print_function
 
+import mock
 import os
-import time
-import six
-import pickle
-import shutil
-import tempfile
-import unittest
-import requests
-import signal
+import json
+import sys
+from distutils.version import StrictVersion
 from subprocess import Popen, STDOUT
 
-from click.testing import CliRunner
 import numpy as np
-import pandas
+import pandas as pd
+import pandas.testing
+import pytest
 import sklearn.datasets
 import sklearn.linear_model
 import sklearn.neighbors
+import yaml
 
 import mlflow
-from mlflow import pyfunc
-from mlflow import tracking
+import mlflow.pyfunc
 import mlflow.pyfunc.cli
+import mlflow.pyfunc.model
+import mlflow.pyfunc.scoring_server as pyfunc_scoring_server
+import mlflow.sklearn
 from mlflow.models import Model
-from mlflow.utils.file_utils import TempDir
+from mlflow.tracking.utils import get_artifact_uri as utils_get_artifact_uri
+from mlflow.tracking.utils import _get_model_log_dir
+from mlflow.utils.environment import _mlflow_conda_env
+from mlflow.utils.model_utils import _get_flavor_configuration
+
+import tests
+from tests.helper_functions import pyfunc_serve_and_score_model
+from tests.helper_functions import score_model_in_sagemaker_docker_container
 
 
-def _load_pyfunc(path):
-    with open(path, "rb") as f:
-        if six.PY2:
-            return pickle.load(f)
-        else:
-            return pickle.load(f, encoding='latin1')  # pylint: disable=unexpected-keyword-arg
+def get_model_class():
+    """
+    Defines a custom Python model class that wraps a scikit-learn estimator.
+    This can be invoked within a pytest fixture to define the class in the ``__main__`` scope.
+    Alternatively, it can be invoked within a module to define the class in the module's scope.
+    """
+    class CustomSklearnModel(mlflow.pyfunc.PythonModel):
+
+        def __init__(self, context):
+            super(CustomSklearnModel, self).__init__(context)
+            self.model = mlflow.sklearn.load_model(path=context.artifacts["sk_model"])
+
+        def predict(self, model_input):
+            return self.context.parameters["predict_fn"](self.model, model_input)
+
+    return CustomSklearnModel
 
 
-class TestModelExport(unittest.TestCase):
-    def setUp(self):
-        self._tmp = tempfile.mkdtemp()
-        iris = sklearn.datasets.load_iris()
-        self._X = iris.data[:, :2]  # we only take the first two features.
-        self._y = iris.target
-        self._knn = sklearn.neighbors.KNeighborsClassifier()
-        self._knn.fit(self._X, self._y)
-        self._knn_predict = self._knn.predict(self._X)
-        self._linear_lr = sklearn.linear_model.LogisticRegression()
-        self._linear_lr.fit(self._X, self._y)
-        self._linear_lr_predict = self._linear_lr.predict(self._X)
+class ModuleScopedSklearnModel(get_model_class()):
+    """
+    A custom Python model class defined in the test module scope. This is intended to be used for
+    testing model export where the specified model class is a fully-qualified class name, as opposed
+    to a ``type`` object.
+    """
+    pass
 
-    def test_model_save_load(self):
-        with TempDir() as tmp:
-            model_path = tmp.path("knn.pkl")
-            with open(model_path, "wb") as f:
-                pickle.dump(self._knn, f)
-            path = tmp.path("knn")
-            m = Model(run_id="test", artifact_path="testtest")
-            pyfunc.save_model(dst_path=path,
-                              data_path=model_path,
-                              loader_module=os.path.basename(__file__)[:-3],
-                              code_path=[__file__],
-                              model=m)
-            m2 = Model.load(os.path.join(path, "MLmodel"))
-            print("m1", m.__dict__)
-            print("m2", m2.__dict__)
-            assert m.__dict__ == m2.__dict__
-            assert pyfunc.FLAVOR_NAME in m2.flavors
-            assert pyfunc.PY_VERSION in m2.flavors[pyfunc.FLAVOR_NAME]
-            x = pyfunc.load_pyfunc(path)
-            xpred = x.predict(self._X)
-            np.testing.assert_array_equal(self._knn_predict, xpred)
 
-    def test_model_log(self):
-        with TempDir(chdr=True, remove_on_exit=True) as tmp:
-            model_path = tmp.path("linear.pkl")
-            with open(model_path, "wb") as f:
-                pickle.dump(self._linear_lr, f)
-            tracking_dir = os.path.abspath(tmp.path("mlruns"))
-            mlflow.set_tracking_uri("file://%s" % tracking_dir)
-            mlflow.start_run()
-            try:
-                pyfunc.log_model(artifact_path="linear",
-                                 data_path=model_path,
-                                 loader_module=os.path.basename(__file__)[:-3],
-                                 code_path=[__file__])
+@pytest.fixture(scope="module")
+def main_scoped_model_class():
+    """
+    A custom Python model class defined in the ``__main__`` scope. This is intended to be used
+    for testing model export where the specified model class is a ``type`` object; in these cases,
+    CloudPickle is used to serialize the model class, and it requires that the class be defined
+    in ``__main__`` or be resolvable from a module on the system path. When running a scoring
+    server, MLflow's "tests" module is not available on the system path, so we opt for a class
+    defined in ``__main__``.
+    """
+    return get_model_class()
 
-                run_id = mlflow.active_run().info.run_uuid
-                path = tracking.utils._get_model_log_dir("linear", run_id)
-                m = Model.load(os.path.join(path, "MLmodel"))
-                print(m.__dict__)
-                assert pyfunc.FLAVOR_NAME in m.flavors
-                assert pyfunc.PY_VERSION in m.flavors[pyfunc.FLAVOR_NAME]
-                x = pyfunc.load_pyfunc("linear", run_id=run_id)
-                xpred = x.predict(self._X)
-                np.testing.assert_array_equal(self._linear_lr_predict, xpred)
-            finally:
-                mlflow.end_run()
-                mlflow.set_tracking_uri(None)
-                # Remove the log directory in order to avoid adding new tests to pytest...
-                shutil.rmtree(tracking_dir)
 
-    def _create_conda_env_file(self, tmp):
-        conda_env_path = tmp.path("conda.yml")
-        with open(conda_env_path, "w") as f:
-            f.write("""
-                    name: mlflow
-                    channels:
-                      - defaults
-                    dependencies:
-                      - pip:
-                        - -e {}
-                    """.format(os.path.abspath(os.path.join(mlflow.__path__[0], '..'))))
-        return conda_env_path
+@pytest.fixture(scope="module")
+def iris_data():
+    iris = sklearn.datasets.load_iris()
+    x = iris.data[:, :2]
+    y = iris.target
+    return x, y
 
-    def _model_serve_with_conda_env(self, extra_args):
-        with TempDir() as tmp:
-            model_path = tmp.path("knn.pkl")
-            with open(model_path, "wb") as f:
-                pickle.dump(self._knn, f)
-            path = tmp.path("knn")
 
-            pyfunc.save_model(dst_path=path,
-                              data_path=model_path,
-                              loader_module=os.path.basename(__file__)[:-3],
-                              code_path=[__file__],
-                              conda_env=self._create_conda_env_file(tmp)
-                              )
-            input_csv_path = tmp.path("input.csv")
-            pandas.DataFrame(self._X).to_csv(input_csv_path, header=True, index=False)
-            port = 5000
-            process = Popen(['mlflow', 'pyfunc', 'serve',
-                             '--model-path', path, '--port', str(port)] + extra_args,
-                            stderr=STDOUT,
-                            preexec_fn=os.setsid)
-            time.sleep(5)
-            try:
-                assert process.poll() is None, "server died prematurely"
-                success = False
-                failcount = 0
-                while not success and failcount < 3 and process.poll() is None:
-                    try:
-                        response = requests.post("http://localhost:{}/invocations".format(port),
-                                                 data=open(input_csv_path, 'rb'),
-                                                 headers={'Content-type': 'text/csv'})
-                        response.close()
-                        success = True
-                    except requests.ConnectionError:
-                        time.sleep(5)
-                        failcount += 1
-            finally:
-                os.killpg(os.getpgid(process.pid), signal.SIGTERM)  # kill process + children
-                time.sleep(0.5)
-                assert process.poll() is not None, "server not dead"
+@pytest.fixture(scope="module")
+def sklearn_knn_model(iris_data):
+    x, y = iris_data
+    knn_model = sklearn.neighbors.KNeighborsClassifier()
+    knn_model.fit(x, y)
+    return knn_model
 
-            # check result
-            if not success:
-                raise RuntimeError("Fail to connect to the server")
+
+@pytest.fixture(scope="module")
+def sklearn_logreg_model(iris_data):
+    x, y = iris_data
+    linear_lr = sklearn.linear_model.LogisticRegression()
+    linear_lr.fit(x, y)
+    return linear_lr
+
+
+@pytest.fixture
+def model_path(tmpdir):
+    return os.path.join(str(tmpdir), "model")
+
+
+@pytest.fixture
+def pyfunc_custom_env(tmpdir):
+    conda_env = os.path.join(str(tmpdir), "conda_env.yml")
+    _mlflow_conda_env(
+            conda_env,
+            additional_conda_deps=["scikit-learn", "pytest", "cloudpickle"])
+    return conda_env
+
+
+def test_save_model_load(sklearn_knn_model, main_scoped_model_class, iris_data, tmpdir):
+    sklearn_model_path = os.path.join(str(tmpdir), "sklearn_model")
+    mlflow.sklearn.save_model(sk_model=sklearn_knn_model, path=sklearn_model_path)
+
+    def test_predict(sk_model, model_input):
+        return sk_model.predict(model_input) * 2
+
+    pyfunc_model_path = os.path.join(str(tmpdir), "pyfunc_model")
+    mlflow.pyfunc.save_model(path=pyfunc_model_path,
+                             artifacts={
+                                "sk_model": sklearn_model_path
+                             },
+                             parameters={
+                                "predict_fn": test_predict
+                             },
+                             model_class=main_scoped_model_class)
+
+    loaded_pyfunc_model = mlflow.pyfunc.load_pyfunc(path=pyfunc_model_path)
+    np.testing.assert_array_equal(
+            loaded_pyfunc_model.predict(model_input=iris_data[0]),
+            test_predict(sk_model=sklearn_knn_model, model_input=iris_data[0]))
+
+
+def test_log_model_load(sklearn_knn_model, main_scoped_model_class, iris_data):
+    sklearn_artifact_path = "sk_model"
+    with mlflow.start_run():
+        mlflow.sklearn.log_model(sk_model=sklearn_knn_model, artifact_path=sklearn_artifact_path)
+        sklearn_run_id = mlflow.active_run().info.run_uuid
+
+    def test_predict(sk_model, model_input):
+        return sk_model.predict(model_input) * 2
+
+    pyfunc_artifact_path = "pyfunc_model"
+    with mlflow.start_run():
+        mlflow.pyfunc.log_model(artifact_path=pyfunc_artifact_path,
+                                artifacts={
+                                    "sk_model": utils_get_artifact_uri(
+                                        artifact_path=sklearn_artifact_path,
+                                        run_id=sklearn_run_id)
+                                },
+                                parameters={
+                                    "predict_fn": test_predict
+                                },
+                                model_class=main_scoped_model_class)
+        pyfunc_run_id = mlflow.active_run().info.run_uuid
+
+    loaded_pyfunc_model = mlflow.pyfunc.load_pyfunc(path=pyfunc_artifact_path, run_id=pyfunc_run_id)
+    np.testing.assert_array_equal(
+            loaded_pyfunc_model.predict(model_input=iris_data[0]),
+            test_predict(sk_model=sklearn_knn_model, model_input=iris_data[0]))
+
+
+def test_add_to_model_adds_specified_kwargs_to_mlmodel_configuration():
+    custom_kwargs = {
+        "key1": "value1",
+        "key2": 20,
+        "key3": range(10),
+    }
+    model_config = Model()
+    mlflow.pyfunc.add_to_model(model=model_config,
+                               loader_module=os.path.basename(__file__)[:-3],
+                               data="data",
+                               code="code",
+                               env=None,
+                               **custom_kwargs)
+
+    assert mlflow.pyfunc.FLAVOR_NAME in model_config.flavors
+    assert all([item in model_config.flavors[mlflow.pyfunc.FLAVOR_NAME] for item in custom_kwargs])
+
+
+def test_pyfunc_model_serving_without_conda_env_activation_succeeds_with_model_class_type_object(
+        sklearn_knn_model, main_scoped_model_class, iris_data, tmpdir):
+    sklearn_model_path = os.path.join(str(tmpdir), "sklearn_model")
+    mlflow.sklearn.save_model(sk_model=sklearn_knn_model, path=sklearn_model_path)
+
+    def test_predict(sk_model, model_input):
+        return sk_model.predict(model_input) * 2
+
+    pyfunc_model_path = os.path.join(str(tmpdir), "pyfunc_model")
+    mlflow.pyfunc.save_model(path=pyfunc_model_path,
+                             artifacts={
+                                "sk_model": sklearn_model_path
+                             },
+                             parameters={
+                                "predict_fn": test_predict
+                             },
+                             model_class=main_scoped_model_class)
+    loaded_pyfunc_model = mlflow.pyfunc.load_pyfunc(path=pyfunc_model_path)
+
+    sample_input = pd.DataFrame(iris_data[0])
+    scoring_response = pyfunc_serve_and_score_model(
+            model_path=pyfunc_model_path,
+            data=sample_input,
+            content_type=pyfunc_scoring_server.CONTENT_TYPE_JSON_SPLIT_ORIENTED,
+            extra_args=["--no-conda"])
+    assert scoring_response.status_code == 200
+    np.testing.assert_array_equal(
+        np.array(json.loads(scoring_response.text)),
+        loaded_pyfunc_model.predict(sample_input))
+
+
+def test_pyfunc_model_serving_with_conda_env_activation_succeeds_with_model_class_type_object(
+        sklearn_knn_model, main_scoped_model_class, iris_data, tmpdir):
+    sklearn_model_path = os.path.join(str(tmpdir), "sklearn_model")
+    mlflow.sklearn.save_model(sk_model=sklearn_knn_model, path=sklearn_model_path)
+
+    def test_predict(sk_model, model_input):
+        return sk_model.predict(model_input) * 2
+
+    pyfunc_model_path = os.path.join(str(tmpdir), "pyfunc_model")
+    mlflow.pyfunc.save_model(path=pyfunc_model_path,
+                             artifacts={
+                                "sk_model": sklearn_model_path
+                             },
+                             parameters={
+                                "predict_fn": test_predict
+                             },
+                             model_class=main_scoped_model_class)
+    loaded_pyfunc_model = mlflow.pyfunc.load_pyfunc(path=pyfunc_model_path)
+
+    sample_input = pd.DataFrame(iris_data[0])
+    scoring_response = pyfunc_serve_and_score_model(
+            model_path=pyfunc_model_path,
+            data=sample_input,
+            content_type=pyfunc_scoring_server.CONTENT_TYPE_JSON_SPLIT_ORIENTED)
+    assert scoring_response.status_code == 200
+    np.testing.assert_array_equal(
+        np.array(json.loads(scoring_response.text)),
+        loaded_pyfunc_model.predict(sample_input))
+
+
+def test_pyfunc_model_serving_without_conda_env_activation_succeeds_with_qualified_model_class_name(
+        sklearn_knn_model, iris_data, tmpdir):
+    sklearn_model_path = os.path.join(str(tmpdir), "sklearn_model")
+    mlflow.sklearn.save_model(sk_model=sklearn_knn_model, path=sklearn_model_path)
+
+    def test_predict(sk_model, model_input):
+        return sk_model.predict(model_input) * 2
+
+    pyfunc_model_path = os.path.join(str(tmpdir), "pyfunc_model")
+    mlflow.pyfunc.save_model(path=pyfunc_model_path,
+                             artifacts={
+                                "sk_model": sklearn_model_path
+                             },
+                             parameters={
+                                "predict_fn": test_predict
+                             },
+                             model_class=".".join([__name__, ModuleScopedSklearnModel.__name__]),
+                             code_paths=[os.path.dirname(tests.__file__)])
+    loaded_pyfunc_model = mlflow.pyfunc.load_pyfunc(path=pyfunc_model_path)
+
+    sample_input = pd.DataFrame(iris_data[0])
+    scoring_response = pyfunc_serve_and_score_model(
+            model_path=pyfunc_model_path,
+            data=sample_input,
+            content_type=pyfunc_scoring_server.CONTENT_TYPE_JSON_SPLIT_ORIENTED,
+            extra_args=["--no-conda"])
+    assert scoring_response.status_code == 200
+    np.testing.assert_array_equal(
+        np.array(json.loads(scoring_response.text)),
+        loaded_pyfunc_model.predict(sample_input))
+
+
+def test_pyfunc_cli_predict_command_without_conda_env_activation_succeeds(
+        sklearn_knn_model, main_scoped_model_class, iris_data, tmpdir):
+    sklearn_model_path = os.path.join(str(tmpdir), "sklearn_model")
+    mlflow.sklearn.save_model(sk_model=sklearn_knn_model, path=sklearn_model_path)
+
+    def test_predict(sk_model, model_input):
+        return sk_model.predict(model_input) * 2
+
+    pyfunc_model_path = os.path.join(str(tmpdir), "pyfunc_model")
+    mlflow.pyfunc.save_model(path=pyfunc_model_path,
+                             artifacts={
+                                "sk_model": sklearn_model_path
+                             },
+                             parameters={
+                                "predict_fn": test_predict
+                             },
+                             model_class=main_scoped_model_class)
+    loaded_pyfunc_model = mlflow.pyfunc.load_pyfunc(path=pyfunc_model_path)
+
+    sample_input = pd.DataFrame(iris_data[0])
+    input_csv_path = os.path.join(str(tmpdir), "input with spaces.csv")
+    sample_input.to_csv(input_csv_path, header=True, index=False)
+    output_csv_path = os.path.join(str(tmpdir), "output.csv")
+    process = Popen(['mlflow', 'pyfunc', 'predict',
+                     '--model-path', pyfunc_model_path,
+                     '-i', input_csv_path,
+                     '-o', output_csv_path,
+                     '--no-conda'],
+                    stderr=STDOUT,
+                    preexec_fn=os.setsid)
+    process.wait()
+    result_df = pandas.read_csv(output_csv_path, header=None)
+    np.testing.assert_array_equal(result_df.values.transpose()[0],
+                                  loaded_pyfunc_model.predict(sample_input))
+
+
+def test_pyfunc_cli_predict_command_with_conda_env_activation_succeeds(
+        sklearn_knn_model, main_scoped_model_class, iris_data, tmpdir):
+    sklearn_model_path = os.path.join(str(tmpdir), "sklearn_model")
+    mlflow.sklearn.save_model(sk_model=sklearn_knn_model, path=sklearn_model_path)
+
+    def test_predict(sk_model, model_input):
+        return sk_model.predict(model_input) * 2
+
+    pyfunc_model_path = os.path.join(str(tmpdir), "pyfunc_model")
+    mlflow.pyfunc.save_model(path=pyfunc_model_path,
+                             artifacts={
+                                "sk_model": sklearn_model_path
+                             },
+                             parameters={
+                                "predict_fn": test_predict
+                             },
+                             model_class=main_scoped_model_class)
+    loaded_pyfunc_model = mlflow.pyfunc.load_pyfunc(path=pyfunc_model_path)
+
+    sample_input = pd.DataFrame(iris_data[0])
+    input_csv_path = os.path.join(str(tmpdir), "input with spaces.csv")
+    sample_input.to_csv(input_csv_path, header=True, index=False)
+    output_csv_path = os.path.join(str(tmpdir), "output.csv")
+    process = Popen(['mlflow', 'pyfunc', 'predict',
+                     '--model-path', pyfunc_model_path,
+                     '-i', input_csv_path,
+                     '-o', output_csv_path],
+                    stderr=STDOUT,
+                    preexec_fn=os.setsid)
+    process.wait()
+    result_df = pandas.read_csv(output_csv_path, header=None)
+    np.testing.assert_array_equal(result_df.values.transpose()[0],
+                                  loaded_pyfunc_model.predict(sample_input))
+
+
+def test_save_model_specifying_model_dependency_with_different_major_python_verison_logs_warning(
+        sklearn_knn_model, main_scoped_model_class, tmpdir):
+    sklearn_model_path = os.path.join(str(tmpdir), "sklearn_model")
+    mlflow.sklearn.save_model(sk_model=sklearn_knn_model, path=sklearn_model_path)
+    sk_model_config_path = os.path.join(sklearn_model_path, "MLmodel")
+    sk_model_config = Model.load(sk_model_config_path)
+    assert mlflow.pyfunc.FLAVOR_NAME in sk_model_config.flavors
+    sk_model_config.flavors[mlflow.pyfunc.FLAVOR_NAME][mlflow.pyfunc.PY_VERSION] = (
+        "2.7.0" if sys.version_info >= (3, 0) else "3.6.0"
+    )
+    sk_model_config.save(sk_model_config_path)
+
+    log_messages = []
+
+    def custom_warn(message_text, *args, **kwargs):
+        log_messages.append(message_text.format(*args, **kwargs))
+
+    with mock.patch("mlflow.pyfunc._logger.warn") as warn_mock:
+        warn_mock.side_effect = custom_warn
+        mlflow.pyfunc.save_model(path=os.path.join(str(tmpdir), "pyfunc_model"),
+                                 artifacts={
+                                    "sk_model": sklearn_model_path
+                                 },
+                                 parameters={
+                                    "predict_fn": lambda sk_model, model_input: None
+                                 },
+                                 model_class=main_scoped_model_class)
+
+    assert any([
+        "MLflow model that was saved with a different major version of Python" in log_message
+        for log_message in log_messages
+    ])
+
+
+def test_save_model_specifying_model_dependency_with_same_major_python_version_does_not_log_warning(
+        sklearn_knn_model, main_scoped_model_class, tmpdir):
+    sklearn_model_path = os.path.join(str(tmpdir), "sklearn_model")
+    mlflow.sklearn.save_model(sk_model=sklearn_knn_model, path=sklearn_model_path)
+    sk_model_config_path = os.path.join(sklearn_model_path, "MLmodel")
+    sk_model_config = Model.load(sk_model_config_path)
+    sk_model_py_version = sk_model_config.flavors.get(mlflow.pyfunc.FLAVOR_NAME, {}).get(
+        mlflow.pyfunc.PY_VERSION, None)
+    assert sk_model_py_version is not None
+    assert StrictVersion(sk_model_py_version).version[0] == sys.version_info.major
+
+    log_messages = []
+
+    def custom_warn(message_text, *args, **kwargs):
+        log_messages.append(message_text.format(*args, **kwargs))
+
+    with mock.patch("mlflow.pyfunc._logger.warn") as warn_mock:
+        warn_mock.side_effect = custom_warn
+        mlflow.pyfunc.save_model(path=os.path.join(str(tmpdir), "pyfunc_model"),
+                                 artifacts={
+                                    "sk_model": sklearn_model_path
+                                 },
+                                 parameters={
+                                    "predict_fn": lambda sk_model, model_input: None
+                                 },
+                                 model_class=main_scoped_model_class)
+
+    assert not any([
+        "MLflow model that was saved with a different major version of Python" in log_message
+        for log_message in log_messages
+    ])
+
+
+def test_save_model_specifying_model_dependency_with_different_cloudpickle_verison_logs_warning(
+        sklearn_knn_model, main_scoped_model_class, tmpdir):
+    sklearn_model_path = os.path.join(str(tmpdir), "sklearn_model")
+    with mock.patch("cloudpickle.__version__") as cloudpickle_version_mock:
+        cloudpickle_version_mock.__str__ = lambda *args, **kwargs: "0.4.6"
+        mlflow.sklearn.save_model(
+            sk_model=sklearn_knn_model,
+            path=sklearn_model_path,
+            serialization_format=mlflow.sklearn.SERIALIZATION_FORMAT_CLOUDPICKLE)
+
+    log_messages = []
+
+    def custom_warn(message_text, *args, **kwargs):
+        log_messages.append(message_text.format(*args, **kwargs))
+
+    with mock.patch("mlflow.pyfunc._logger.warn") as warn_mock,\
+            mock.patch("cloudpickle.__version__") as cloudpickle_version_mock:
+        warn_mock.side_effect = custom_warn
+        cloudpickle_version_mock.__str__ = lambda *args, **kwargs: "0.5.8"
+        mlflow.pyfunc.save_model(path=os.path.join(str(tmpdir), "pyfunc_model"),
+                                 artifacts={
+                                    "sk_model": sklearn_model_path
+                                 },
+                                 parameters={
+                                    "predict_fn": lambda sk_model, model_input: None
+                                 },
+                                 model_class=main_scoped_model_class)
+
+    assert any([
+        "MLflow model that contains a dependency on either a different version or a"
+        " range of versions of the CloudPickle library" in log_message
+        for log_message in log_messages
+    ])
+
+
+def test_save_model_specifying_model_dependency_with_same_cloudpickle_verison_does_not_log_warning(
+        sklearn_knn_model, main_scoped_model_class, tmpdir):
+    sklearn_model_path = os.path.join(str(tmpdir), "sklearn_model")
+    mlflow.sklearn.save_model(sk_model=sklearn_knn_model,
+                              path=sklearn_model_path,
+                              serialization_format=mlflow.sklearn.SERIALIZATION_FORMAT_CLOUDPICKLE)
+
+    log_messages = []
+
+    def custom_warn(message_text, *args, **kwargs):
+        log_messages.append(message_text.format(*args, **kwargs))
+
+    with mock.patch("mlflow.pyfunc._logger.warn") as warn_mock:
+        warn_mock.side_effect = custom_warn
+        mlflow.pyfunc.save_model(path=os.path.join(str(tmpdir), "pyfunc_model"),
+                                 artifacts={
+                                    "sk_model": sklearn_model_path
+                                 },
+                                 parameters={
+                                    "predict_fn": lambda sk_model, model_input: None
+                                 },
+                                 model_class=main_scoped_model_class)
+
+    assert not any([
+        "MLflow model that contains a dependency on either a different version or a"
+        " range of versions of the CloudPickle library" in log_message
+        for log_message in log_messages
+    ])
+
+
+def test_save_model_persists_specified_conda_env_in_mlflow_model_directory(
+        sklearn_knn_model, main_scoped_model_class, pyfunc_custom_env, tmpdir):
+    sklearn_model_path = os.path.join(str(tmpdir), "sklearn_model")
+    mlflow.sklearn.save_model(sk_model=sklearn_knn_model,
+                              path=sklearn_model_path,
+                              serialization_format=mlflow.sklearn.SERIALIZATION_FORMAT_CLOUDPICKLE)
+
+    pyfunc_model_path = os.path.join(str(tmpdir), "pyfunc_model")
+    mlflow.pyfunc.save_model(path=pyfunc_model_path,
+                             artifacts={
+                                "sk_model": sklearn_model_path
+                             },
+                             parameters={
+                                "predict_fn": lambda sk_model, model_input: None
+                             },
+                             model_class=main_scoped_model_class,
+                             conda_env=pyfunc_custom_env)
+
+    pyfunc_conf = _get_flavor_configuration(
+        model_path=pyfunc_model_path, flavor_name=mlflow.pyfunc.FLAVOR_NAME)
+    saved_conda_env_path = os.path.join(pyfunc_model_path, pyfunc_conf[mlflow.pyfunc.ENV])
+    assert os.path.exists(saved_conda_env_path)
+    assert saved_conda_env_path != pyfunc_custom_env
+
+    with open(pyfunc_custom_env, "r") as f:
+        pyfunc_custom_env_parsed = yaml.safe_load(f)
+    with open(saved_conda_env_path, "r") as f:
+        saved_conda_env_parsed = yaml.safe_load(f)
+    assert saved_conda_env_parsed == pyfunc_custom_env_parsed
+
+
+def test_log_model_persists_specified_conda_env_in_mlflow_model_directory(
+        sklearn_knn_model, main_scoped_model_class, pyfunc_custom_env):
+    sklearn_artifact_path = "sk_model"
+    with mlflow.start_run():
+        mlflow.sklearn.log_model(sk_model=sklearn_knn_model, artifact_path=sklearn_artifact_path)
+        sklearn_run_id = mlflow.active_run().info.run_uuid
+
+    pyfunc_artifact_path = "pyfunc_model"
+    with mlflow.start_run():
+        mlflow.pyfunc.log_model(artifact_path=pyfunc_artifact_path,
+                                artifacts={
+                                    "sk_model": utils_get_artifact_uri(
+                                        artifact_path=sklearn_artifact_path,
+                                        run_id=sklearn_run_id)
+                                },
+                                parameters={
+                                    "predict_fn": lambda sk_model, model_input: None
+                                },
+                                model_class=main_scoped_model_class,
+                                conda_env=pyfunc_custom_env)
+        pyfunc_run_id = mlflow.active_run().info.run_uuid
+
+    pyfunc_model_path = _get_model_log_dir(pyfunc_artifact_path, pyfunc_run_id)
+    pyfunc_conf = _get_flavor_configuration(
+        model_path=pyfunc_model_path, flavor_name=mlflow.pyfunc.FLAVOR_NAME)
+    saved_conda_env_path = os.path.join(pyfunc_model_path, pyfunc_conf[mlflow.pyfunc.ENV])
+    assert os.path.exists(saved_conda_env_path)
+    assert saved_conda_env_path != pyfunc_custom_env
+
+    with open(pyfunc_custom_env, "r") as f:
+        pyfunc_custom_env_parsed = yaml.safe_load(f)
+    with open(saved_conda_env_path, "r") as f:
+        saved_conda_env_parsed = yaml.safe_load(f)
+    assert saved_conda_env_parsed == pyfunc_custom_env_parsed
+
+
+def test_save_model_without_specified_conda_env_uses_default_env_with_expected_dependencies(
+        sklearn_logreg_model, main_scoped_model_class, tmpdir):
+    sklearn_model_path = os.path.join(str(tmpdir), "sklearn_model")
+    mlflow.sklearn.save_model(sk_model=sklearn_logreg_model, path=sklearn_model_path)
+
+    pyfunc_model_path = os.path.join(str(tmpdir), "pyfunc_model")
+    mlflow.pyfunc.save_model(path=pyfunc_model_path,
+                             artifacts={
+                                "sk_model": sklearn_model_path
+                             },
+                             parameters={
+                                "predict_fn": lambda sk_model, model_input: None
+                             },
+                             model_class=main_scoped_model_class)
+
+    pyfunc_conf = _get_flavor_configuration(
+        model_path=pyfunc_model_path, flavor_name=mlflow.pyfunc.FLAVOR_NAME)
+    conda_env_path = os.path.join(pyfunc_model_path, pyfunc_conf[mlflow.pyfunc.ENV])
+    with open(conda_env_path, "r") as f:
+        conda_env = yaml.safe_load(f)
+
+    assert conda_env == mlflow.pyfunc.model.DEFAULT_CONDA_ENV
+
+
+def test_log_model_without_specified_conda_env_uses_default_env_with_expected_dependencies(
+        sklearn_knn_model, main_scoped_model_class):
+    sklearn_artifact_path = "sk_model"
+    with mlflow.start_run():
+        mlflow.sklearn.log_model(sk_model=sklearn_knn_model, artifact_path=sklearn_artifact_path)
+        sklearn_run_id = mlflow.active_run().info.run_uuid
+
+    pyfunc_artifact_path = "pyfunc_model"
+    with mlflow.start_run():
+        mlflow.pyfunc.log_model(artifact_path=pyfunc_artifact_path,
+                                artifacts={
+                                    "sk_model": utils_get_artifact_uri(
+                                        artifact_path=sklearn_artifact_path,
+                                        run_id=sklearn_run_id)
+                                },
+                                parameters={
+                                    "predict_fn": lambda sk_model, model_input: None
+                                },
+                                model_class=main_scoped_model_class)
+        pyfunc_run_id = mlflow.active_run().info.run_uuid
+
+    pyfunc_model_path = _get_model_log_dir(pyfunc_artifact_path, pyfunc_run_id)
+    pyfunc_conf = _get_flavor_configuration(
+        model_path=pyfunc_model_path, flavor_name=mlflow.pyfunc.FLAVOR_NAME)
+    conda_env_path = os.path.join(pyfunc_model_path, pyfunc_conf[mlflow.pyfunc.ENV])
+    with open(conda_env_path, "r") as f:
+        conda_env = yaml.safe_load(f)
+
+    assert conda_env == mlflow.pyfunc.model.DEFAULT_CONDA_ENV
+
+
+def test_save_model_correctly_resolves_directory_artifact_with_nested_contents(
+        tmpdir, model_path, iris_data):
+    directory_artifact_path = os.path.join(str(tmpdir), "directory_artifact")
+    nested_file_relative_path = os.path.join(
+        "my", "somewhat", "heavily", "nested", "directory", "myfile.txt")
+    nested_file_path = os.path.join(directory_artifact_path, nested_file_relative_path)
+    os.makedirs(os.path.dirname(nested_file_path))
+    nested_file_text = "some sample file text"
+    with open(nested_file_path, "w") as f:
+        f.write(nested_file_text)
+
+    class ArtifactValidationModel(mlflow.pyfunc.PythonModel):
+        def predict(self, model_input):
+            expected_file_path = os.path.join(
+                self.context.artifacts["testdir"], nested_file_relative_path)
+            if not os.path.exists(expected_file_path):
+                return False
             else:
-                result_df = pandas.read_json(response.content)
-                np.testing.assert_array_equal(result_df.values.transpose()[0],
-                                              self._knn.predict(self._X))
+                with open(expected_file_path, "r") as f:
+                    return (f.read() == nested_file_text)
 
-    def test_model_serve_with_conda(self):
-        self._model_serve_with_conda_env(extra_args=[])
+    mlflow.pyfunc.save_model(path=model_path,
+                             artifacts={
+                                 "testdir": directory_artifact_path
+                             },
+                             model_class=ArtifactValidationModel)
 
-    def test_model_serve_with_no_conda(self):
-        self._model_serve_with_conda_env(extra_args=['--no-conda'])
+    loaded_model = mlflow.pyfunc.load_pyfunc(model_path)
+    assert loaded_model.predict(iris_data[0])
 
-    def test_cli_predict(self):
-        with TempDir() as tmp:
-            model_path = tmp.path("knn.pkl")
-            with open(model_path, "wb") as f:
-                pickle.dump(self._knn, f)
-            path = tmp.path("knn")
-            pyfunc.save_model(dst_path=path,
-                              data_path=model_path,
-                              loader_module=os.path.basename(__file__)[:-3],
-                              code_path=[__file__],
-                              )
-            input_csv_path = tmp.path("input with spaces.csv")
-            pandas.DataFrame(self._X).to_csv(input_csv_path, header=True, index=False)
-            output_csv_path = tmp.path("output.csv")
-            runner = CliRunner(env={"LC_ALL": "en_US.UTF-8", "LANG": "en_US.UTF-8"})
-            result = runner.invoke(mlflow.pyfunc.cli.commands,
-                                   ['predict', '--model-path', path, '-i',
-                                    input_csv_path, '-o', output_csv_path])
-            print("result", result.output)
-            print(result.exc_info)
-            print(result.exception)
-            assert result.exit_code == 0
-            result_df = pandas.read_csv(output_csv_path, header=None)
-            np.testing.assert_array_equal(result_df.values.transpose()[0],
-                                          self._knn.predict(self._X))
 
-    def _cli_predict_with_conda_env(self, extra_args):
-        with TempDir() as tmp:
-            model_path = tmp.path("knn.pkl")
-            with open(model_path, "wb") as f:
-                pickle.dump(self._knn, f)
+def test_save_model_with_no_artifacts_or_parameters_does_not_produce_artifacts_or_parameters_dirs(
+        tmpdir):
+    no_params_or_artifacts_model_path = os.path.join(str(tmpdir), "no_params_or_artifacts")
+    mlflow.pyfunc.save_model(path=no_params_or_artifacts_model_path,
+                             model_class="a.sample.ClassName",
+                             parameters=None,
+                             artifacts=None)
 
-            # create a conda yaml that installs mlflow from source in-place mode
-            path = tmp.path("knn")
-            pyfunc.save_model(dst_path=path,
-                              data_path=model_path,
-                              loader_module=os.path.basename(__file__)[:-3],
-                              code_path=[__file__],
-                              conda_env=self._create_conda_env_file(tmp)
-                              )
-            input_csv_path = tmp.path("input with spaces.csv")
-            pandas.DataFrame(self._X).to_csv(input_csv_path, header=True, index=False)
-            output_csv_path = tmp.path("output.csv")
-            process = Popen(['mlflow', 'pyfunc', 'predict',
-                             '--model-path', path,
-                             '-i', input_csv_path,
-                             '-o', output_csv_path] + extra_args,
-                            stderr=STDOUT,
-                            preexec_fn=os.setsid)
-            process.wait()
-            result_df = pandas.read_csv(output_csv_path, header=None)
-            np.testing.assert_array_equal(result_df.values.transpose()[0],
-                                          self._knn.predict(self._X))
+    no_artifacts_model_path = os.path.join(str(tmpdir), "no_artifacts")
+    mlflow.pyfunc.save_model(path=no_artifacts_model_path,
+                             model_class="a.sample.ClassName",
+                             parameters={
+                                "sample_set": set(range(10)),
+                             },
+                             artifacts=None)
 
-    def test_cli_predict_with_conda(self):
-        """Run prediction in MLModel specified conda env"""
-        self._cli_predict_with_conda_env([])
+    no_params_model_path = os.path.join(str(tmpdir), "no_params")
+    mlflow.pyfunc.save_model(path=no_params_model_path,
+                             model_class="a.sample.ClassName",
+                             parameters=None,
+                             artifacts={
+                                "no_artifacts_model": no_artifacts_model_path,
+                             })
 
-    def test_cli_predict_with_no_conda(self):
-        """Run prediction in current conda env"""
-        self._cli_predict_with_conda_env(['--no-conda'])
+    model_paths_and_expected_existence_results = {
+        no_params_or_artifacts_model_path: {
+            "artifacts_exists": False,
+            "params_exists": False,
+        },
+        no_artifacts_model_path: {
+            "artifacts_exists": False,
+            "params_exists": True,
+        },
+        no_params_model_path: {
+            "artifacts_exists": True,
+            "params_exists": False,
+        },
+    }
+
+    for model_path, expected_existence_result in\
+            model_paths_and_expected_existence_results.items():
+        assert os.path.exists(model_path)
+        assert os.path.exists(os.path.join(model_path, "artifacts")) ==\
+            expected_existence_result["artifacts_exists"]
+        assert os.path.exists(os.path.join(model_path, "parameters")) ==\
+            expected_existence_result["params_exists"]
+
+        pyfunc_conf = _get_flavor_configuration(
+            model_path=model_path, flavor_name=mlflow.pyfunc.FLAVOR_NAME)
+        assert (mlflow.pyfunc.model.CONFIG_KEY_ARTIFACTS in pyfunc_conf) ==\
+            expected_existence_result["artifacts_exists"]
+        assert (mlflow.pyfunc.model.CONFIG_KEY_PARAMETERS in pyfunc_conf) ==\
+            expected_existence_result["params_exists"]
+
+
+def test_sagemaker_docker_model_scoring_with_default_conda_env(
+        sklearn_logreg_model, main_scoped_model_class, iris_data, tmpdir):
+    sklearn_model_path = os.path.join(str(tmpdir), "sklearn_model")
+    mlflow.sklearn.save_model(sk_model=sklearn_logreg_model, path=sklearn_model_path)
+
+    def test_predict(sk_model, model_input):
+        return sk_model.predict(model_input) * 2
+
+    pyfunc_model_path = os.path.join(str(tmpdir), "pyfunc_model")
+    mlflow.pyfunc.save_model(path=pyfunc_model_path,
+                             artifacts={
+                                "sk_model": sklearn_model_path
+                             },
+                             parameters={
+                                "predict_fn": test_predict
+                             },
+                             model_class=main_scoped_model_class)
+    reloaded_pyfunc = mlflow.pyfunc.load_pyfunc(path=pyfunc_model_path)
+
+    inference_df = pd.DataFrame(iris_data[0])
+    scoring_response = score_model_in_sagemaker_docker_container(
+            model_path=pyfunc_model_path,
+            data=inference_df,
+            content_type=pyfunc_scoring_server.CONTENT_TYPE_JSON_SPLIT_ORIENTED,
+            flavor=mlflow.pyfunc.FLAVOR_NAME)
+    deployed_model_preds = pd.DataFrame(json.loads(scoring_response.content))
+
+    pandas.testing.assert_frame_equal(
+        deployed_model_preds,
+        pd.DataFrame(reloaded_pyfunc.predict(inference_df)),
+        check_dtype=False,
+        check_less_precise=6)

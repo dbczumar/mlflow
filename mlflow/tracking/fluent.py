@@ -13,7 +13,8 @@ import sys
 import time
 import logging
 
-from mlflow.entities import Experiment, Run, SourceType, RunInfo
+import mlflow.tracking.utils
+from mlflow.entities import Experiment, Run, SourceType, RunInfo, RunStatus
 from mlflow.exceptions import MlflowException
 from mlflow.tracking.client import MlflowClient
 from mlflow.utils import env
@@ -26,6 +27,7 @@ from mlflow.utils.validation import _validate_run_id
 
 _EXPERIMENT_ID_ENV_VAR = "MLFLOW_EXPERIMENT_ID"
 _RUN_ID_ENV_VAR = "MLFLOW_RUN_ID"
+_AUTODETECT_EXPERIMENT = "MLFLOW_AUTODETECT_EXPERIMENT_ID"
 _active_run_stack = []
 _active_experiment_id = None
 
@@ -60,8 +62,8 @@ class ActiveRun(Run):  # pylint: disable=W0223
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        status = "FINISHED" if exc_type is None else "FAILED"
-        end_run(status)
+        status = RunStatus.FINISHED if exc_type is None else RunStatus.FAILED
+        end_run(RunStatus.to_string(status))
         return exc_type is None
 
 
@@ -115,7 +117,7 @@ def start_run(run_uuid=None, experiment_id=None, source_name=None, source_versio
         else:
             parent_run_id = None
 
-        exp_id_for_run = experiment_id or _get_experiment_id()
+        exp_id_for_run = experiment_id if experiment_id is not None else _get_experiment_id()
         if is_in_databricks_notebook():
             databricks_tags = {}
             notebook_id = get_notebook_id()
@@ -149,7 +151,7 @@ def start_run(run_uuid=None, experiment_id=None, source_name=None, source_versio
     return _active_run_stack[-1]
 
 
-def end_run(status="FINISHED"):
+def end_run(status=RunStatus.to_string(RunStatus.FINISHED)):
     """End an active MLflow run (if there is one)."""
     global _active_run_stack
     if len(_active_run_stack) > 0:
@@ -238,12 +240,25 @@ def create_experiment(name, artifact_location=None):
     return MlflowClient().create_experiment(name, artifact_location)
 
 
-def get_artifact_uri():
+def get_artifact_uri(artifact_path=None):
     """
-    Get the artifact URI of the currently active run. Calls to ``log_artifact`` and
-    ``log_artifacts`` write artifact(s) to subdirectories of the returned URI.
+    Get the absolute URI of the specified artifact in the currently active run.
+    If `path` is not specified, the artifact root URI of the currently active
+    run will be returned; calls to ``log_artifact`` and ``log_artifacts`` write
+    artifact(s) to subdirectories of the artifact root URI.
+
+    :param artifact_path: The run-relative artifact path for which to obtain an absolute URI.
+                          For example, "path/to/artifact". If unspecified, the artifact root URI
+                          for the currently active run will be returned.
+    :return: An *absolute* URI referring to the specified artifact or the currently adtive run's
+             artifact root. For example, if an artifact path is provided and the currently active
+             run uses an S3-backed store, this may be a uri of the form
+             ``s3://<bucket_name>/path/to/artifact/root/path/to/artifact``. If an artifact path
+             is not provided and the currently active run uses an S3-backed store, this may be a
+             URI of the form ``s3://<bucket_name>/path/to/artifact/root``.
     """
-    return _get_or_start_run().info.artifact_uri
+    return mlflow.tracking.utils.get_artifact_uri(
+        run_id=_get_or_start_run().info.run_uuid, artifact_path=artifact_path)
 
 
 def _get_or_start_run():
@@ -279,6 +294,8 @@ def _get_source_type():
 def _get_experiment_id():
     return int(_active_experiment_id or
                env.get_env(_EXPERIMENT_ID_ENV_VAR) or
+               (env.get_env(_AUTODETECT_EXPERIMENT) and
+                is_in_databricks_notebook() and get_notebook_id()) or
                Experiment.DEFAULT_EXPERIMENT_ID)
 
 

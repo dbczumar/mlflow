@@ -11,7 +11,7 @@ pyarrow
 pylint==1.8.2
 pyspark
 pytest==3.2.1
-pytest-cov
+pytest-cov==2.6.0
 rstcheck==3.2
 # TODO: Stop pinning the version of scikit-learn when the latest version of the
 # library on Anaconda catches up to pip
@@ -25,3 +25,4 @@ keras
 attrdict==2.0.0
 azureml-sdk; python_version >= "3.0"
 cloudpickle
+pytest-localserver
