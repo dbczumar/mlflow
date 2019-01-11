@@ -269,45 +269,27 @@ def _validate_artifacts(artifacts):
     :param artifacts: A dictionary containing ``<name, artifact_path>`` entries, where
                       ``artifact_path`` is the absolute filesystem path to the artifact.
     """
-    try:
-        from conda.resolve import MatchSpec
-    except ImportError:
-        raise MlflowException(
-            "Failed to import the `conda.resolve.MatchSpec` class. Please ensure that the `conda`"
-            " package (https://anaconda.org/anaconda/conda) is installed in your current"
-            " environment. Note that this package is not automatically included when creating a new"
-            " Conda environment via `conda create`; it must be explicitly specified during"
-            " environment creation or installed after environment activation via"
-            " `conda install conda`.")
+    def _validate_cloudpickle_version_compatibility(models):
+        try:
+            from conda.resolve import MatchSpec
+        except ImportError:
+            mlflow.pyfunc._logger.warning(
+                "Failed to import the `conda.resolve.MatchSpec` class. Library compatibility checks"
+                " for model artifacts will be skipped. To enable these checks, please ensure that"
+                " the `conda` package (https://anaconda.org/anaconda/conda) is installed in your"
+                " current environment. Note that this package is not automatically included when"
+                " creating a new Conda environment via `conda create`; it must be explicitly"
+                " specified during environment creation or installed after environment activation"
+                " via `conda install conda`.")
+            return
 
-    curr_major_py_version = StrictVersion(mlflow.utils.PYTHON_VERSION).version[0]
-    curr_cloudpickle_version_spec = MatchSpec("cloudpickle=={curr_cloudpickle_version}".format(
-        curr_cloudpickle_version=cloudpickle.__version__))
+        curr_cloudpickle_version_spec = MatchSpec("cloudpickle=={curr_cloudpickle_version}".format(
+            curr_cloudpickle_version=cloudpickle.__version__))
+        for model_name, model_path, pyfunc_conf in models.items():
+            conda_env_subpath = pyfunc_conf.get(mlflow.pyfunc.ENV, None)
+            if conda_env_subpath is None:
+                continue
 
-    models = dict([
-        (artifact_name, artifact_path) for artifact_name, artifact_path in artifacts.items()
-        if os.path.isdir(artifact_path) and "MLmodel" in os.listdir(artifact_path)])
-    model_py_version_data = []
-    for model_name, model_path in models.items():
-        model_conf = Model.load(os.path.join(model_path, "MLmodel"))
-        pyfunc_conf = model_conf.flavors.get(mlflow.pyfunc.FLAVOR_NAME, {})
-
-        model_py_version = pyfunc_conf.get(mlflow.pyfunc.PY_VERSION, None)
-        if model_py_version is not None:
-            model_py_version_data.append({
-                "artifact_name": model_name,
-                "model_version": model_py_version,
-            })
-            model_py_major_version = StrictVersion(model_py_version).version[0]
-            if model_py_major_version != curr_major_py_version:
-                mlflow.pyfunc._logger.warning(
-                    "The artifact with name %s is an MLflow model that was saved with a different"
-                    " major version of Python. As a result, your new model may not load or perform"
-                    " correctly. Current python version: %s. Model python version: %s",
-                    model_name, mlflow.utils.PYTHON_VERSION, model_py_version)
-
-        conda_env_subpath = pyfunc_conf.get(mlflow.pyfunc.ENV, None)
-        if conda_env_subpath is not None:
             with open(os.path.join(model_path, conda_env_subpath), "r") as f:
                 conda_env = yaml.safe_load(f)
 
@@ -328,6 +310,32 @@ def _validate_artifacts(artifacts):
                         model_name,
                         curr_cloudpickle_version_spec.version,
                         cloudpickle_dep_spec.version)
+
+    def _validate_python_version_compatibility(models):
+        curr_major_py_version = StrictVersion(mlflow.utils.PYTHON_VERSION).version[0]
+        for model_name, _, pyfunc_conf in models.items():
+            model_py_version = pyfunc_conf.get(mlflow.pyfunc.PY_VERSION, None)
+            if model_py_version is not None and\
+                    StrictVersion(model_py_version).version[0] != curr_major_py_version:
+                mlflow.pyfunc._logger.warning(
+                    "The artifact with name %s is an MLflow model that was saved with a different"
+                    " major version of Python. As a result, your new model may not load or perform"
+                    " correctly. Current python version: %s. Model python version: %s",
+                    model_name, mlflow.utils.PYTHON_VERSION, model_py_version)
+
+    models = [
+        (artifact_name, artifact_path, Model.load(os.path.join(artifact_path, "MLmodel")))
+        for artifact_name, artifact_path in artifacts.items()
+        if os.path.isdir(artifact_path) and "MLmodel" in os.listdir(artifact_path)
+    ]
+    models = [
+        (model_name, model_path, model_conf.flavors[mlflow.pyfunc.FLAVOR_NAME])
+        for model_name, model_path, model_conf in models
+        if mlflow.pyfunc.FLAVOR_NAME in model_conf
+    ]
+
+    _validate_python_version_compatibility(models)
+    _validate_cloudpickle_version_compatibility(models)
 
 
 def _load_pyfunc(model_path):
