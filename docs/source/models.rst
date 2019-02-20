@@ -146,9 +146,22 @@ and the :mod:`mlflow.pyfunc` documentation.
 H\ :sub:`2`\ O (``h2o``)
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
-The H2O model flavor enables logging and loading H2O models. These models will be saved by using the :py:mod:`mlflow.h2o.save_model`. Using :py:mod:`mlflow.h2o.log_model` will also enable a valid ``Python Function`` flavor.
+The ``h2o`` model flavor enables logging and loading H2O models. 
 
-When loading a H2O model as a PyFunc model, :py:mod:`h2o.init(...)` will be called. Therefore, the right version of h2o(-py) has to be in the environment. The arguments given to :py:mod:`h2o.init(...)` can be customized in ``model.h2o/h2o.yaml`` under the key ``init``. For more information, see :py:mod:`mlflow.h2o`.
+The :py:mod:`mlflow.h2o` module defines :py:func:`save_model() <mlflow.h2o.save_model>` and 
+:py:func:`log_model() <mlflow.h2o.log_model>` methods for saving H2O models in MLflow model format.
+These methods produce MLflow models with the ``python_function`` flavor, allowing them to be loaded 
+as generic Python functions for inference via :py:func:`mlflow.pyfunc.load_pyfunc()`. When MLflow 
+models with the ``h2o`` flavor are loaded via :py:func:`load_pyfunc() <mlflow.pyfunc.load_pyfunc>`, 
+the :py:func:`h2o.init()` method is called. Therefore, the correct version of ``h2o(-py)`` must be 
+installed in the loader's environment. The arguments given to :py:func:`h2o.init()` method can be 
+customized by modifying the ``init`` entry of the persisted H2O model's YAML configuration file: 
+``model.h2o/h2o.yaml``.
+
+Finally, the :py:func:`mlflow.h2o.load_model()` method can be used to load MLflow models with the
+``h2o`` flavor as H2O model objects.
+
+For more information, see :py:mod:`mlflow.h2o`.
 
 Keras (``keras``)
 ^^^^^^^^^^^^^^^^^
@@ -196,11 +209,13 @@ The ``sklearn`` model flavor provides an easy-to-use interface for saving and lo
 models. The :py:mod:`mlflow.sklearn` module defines 
 :py:func:`save_model() <mlflow.sklearn.save_model>` and 
 :py:func:`log_model() <mlflow.sklearn.log_model>` functions that save scikit-learn models in
-MLflow format, using either Python's pickle module (Pickle) or CloudPickle for model serialization.  
+MLflow format, using either Python's pickle module (Pickle) or CloudPickle for model serialization.
+These functions produce MLflow models with the ``python_function`` flavor, allowing them to
+be loaded as generic Python functions for inference via :py:func:`mlflow.pyfunc.load_pyfunc()`.
+Finally, the :py:func:`mlflow.sklearn.load_model()` method can be used to load MLflow models with 
+the ``sklearn`` flavor as scikit-learn model objects.
 
-handling scikit-learn models with no
-external dependencies. It saves and loads models using Python's pickle module and also generates a valid
-``python_function`` flavor model. For more information, see :py:mod:`mlflow.sklearn`.
+For more information, see :py:mod:`mlflow.sklearn`.
 
 
 Spark MLlib (``spark``)
