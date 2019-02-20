@@ -221,13 +221,23 @@ For more information, see :py:mod:`mlflow.sklearn`.
 Spark MLlib (``spark``)
 ^^^^^^^^^^^^^^^^^^^^^^^
 
-The ``spark`` model flavor enables exporting Spark MLlib models as MLflow models. Exported models are
-saved using Spark MLLib's native serialization, and can then be loaded back as MLlib models or
-deployed as ``python_function`` models. When deployed as a ``python_function``, the model creates its own
-SparkContext and converts pandas DataFrame input to a Spark DataFrame before scoring. While this is not
-the most efficient solution, especially for real-time scoring, it enables you to easily deploy any MLlib PipelineModel
-(as long as the PipelineModel has no external JAR dependencies) to any endpoint supported by
-MLflow. For more information, see :py:mod:`mlflow.spark`.
+The ``spark`` model flavor enables exporting Spark MLlib models as MLflow models. 
+
+The :py:mod:`mlflow.spark` module defines :py:func:`save_model() <mlflow.spark.save_model>` and 
+:py:func:`log_model() <mlflow.spark.log_model>` methods that save Spark MLlib pipelines in MLflow
+model format. MLflow models produced by these functions contain the ``python_function`` flavor,
+allowing them to be loaded as generic Python functions via :py:func:`mlflow.pyfunc.load_pyfunc()`.
+When a model with the ``spark`` flavor is loaded as a Python function via 
+:py:func:`load_pyfunc() <mlflow.spark.load_pyfunc>`, a new SparkContext is created for model 
+inference; additionally, the function converts all Pandas DataFrame inputs to Spark DataFrames
+before scoring. While this initialization overhead and format translation latency is not ideal
+for high-performance use cases, it enables you to easily deploy any MLlib PipelineModel
+to any production environment supported by MLflow (SageMaker, AzureML, etc).
+
+Finally, the :py:func:`mlflow.spark.load_model()` method is used to load MLflow models with
+the ``spark`` flavor as Spark MLlib pipelines.
+
+For more information, see :py:mod:`mlflow.spark`.
 
 TensorFlow (``tensorflow``)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
