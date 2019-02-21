@@ -153,8 +153,10 @@ The :py:mod:`mlflow.h2o` module defines :py:func:`save_model() <mlflow.h2o.save_
 These methods produce MLflow models with the ``python_function`` flavor, allowing them to be loaded 
 as generic Python functions for inference via :py:func:`mlflow.pyfunc.load_pyfunc()`. When MLflow 
 models with the ``h2o`` flavor are loaded via :py:func:`load_pyfunc() <mlflow.pyfunc.load_pyfunc>`, 
-the :py:func:`h2o.init()` method is called. Therefore, the correct version of ``h2o(-py)`` must be 
-installed in the loader's environment. The arguments given to :py:func:`h2o.init()` method can be 
+the `h2o.init() <http://docs.h2o.ai/h2o/latest-stable/h2o-py/docs/h2o.html#h2o.init>`_ method is 
+called. Therefore, the correct version of ``h2o(-py)`` must be installed in the loader's 
+environment. The arguments given to 
+`h2o.init() <http://docs.h2o.ai/h2o/latest-stable/h2o-py/docs/h2o.html#h2o.init>`_ can be 
 customized by modifying the ``init`` entry of the persisted H2O model's YAML configuration file: 
 ``model.h2o/h2o.yaml``.
 
@@ -181,7 +183,24 @@ For more information, see :py:mod:`mlflow.keras`.
 MLeap (``mleap``)
 ^^^^^^^^^^^^^^^^^
 
-The ``mleap`` model flavor supports saving models using the MLeap persistence mechanism. A companion module for loading MLflow models with the MLeap flavor format is available in the ``mlflow/java`` package. For more information, see :py:mod:`mlflow.mleap`.
+The ``mleap`` model flavor supports saving Spark models in MLflow format using the 
+`MLeap <http://mleap-docs.combust.ml/>`_ persistence mechanism. MLeap is an inference-optimized 
+format and execution engine for Spark models that does not depend on 
+`SparkContext <https://spark.apache.org/docs/latest/api/python/pyspark.html#pyspark.SparkContext>`_
+to evaluate inputs.
+
+Spark models can be saved with in MLflow format with MLeap by specifying the ``sample_input`` 
+argument of the :py:func:`mlflow.spark.save_model()` or :py:func:`mlflow.spark.log_model()` method 
+(recommended). The :py:mod:`mlflow.mleap` module also defines 
+:py:func:`save_model() <mlflow.mleap.save_model>` and 
+:py:func:`log_model() <mlflow.mleap.log_model>` methods for saving MLeap models in MLflow format, 
+but these methods do not include the ``python_function`` flavor in the models they produce.
+
+A companion module for loading MLflow models with the MLeap flavor format is available 
+in the ``mlflow/java`` package. 
+
+For more information, see :py:mod:`mlflow.spark`, :py:mod:`mlflow.mleap`, and the
+`MLeap documentation <http://mleap-docs.combust.ml/>`_.
 
 PyTorch (``pytorch``)
 ^^^^^^^^^^^^^^^^^^^^^
@@ -228,11 +247,14 @@ The :py:mod:`mlflow.spark` module defines :py:func:`save_model() <mlflow.spark.s
 model format. MLflow models produced by these functions contain the ``python_function`` flavor,
 allowing them to be loaded as generic Python functions via :py:func:`mlflow.pyfunc.load_pyfunc()`.
 When a model with the ``spark`` flavor is loaded as a Python function via 
-:py:func:`load_pyfunc() <mlflow.spark.load_pyfunc>`, a new SparkContext is created for model 
-inference; additionally, the function converts all Pandas DataFrame inputs to Spark DataFrames
-before scoring. While this initialization overhead and format translation latency is not ideal
-for high-performance use cases, it enables you to easily deploy any MLlib PipelineModel
-to any production environment supported by MLflow (SageMaker, AzureML, etc).
+:py:func:`load_pyfunc() <mlflow.spark.load_pyfunc>`, a new 
+`SparkContext <https://spark.apache.org/docs/latest/api/python/pyspark.html#pyspark.SparkContext>`_
+is created for model inference; additionally, the function converts all Pandas DataFrame inputs to 
+Spark DataFrames before scoring. While this initialization overhead and format translation latency 
+is not ideal for high-performance use cases, it enables you to easily deploy any 
+`MLlib PipelineModel <http://spark.apache.org/docs/latest/api/python/pyspark.ml.html?highlight=
+pipelinemodel#pyspark.ml.Pipeline>`_ to any production environment supported by MLflow 
+(SageMaker, AzureML, etc).
 
 Finally, the :py:func:`mlflow.spark.load_model()` method is used to load MLflow models with
 the ``spark`` flavor as Spark MLlib pipelines.
