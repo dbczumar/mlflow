@@ -60,7 +60,7 @@ class ActiveRun(Run):  # pylint: disable=W0223
 
     def __init__(self, run):
         Run.__init__(self, run.info, run.data)
-        self.step = 0
+        self.metric_step_state = {}
 
     def __enter__(self):
         return self
@@ -196,13 +196,13 @@ def log_metric(key, value, step=None):
     """
     run = _get_or_start_run().info.run_uuid
     if step is None:
-        step = run.step
+        step = run.metric_step_state.get(key, 0)
     MlflowClient().log_metric(run_id=run.info.run_uuid,
                               key=key,
                               value=value,
                               timestamp=int(time.time()),
                               step=step)
-    run.step = step + 1 # Or just `step`?
+    run.metric_step_state[key] = step + 1 # Or just `step`?
 
 
 def log_metrics(metrics):
