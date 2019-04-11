@@ -194,7 +194,7 @@ def log_metric(key, value, step=None):
     :param key: Metric name (string).
     :param value: Metric value (float).
     """
-    run = _get_or_start_run().info.run_uuid
+    run = _get_or_start_run()
     if step is None:
         step = run.metric_step_state.get(key, 0)
     MlflowClient().log_metric(run_id=run.info.run_uuid,
