@@ -128,7 +128,7 @@ def _serve_pyfunc(model):
     # link the log streams to stdout/err so they will be logged to the container logs
     check_call(['ln', '-sf', '/dev/stdout', '/var/log/nginx/access.log'])
     check_call(['ln', '-sf', '/dev/stderr', '/var/log/nginx/error.log'])
-    cpu_count = multiprocessing.cpu_count()
+    cpu_count = int(multiprocessing.cpu_count() / 2)
     os.system("pip -V")
     os.system("python -V")
     os.system('python -c"from mlflow.version import VERSION as V; print(V)"')
