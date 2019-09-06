@@ -29,8 +29,30 @@ from mlflow.utils.file_utils import TempDir
 from tests.resources.db.initial_models import Base as InitialBase
 from tests.integration.utils import invoke_cli_runner
 
+from tests.store.test_backend_store import BackendStoreTest
+
 DB_URI = 'sqlite:///'
 ARTIFACT_URI = 'artifact_folder'
+
+class TestSqlAlchemyStoreSqlite2(unittest.TestCase, BackendStoreTest):
+
+    def setUp(self):
+        fd, self.temp_dbfile = tempfile.mkstemp()
+        # Close handle immediately so that we can remove the file later on in Windows
+        os.close(fd)
+        self.db_uri = "%s%s" % ("sqlite:///", self.temp_dbfile)
+
+    def tearDown(self):
+        models.Base.metadata.drop_all(self.store.engine)
+        os.remove(self.temp_dbfile)
+        shutil.rmtree(ARTIFACT_URI)
+
+    def get_store(self):
+        return SqlAlchemyStore(self.db_uri, ARTIFACT_URI)
+
+    @property
+    def store(self):
+        return self.get_store()
 
 
 class TestParseDbUri(unittest.TestCase):
@@ -109,117 +131,6 @@ class TestSqlAlchemyStoreSqlite(unittest.TestCase):
         assert len(run.data.params) == len(params)
         logged_params = [(param_key, param_val) for param_key, param_val in run.data.params.items()]
         assert set(logged_params) == set([(param.key, param.value) for param in params])
-
-    def test_default_experiment(self):
-        experiments = self.store.list_experiments()
-        self.assertEqual(len(experiments), 1)
-
-        first = experiments[0]
-        self.assertEqual(first.experiment_id, "0")
-        self.assertEqual(first.name, "Default")
-
-    def test_default_experiment_lifecycle(self):
-        default_experiment = self.store.get_experiment(experiment_id=0)
-        self.assertEqual(default_experiment.name, Experiment.DEFAULT_EXPERIMENT_NAME)
-        self.assertEqual(default_experiment.lifecycle_stage, entities.LifecycleStage.ACTIVE)
-
-        self._experiment_factory('aNothEr')
-        all_experiments = [e.name for e in self.store.list_experiments()]
-        six.assertCountEqual(self, set(['aNothEr', 'Default']), set(all_experiments))
-
-        self.store.delete_experiment(0)
-
-        six.assertCountEqual(self, ['aNothEr'], [e.name for e in self.store.list_experiments()])
-        another = self.store.get_experiment(1)
-        self.assertEqual('aNothEr', another.name)
-
-        default_experiment = self.store.get_experiment(experiment_id=0)
-        self.assertEqual(default_experiment.name, Experiment.DEFAULT_EXPERIMENT_NAME)
-        self.assertEqual(default_experiment.lifecycle_stage, entities.LifecycleStage.DELETED)
-
-        # destroy SqlStore and make a new one
-        del self.store
-        self.store = self._get_store(self.db_url)
-
-        # test that default experiment is not reactivated
-        default_experiment = self.store.get_experiment(experiment_id=0)
-        self.assertEqual(default_experiment.name, Experiment.DEFAULT_EXPERIMENT_NAME)
-        self.assertEqual(default_experiment.lifecycle_stage, entities.LifecycleStage.DELETED)
-
-        six.assertCountEqual(self, ['aNothEr'], [e.name for e in self.store.list_experiments()])
-        all_experiments = [e.name for e in self.store.list_experiments(ViewType.ALL)]
-        six.assertCountEqual(self, set(['aNothEr', 'Default']), set(all_experiments))
-
-        # ensure that experiment ID dor active experiment is unchanged
-        another = self.store.get_experiment(1)
-        self.assertEqual('aNothEr', another.name)
-
-    def test_raise_duplicate_experiments(self):
-        with self.assertRaises(Exception):
-            self._experiment_factory(['test', 'test'])
-
-    def test_raise_experiment_dont_exist(self):
-        with self.assertRaises(Exception):
-            self.store.get_experiment(experiment_id=100)
-
-    def test_delete_experiment(self):
-        experiments = self._experiment_factory(['morty', 'rick', 'rick and morty'])
-
-        all_experiments = self.store.list_experiments()
-        self.assertEqual(len(all_experiments), len(experiments) + 1)  # default
-
-        exp_id = experiments[0]
-        self.store.delete_experiment(exp_id)
-
-        updated_exp = self.store.get_experiment(exp_id)
-        self.assertEqual(updated_exp.lifecycle_stage, entities.LifecycleStage.DELETED)
-
-        self.assertEqual(len(self.store.list_experiments()), len(all_experiments) - 1)
-
-    def test_get_experiment(self):
-        name = 'goku'
-        experiment_id = self._experiment_factory(name)
-        actual = self.store.get_experiment(experiment_id)
-        self.assertEqual(actual.name, name)
-        self.assertEqual(actual.experiment_id, experiment_id)
-
-        actual_by_name = self.store.get_experiment_by_name(name)
-        self.assertEqual(actual_by_name.name, name)
-        self.assertEqual(actual_by_name.experiment_id, experiment_id)
-
-    def test_list_experiments(self):
-        testnames = ['blue', 'red', 'green']
-
-        experiments = self._experiment_factory(testnames)
-        actual = self.store.list_experiments()
-
-        self.assertEqual(len(experiments) + 1, len(actual))  # default
-
-        with self.store.ManagedSessionMaker() as session:
-            for experiment_id in experiments:
-                res = session.query(models.SqlExperiment).filter_by(
-                    experiment_id=experiment_id).first()
-                self.assertIn(res.name, testnames)
-                self.assertEqual(str(res.experiment_id), experiment_id)
-
-    def test_create_experiments(self):
-        with self.store.ManagedSessionMaker() as session:
-            result = session.query(models.SqlExperiment).all()
-            self.assertEqual(len(result), 1)
-
-        experiment_id = self.store.create_experiment(name='test exp')
-        self.assertEqual(experiment_id, "1")
-        with self.store.ManagedSessionMaker() as session:
-            result = session.query(models.SqlExperiment).all()
-            self.assertEqual(len(result), 2)
-
-            test_exp = session.query(models.SqlExperiment).filter_by(name='test exp').first()
-            self.assertEqual(str(test_exp.experiment_id), experiment_id)
-            self.assertEqual(test_exp.name, 'test exp')
-
-        actual = self.store.get_experiment(experiment_id)
-        self.assertEqual(actual.experiment_id, experiment_id)
-        self.assertEqual(actual.name, 'test exp')
 
     def test_run_tag_model(self):
         # Create a run whose UUID we can reference when creating tag models.

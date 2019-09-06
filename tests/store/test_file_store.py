@@ -23,9 +23,28 @@ from mlflow.protos.databricks_pb2 import ErrorCode, RESOURCE_DOES_NOT_EXIST, INT
 
 from tests.helper_functions import random_int, random_str, safe_edit_yaml
 
+from tests.store.test_backend_store import BackendStoreTest
 
-class TestFileStore(unittest.TestCase):
+class TestFileStore(unittest.TestCase, BackendStoreTest):
     ROOT_LOCATION = tempfile.gettempdir()
+
+    def setUp(self):
+        self.test_root = os.path.join(
+            TestFileStore.ROOT_LOCATION, "test_file_store_%d" % random_int())
+        self.maxDiff = None
+
+    def tearDown(self):
+        shutil.rmtree(self.test_root, ignore_errors=True)
+
+    def get_store(self):
+        return FileStore(self.test_root)
+
+    @property
+    def store(self):
+        return self.get_store()
+
+
+class TestFileStor(unittest.TestCase):
 
     def setUp(self):
         self._create_root(TestFileStore.ROOT_LOCATION)

@@ -15,6 +15,7 @@ import shutil
 from threading import Thread
 import time
 import tempfile
+import unittest
 
 import mlflow.experiments
 from mlflow.exceptions import MlflowException
@@ -24,9 +25,43 @@ from mlflow.tracking import MlflowClient
 from mlflow.utils.mlflow_tags import MLFLOW_USER, MLFLOW_RUN_NAME, MLFLOW_PARENT_RUN_ID, \
     MLFLOW_SOURCE_TYPE, MLFLOW_SOURCE_NAME, MLFLOW_PROJECT_ENTRY_POINT, MLFLOW_GIT_COMMIT
 from mlflow.utils.file_utils import path_to_local_file_uri, local_file_uri_to_path
+from mlflow.utils.rest_utils import MlflowHostCreds, _DEFAULT_HEADERS
 from tests.integration.utils import invoke_cli_runner
 
+from mlflow.store.rest_store import RestStore
+
 from tests.helper_functions import LOCALHOST, get_safe_port
+from tests.helper_functions import random_int
+from tests.store.test_backend_store import BackendStoreTest
+
+class TestRestTracking2(unittest.TestCase, BackendStoreTest):
+
+    @classmethod
+    def setUpClass(cls):
+        backend_store_uri = os.path.join(
+            tempfile.gettempdir(), "file_store_for_rest%d" % random_int())
+        artifact_uri = tempfile.mkdtemp("test_rest_tracking")
+        rest_store_uri, rest_store_proc = _init_server(backend_uri=backend_store_uri,
+                     root_artifact_uri=artifact_uri)
+        print("URI", rest_store_uri)
+        cls.backend_store_uri = backend_store_uri
+        cls.artifact_uri = artifact_uri
+        cls.rest_store_uri = rest_store_uri
+        cls.rest_store_proc = rest_store_proc
+
+    @classmethod
+    def tearDownClass(cls):
+        pass
+
+    def tearDown(self):
+        shutil.rmtree(self.backend_store_uri, ignore_errors=True)
+
+    def get_store(self):
+        return RestStore(lambda: MlflowHostCreds(host=self.rest_store_uri))
+
+    @property
+    def store(self):
+        return self.get_store()
 
 
 def _await_server_up_or_die(port, timeout=60):
