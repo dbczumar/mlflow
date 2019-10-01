@@ -11,6 +11,7 @@ from mlflow.store.local_artifact_repo import LocalArtifactRepository
 from mlflow.store.runs_artifact_repo import RunsArtifactRepository
 from mlflow.store.s3_artifact_repo import S3ArtifactRepository
 from mlflow.store.sftp_artifact_repo import SFTPArtifactRepository
+from mlflow.store.model_registry_artifact_repo import ModelRegistryArtifactRepository 
 
 from mlflow.utils import get_uri_scheme
 
@@ -82,6 +83,7 @@ _artifact_repository_registry.register('sftp', SFTPArtifactRepository)
 _artifact_repository_registry.register('dbfs', dbfs_artifact_repo_factory)
 _artifact_repository_registry.register('hdfs', HdfsArtifactRepository)
 _artifact_repository_registry.register('runs', RunsArtifactRepository)
+_artifact_repository_registry.register('models', ModelRegistryArtifactRepository)
 
 _artifact_repository_registry.register_entrypoints()
 
