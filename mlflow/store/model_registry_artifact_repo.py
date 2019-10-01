@@ -43,18 +43,14 @@ class ModelRegistryArtifactRepository(ArtifactRepository):
     URI_TYPE_VERSION = "version"
 
     def __init__(self, artifact_uri):
+        super(ModelRegistryArtifactRepository, self).__init__(artifact_uri)
+
         self.get_host_creds = self._get_host_creds_from_default_store()
 
-        from mlflow.store.artifact_repository_registry import get_artifact_repository
-        model_name, stage_or_version, uri_type =\
+        model_name, uri_type =\
             ModelRegistryArtifactRepository.parse_uri(artifact_uri)
-        source_uri = self.get_model_source_uri(
-            model_name=model_name,
-            stage_or_version=stage_or_version,
-            uri_type=uri_type)
-        assert urllib.parse.urlparse(source_uri).scheme != "models"  # avoid an infinite loop
-        super(ModelRegistryArtifactRepository, self).__init__(artifact_uri)
-        self.repo = get_artifact_repository(source_uri)
+        self.model_name = model_name
+        self.uri_type = uri_type
 
     def _get_host_creds_from_default_store(self):
         store = utils._get_store()
@@ -123,7 +119,7 @@ class ModelRegistryArtifactRepository(ArtifactRepository):
                     "Found no registered models matching stage: {}".format(stage_or_version))
 
         else:
-            raise MlflowException("Invalid models URI") 
+            raise MlflowException("Invalid models URI")
 
 
     @staticmethod
@@ -140,9 +136,11 @@ class ModelRegistryArtifactRepository(ArtifactRepository):
                 "Not a proper models:/ URI: %s. " % uri +
                 "Models URIs must be of the form 'models:/<model_name>/<stage/version>/<stage_or_version>'")
 
+        path = path.rstrip("/")
+
         path = path[1:]
         path_parts = path.split('/')
-        if len(path_parts) != 3:
+        if len(path_parts) != 2:
             raise MlflowException(
                 "Not a proper models:/ URI: %s. " % uri +
                 "Models URIs must be of the form 'models:/<model_name>/<stage/version>/<stage_or_version>'")
@@ -152,7 +150,7 @@ class ModelRegistryArtifactRepository(ArtifactRepository):
             ModelRegistryArtifactRepository.URI_TYPE_STAGE,
             ModelRegistryArtifactRepository.URI_TYPE_VERSION
         ]:
-            return path_parts[0], path_parts[2], uri_type
+            return path_parts[0], uri_type
         else:
             raise MlflowException(
                 "Not a proper models:/ URI: %s. " % uri +
@@ -169,7 +167,7 @@ class ModelRegistryArtifactRepository(ArtifactRepository):
         :param artifact_path: Directory within the run's artifact directory in which to log the
                               artifact
         """
-        self.repo.log_artifact(local_file, artifact_path)
+        raise MlflowException("Not implemented")
 
     def log_artifacts(self, local_dir, artifact_path=None):
         """
@@ -180,7 +178,7 @@ class ModelRegistryArtifactRepository(ArtifactRepository):
         :param artifact_path: Directory within the run's artifact directory in which to log the
                               artifacts
         """
-        self.repo.log_artifacts(local_dir, artifact_path)
+        raise MlflowException("Not implemented")
 
     def list_artifacts(self, path):
         """
@@ -191,7 +189,7 @@ class ModelRegistryArtifactRepository(ArtifactRepository):
 
         :return: List of artifacts as FileInfo listed directly under path.
         """
-        return self.repo.list_artifacts(path)
+        raise MlflowException("Not implemented")
 
     def download_artifacts(self, artifact_path, dst_path=None):
         """
@@ -208,7 +206,19 @@ class ModelRegistryArtifactRepository(ArtifactRepository):
 
         :return: Absolute path of the local filesystem location containing the desired artifacts.
         """
-        return self.repo.download_artifacts(artifact_path, dst_path)
+        from mlflow.store.artifact_repository_registry import get_artifact_repository
+
+        stage_or_version = artifact_path
+
+        source_uri = self.get_model_source_uri(
+            model_name=self.model_name,
+            stage_or_version=stage_or_version,
+            uri_type=self.uri_type)
+
+        assert urllib.parse.urlparse(source_uri).scheme != "models"  # avoid an infinite loop
+        repo = get_artifact_repository(source_uri)
+
+        return repo.download_artifacts(".", dst_path)
 
     def _download_file(self, remote_file_path, local_path):
         """
@@ -219,4 +229,5 @@ class ModelRegistryArtifactRepository(ArtifactRepository):
                                  directory of the artifact repository.
         :param local_path: The path to which to save the downloaded file.
         """
-        self.repo._download_file(remote_file_path, local_path)
+        raise MlflowException("Not implemented")
+        # self.repo._download_file(remote_file_path, local_path)
