@@ -358,11 +358,16 @@ def autolog():
         def on_epoch_end(self, epoch, logs=None):
             if not logs:
                 return
-            try_mlflow_log(mlflow.log_metrics, logs, step=epoch)
+            if epoch % 5 == 0:
+                try_mlflow_log(mlflow.log_metrics, logs, step=epoch)
 
-        def on_train_end(self, logs=None):
+        def on_train_begin(self, logs=None):
             try_mlflow_log(mlflow.log_param, 'num_layers', len(self.model.layers))
             try_mlflow_log(mlflow.log_param, 'optimizer_name', type(self.model.optimizer).__name__)
+
+            for layer in self.model.layers[1:-1]:
+                try_mlflow_log(mlflow.log_param, '{layer_name}_size'.format(layer_name=layer.name), layer.output_shape)
+
             if hasattr(self.model.optimizer, 'lr'):
                 lr = self.model.optimizer.lr if \
                     type(self.model.optimizer.lr) is float \
