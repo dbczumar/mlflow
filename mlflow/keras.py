@@ -419,7 +419,8 @@ def autolog():
             kwargs['callbacks'] += [__MLflowKerasCallback()]
         else:
             kwargs['callbacks'] = [__MLflowKerasCallback()]
-        return original(self, *args, **kwargs)
+        # return original(self, *args, **kwargs)
+        original(self, *args, **kwargs, verbose=0)
 
     @gorilla.patch(keras.Model)
     def fit_generator(self, *args, **kwargs):
