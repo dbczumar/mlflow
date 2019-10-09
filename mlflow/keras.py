@@ -358,14 +358,18 @@ def autolog():
         """
 
         def on_epoch_end(self, epoch, logs=None):
+            import time
             if not logs:
                 return
-            if epoch % 5 == 0:
-                try_mlflow_log(mlflow.log_metrics, logs, step=epoch)
+            self.metrics.append((logs, int(time.time() * 1000), epoch))
+            # if epoch % 5 == 0:
+            #     try_mlflow_log(mlflow.log_metrics, logs, step=epoch)
 
         def on_train_begin(self, logs=None):
             from mlflow.entities import Param, Metric, RunTag
             from mlflow.tracking.client import MlflowClient
+
+            self.metrics = []
 
             _get_or_start_run() 
 
@@ -398,13 +402,24 @@ def autolog():
                 run_id=mlflow.active_run().info.run_id,
                 params=params,
                 tags=[
-                   RunTag(key="summary", value=summary), 
+                   RunTag(key="summary", value=summary),
                 ],
             )
 
 
         def on_train_end(self, logs=None):
+            from mlflow.entities import Metric
+            from mlflow.tracking.client import MlflowClient
+
+            metrics_arr = []
+            for metrics, timestamp, step in self.metrics:
+                for key, value in metrics.items():
+                    metrics_arr.append(
+                        Metric(key, value, timestamp, step or 0)
+                    )
+            MlflowClient().log_batch(run_id=mlflow.active_run().info.run_id, metrics=metrics_arr, params=[], tags=[])
             try_mlflow_log(log_model, self.model, artifact_path='model')
+
             mlflow.end_run()
 
 

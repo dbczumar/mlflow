@@ -39,18 +39,14 @@ _METHOD_TO_INFO = _api_method_to_info()
 
 class ModelRegistryArtifactRepository(ArtifactRepository):
 
-    URI_TYPE_STAGE = "stage"
-    URI_TYPE_VERSION = "version"
-
     def __init__(self, artifact_uri):
         super(ModelRegistryArtifactRepository, self).__init__(artifact_uri)
 
         self.get_host_creds = self._get_host_creds_from_default_store()
 
-        model_name, uri_type =\
+        model_name =\
             ModelRegistryArtifactRepository.parse_uri(artifact_uri)
         self.model_name = model_name
-        self.uri_type = uri_type
 
     def _get_host_creds_from_default_store(self):
         store = utils._get_store()
@@ -81,8 +77,8 @@ class ModelRegistryArtifactRepository(ArtifactRepository):
         parse_dict(js_dict=js_dict, message=response_proto)
         return response_proto
 
-    def get_model_source_uri(self, model_name, stage_or_version, uri_type):
-        if uri_type == ModelRegistryArtifactRepository.URI_TYPE_VERSION:
+    def get_model_details(self, model_name, stage_or_version):
+        if str(stage_or_version).isdigit():
             req_body = message_to_json(
                 GetModelVersionDetails(
                     model_version=(
@@ -97,9 +93,8 @@ class ModelRegistryArtifactRepository(ArtifactRepository):
             )
 
             response_proto = self._call_endpoint(GetModelVersionDetails, req_body)
-            return response_proto.model_version_detailed.source
-
-        elif uri_type == ModelRegistryArtifactRepository.URI_TYPE_STAGE:
+            return response_proto.model_version_detailed
+        else:
             req_body = message_to_json(
                GetLatestVersions(
                    registered_model=RegisteredModel(
@@ -113,14 +108,10 @@ class ModelRegistryArtifactRepository(ArtifactRepository):
             model_versions = response_proto.model_versions_detailed
 
             if len(model_versions) > 0:
-                return model_versions[0].source
+                return model_versions[0]
             else:
                 raise MlflowException(
                     "Found no registered models matching stage: {}".format(stage_or_version))
-
-        else:
-            raise MlflowException("Invalid models URI")
-
 
     @staticmethod
     def parse_uri(uri):
@@ -128,33 +119,24 @@ class ModelRegistryArtifactRepository(ArtifactRepository):
         if parsed.scheme != "models":
             raise MlflowException(
                 "Not a proper models:/ URI: %s. " % uri +
-                "Models URIs must be of the form 'models:/<model_name>/<stage/version>/<stage_or_version>'")
+                "Models URIs must be of the form 'models:/<model_name>/<stage_or_version>'")
 
         path = parsed.path
         if not path.startswith('/') or len(path) <= 1:
             raise MlflowException(
                 "Not a proper models:/ URI: %s. " % uri +
-                "Models URIs must be of the form 'models:/<model_name>/<stage/version>/<stage_or_version>'")
+                "Models URIs must be of the form 'models:/<model_name>/<stage_or_version>'")
 
         path = path.rstrip("/")
 
         path = path[1:]
         path_parts = path.split('/')
-        if len(path_parts) != 2:
-            raise MlflowException(
-                "Not a proper models:/ URI: %s. " % uri +
-                "Models URIs must be of the form 'models:/<model_name>/<stage/version>/<stage_or_version>'")
-
-        uri_type = path_parts[1].lower()
-        if uri_type in [
-            ModelRegistryArtifactRepository.URI_TYPE_STAGE,
-            ModelRegistryArtifactRepository.URI_TYPE_VERSION
-        ]:
-            return path_parts[0], uri_type
+        if len(path_parts) == 1:
+            return path_parts[0]
         else:
             raise MlflowException(
                 "Not a proper models:/ URI: %s. " % uri +
-                "Models URIs must be of the form 'models:/<model_name>/<stage/version>/<stage_or_version>'")
+                "Models URIs must be of the form 'models:/<model_name>/<stage_or_version>'")
 
 
     def log_artifact(self, local_file, artifact_path=None):
@@ -210,10 +192,28 @@ class ModelRegistryArtifactRepository(ArtifactRepository):
 
         stage_or_version = artifact_path
 
-        source_uri = self.get_model_source_uri(
+        model_details = self.get_model_details(
             model_name=self.model_name,
-            stage_or_version=stage_or_version,
-            uri_type=self.uri_type)
+            stage_or_version=stage_or_version)
+        
+        source_uri = model_details.source
+        
+        print(
+          ("Loading Registered Model..."
+          "Model Name: {model_name}\n"
+          "Model Version: {model_version}\n"
+          "Author: {author}").format(
+            model_name=model_details.model_version.registered_model.name,
+            model_version=model_details.model_version.version,
+            author=model_details.user_id,
+          )
+        )
+        
+#         print("Loading Version '{version}' of Registered Model '{model_name}' created by '{author}'".format(
+#           version=model_details.model_version.version,
+#           model_name=model_details.model_version.registered_model.name,
+#           author=model_details.user_id,
+#         ))
 
         assert urllib.parse.urlparse(source_uri).scheme != "models"  # avoid an infinite loop
         repo = get_artifact_repository(source_uri)
