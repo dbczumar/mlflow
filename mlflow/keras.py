@@ -17,11 +17,9 @@ import gorilla
 
 import pandas as pd
 
-import mlflow
 from mlflow import pyfunc
 from mlflow.models import Model
 import mlflow.tracking
-from mlflow.tracking.fluent import _get_or_start_run
 from mlflow.exceptions import MlflowException
 from mlflow.tracking.artifact_utils import _download_artifact_from_uri
 from mlflow.utils.environment import _mlflow_conda_env
@@ -358,70 +356,28 @@ def autolog():
         """
 
         def on_epoch_end(self, epoch, logs=None):
-            import time
             if not logs:
                 return
-            self.metrics.append((logs, int(time.time() * 1000), epoch))
-            # if epoch % 5 == 0:
-            #     try_mlflow_log(mlflow.log_metrics, logs, step=epoch)
+            try_mlflow_log(mlflow.log_metrics, logs, step=epoch)
 
-        def on_train_begin(self, logs=None):
-            from mlflow.entities import Param, Metric, RunTag
-            from mlflow.tracking.client import MlflowClient
-
-            self.metrics = []
-
-            _get_or_start_run() 
-
-            params = [
-                Param(key="num_layers", value=str(len(self.model.layers))),
-                Param(key="optimizer_name", value=type(self.model.optimizer).__name__) 
-            ]
-            for layer in self.model.layers:
-                params.append(
-                    Param(key="{}_size".format(layer.name), value=str(layer.output_shape[-1]))
-                )
+        def on_train_end(self, logs=None):
+            try_mlflow_log(mlflow.log_param, 'num_layers', len(self.model.layers))
+            try_mlflow_log(mlflow.log_param, 'optimizer_name', type(self.model.optimizer).__name__)
             if hasattr(self.model.optimizer, 'lr'):
                 lr = self.model.optimizer.lr if \
                     type(self.model.optimizer.lr) is float \
                     else keras.backend.eval(self.model.optimizer.lr)
-                params.append(Param(key="learning_rate", value=str(lr)))
+                try_mlflow_log(mlflow.log_param, 'learning_rate', lr)
             if hasattr(self.model.optimizer, 'epsilon'):
                 epsilon = self.model.optimizer.epsilon if \
                     type(self.model.optimizer.epsilon) is float \
                     else keras.backend.eval(self.model.optimizer.epsilon)
-                params.append(Param(key="epsilon", value=str(epsilon)))
-
+                try_mlflow_log(mlflow.log_param, 'epsilon', epsilon)
             sum_list = []
             self.model.summary(print_fn=sum_list.append)
             summary = '\n'.join(sum_list)
-
-            client = MlflowClient()
-            try_mlflow_log(
-                client.log_batch,
-                run_id=mlflow.active_run().info.run_id,
-                params=params,
-                tags=[
-                   RunTag(key="summary", value=summary),
-                ],
-            )
-
-
-        def on_train_end(self, logs=None):
-            from mlflow.entities import Metric
-            from mlflow.tracking.client import MlflowClient
-
-            metrics_arr = []
-            for metrics, timestamp, step in self.metrics:
-                for key, value in metrics.items():
-                    metrics_arr.append(
-                        Metric(key, value, timestamp, step or 0)
-                    )
-            MlflowClient().log_batch(run_id=mlflow.active_run().info.run_id, metrics=metrics_arr, params=[], tags=[])
+            try_mlflow_log(mlflow.set_tag, 'summary', summary)
             try_mlflow_log(log_model, self.model, artifact_path='model')
-
-            mlflow.end_run()
-
 
     @gorilla.patch(keras.Model)
     def fit(self, *args, **kwargs):
@@ -434,8 +390,7 @@ def autolog():
             kwargs['callbacks'] += [__MLflowKerasCallback()]
         else:
             kwargs['callbacks'] = [__MLflowKerasCallback()]
-        # return original(self, *args, **kwargs)
-        original(self, *args, **kwargs, verbose=0)
+        return original(self, *args, **kwargs)
 
     @gorilla.patch(keras.Model)
     def fit_generator(self, *args, **kwargs):
