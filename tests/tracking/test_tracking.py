@@ -13,10 +13,10 @@ import mlflow
 from mlflow import tracking
 from mlflow.entities import RunStatus, LifecycleStage, Metric, Param, RunTag, ViewType
 from mlflow.exceptions import MlflowException
-from mlflow.store.file_store import FileStore
+from mlflow.store.tracking.file_store import FileStore
 from mlflow.protos.databricks_pb2 import ErrorCode, INVALID_PARAMETER_VALUE
 from mlflow.tracking.client import MlflowClient
-from mlflow.tracking.fluent import start_run, end_run
+from mlflow.tracking.fluent import start_run
 from mlflow.utils.file_utils import local_file_uri_to_path
 from mlflow.utils.mlflow_tags import MLFLOW_PARENT_RUN_ID, MLFLOW_USER, MLFLOW_SOURCE_NAME, \
     MLFLOW_SOURCE_TYPE
@@ -484,31 +484,6 @@ def test_log_artifact(tracking_uri_mock):
         assert len(dir_comparison.right_only) == 0
         assert len(dir_comparison.diff_files) == 0
         assert len(dir_comparison.funny_files) == 0
-
-
-def test_uri_types():
-    from mlflow.tracking import utils
-    assert utils._is_local_uri("mlruns")
-    assert utils._is_local_uri("./mlruns")
-    assert utils._is_local_uri("file:///foo/mlruns")
-    assert utils._is_local_uri("file:foo/mlruns")
-    assert not utils._is_local_uri("https://whatever")
-    assert not utils._is_local_uri("http://whatever")
-    assert not utils._is_local_uri("databricks")
-    assert not utils._is_local_uri("databricks:whatever")
-    assert not utils._is_local_uri("databricks://whatever")
-
-    assert utils._is_databricks_uri("databricks")
-    assert utils._is_databricks_uri("databricks:whatever")
-    assert utils._is_databricks_uri("databricks://whatever")
-    assert not utils._is_databricks_uri("mlruns")
-    assert not utils._is_databricks_uri("http://whatever")
-
-    assert utils._is_http_uri("http://whatever")
-    assert utils._is_http_uri("https://whatever")
-    assert not utils._is_http_uri("file://whatever")
-    assert not utils._is_http_uri("databricks://whatever")
-    assert not utils._is_http_uri("mlruns")
 
 
 def test_with_startrun():

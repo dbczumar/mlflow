@@ -4,14 +4,13 @@ import pytest
 from six.moves import reload_module as reload
 
 import mlflow
-from mlflow.store.dbmodels.db_types import DATABASE_ENGINES
-from mlflow.store.file_store import FileStore
-from mlflow.store.rest_store import RestStore
-from mlflow.store.sqlalchemy_store import SqlAlchemyStore
+from mlflow.store.db.db_types import DATABASE_ENGINES
+from mlflow.store.tracking.file_store import FileStore
+from mlflow.store.tracking.rest_store import RestStore
+from mlflow.store.tracking.sqlalchemy_store import SqlAlchemyStore
 from mlflow.tracking.registry import TrackingStoreRegistry
 from mlflow.tracking.utils import _get_store, _TRACKING_URI_ENV_VAR, _TRACKING_USERNAME_ENV_VAR, \
-    _TRACKING_PASSWORD_ENV_VAR, _TRACKING_TOKEN_ENV_VAR, _TRACKING_INSECURE_TLS_ENV_VAR, \
-    get_db_profile_from_uri
+    _TRACKING_PASSWORD_ENV_VAR, _TRACKING_TOKEN_ENV_VAR, _TRACKING_INSECURE_TLS_ENV_VAR
 
 
 def test_get_store_file_store(tmp_wkdir):
@@ -117,8 +116,8 @@ def test_get_store_sqlalchemy_store(tmp_wkdir, db_type):
         _TRACKING_URI_ENV_VAR: uri
     }
     with mock.patch.dict(os.environ, env), patch_create_engine as mock_create_engine,\
-            mock.patch("mlflow.store.sqlalchemy_store.SqlAlchemyStore._verify_schema"), \
-            mock.patch("mlflow.store.sqlalchemy_store.SqlAlchemyStore._initialize_tables"):
+            mock.patch("mlflow.store.tracking.sqlalchemy_store.SqlAlchemyStore._verify_schema"), \
+            mock.patch("mlflow.store.tracking.sqlalchemy_store.SqlAlchemyStore._initialize_tables"):
         store = _get_store()
         assert isinstance(store, SqlAlchemyStore)
         assert store.db_uri == uri
@@ -137,8 +136,8 @@ def test_get_store_sqlalchemy_store_with_artifact_uri(tmp_wkdir, db_type):
     artifact_uri = "file:artifact/path"
 
     with mock.patch.dict(os.environ, env), patch_create_engine as mock_create_engine, \
-            mock.patch("mlflow.store.sqlalchemy_store.SqlAlchemyStore._verify_schema"), \
-            mock.patch("mlflow.store.sqlalchemy_store.SqlAlchemyStore._initialize_tables"):
+            mock.patch("mlflow.store.tracking.sqlalchemy_store.SqlAlchemyStore._verify_schema"), \
+            mock.patch("mlflow.store.tracking.sqlalchemy_store.SqlAlchemyStore._initialize_tables"):
         store = _get_store(artifact_uri=artifact_uri)
         assert isinstance(store, SqlAlchemyStore)
         assert store.db_uri == uri
@@ -280,7 +279,3 @@ def test_get_store_for_unregistered_scheme():
     with pytest.raises(mlflow.exceptions.MlflowException,
                        match="Unexpected URI scheme"):
         tracking_store.get_store("unknown-scheme://")
-
-
-def test_get_db_profile_from_uri_casing():
-    assert get_db_profile_from_uri('databricks://aAbB') == 'aAbB'
