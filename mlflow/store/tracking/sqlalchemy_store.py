@@ -431,9 +431,9 @@ class SqlAlchemyStore(AbstractStore):
             # of the eager loading procedure. For more information about relationship loading
             # techniques, see https://docs.sqlalchemy.org/en/13/orm/
             # loading_relationships.html#relationship-loading-techniques
-            sqlalchemy.orm.selectinload(SqlRun.latest_metrics),
-            sqlalchemy.orm.selectinload(SqlRun.params),
-            sqlalchemy.orm.selectinload(SqlRun.tags),
+            sqlalchemy.orm.subqueryload(SqlRun.latest_metrics),
+            sqlalchemy.orm.subqueryload(SqlRun.params),
+            sqlalchemy.orm.subqueryload(SqlRun.tags),
         ]
 
     def _check_run_is_active(self, run):

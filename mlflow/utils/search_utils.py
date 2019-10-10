@@ -257,7 +257,6 @@ class SearchUtils(object):
         if not filter_string:
             return runs
         parsed = cls._parse_search_filter(filter_string)
-        print(parsed)
 
         def run_matches(run):
             return all([cls._does_run_match_clause(run, s) for s in parsed])
