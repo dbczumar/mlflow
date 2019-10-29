@@ -41,6 +41,13 @@ warnings.filterwarnings("module", category=DeprecationWarning)
 import mlflow.projects as projects  # noqa
 import mlflow.tracking as tracking  # noqa
 
+try:
+    import sqlplugin
+except ImportError:
+    pass
+except Exception as exc:
+    print("Error import sqlserver plugin: {}".format(exc))
+
 _configure_mlflow_loggers(root_module_name=__name__)
 
 ActiveRun = mlflow.tracking.fluent.ActiveRun
