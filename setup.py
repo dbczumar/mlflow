@@ -61,6 +61,9 @@ setup(
             'azure-storage',
             'google-cloud-storage',
         ],
+        'sqlserver':[
+            "sqlplugin",
+        ],
     },
     entry_points='''
         [console_scripts]
