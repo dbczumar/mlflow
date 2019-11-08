@@ -318,7 +318,8 @@ class MlflowClient(object):
         :param max_results: Maximum number of runs desired.
         :param order_by: List of columns to order by (e.g., "metrics.rmse"). The ``order_by`` column
                      can contain an optional ``DESC`` or ``ASC`` value. The default is ``ASC``.
-                     The default ordering is to sort by ``start_time DESC``, then ``run_id``.
+                     The default ordering is to sort by ``attributes.start_time DESC``, then
+                     ``attributes.run_id``.
         :param page_token: Token specifying the next page of results. It should be obtained from
             a ``search_runs`` call.
 
