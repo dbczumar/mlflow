@@ -175,6 +175,38 @@ class DatabricksJobRunner(object):
         databricks_run_id = run_submit_res["run_id"]
         return databricks_run_id
 
+    def run_databricks_notebook_project(self, project_uri, parameters, experiment_id, cluster_spec, run_id):
+        tracking_uri = _get_tracking_uri_for_run()
+        spark_env = cluster_spec.get('spark_env_vars', {})
+        spark_env.update({
+            tracking._TRACKING_URI_ENV_VAR: tracking_uri,
+            tracking._EXPERIMENT_ID_ENV_VAR: experiment_id,
+        })
+
+        notebook_path = _get_databricks_notebook_path(project_uri)
+
+        # Make jobs API request to launch run.
+        req_body_json = {
+            'run_name': 'MLflow Run for %s' % project_uri,
+            'notebook_task': {
+                'notebook_path': notebook_path,
+                'base_parameters': parameters, 
+            },
+            # NB: We use <= on the version specifier to allow running projects on pre-release
+            # versions, where we will select the most up-to-date mlflow version available.
+            # Also note, that we escape this so '<' is not treated as a shell pipe.
+            "libraries": [{"pypi": {"package": "'mlflow<=%s'" % VERSION}}],
+        }
+        if "existing_cluster_id" in cluster_spec or "new_cluster" in cluster_spec:
+            req_body_json.update(cluster_spec)
+        else:
+            # Backwards compatibility (in a prototype, no less!)
+            req_body_json["new_cluster"] = cluster_spec
+
+        run_submit_res = self._jobs_runs_submit(req_body_json)
+        databricks_run_id = run_submit_res["run_id"]
+        return databricks_run_id
+
     def run_databricks(self, uri, entry_point, work_dir, parameters, experiment_id, cluster_spec,
                        run_id):
         tracking_uri = _get_tracking_uri_for_run()
@@ -265,6 +297,27 @@ def _get_databricks_run_cmd(dbfs_fuse_tar_uri, run_id, entry_point, parameters):
                tarfile_archive_name=DB_TARFILE_ARCHIVE_NAME, work_dir=project_dir,
                mlflow_run=mlflow_run_cmd))
     return ["bash", "-c", shell_command]
+
+
+def _get_databricks_notebook_path(uri):
+    from six.moves import urllib
+    parsed_uri = urllib.parse.urlparse(urllib.parse.unquote(uri))
+    return parsed_uri.path
+
+
+def run_databricks_notebook_project(uri, parameters, experiment_id, cluster_spec, remote_run=None):
+    if remote_run is None:
+        remote_run = tracking.MlflowClient().create_run(experiment_id=experiment_id, tags=None)
+
+    profile = get_db_profile_from_uri(tracking.get_tracking_uri())
+    run_id = remote_run.info.run_id
+    
+    db_job_runner = DatabricksJobRunner(databricks_profile=profile)
+    db_run_id = db_job_runner.run_databricks_notebook_project(
+        uri, parameters, experiment_id, cluster_spec, run_id)
+    submitted_run = DatabricksSubmittedRun(db_run_id, run_id, db_job_runner)
+    submitted_run._print_description_and_log_tags()
+    return submitted_run
 
 
 def run_databricks(remote_run, uri, entry_point, work_dir, parameters, experiment_id, cluster_spec):

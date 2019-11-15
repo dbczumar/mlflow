@@ -99,6 +99,20 @@ def _run(uri, experiment_id, entry_point="main", version=None, parameters=None,
     Helper that delegates to the project-running method corresponding to the passed-in backend.
     Returns a ``SubmittedRun`` corresponding to the project run.
     """
+    if _is_databricks_uri(uri):
+        if backend != "databricks":
+            raise MlflowException("Notebook projects can only be run with the Databricks backend!")
+
+        active_run = tracking.mlflowclient().get_run(run_id) if run_id else None
+
+        from mlflow.projects.databricks import run_databricks_notebook_project
+        return run_databricks_notebook_project(
+            uri=uri, 
+            parameters=parameters, 
+            experiment_id=experiment_id, 
+            cluster_spec=backend_config, 
+            remote_run=active_run)
+
 
     parameters = parameters or {}
     work_dir = _fetch_project(uri=uri, force_tempdir=False, version=version)
@@ -106,7 +120,7 @@ def _run(uri, experiment_id, entry_point="main", version=None, parameters=None,
     _validate_execution_environment(project, backend)
     project.get_entry_point(entry_point)._validate_parameters(parameters)
     if run_id:
-        active_run = tracking.MlflowClient().get_run(run_id)
+        active_run = tracking.mlflowclient().get_run(run_id)
     else:
         active_run = _create_run(uri, experiment_id, work_dir, entry_point)
 
@@ -310,6 +324,11 @@ def _wait_for(submitted_run_obj):
         submitted_run_obj.cancel()
         _maybe_set_run_terminated(active_run, "FAILED")
         raise
+
+
+def _is_databricks_uri(uri):
+    parsed_uri = urllib.parse.urlparse(urllib.parse.unquote(uri))
+    return parsed_uri.scheme == "databricks" 
 
 
 def _fetch_project(uri, force_tempdir, version=None):
