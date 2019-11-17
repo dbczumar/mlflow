@@ -32,7 +32,7 @@ from mlflow.projects.utils import (
 )
 from mlflow.tracking.context.default_context import _get_user
 from mlflow.tracking.context.git_context import _get_git_commit
-from mlflow.tracking.fluent import _get_experiment_id
+from mlflow.tracking.fluent import _get_experiment_id, set_run
 from mlflow.store.artifact.artifact_repository_registry import get_artifact_repository
 from mlflow.store.artifact.azure_blob_artifact_repo import AzureBlobArtifactRepository
 from mlflow.store.artifact.gcs_artifact_repo import GCSArtifactRepository
@@ -99,6 +99,8 @@ def _run(uri, experiment_id, entry_point="main", version=None, parameters=None,
     Helper that delegates to the project-running method corresponding to the passed-in backend.
     Returns a ``SubmittedRun`` corresponding to the project run.
     """
+    parameters = parameters or {}
+
     if _is_databricks_uri(uri):
         if backend != "databricks":
             raise MlflowException("Notebook projects can only be run with the Databricks backend!")
@@ -107,14 +109,13 @@ def _run(uri, experiment_id, entry_point="main", version=None, parameters=None,
 
         from mlflow.projects.databricks import run_databricks_notebook_project
         return run_databricks_notebook_project(
-            uri=uri, 
-            parameters=parameters, 
-            experiment_id=experiment_id, 
-            cluster_spec=backend_config, 
+            uri=uri,
+            parameters=parameters,
+            experiment_id=experiment_id,
+            cluster_spec=backend_config,
             remote_run=active_run)
 
 
-    parameters = parameters or {}
     work_dir = _fetch_project(uri=uri, force_tempdir=False, version=version)
     project = _project_spec.load_project(work_dir)
     _validate_execution_environment(project, backend)

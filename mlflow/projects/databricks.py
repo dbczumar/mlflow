@@ -11,13 +11,14 @@ import posixpath
 from six.moves import shlex_quote
 
 from mlflow import tracking
-from mlflow.entities import RunStatus
+from mlflow.entities import RunStatus, SourceType
 from mlflow.exceptions import MlflowException
 from mlflow.projects.submitted_run import SubmittedRun
 from mlflow.utils import rest_utils, file_utils, databricks_utils
 from mlflow.exceptions import ExecutionException
 from mlflow.utils.mlflow_tags import MLFLOW_DATABRICKS_RUN_URL, MLFLOW_DATABRICKS_SHELL_JOB_ID, \
-    MLFLOW_DATABRICKS_SHELL_JOB_RUN_ID, MLFLOW_DATABRICKS_WEBAPP_URL
+    MLFLOW_DATABRICKS_SHELL_JOB_RUN_ID, MLFLOW_DATABRICKS_WEBAPP_URL, MLFLOW_SOURCE_TYPE, \
+    MLFLOW_SOURCE_NAME
 from mlflow.utils.uri import get_db_profile_from_uri, is_databricks_uri, is_http_uri
 from mlflow.version import VERSION
 
@@ -175,7 +176,7 @@ class DatabricksJobRunner(object):
         databricks_run_id = run_submit_res["run_id"]
         return databricks_run_id
 
-    def run_databricks_notebook_project(self, project_uri, parameters, experiment_id, cluster_spec, run_id):
+    def run_databricks_notebook_project(self, notebook_path, parameters, experiment_id, cluster_spec, run_id):
         tracking_uri = _get_tracking_uri_for_run()
         spark_env = cluster_spec.get('spark_env_vars', {})
         spark_env.update({
@@ -183,19 +184,23 @@ class DatabricksJobRunner(object):
             tracking._EXPERIMENT_ID_ENV_VAR: experiment_id,
         })
 
-        notebook_path = _get_databricks_notebook_path(project_uri)
+        parameters.update({
+            "run_id": run_id,
+        })
 
         # Make jobs API request to launch run.
         req_body_json = {
-            'run_name': 'MLflow Run for %s' % project_uri,
+            'run_name': 'MLflow Run for %s' % notebook_path,
             'notebook_task': {
                 'notebook_path': notebook_path,
-                'base_parameters': parameters, 
+                'base_parameters': parameters,
             },
             # NB: We use <= on the version specifier to allow running projects on pre-release
             # versions, where we will select the most up-to-date mlflow version available.
             # Also note, that we escape this so '<' is not treated as a shell pipe.
-            "libraries": [{"pypi": {"package": "'mlflow<=%s'" % VERSION}}],
+            "libraries": [
+                # {"pypi": {"package": "mlflow<=%s" % VERSION}},
+            ],
         }
         if "existing_cluster_id" in cluster_spec or "new_cluster" in cluster_spec:
             req_body_json.update(cluster_spec)
@@ -306,15 +311,28 @@ def _get_databricks_notebook_path(uri):
 
 
 def run_databricks_notebook_project(uri, parameters, experiment_id, cluster_spec, remote_run=None):
+    notebook_path = _get_databricks_notebook_path(uri)
+
+    client = tracking.MlflowClient()
     if remote_run is None:
-        remote_run = tracking.MlflowClient().create_run(experiment_id=experiment_id, tags=None)
+        remote_run = client.create_run(experiment_id=experiment_id, tags=None)
+    run_id = remote_run.info.run_id
+
+    for key, value in parameters.items():
+        client.log_param(run_id, key, value)
+
+    tags = {
+        MLFLOW_SOURCE_NAME: uri,
+        MLFLOW_SOURCE_TYPE: SourceType.to_string(SourceType.PROJECT),
+    }
+    for key, value in tags.items():
+        client.set_tag(run_id, key, value)
 
     profile = get_db_profile_from_uri(tracking.get_tracking_uri())
-    run_id = remote_run.info.run_id
-    
+
     db_job_runner = DatabricksJobRunner(databricks_profile=profile)
     db_run_id = db_job_runner.run_databricks_notebook_project(
-        uri, parameters, experiment_id, cluster_spec, run_id)
+        notebook_path, parameters, experiment_id, cluster_spec, run_id)
     submitted_run = DatabricksSubmittedRun(db_run_id, run_id, db_job_runner)
     submitted_run._print_description_and_log_tags()
     return submitted_run
@@ -346,7 +364,7 @@ class DatabricksSubmittedRun(SubmittedRun):
                                   requests.
     """
     # How often to poll run status when waiting on a run
-    POLL_STATUS_INTERVAL = 30
+    POLL_STATUS_INTERVAL = 5
 
     def __init__(self, databricks_run_id, mlflow_run_id, databricks_job_runner):
         super(DatabricksSubmittedRun, self).__init__()

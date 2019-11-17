@@ -175,6 +175,14 @@ def active_run():
     return _active_run_stack[-1] if len(_active_run_stack) > 0 else None
 
 
+def set_run(run_id):
+    if len(_active_run_stack) > 0:
+        raise MlflowException(
+            "Cannot set a run because a run is already active. You can end"
+            " the current active run using mlflow.end_run().")
+    _active_run_stack.append(get_run(run_id))
+
+
 def get_run(run_id):
     """
     Fetch the run from backend store. The resulting :py:class:`Run <mlflow.entities.Run>`
