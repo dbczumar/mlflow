@@ -3,19 +3,20 @@ from mlflow.tracking.fluent import set_run
 from mlflow.utils.databricks_utils import _get_dbutils
 
 
-def fetch_project_context():
-    run_id = get_param("run_id")
-    set_run(run_id)
-
+# def fetch_project_context():
+#     run_id = get_param("run_id")
+#     set_run(run_id)
+#
 
 def get_param(param):
     return _get_dbutils().widgets.get(param)
 
 
-def restore_project_context():
+def fetch_project_context():
     run_id = get_param("run_id")
     set_run(run_id)
     return ProjectContext(run_id)
+
 
 class ProjectParams(object):
 
@@ -28,7 +29,10 @@ class ProjectParams(object):
 
     @staticmethod
     def get(key, default=None):
-        return _get_dbutils().widgets.get(key, default)
+        try:
+            return _get_dbutils().widgets.get(key)
+        except Exception:
+            return default
 
 
 class ProjectContext(object):

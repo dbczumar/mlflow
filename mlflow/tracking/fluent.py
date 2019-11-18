@@ -181,6 +181,7 @@ def set_run(run_id):
             "Cannot set a run because a run is already active. You can end"
             " the current active run using mlflow.end_run().")
     run = get_run(run_id)
+    global _active_experiment_id
     _active_experiment_id = run.info.experiment_id
     _active_run_stack.append(run)
 

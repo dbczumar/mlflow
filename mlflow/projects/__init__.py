@@ -102,6 +102,7 @@ def _run(uri, experiment_id, entry_point="main", version=None, parameters=None,
     parameters = parameters or {}
 
     if _is_databricks_uri(uri):
+        backend = backend or "databricks"
         if backend != "databricks":
             raise MlflowException("Notebook projects can only be run with the Databricks backend!")
 
@@ -329,7 +330,7 @@ def _wait_for(submitted_run_obj):
 
 def _is_databricks_uri(uri):
     parsed_uri = urllib.parse.urlparse(urllib.parse.unquote(uri))
-    return parsed_uri.scheme == "databricks" 
+    return parsed_uri.scheme == "databricks"
 
 
 def _fetch_project(uri, force_tempdir, version=None):
