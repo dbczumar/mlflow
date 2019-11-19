@@ -47,7 +47,9 @@ def is_in_databricks_notebook():
     if _get_property_from_spark_context("spark.databricks.notebook.id") is not None:
         return True
     try:
-        return _get_extra_context("aclPathOfAclRoot").startswith('/workspace')
+        aclpath_of_root = _get_extra_context("aclPathOfAclRoot")
+        return aclpath_of_root.startswith("/workspace") or aclpath_of_root.startswith("/jobs")
+        # return _get_extra_context("aclPathOfAclRoot").startswith('/workspace')
     except Exception:  # pylint: disable=broad-except
         return False
 

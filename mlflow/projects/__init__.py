@@ -106,7 +106,7 @@ def _run(uri, experiment_id, entry_point="main", version=None, parameters=None,
         if backend != "databricks":
             raise MlflowException("Notebook projects can only be run with the Databricks backend!")
 
-        active_run = tracking.mlflowclient().get_run(run_id) if run_id else None
+        active_run = tracking.MlflowClient().get_run(run_id) if run_id else None
 
         from mlflow.projects.databricks import run_databricks_notebook_project
         return run_databricks_notebook_project(
@@ -122,7 +122,7 @@ def _run(uri, experiment_id, entry_point="main", version=None, parameters=None,
     _validate_execution_environment(project, backend)
     project.get_entry_point(entry_point)._validate_parameters(parameters)
     if run_id:
-        active_run = tracking.mlflowclient().get_run(run_id)
+        active_run = tracking.MlflowClient().get_run(run_id)
     else:
         active_run = _create_run(uri, experiment_id, work_dir, entry_point)
 

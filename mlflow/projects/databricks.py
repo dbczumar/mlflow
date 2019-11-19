@@ -178,39 +178,48 @@ class DatabricksJobRunner(object):
 
     def run_databricks_notebook_project(self, notebook_path, parameters, experiment_id, cluster_spec, run_id):
         tracking_uri = _get_tracking_uri_for_run()
-        spark_env = cluster_spec.get('spark_env_vars', {})
-        spark_env.update({
-            tracking._TRACKING_URI_ENV_VAR: tracking_uri,
-            tracking._EXPERIMENT_ID_ENV_VAR: experiment_id,
-        })
+        # spark_env = cluster_spec.get('spark_env_vars', {})
+        # spark_env.update({
+        #     tracking._TRACKING_URI_ENV_VAR: tracking_uri,
+        #     tracking._EXPERIMENT_ID_ENV_VAR: experiment_id,
+        # })
 
         parameters.update({
             "run_id": run_id,
         })
 
-        # Make jobs API request to launch run.
-        req_body_json = {
-            'run_name': 'MLflow Run for %s' % notebook_path,
-            'notebook_task': {
-                'notebook_path': notebook_path,
-                'base_parameters': parameters,
-            },
-            # NB: We use <= on the version specifier to allow running projects on pre-release
-            # versions, where we will select the most up-to-date mlflow version available.
-            # Also note, that we escape this so '<' is not treated as a shell pipe.
-            "libraries": [
-                # {"pypi": {"package": "mlflow<=%s" % VERSION}},
-            ],
-        }
-        if "existing_cluster_id" in cluster_spec or "new_cluster" in cluster_spec:
-            req_body_json.update(cluster_spec)
+        if databricks_utils.is_in_databricks_notebook():
+            submitted_run = DatabricksNotebookWorkflowsSubmittedRun(
+                    run_id, notebook_path, parameters)
+            submitted_run._start()
         else:
-            # Backwards compatibility (in a prototype, no less!)
-            req_body_json["new_cluster"] = cluster_spec
+            # Make jobs API request to launch run.
+            req_body_json = {
+                'run_name': 'MLflow Run for %s' % notebook_path,
+                'notebook_task': {
+                    'notebook_path': notebook_path,
+                    'base_parameters': parameters,
+                },
+                # NB: We use <= on the version specifier to allow running projects on pre-release
+                # versions, where we will select the most up-to-date mlflow version available.
+                # Also note, that we escape this so '<' is not treated as a shell pipe.
+                "libraries": [
+                    # {"pypi": {"package": "mlflow<=%s" % VERSION}},
+                ],
+            }
+            if cluster_spec is not None:
+                if "existing_cluster_id" in cluster_spec or "new_cluster" in cluster_spec:
+                    req_body_json.update(cluster_spec)
+                else:
+                    # Backwards compatibility
+                    req_body_json["new_cluster"] = cluster_spec
 
-        run_submit_res = self._jobs_runs_submit(req_body_json)
-        databricks_run_id = run_submit_res["run_id"]
-        return databricks_run_id
+            run_submit_res = self._jobs_runs_submit(req_body_json)
+            databricks_run_id = run_submit_res["run_id"]
+
+            submitted_run = DatabricksSubmittedRun(databricks_run_id, run_id, self)
+        
+        return submitted_run 
 
     def run_databricks(self, uri, entry_point, work_dir, parameters, experiment_id, cluster_spec,
                        run_id):
@@ -331,9 +340,8 @@ def run_databricks_notebook_project(uri, parameters, experiment_id, cluster_spec
     profile = get_db_profile_from_uri(tracking.get_tracking_uri())
 
     db_job_runner = DatabricksJobRunner(databricks_profile=profile)
-    db_run_id = db_job_runner.run_databricks_notebook_project(
+    submitted_run = db_job_runner.run_databricks_notebook_project(
         notebook_path, parameters, experiment_id, cluster_spec, run_id)
-    submitted_run = DatabricksSubmittedRun(db_run_id, run_id, db_job_runner)
     submitted_run._print_description_and_log_tags()
     return submitted_run
 
@@ -411,3 +419,45 @@ class DatabricksSubmittedRun(SubmittedRun):
 
     def get_status(self):
         return self._job_runner.get_status(self._databricks_run_id)
+
+
+class DatabricksNotebookWorkflowsSubmittedRun(SubmittedRun):
+
+    def __init__(self, mlflow_run_id, notebook_path, params=None):
+        super(DatabricksNotebookWorkflowsSubmittedRun, self).__init__()
+
+        from threading import Thread
+        params = params or {}
+        self._mlflow_run_id = mlflow_run_id
+        self.future = {}
+        self._thread = Thread(target=self._run, args=[notebook_path, params, self.future])
+
+    def _run(self, notebook_path, params, future):
+        try:
+            db_utils = databricks_utils._get_dbutils()
+            result = db_utils.notebook.run(notebook_path, 0, params)
+            future["status"] = "SUCCESS"
+            future["result"] = result
+        except Exception as e:
+            future["status"] = "FAILED"
+            future["result"] = str(e)
+
+    def _start(self):
+        self._thread.start()
+
+    def get_status(self):
+        return self.future.get("status", "RUNNING")
+
+    @property
+    def run_id(self):
+        return self._mlflow_run_id
+
+    def wait(self):
+        self._thread.join()
+        return self.future["status"] == "SUCCESS"
+
+    def cancel(self):
+        return
+
+    def _print_description_and_log_tags(self):
+        return
