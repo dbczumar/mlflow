@@ -65,6 +65,7 @@ def http_request(host_creds, endpoint, retries=3, retry_interval=3,
 
     cleaned_hostname = strip_suffix(hostname, '/')
     url = "%s%s" % (cleaned_hostname, endpoint)
+    print(cleaned_hostname, endpoint)
     for i in range(retries):
         response = request_with_ratelimit_retries(max_rate_limit_interval,
                                                   url=url, headers=headers, verify=verify, **kwargs)

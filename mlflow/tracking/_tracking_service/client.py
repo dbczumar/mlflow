@@ -238,6 +238,7 @@ class TrackingServiceClient(object):
         :param artifact_path: If provided, the directory in ``artifact_uri`` to write to.
         """
         run = self.get_run(run_id)
+        print("RUN ARTIFACT_URI", run.info.artifact_uri)
         artifact_repo = get_artifact_repository(run.info.artifact_uri)
         if os.path.isdir(local_path):
             dir_name = os.path.basename(os.path.normpath(local_path))

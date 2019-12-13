@@ -167,10 +167,9 @@ class FileStore(AbstractStore):
 
     def _get_artifact_dir(self, experiment_id, run_uuid):
         _validate_run_id(run_uuid)
-        artifacts_dir = posixpath.join(self.get_experiment(experiment_id).artifact_location,
-                                       run_uuid,
-                                       FileStore.ARTIFACTS_FOLDER_NAME)
-        return artifacts_dir
+        artifact_location = self.get_experiment(experiment_id).artifact_location
+        return self._get_target_artifact_location(
+            artifact_location, run_uuid, FileStore.ARTIFACTS_FOLDER_NAME)
 
     def _get_active_experiments(self, full_path=False):
         exp_list = list_subdirs(self.root_directory, full_path)
@@ -199,8 +198,20 @@ class FileStore(AbstractStore):
                                 str(exp_id), str(rnfe), exc_info=True)
         return experiments
 
+    def _get_target_artifact_location(self, artifact_uri, *path):
+        from six.moves import urllib
+        parsed_artifact_uri = urllib.parse.urlparse(artifact_uri)
+        new_path = posixpath.join(parsed_artifact_uri.path,
+                                  *path)
+        parsed_artifact_location = parsed_artifact_uri._replace(path=new_path)
+        artifact_location = urllib.parse.urlunparse(parsed_artifact_location)
+        print("ARTIFACT LOCATION", artifact_location)
+        return artifact_location 
+
     def _create_experiment_with_id(self, name, experiment_id, artifact_uri):
-        artifact_uri = artifact_uri or posixpath.join(self.artifact_root_uri, str(experiment_id))
+        artifact_uri = artifact_uri or self._get_target_artifact_location(
+            self.artifact_root_uri, str(experiment_id))
+        # artifact_uri = artifact_uri or posixpath.join(self.artifact_root_uri, str(experiment_id))
         self._check_root_dir()
         meta_dir = mkdir(self.root_directory, str(experiment_id))
         experiment = Experiment(experiment_id, name, artifact_uri, LifecycleStage.ACTIVE)
