@@ -41,10 +41,8 @@ export class ArtifactNode {
   }
 
   static findChild(node, path) {
-    console.log(path);
     const parts = path.split('/');
     let ret = node;
-    console.log(ret.children);
     parts.forEach((part) => {
       if (ret.children && ret.children[part] !== undefined) {
         ret = ret.children[part];

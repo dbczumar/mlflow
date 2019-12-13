@@ -41,9 +41,7 @@ def _relative_path_local(base_dir, subdir_path):
 # The repo_uri is of the form DB_URI/runID/ROOT_PATH_BASE where DB_URI:
 # <dialect>+<driver>://<username>:<password>@<host>:<port>/<database>?<query>.
 def extract_db_uri_and_root_path(repo_uri):
-    print("REPO URI", repo_uri)
     parsed_uri = urllib.parse.urlparse(repo_uri)
-    print(parsed_uri)
     scheme = parsed_uri.scheme
     scheme_plus_count = scheme.count('+')
     if scheme_plus_count > 1:
@@ -61,27 +59,6 @@ def extract_db_uri_and_root_path(repo_uri):
     dbname, artifact_path = get_dbname_and_path(parsed_uri.path)
     parsed_root_uri = parsed_uri._replace(path=dbname)
     return urllib.parse.urlunparse(parsed_root_uri), artifact_path
-    #
-    # if parsed_uri.query == "":
-    #     if parsed_uri.path == "":
-    #         return repo_uri, ""
-    #     else:
-    #         parsed_path = parsed_uri.path.split(ROOT_PATH_BASE, 1)
-    #         if len(parsed_path) == 2:
-    #             db_uri = os.path.dirname(os.path.dirname(repo_uri))
-    #             path = os.path.normpath(repo_uri.split(db_uri)[1])
-    #             path = path.split(os.sep, 1)[1]
-    #             return db_uri, path
-    #         else:
-    #             return repo_uri, ""
-    # else:
-    #     parsed_query = parsed_uri.query.split("/", 1)
-    #     if len(parsed_query) == 2:
-    #         path = os.path.normpath(parsed_query[1])
-    #         parsed_uri = parsed_uri._replace(query=parsed_query[0])
-    #     else:
-    #         path = ""
-    #     return urllib.parse.urlunparse(parsed_uri), path
 
 
 class DBArtifactRepository(ArtifactRepository):
