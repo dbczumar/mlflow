@@ -433,13 +433,13 @@ def autolog():
         Records model structural information as params when training begins
         """
         def on_train_begin(self, logs=None):  # pylint: disable=unused-argument
-            try_mlflow_log(mlflow.log_param, 'num_layers', len(self.model.layers))
+            # try_mlflow_log(mlflow.log_param, 'num_layers', len(self.model.layers))
             try_mlflow_log(mlflow.log_param, 'optimizer_name', type(self.model.optimizer).__name__)
             if hasattr(self.model.optimizer, 'lr'):
                 lr = self.model.optimizer.lr if \
                     type(self.model.optimizer.lr) is float \
                     else keras.backend.eval(self.model.optimizer.lr)
-                try_mlflow_log(mlflow.log_param, 'learning_rate', lr)
+                # try_mlflow_log(mlflow.log_param, 'learning_rate', lr)
             if hasattr(self.model.optimizer, 'epsilon'):
                 epsilon = self.model.optimizer.epsilon if \
                     type(self.model.optimizer.epsilon) is float \
@@ -551,7 +551,7 @@ def autolog():
     @gorilla.patch(keras.Model)
     def fit(self, *args, **kwargs):
         original = gorilla.get_original_attribute(keras.Model, 'fit')
-        unlogged_params = ['self', 'x', 'y', 'callbacks', 'validation_data', 'verbose']
+        unlogged_params = ['self', 'x', 'y', 'callbacks', 'validation_data', 'verbose', 'batch_size']
         return _run_and_log_function(self, original, args, kwargs, unlogged_params, 5)
 
     @gorilla.patch(keras.Model)
