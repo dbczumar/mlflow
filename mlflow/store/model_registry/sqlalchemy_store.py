@@ -224,7 +224,7 @@ class SqlAlchemyStore(AbstractStore):
 
     # CRUD API for ModelVersion objects
 
-    def create_model_version(self, name, source, run_id):
+    def create_model_version(self, name, source, run_id, user_id=None):
         """
         Create a new model version from given source and run ID.
 
@@ -250,7 +250,8 @@ class SqlAlchemyStore(AbstractStore):
                                                     version=next_version(sql_registered_model),
                                                     creation_time=creation_time,
                                                     last_updated_time=creation_time,
-                                                    source=source, run_id=run_id)
+                                                    source=source, run_id=run_id,
+                                                    user_id=user_id)
                     self._save_to_db(session, [sql_registered_model, model_version])
                     session.flush()
                     return model_version.to_mlflow_entity()

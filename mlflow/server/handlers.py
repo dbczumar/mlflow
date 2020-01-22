@@ -514,10 +514,17 @@ def _get_latest_versions():
 
 @catch_mlflow_exception
 def _create_model_version():
+    from mlflow.utils.mlflow_tags import MLFLOW_USER
     request_message = _get_request_message(CreateModelVersion())
+    try:
+        user_tag = _get_tracking_store().get_run(
+            run_id=request_message.run_id).data.tags.get(MLFLOW_USER)
+    except Exception as e:
+        user_tag = None
     model_version = _get_model_registry_store().create_model_version(request_message.name,
                                                                      request_message.source,
-                                                                     request_message.run_id)
+                                                                     request_message.run_id,
+                                                                     user_tag=user_tag)
     response_message = CreateModelVersion.Response(model_version=model_version.to_proto())
     return _wrap_response(response_message)
 
