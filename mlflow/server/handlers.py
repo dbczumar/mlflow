@@ -524,7 +524,7 @@ def _create_model_version():
     model_version = _get_model_registry_store().create_model_version(request_message.name,
                                                                      request_message.source,
                                                                      request_message.run_id,
-                                                                     user_tag=user_tag)
+                                                                     user_id=user_tag)
     response_message = CreateModelVersion.Response(model_version=model_version.to_proto())
     return _wrap_response(response_message)
 
