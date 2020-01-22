@@ -494,7 +494,7 @@ class SqlAlchemyStore(AbstractStore):
                 # This will check for various integrity checks for params table.
                 # ToDo: Consider prior checks for null, type, param name validations, ... etc.
                 self._get_or_create(model=SqlParam, session=session, run_uuid=run_id,
-                                    key=param.key, value=param.value)
+                                    key=param.key.replace("_", "-"), value=param.value)
                 # Explicitly commit the session in order to catch potential integrity errors
                 # while maintaining the current managed session scope ("commit" checks that
                 # a transaction satisfies uniqueness constraints and throws integrity errors
@@ -513,14 +513,14 @@ class SqlAlchemyStore(AbstractStore):
                 # using the session. In this case, we re-use the session because the SqlRun, `run`,
                 # is lazily evaluated during the invocation of `run.params`.
                 session.rollback()
-                existing_params = [p.value for p in run.params if p.key == param.key]
-                if len(existing_params) > 0:
-                    old_value = existing_params[0]
-                    raise MlflowException(
-                        "Changing param value is not allowed. Param with key='{}' was already"
-                        " logged with value='{}' for run ID='{}. Attempted logging new value"
-                        " '{}'.".format(
-                            param.key, old_value, run_id, param.value), INVALID_PARAMETER_VALUE)
+                # existing_params = [p.value for p in run.params if p.key == param.key]
+                # if len(existing_params) > 0:
+                #     old_value = existing_params[0]
+                #     raise MlflowException(
+                #         "Changing param value is not allowed. Param with key='{}' was already"
+                #         " logged with value='{}' for run ID='{}. Attempted logging new value"
+                #         " '{}'.".format(
+                #             param.key, old_value, run_id, param.value), INVALID_PARAMETER_VALUE)
                 else:
                     raise
 
