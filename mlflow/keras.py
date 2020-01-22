@@ -551,7 +551,7 @@ def autolog():
     @gorilla.patch(keras.Model)
     def fit(self, *args, **kwargs):
         original = gorilla.get_original_attribute(keras.Model, 'fit')
-        unlogged_params = ['self', 'x', 'y', 'callbacks', 'validation_data', 'verbose', 'batch_size']
+        unlogged_params = ['self', 'x', 'y', 'callbacks', 'validation_data', 'verbose', 'batch_size', 'learning_rate']
         return _run_and_log_function(self, original, args, kwargs, unlogged_params, 5)
 
     @gorilla.patch(keras.Model)
