@@ -24,6 +24,9 @@ from mlflow.protos.model_registry_pb2 import ModelRegistryService, CreateRegiste
     GetLatestVersions, CreateModelVersion, UpdateModelVersion, DeleteModelVersion, \
     GetModelVersion, GetModelVersionDownloadUri, SearchModelVersions, RenameRegisteredModel, \
     TransitionModelVersionStage
+from mlflow.protos.projects_pb2 import (
+    ProjectRunnerService, ProjectParameter, RunProject, SubmittedProjectRun 
+)
 from mlflow.protos.databricks_pb2 import RESOURCE_DOES_NOT_EXIST, INVALID_PARAMETER_VALUE
 from mlflow.store.artifact.artifact_repository_registry import get_artifact_repository
 from mlflow.store.db.db_types import DATABASE_ENGINES
@@ -630,6 +633,26 @@ def _search_model_versions():
     return _wrap_response(response_message)
 
 
+@catch_mlflow_exception
+def _run_project():
+    def resolve_parameters(request_message):
+        return {
+            param.key: param.value
+            for param in request_message.parameters
+        }
+
+    from mlflow.server.project_runner.tasks import run_mlflow_project
+    request_message = _get_request_message(RunProject())
+    parameters = resolve_parameters(request_message)
+    run_mlflow_project(request_message.project, parameters=parameters)
+
+    response_message = RunProject.Response()
+    project_run = ProjectRun()
+    project_run.id = "7"
+    response_message.run = project_run
+
+    return _wrap_response(response_message)
+
 def _add_static_prefix(route):
     prefix = os.environ.get(STATIC_PREFIX_ENV_VAR)
     if prefix:
@@ -669,7 +692,11 @@ def get_endpoints():
                     ret.append((http_path, handler, [endpoint.method]))
         return ret
 
-    return get_service_endpoints(MlflowService) + get_service_endpoints(ModelRegistryService)
+    return (
+        get_service_endpoints(MlflowService) 
+        + get_service_endpoints(ModelRegistryService)
+        + get_service_endpoints(ProjectRunnerService)
+    )
 
 
 HANDLERS = {
@@ -712,4 +739,9 @@ HANDLERS = {
     TransitionModelVersionStage: _transition_stage,
     GetModelVersionDownloadUri: _get_model_version_download_uri,
     SearchModelVersions: _search_model_versions,
+
+    # Project Runner APIs
+    RunProject: _run_project,
 }
+
+

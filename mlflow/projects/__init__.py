@@ -101,6 +101,11 @@ def _run(uri, experiment_id, entry_point="main", version=None, parameters=None,
     """
 
     parameters = parameters or {}
+
+    if backend == "mlflow":
+        from mlflow.server.project_runner.client import run_project
+        return run_project(uri, parameters)
+
     work_dir = _fetch_project(uri=uri, force_tempdir=False, version=version)
     project = _project_spec.load_project(work_dir)
     _validate_execution_environment(project, backend)

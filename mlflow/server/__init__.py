@@ -4,6 +4,7 @@ import sys
 
 from flask import Flask, send_from_directory
 
+import mlflow.server.project_runner
 from mlflow.server import handlers
 from mlflow.server.handlers import get_artifact_handler, STATIC_PREFIX_ENV_VAR, _add_static_prefix
 from mlflow.utils.process import exec_cmd
@@ -67,8 +68,14 @@ def _build_gunicorn_command(gunicorn_opts, host, port, workers):
     return ["gunicorn"] + opts + ["-b", bind_address, "-w", "%s" % workers, "mlflow.server:app"]
 
 
+def _build_project_runner_command(project_runner_opts):
+    opts = shlex.split(project_runner_opts) if project_runner_opts else []
+    return shlex.split("huey_consumer.py __init__.huey") + opts 
+
+
 def _run_server(file_store_path, default_artifact_root, host, port, static_prefix=None,
-                workers=None, gunicorn_opts=None, waitress_opts=None, expose_prometheus=None):
+                workers=None, gunicorn_opts=None, waitress_opts=None, expose_prometheus=None,
+                enable_project_runner=False, project_runner_opts=None):
     """
     Run the MLflow server, wrapping it in gunicorn or waitress on windows
     :param static_prefix: If set, the index.html asset will be served from the path static_prefix.
@@ -91,4 +98,17 @@ def _run_server(file_store_path, default_artifact_root, host, port, static_prefi
         full_command = _build_waitress_command(waitress_opts, host, port)
     else:
         full_command = _build_gunicorn_command(gunicorn_opts, host, port, workers or 4)
-    exec_cmd(full_command, env=env_map, stream_output=True)
+    full_command_proc = exec_cmd(full_command, env=env_map, stream_output=True, synchronous=False)
+
+    if enable_project_runner:
+        project_runner_command = _build_project_runner_command(project_runner_opts)
+        project_runner_command_proc = exec_cmd(
+            project_runner_command, env=env_map, stream_output=True, synchronous=False,
+            cwd=mlflow.server.project_runner.__path__[0])
+
+        project_runner_command_proc.wait()
+
+    full_command_proc.wait()
+
+
+
