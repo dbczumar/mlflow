@@ -32,9 +32,8 @@ def exec_cmd(cmd, throw_on_error=True, env=None, stream_output=False, cwd=None, 
     if stream_output:
         child = subprocess.Popen(cmd, env=cmd_env, cwd=cwd, universal_newlines=True,
                                  stdin=subprocess.PIPE, **kwargs)
-        if cmd_stdin is not None:
-            child.communicate(cmd_stdin)
         if synchronous:
+            child.communicate(cmd_stdin)
             exit_code = child.wait()
             if throw_on_error and exit_code != 0:
                 raise ShellCommandException("Non-zero exitcode: %s" % (exit_code))
@@ -45,8 +44,8 @@ def exec_cmd(cmd, throw_on_error=True, env=None, stream_output=False, cwd=None, 
         child = subprocess.Popen(
             cmd, env=cmd_env, stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE,
             cwd=cwd, universal_newlines=True, **kwargs)
-        (stdout, stderr) = child.communicate(cmd_stdin) if cmd_stdin is not None else (None, None)
         if synchronous:
+            (stdout, stderr) = child.communicate(cmd_stdin)
             exit_code = child.wait()
             if throw_on_error and exit_code != 0:
                 raise ShellCommandException("Non-zero exit code: %s\n\nSTDOUT:\n%s\n\nSTDERR:%s" %

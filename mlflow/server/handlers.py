@@ -24,9 +24,7 @@ from mlflow.protos.model_registry_pb2 import ModelRegistryService, CreateRegiste
     GetLatestVersions, CreateModelVersion, UpdateModelVersion, DeleteModelVersion, \
     GetModelVersion, GetModelVersionDownloadUri, SearchModelVersions, RenameRegisteredModel, \
     TransitionModelVersionStage
-from mlflow.protos.projects_pb2 import (
-    ProjectRunnerService, ProjectParameter, RunProject, SubmittedProjectRun 
-)
+from mlflow.protos.projects_pb2 import ProjectsService, RunProject, SubmittedProjectRun 
 from mlflow.protos.databricks_pb2 import RESOURCE_DOES_NOT_EXIST, INVALID_PARAMETER_VALUE
 from mlflow.store.artifact.artifact_repository_registry import get_artifact_repository
 from mlflow.store.db.db_types import DATABASE_ENGINES
@@ -633,26 +631,6 @@ def _search_model_versions():
     return _wrap_response(response_message)
 
 
-@catch_mlflow_exception
-def _run_project():
-    def resolve_parameters(request_message):
-        return {
-            param.key: param.value
-            for param in request_message.parameters
-        }
-
-    from mlflow.server.project_runner.tasks import run_mlflow_project
-    request_message = _get_request_message(RunProject())
-    parameters = resolve_parameters(request_message)
-    run_mlflow_project(request_message.project, parameters=parameters)
-
-    response_message = RunProject.Response()
-    project_run = ProjectRun()
-    project_run.id = "7"
-    response_message.run = project_run
-
-    return _wrap_response(response_message)
-
 def _add_static_prefix(route):
     prefix = os.environ.get(STATIC_PREFIX_ENV_VAR)
     if prefix:
@@ -693,10 +671,57 @@ def get_endpoints():
         return ret
 
     return (
-        get_service_endpoints(MlflowService) 
+        get_service_endpoints(MlflowService)
         + get_service_endpoints(ModelRegistryService)
-        + get_service_endpoints(ProjectRunnerService)
     )
+
+
+def get_projects_endpoints(backend, backend_config):
+    
+    @catch_mlflow_exception
+    def _run_project():
+        import mlflow.projects 
+
+        def resolve_parameters(request):
+            return {
+                param.key: param.value
+                for param in request.parameters
+            }
+
+        def val_or_none(val):
+            return val if val != '' else None
+
+        # import mlflow
+        # mlflow.set_tracking_uri(os.environ.get(BACKEND_STORE_URI_ENV_VAR))
+
+        request = _get_request_message(RunProject())
+        params = resolve_parameters(request)
+
+        submitted_run = mlflow.projects.run(
+            uri=request.project,
+            entry_point=request.entry_point,
+            version=val_or_none(request.version),
+            parameters=params,
+            experiment_id=request.experiment_id,
+            run_id=val_or_none(request.run_id),
+            backend=backend,
+            backend_config=val_or_none(request.config),
+            synchronous=False,
+        )
+
+        submitted_run_proto = SubmittedProjectRun(run_id=submitted_run.run_id)
+        response = RunProject.Response(run=submitted_run_proto)
+
+        return _wrap_response(response)
+
+    service_method = ProjectsService.DESCRIPTOR.methods_by_name["runProject"]
+
+    ret = []
+    endpoints = service_method.GetOptions().Extensions[databricks_pb2.rpc].endpoints
+    for endpoint in endpoints:
+        for http_path in _get_paths(endpoint.path):
+            ret.append((http_path, _run_project, [endpoint.method]))
+    return ret
 
 
 HANDLERS = {
@@ -739,9 +764,6 @@ HANDLERS = {
     TransitionModelVersionStage: _transition_stage,
     GetModelVersionDownloadUri: _get_model_version_download_uri,
     SearchModelVersions: _search_model_versions,
-
-    # Project Runner APIs
-    RunProject: _run_project,
 }
 
 

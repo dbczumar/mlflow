@@ -4,7 +4,6 @@ import sys
 
 from flask import Flask, send_from_directory
 
-import mlflow.server.project_runner
 from mlflow.server import handlers
 from mlflow.server.handlers import get_artifact_handler, STATIC_PREFIX_ENV_VAR, _add_static_prefix
 from mlflow.utils.process import exec_cmd
@@ -14,6 +13,8 @@ from mlflow.utils.process import exec_cmd
 BACKEND_STORE_URI_ENV_VAR = "_MLFLOW_SERVER_FILE_STORE"
 ARTIFACT_ROOT_ENV_VAR = "_MLFLOW_SERVER_ARTIFACT_ROOT"
 PROMETHEUS_EXPORTER_ENV_VAR = "prometheus_multiproc_dir"
+PROJECT_RUNNER_BACKEND_ENV_VAR = "_MLFLOW_SERVER_PROJECT_RUNNER_BACKEND"
+PROJECT_RUNNER_BACKEND_CONFIG_ENV_VAR = "_MLFLOW_SERVER_PROJECT_RUNNER_BACKEND_CONFIG"
 
 REL_STATIC_DIR = "js/build"
 
@@ -23,6 +24,18 @@ STATIC_DIR = os.path.join(app.root_path, REL_STATIC_DIR)
 
 for http_path, handler, methods in handlers.get_endpoints():
     app.add_url_rule(http_path, handler.__name__, handler, methods=methods)
+
+
+if os.getenv(PROJECT_RUNNER_BACKEND_ENV_VAR):
+    backend = os.getenv(PROJECT_RUNNER_BACKEND_ENV_VAR)
+    backend_config = os.getenv(PROJECT_RUNNER_BACKEND_CONFIG_ENV_VAR)
+    backend = backend if backend != "None" else None
+    backend_config = backend_config if backend_config != "None" else None
+
+    projects_endpoints = handlers.get_projects_endpoints(backend, backend_config)
+    for http_path, handler, methods in projects_endpoints:
+        app.add_url_rule(http_path, handler.__name__, handler, methods=methods)
+
 
 if os.getenv(PROMETHEUS_EXPORTER_ENV_VAR):
     from mlflow.server.prometheus_exporter import activate_prometheus_exporter
@@ -68,14 +81,15 @@ def _build_gunicorn_command(gunicorn_opts, host, port, workers):
     return ["gunicorn"] + opts + ["-b", bind_address, "-w", "%s" % workers, "mlflow.server:app"]
 
 
-def _build_project_runner_command(project_runner_opts):
+def _build_project_runner_command(project_runner_opts=None):
     opts = shlex.split(project_runner_opts) if project_runner_opts else []
     return shlex.split("huey_consumer.py __init__.huey") + opts 
 
 
 def _run_server(file_store_path, default_artifact_root, host, port, static_prefix=None,
                 workers=None, gunicorn_opts=None, waitress_opts=None, expose_prometheus=None,
-                enable_project_runner=False, project_runner_opts=None):
+                enable_project_runner=False, project_runner_backend=None, 
+                project_runner_backend_config=None):
     """
     Run the MLflow server, wrapping it in gunicorn or waitress on windows
     :param static_prefix: If set, the index.html asset will be served from the path static_prefix.
@@ -93,6 +107,12 @@ def _run_server(file_store_path, default_artifact_root, host, port, static_prefi
     if expose_prometheus:
         env_map[PROMETHEUS_EXPORTER_ENV_VAR] = expose_prometheus
 
+    if enable_project_runner:
+        project_runner_backend =\
+            project_runner_backend if project_runner_backend is not None else "huey"
+        env_map[PROJECT_RUNNER_BACKEND_ENV_VAR] = project_runner_backend
+        env_map[PROJECT_RUNNER_BACKEND_CONFIG_ENV_VAR] = str(project_runner_backend_config)
+
     # TODO: eventually may want waitress on non-win32
     if sys.platform == 'win32':
         full_command = _build_waitress_command(waitress_opts, host, port)
@@ -100,11 +120,13 @@ def _run_server(file_store_path, default_artifact_root, host, port, static_prefi
         full_command = _build_gunicorn_command(gunicorn_opts, host, port, workers or 4)
     full_command_proc = exec_cmd(full_command, env=env_map, stream_output=True, synchronous=False)
 
-    if enable_project_runner:
-        project_runner_command = _build_project_runner_command(project_runner_opts)
+    if enable_project_runner and project_runner_backend == "huey":
+        import mlflow.projects.backend.huey_backend
+        # TODO: Huey backend config
+        project_runner_command = _build_project_runner_command("-w 5 -k process")
         project_runner_command_proc = exec_cmd(
             project_runner_command, env=env_map, stream_output=True, synchronous=False,
-            cwd=mlflow.server.project_runner.__path__[0])
+            cwd=mlflow.projects.backend.huey_backend.__path__[0])
 
         project_runner_command_proc.wait()
 
