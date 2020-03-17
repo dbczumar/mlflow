@@ -1,0 +1,55 @@
+syntax = "proto2";
+
+package mlflow;
+
+import "scalapb/scalapb.proto";
+import "databricks.proto";
+
+option java_package = "org.mlflow.api.proto";
+option py_generic_services = true;
+option (scalapb.options) = {
+  flat_package: true,
+};
+
+service ProjectsService {
+
+  rpc runProject (RunProject) returns (RunProject.Response) {
+    option (rpc) = {
+      endpoints: [{
+        method: "POST",
+        path: "/mlflow/project-runs/create"
+        since { major: 2, minor: 0 },
+      }, {
+        method: "POST",
+        path: "/preview/mlflow/project-runs/create"
+        since { major: 2, minor: 0 },
+      }],
+      visibility: PUBLIC,
+      rpc_doc_title: "Run Project",
+    };
+  }
+
+}
+
+message SubmittedProjectRun {
+  optional string run_id = 1;
+}
+
+message ProjectParameter {
+  optional string key = 1;
+  optional string value = 2;
+}
+
+message RunProject {
+  optional string project = 1;
+  optional string entry_point = 2;
+  optional string version = 3;
+  repeated ProjectParameter parameters = 4;
+  optional string experiment_id = 5;
+  optional string run_id = 6;
+  optional string config = 7;
+
+  message Response {
+    optional SubmittedProjectRun run = 1;
+  }
+}
