@@ -343,6 +343,9 @@ class DatabricksSubmittedRun(SubmittedRun):
             result_state = self._job_runner.get_run_result_state(self._databricks_run_id)
         return result_state == "SUCCESS"
 
+    def is_complete(self):
+        pass
+
     def cancel(self):
         self._job_runner.jobs_runs_cancel(self._databricks_run_id)
         self.wait()

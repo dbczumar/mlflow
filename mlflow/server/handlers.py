@@ -24,7 +24,9 @@ from mlflow.protos.model_registry_pb2 import ModelRegistryService, CreateRegiste
     GetLatestVersions, CreateModelVersion, UpdateModelVersion, DeleteModelVersion, \
     GetModelVersion, GetModelVersionDownloadUri, SearchModelVersions, RenameRegisteredModel, \
     TransitionModelVersionStage
-from mlflow.protos.projects_pb2 import ProjectsService, RunProject, SubmittedProjectRun 
+from mlflow.protos.projects_pb2 import (
+    ProjectsService, RunProject, SubmittedProjectRun, GetProjectRunStatus,
+)
 from mlflow.protos.databricks_pb2 import RESOURCE_DOES_NOT_EXIST, INVALID_PARAMETER_VALUE
 from mlflow.store.artifact.artifact_repository_registry import get_artifact_repository
 from mlflow.store.db.db_types import DATABASE_ENGINES
@@ -677,10 +679,26 @@ def get_endpoints():
 
 
 def get_projects_endpoints(backend, backend_config):
-    
+    method_handlers = _get_projects_handlers(backend, backend_config)
+
+    endpoint_handler_infos = []
+    for method_name, handler in method_handlers.items():
+        service_method = ProjectsService.DESCRIPTOR.FindMethodByName(method_name)
+        endpoints = service_method.GetOptions().Extensions[databricks_pb2.rpc].endpoints
+        for endpoint in endpoints:
+            for http_path in _get_paths(endpoint.path):
+                endpoint_handler_infos.append((http_path, handler, [endpoint.method]))
+
+    return endpoint_handler_infos
+
+
+def _get_projects_handlers(backend, backend_config):
+
+    project_runs = {}
+
     @catch_mlflow_exception
     def _run_project():
-        import mlflow.projects 
+        import mlflow.projects
 
         def resolve_parameters(request):
             return {
@@ -705,23 +723,32 @@ def get_projects_endpoints(backend, backend_config):
             experiment_id=request.experiment_id,
             run_id=val_or_none(request.run_id),
             backend=backend,
-            backend_config=val_or_none(request.config),
+            # TODO(czumar): Consider updating this with the request config
+            backend_config=backend_config,
             synchronous=False,
         )
+        project_runs[submitted_run.run_id] = submitted_run
 
         submitted_run_proto = SubmittedProjectRun(run_id=submitted_run.run_id)
         response = RunProject.Response(run=submitted_run_proto)
-
         return _wrap_response(response)
 
-    service_method = ProjectsService.DESCRIPTOR.methods_by_name["runProject"]
+    @catch_mlflow_exception
+    def _get_project_run_status():
+        request = _get_request_message(GetProjectRunStatus())
+        project_run = project_runs.get(request.run_id)
+        if project_run is not None:
+            
+        else:
+            raise MlflowException(
+                "Could not find project run with ID '%s'" % request_message.run_id,
+                error_code=RESOURCE_DOES_NOT_EXIST)
+        return
 
-    ret = []
-    endpoints = service_method.GetOptions().Extensions[databricks_pb2.rpc].endpoints
-    for endpoint in endpoints:
-        for http_path in _get_paths(endpoint.path):
-            ret.append((http_path, _run_project, [endpoint.method]))
-    return ret
+    return {
+        "runProject": _run_project,
+        "getProjectRunStatus": _get_project_run_status,
+    }
 
 
 HANDLERS = {
