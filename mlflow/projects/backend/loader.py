@@ -4,7 +4,7 @@ import warnings
 
 from mlflow.exceptions import MlflowException
 from mlflow.projects.backend.rest_backend import _get_rest_backend
-from mlflow.projects.backend.huey_backend import HueyBackend 
+from mlflow.projects.backend.huey_backend import HueyBackend
 from mlflow.protos.databricks_pb2 import INVALID_PARAMETER_VALUE
 from mlflow.utils.uri import get_uri_scheme
 
@@ -20,7 +20,7 @@ class UnsupportedProjectBackendException(MlflowException):
             unsupported_backend, supported_backends)
         super(UnsupportedProjectBackendException, self).__init__(
             message, error_code=INVALID_PARAMETER_VALUE)
-        self.supported_backends = supported_backends 
+        self.supported_backends = supported_backends
 
 
 class ProjectBackendRegistry:

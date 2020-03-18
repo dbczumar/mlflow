@@ -1,4 +1,3 @@
-import mlflow
 import os
 
 from mlflow.projects import SubmittedRun
@@ -21,7 +20,7 @@ _METHOD_TO_INFO = extract_api_info_for_service(ProjectsService, _PATH_PREFIX)
 def _get_rest_backend(backend_uri):
     def get_default_host_creds():
         return rest_utils.MlflowHostCreds(
-            host=mlflow.get_tracking_uri() if backend_uri == "mlflow" else backend_uri,
+            host=backend_uri,
             username=os.environ.get(_TRACKING_USERNAME_ENV_VAR),
             password=os.environ.get(_TRACKING_PASSWORD_ENV_VAR),
             token=os.environ.get(_TRACKING_TOKEN_ENV_VAR),
@@ -32,18 +31,18 @@ def _get_rest_backend(backend_uri):
 
 class RestBackend(AbstractBackend):
 
-    def __init__(self, get_default_host_creds):
-        self.get_default_host_creds = get_default_host_creds
+    def __init__(self, get_host_creds):
+        self.get_host_creds = get_host_creds
 
-    def run(self, project_uri, entry_point, params, experiment_id, run_id=None, version=None, 
-            backend_config=None):
+    def run(self, project_uri, entry_point, params, experiment_id, tracking_backend_store_uri,
+            run_id=None, version=None, backend_config=None):
         param_protos = []
         for key, value in params.items():
             param_proto = ProjectParameter(key=key, value=value)
             param_protos.append(param_proto)
 
         run_project = RunProject(
-            project=project_uri, 
+            project=project_uri,
             parameters=param_protos,
             entry_point=entry_point,
             version=version,
@@ -59,7 +58,7 @@ class RestBackend(AbstractBackend):
         endpoint, method = _METHOD_TO_INFO[api]
         response_proto = api.Response()
         return call_endpoint(
-            self.get_default_host_creds(), endpoint, method, json_body, response_proto)
+            self.get_host_creds(), endpoint, method, json_body, response_proto)
 
 
 class RestSubmittedRun(SubmittedRun):

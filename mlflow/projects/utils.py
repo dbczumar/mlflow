@@ -203,29 +203,31 @@ def _fetch_zip_repo(uri):
     return BytesIO(response.content)
 
 
-def get_or_create_run(run_id, uri, experiment_id, work_dir, entry_point):
+def get_or_create_run(run_id, uri, experiment_id, work_dir, entry_point, 
+                      tracking_backend_store_uri=None):
     if run_id:
-        return tracking.MlflowClient().get_run(run_id)
+        return tracking.MlflowClient(tracking_backend_store_uri).get_run(run_id)
+
+    if tracking_backend_store_uri is None and fluent.active_run():
+        parent_run_id = fluent.active_run().info.run_id
     else:
-        return _create_run(uri, experiment_id, work_dir, entry_point)
+        parent_run_id = None
+    return _create_run(uri, experiment_id, work_dir, entry_point, parent_run_id=parent_run_id,
+                       tracking_backend_store_uri=tracking_backend_store_uri)
 
 
-def _create_run(uri, experiment_id, work_dir, entry_point):
+def _create_run(source_uri, experiment_id, work_dir, entry_point, parent_run_id=None,
+               tracking_backend_store_uri=None):
     """
     Create a ``Run`` against the current MLflow tracking server, logging metadata (e.g. the URI,
     entry point, and parameters of the project) about the run. Return an ``ActiveRun`` that can be
     used to report additional data about the run (metrics/params) to the tracking server.
     """
-    if _is_local_uri(uri):
-        source_name = tracking._tracking_service.utils._get_git_url_if_present(_expand_uri(uri))
+    if _is_local_uri(source_uri):
+        source_name = tracking._tracking_service.utils._get_git_url_if_present(_expand_uri(source_uri))
     else:
-        source_name = _expand_uri(uri)
+        source_name = _expand_uri(source_uri)
     source_version = _get_git_commit(work_dir)
-    existing_run = fluent.active_run()
-    if existing_run:
-        parent_run_id = existing_run.info.run_id
-    else:
-        parent_run_id = None
 
     tags = {
         MLFLOW_USER: _get_user(),
@@ -238,27 +240,29 @@ def _create_run(uri, experiment_id, work_dir, entry_point):
     if parent_run_id is not None:
         tags[MLFLOW_PARENT_RUN_ID] = parent_run_id
 
-    active_run = tracking.MlflowClient().create_run(experiment_id=experiment_id, tags=tags)
+    active_run = tracking.MlflowClient(tracking_backend_store_uri).create_run(
+        experiment_id=experiment_id, tags=tags)
     return active_run
 
 
-def log_project_params_and_tags(run, project, work_dir, entry_point, parameters, version):
+def log_project_params_and_tags(run, project, work_dir, entry_point, parameters, version, tracking_backend_store_uri=None):
+    client = tracking.MlflowClient(tracking_backend_store_uri)
     # Consolidate parameters for logging.
     # `storage_dir` is `None` since we want to log actual path not downloaded local path
     entry_point_obj = project.get_entry_point(entry_point)
     final_params, extra_params = entry_point_obj.compute_parameters(parameters, storage_dir=None)
     for key, value in (list(final_params.items()) + list(extra_params.items())):
-        tracking.MlflowClient().log_param(run.info.run_id, key, value)
+        client.log_param(run.info.run_id, key, value)
 
     repo_url = _get_git_repo_url(work_dir)
     if repo_url is not None:
         for tag in [MLFLOW_GIT_REPO_URL, LEGACY_MLFLOW_GIT_REPO_URL]:
-            tracking.MlflowClient().set_tag(run.info.run_id, tag, repo_url)
+            client.set_tag(run.info.run_id, tag, repo_url)
 
     # Add branch name tag if a branch is specified through -version
     if _is_valid_branch_name(work_dir, version):
         for tag in [MLFLOW_GIT_BRANCH, LEGACY_MLFLOW_GIT_BRANCH_NAME]:
-            tracking.MlflowClient().set_tag(run.info.run_id, tag, version)
+            client.set_tag(run.info.run_id, tag, version)
 
 
 FetchedProject = collections.namedtuple("FetchedProject", ["project", "work_dir", "run"])

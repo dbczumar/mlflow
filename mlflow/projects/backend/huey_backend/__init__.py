@@ -11,10 +11,11 @@ class HueyBackend(AbstractBackend):
     def __init__(self, backend_str):
         self.backend_str = backend_str
 
-    def run(self, project_uri, entry_point, params, experiment_id, run_id=None, version=None,
-            backend_config=None):
+    def run(self, project_uri, entry_point, params, experiment_id, tracking_backend_store_uri,
+            run_id=None, version=None, backend_config=None):
         if run_id is None:
-            new_run = MlflowClient().create_run(experiment_id=experiment_id)
+            new_run = MlflowClient(tracking_backend_store_uri).create_run(
+                experiment_id=experiment_id)
             run_id = new_run.info.run_id
 
         run_mlflow_project(
@@ -24,6 +25,8 @@ class HueyBackend(AbstractBackend):
             parameters=params,
             experiment_id=experiment_id,
             run_id=run_id,
+            tracking_backend_store_uri=tracking_backend_store_uri,
+            synchronous=True
         )
         return HueySubmittedRun(run_id)
 

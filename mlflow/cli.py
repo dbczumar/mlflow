@@ -221,7 +221,7 @@ def _validate_static_prefix(ctx, param, value):  # pylint: disable=unused-argume
 
 @cli.command()
 @click.option("--backend-store-uri", metavar="PATH",
-              default=DEFAULT_LOCAL_FILE_AND_ARTIFACT_PATH,
+              default=None,
               help="URI to which to persist experiment and run data. Acceptable URIs are "
                    "SQLAlchemy-compatible database connection strings "
                    "(e.g. 'sqlite:///path/to/file.db') or local filesystem URIs "
@@ -264,7 +264,9 @@ def server(backend_store_uri, default_artifact_root, host, port,
 
     # Ensure that both backend_store_uri and default_artifact_uri are set correctly.
     if not backend_store_uri:
-        backend_store_uri = DEFAULT_LOCAL_FILE_AND_ARTIFACT_PATH
+        from mlflow.utils.file_utils import path_to_local_file_uri
+        backend_store_uri = path_to_local_file_uri(
+            os.path.abspath(DEFAULT_LOCAL_FILE_AND_ARTIFACT_PATH))
 
     if not default_artifact_root:
         if is_local_uri(backend_store_uri):

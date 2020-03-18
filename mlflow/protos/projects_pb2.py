@@ -3,7 +3,6 @@
 
 import sys
 _b=sys.version_info[0]<3 and (lambda x:x) or (lambda x:x.encode('latin1'))
-from google.protobuf.internal import enum_type_wrapper
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import message as _message
 from google.protobuf import reflection as _reflection
@@ -24,50 +23,10 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   package='mlflow',
   syntax='proto2',
   serialized_options=_b('\n\024org.mlflow.api.proto\220\001\001\342?\002\020\001'),
-  serialized_pb=_b('\n\x0eprojects.proto\x12\x06mlflow\x1a\x15scalapb/scalapb.proto\x1a\x10\x64\x61tabricks.proto\"%\n\x13SubmittedProjectRun\x12\x0e\n\x06run_id\x18\x01 \x01(\t\".\n\x10ProjectParameter\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t\"\xde\x01\n\nRunProject\x12\x0f\n\x07project\x18\x01 \x01(\t\x12\x13\n\x0b\x65ntry_point\x18\x02 \x01(\t\x12\x0f\n\x07version\x18\x03 \x01(\t\x12,\n\nparameters\x18\x04 \x03(\x0b\x32\x18.mlflow.ProjectParameter\x12\x15\n\rexperiment_id\x18\x05 \x01(\t\x12\x0e\n\x06run_id\x18\x06 \x01(\t\x12\x0e\n\x06\x63onfig\x18\x07 \x01(\t\x1a\x34\n\x08Response\x12(\n\x03run\x18\x01 \x01(\x0b\x32\x1b.mlflow.SubmittedProjectRun\"[\n\x13GetProjectRunStatus\x12\x0e\n\x06run_id\x18\x01 \x01(\t\x1a\x34\n\x08Response\x12(\n\x06status\x18\x01 \x01(\x0e\x32\x18.mlflow.ProjectRunStatus*|\n\x10ProjectRunStatus\x12\x13\n\x0fPROJECT_RUNNING\x10\x01\x12\x14\n\x10PROJECT_FINISHED\x10\x02\x12\x12\n\x0ePROJECT_FAILED\x10\x03\x12\x12\n\x0ePROJECT_KILLED\x10\x04\x12\x15\n\x11PROJECT_SCHEDULED\x10\x05\x32\xa7\x03\n\x0fProjectsService\x12\xb0\x01\n\nrunProject\x12\x12.mlflow.RunProject\x1a\x1b.mlflow.RunProject.Response\"q\xf2\x86\x19m\n)\n\x04POST\x12\x1b/mlflow/project-runs/create\x1a\x04\x08\x02\x10\x00\n1\n\x04POST\x12#/preview/mlflow/project-runs/create\x1a\x04\x08\x02\x10\x00\x10\x01*\x0bRun Project\x12\xe0\x01\n\x13getProjectRunStatus\x12\x1b.mlflow.GetProjectRunStatus\x1a$.mlflow.GetProjectRunStatus.Response\"\x85\x01\xf2\x86\x19\x80\x01\n-\n\x04POST\x12\x1f/mlflow/project-runs/get-status\x1a\x04\x08\x02\x10\x00\n5\n\x04POST\x12\'/preview/mlflow/project-runs/get-status\x1a\x04\x08\x02\x10\x00\x10\x01*\x16Get Project Run StatusB\x1e\n\x14org.mlflow.api.proto\x90\x01\x01\xe2?\x02\x10\x01')
+  serialized_pb=_b('\n\x0eprojects.proto\x12\x06mlflow\x1a\x15scalapb/scalapb.proto\x1a\x10\x64\x61tabricks.proto\"%\n\x13SubmittedProjectRun\x12\x0e\n\x06run_id\x18\x01 \x01(\t\".\n\x10ProjectParameter\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t\"\xde\x01\n\nRunProject\x12\x0f\n\x07project\x18\x01 \x01(\t\x12\x13\n\x0b\x65ntry_point\x18\x02 \x01(\t\x12\x0f\n\x07version\x18\x03 \x01(\t\x12,\n\nparameters\x18\x04 \x03(\x0b\x32\x18.mlflow.ProjectParameter\x12\x15\n\rexperiment_id\x18\x05 \x01(\t\x12\x0e\n\x06run_id\x18\x06 \x01(\t\x12\x0e\n\x06\x63onfig\x18\x07 \x01(\t\x1a\x34\n\x08Response\x12(\n\x03run\x18\x01 \x01(\x0b\x32\x1b.mlflow.SubmittedProjectRun2\xc4\x01\n\x0fProjectsService\x12\xb0\x01\n\nrunProject\x12\x12.mlflow.RunProject\x1a\x1b.mlflow.RunProject.Response\"q\xf2\x86\x19m\n)\n\x04POST\x12\x1b/mlflow/project-runs/create\x1a\x04\x08\x02\x10\x00\n1\n\x04POST\x12#/preview/mlflow/project-runs/create\x1a\x04\x08\x02\x10\x00\x10\x01*\x0bRun ProjectB\x1e\n\x14org.mlflow.api.proto\x90\x01\x01\xe2?\x02\x10\x01')
   ,
   dependencies=[scalapb_dot_scalapb__pb2.DESCRIPTOR,databricks__pb2.DESCRIPTOR,])
 
-_PROJECTRUNSTATUS = _descriptor.EnumDescriptor(
-  name='ProjectRunStatus',
-  full_name='mlflow.ProjectRunStatus',
-  filename=None,
-  file=DESCRIPTOR,
-  values=[
-    _descriptor.EnumValueDescriptor(
-      name='PROJECT_RUNNING', index=0, number=1,
-      serialized_options=None,
-      type=None),
-    _descriptor.EnumValueDescriptor(
-      name='PROJECT_FINISHED', index=1, number=2,
-      serialized_options=None,
-      type=None),
-    _descriptor.EnumValueDescriptor(
-      name='PROJECT_FAILED', index=2, number=3,
-      serialized_options=None,
-      type=None),
-    _descriptor.EnumValueDescriptor(
-      name='PROJECT_KILLED', index=3, number=4,
-      serialized_options=None,
-      type=None),
-    _descriptor.EnumValueDescriptor(
-      name='PROJECT_SCHEDULED', index=4, number=5,
-      serialized_options=None,
-      type=None),
-  ],
-  containing_type=None,
-  serialized_options=None,
-  serialized_start=472,
-  serialized_end=596,
-)
-_sym_db.RegisterEnumDescriptor(_PROJECTRUNSTATUS)
-
-ProjectRunStatus = enum_type_wrapper.EnumTypeWrapper(_PROJECTRUNSTATUS)
-PROJECT_RUNNING = 1
-PROJECT_FINISHED = 2
-PROJECT_FAILED = 3
-PROJECT_KILLED = 4
-PROJECT_SCHEDULED = 5
 
 
 
@@ -242,77 +201,12 @@ _RUNPROJECT = _descriptor.Descriptor(
   serialized_end=377,
 )
 
-
-_GETPROJECTRUNSTATUS_RESPONSE = _descriptor.Descriptor(
-  name='Response',
-  full_name='mlflow.GetProjectRunStatus.Response',
-  filename=None,
-  file=DESCRIPTOR,
-  containing_type=None,
-  fields=[
-    _descriptor.FieldDescriptor(
-      name='status', full_name='mlflow.GetProjectRunStatus.Response.status', index=0,
-      number=1, type=14, cpp_type=8, label=1,
-      has_default_value=False, default_value=1,
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
-  ],
-  extensions=[
-  ],
-  nested_types=[],
-  enum_types=[
-  ],
-  serialized_options=None,
-  is_extendable=False,
-  syntax='proto2',
-  extension_ranges=[],
-  oneofs=[
-  ],
-  serialized_start=418,
-  serialized_end=470,
-)
-
-_GETPROJECTRUNSTATUS = _descriptor.Descriptor(
-  name='GetProjectRunStatus',
-  full_name='mlflow.GetProjectRunStatus',
-  filename=None,
-  file=DESCRIPTOR,
-  containing_type=None,
-  fields=[
-    _descriptor.FieldDescriptor(
-      name='run_id', full_name='mlflow.GetProjectRunStatus.run_id', index=0,
-      number=1, type=9, cpp_type=9, label=1,
-      has_default_value=False, default_value=_b("").decode('utf-8'),
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
-  ],
-  extensions=[
-  ],
-  nested_types=[_GETPROJECTRUNSTATUS_RESPONSE, ],
-  enum_types=[
-  ],
-  serialized_options=None,
-  is_extendable=False,
-  syntax='proto2',
-  extension_ranges=[],
-  oneofs=[
-  ],
-  serialized_start=379,
-  serialized_end=470,
-)
-
 _RUNPROJECT_RESPONSE.fields_by_name['run'].message_type = _SUBMITTEDPROJECTRUN
 _RUNPROJECT_RESPONSE.containing_type = _RUNPROJECT
 _RUNPROJECT.fields_by_name['parameters'].message_type = _PROJECTPARAMETER
-_GETPROJECTRUNSTATUS_RESPONSE.fields_by_name['status'].enum_type = _PROJECTRUNSTATUS
-_GETPROJECTRUNSTATUS_RESPONSE.containing_type = _GETPROJECTRUNSTATUS
 DESCRIPTOR.message_types_by_name['SubmittedProjectRun'] = _SUBMITTEDPROJECTRUN
 DESCRIPTOR.message_types_by_name['ProjectParameter'] = _PROJECTPARAMETER
 DESCRIPTOR.message_types_by_name['RunProject'] = _RUNPROJECT
-DESCRIPTOR.message_types_by_name['GetProjectRunStatus'] = _GETPROJECTRUNSTATUS
-DESCRIPTOR.enum_types_by_name['ProjectRunStatus'] = _PROJECTRUNSTATUS
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 SubmittedProjectRun = _reflection.GeneratedProtocolMessageType('SubmittedProjectRun', (_message.Message,), dict(
@@ -344,21 +238,6 @@ RunProject = _reflection.GeneratedProtocolMessageType('RunProject', (_message.Me
 _sym_db.RegisterMessage(RunProject)
 _sym_db.RegisterMessage(RunProject.Response)
 
-GetProjectRunStatus = _reflection.GeneratedProtocolMessageType('GetProjectRunStatus', (_message.Message,), dict(
-
-  Response = _reflection.GeneratedProtocolMessageType('Response', (_message.Message,), dict(
-    DESCRIPTOR = _GETPROJECTRUNSTATUS_RESPONSE,
-    __module__ = 'projects_pb2'
-    # @@protoc_insertion_point(class_scope:mlflow.GetProjectRunStatus.Response)
-    ))
-  ,
-  DESCRIPTOR = _GETPROJECTRUNSTATUS,
-  __module__ = 'projects_pb2'
-  # @@protoc_insertion_point(class_scope:mlflow.GetProjectRunStatus)
-  ))
-_sym_db.RegisterMessage(GetProjectRunStatus)
-_sym_db.RegisterMessage(GetProjectRunStatus.Response)
-
 
 DESCRIPTOR._options = None
 
@@ -368,8 +247,8 @@ _PROJECTSSERVICE = _descriptor.ServiceDescriptor(
   file=DESCRIPTOR,
   index=0,
   serialized_options=None,
-  serialized_start=599,
-  serialized_end=1022,
+  serialized_start=380,
+  serialized_end=576,
   methods=[
   _descriptor.MethodDescriptor(
     name='runProject',
@@ -379,15 +258,6 @@ _PROJECTSSERVICE = _descriptor.ServiceDescriptor(
     input_type=_RUNPROJECT,
     output_type=_RUNPROJECT_RESPONSE,
     serialized_options=_b('\362\206\031m\n)\n\004POST\022\033/mlflow/project-runs/create\032\004\010\002\020\000\n1\n\004POST\022#/preview/mlflow/project-runs/create\032\004\010\002\020\000\020\001*\013Run Project'),
-  ),
-  _descriptor.MethodDescriptor(
-    name='getProjectRunStatus',
-    full_name='mlflow.ProjectsService.getProjectRunStatus',
-    index=1,
-    containing_service=None,
-    input_type=_GETPROJECTRUNSTATUS,
-    output_type=_GETPROJECTRUNSTATUS_RESPONSE,
-    serialized_options=_b('\362\206\031\200\001\n-\n\004POST\022\037/mlflow/project-runs/get-status\032\004\010\002\020\000\n5\n\004POST\022\'/preview/mlflow/project-runs/get-status\032\004\010\002\020\000\020\001*\026Get Project Run Status'),
   ),
 ])
 _sym_db.RegisterServiceDescriptor(_PROJECTSSERVICE)

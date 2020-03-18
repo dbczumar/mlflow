@@ -29,22 +29,6 @@ service ProjectsService {
     };
   }
 
-  rpc getProjectRunStatus (GetProjectRunStatus) returns (GetProjectRunStatus.Response) {
-    option (rpc) = {
-      endpoints: [{
-        method: "POST",
-        path: "/mlflow/project-runs/get-status"
-        since { major: 2, minor: 0 },
-      }, {
-        method: "POST",
-        path: "/preview/mlflow/project-runs/get-status"
-        since { major: 2, minor: 0 },
-      }],
-      visibility: PUBLIC,
-      rpc_doc_title: "Get Project Run Status",
-    };
-  }
-
 }
 
 message SubmittedProjectRun {
@@ -77,28 +61,6 @@ message RunProject {
   message Response {
 
     optional SubmittedProjectRun run = 1;
-
-  }
-}
-
-enum ProjectRunStatus {
-  PROJECT_RUNNING = 1;
-
-  PROJECT_FINISHED = 2;
-
-  PROJECT_FAILED = 3;
-
-  PROJECT_KILLED = 4;
-
-  PROJECT_SCHEDULED = 5;
-}
-
-message GetProjectRunStatus {
-  optional string run_id = 1;
-
-  message Response {
-
-    optional ProjectRunStatus status = 1;
 
   }
 }

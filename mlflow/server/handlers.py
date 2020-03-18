@@ -25,7 +25,7 @@ from mlflow.protos.model_registry_pb2 import ModelRegistryService, CreateRegiste
     GetModelVersion, GetModelVersionDownloadUri, SearchModelVersions, RenameRegisteredModel, \
     TransitionModelVersionStage
 from mlflow.protos.projects_pb2 import (
-    ProjectsService, RunProject, SubmittedProjectRun, GetProjectRunStatus,
+    ProjectsService, RunProject, SubmittedProjectRun,
 )
 from mlflow.protos.databricks_pb2 import RESOURCE_DOES_NOT_EXIST, INVALID_PARAMETER_VALUE
 from mlflow.store.artifact.artifact_repository_registry import get_artifact_repository
@@ -693,8 +693,7 @@ def get_projects_endpoints(backend, backend_config):
 
 
 def _get_projects_handlers(backend, backend_config):
-
-    project_runs = {}
+    from mlflow.server import BACKEND_STORE_URI_ENV_VAR
 
     @catch_mlflow_exception
     def _run_project():
@@ -708,9 +707,6 @@ def _get_projects_handlers(backend, backend_config):
 
         def val_or_none(val):
             return val if val != '' else None
-
-        # import mlflow
-        # mlflow.set_tracking_uri(os.environ.get(BACKEND_STORE_URI_ENV_VAR))
 
         request = _get_request_message(RunProject())
         params = resolve_parameters(request)
@@ -726,28 +722,15 @@ def _get_projects_handlers(backend, backend_config):
             # TODO(czumar): Consider updating this with the request config
             backend_config=backend_config,
             synchronous=False,
+            tracking_backend_store_uri=os.environ.get(BACKEND_STORE_URI_ENV_VAR),
         )
-        project_runs[submitted_run.run_id] = submitted_run
 
         submitted_run_proto = SubmittedProjectRun(run_id=submitted_run.run_id)
         response = RunProject.Response(run=submitted_run_proto)
         return _wrap_response(response)
 
-    @catch_mlflow_exception
-    def _get_project_run_status():
-        request = _get_request_message(GetProjectRunStatus())
-        project_run = project_runs.get(request.run_id)
-        if project_run is not None:
-            
-        else:
-            raise MlflowException(
-                "Could not find project run with ID '%s'" % request_message.run_id,
-                error_code=RESOURCE_DOES_NOT_EXIST)
-        return
-
     return {
         "runProject": _run_project,
-        "getProjectRunStatus": _get_project_run_status,
     }
 
 
