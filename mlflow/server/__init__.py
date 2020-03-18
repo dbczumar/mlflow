@@ -123,7 +123,7 @@ def _run_server(file_store_path, default_artifact_root, host, port, static_prefi
     if enable_project_runner and project_runner_backend == "huey":
         import mlflow.projects.backend.huey_backend
         # TODO: Huey backend config
-        project_runner_command = _build_project_runner_command("-w 5 -k process")
+        project_runner_command = _build_project_runner_command("-w 5")
         project_runner_command_proc = exec_cmd(
             project_runner_command, env=env_map, stream_output=True, synchronous=False,
             cwd=mlflow.projects.backend.huey_backend.__path__[0])
