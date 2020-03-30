@@ -155,7 +155,7 @@ def log_model(spark_model, artifact_path, conda_env=None, dfs_tmpdir=None,
     # model
     model_dir = os.path.join(run_root_artifact_uri, artifact_path)
     try:
-        spark_model.save(os.path.join(model_dir, _SPARK_MODEL_PATH_SUB))
+        spark_model.save(os.path.join(model_dir, _SPARK_MODEL_PATH_SUB)) # Spark task is used here
     except Py4JJavaError:
         return Model.log(artifact_path=artifact_path, flavor=mlflow.spark, spark_model=spark_model,
                          conda_env=conda_env, dfs_tmpdir=dfs_tmpdir, sample_input=sample_input,
@@ -383,6 +383,19 @@ def save_model(spark_model, path, mlflow_model=Model(), conda_env=None,
         dst_dir=path, spark_model=spark_model, mlflow_model=mlflow_model,
         sample_input=sample_input, conda_env=conda_env)
 
+# Old path: Download file locally, upload to temporary DBFS location, load the model from there. This is a security risk. We can't delete
+# after loading because the model is not loaded all at once.
+
+# Option 0: Tell users to leverage MLeap, which will be okay with ACLs. But MLeap models aren't compatible in UDF.
+
+# Option 1: Log the *metadata* into ACL'ed location. Log the Spark model into the non-ACL'ed location. "Spark models are not ACL'ed because
+# it doesn't make sense for them to be ACL'ed."
+
+# Option 2: If Spark knows that the DBFS location is ACL'ed, it can ask for the presigned URL.
+
+# Option 3: Build different scoring format for SparkML models
+
+# Ideally, we'd just have ACLs on DBFS.
 
 def _load_model(model_uri, dfs_tmpdir=None):
     from pyspark.ml.pipeline import PipelineModel

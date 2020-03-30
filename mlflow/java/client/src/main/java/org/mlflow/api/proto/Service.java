@@ -47987,7 +47987,7 @@ public final class Service {
       "\022\007\n\003JOB\020\002\022\013\n\007PROJECT\020\003\022\t\n\005LOCAL\020\004\022\014\n\007UNK" +
       "NOWN\020\350\007*M\n\tRunStatus\022\013\n\007RUNNING\020\001\022\r\n\tSCH" +
       "EDULED\020\002\022\014\n\010FINISHED\020\003\022\n\n\006FAILED\020\004\022\n\n\006KI" +
-      "LLED\020\0052\341\036\n\rMlflowService\022\246\001\n\023getExperime" +
+      "LLED\020\0052\337\036\n\rMlflowService\022\246\001\n\023getExperime" +
       "ntByName\022\033.mlflow.GetExperimentByName\032$." +
       "mlflow.GetExperimentByName.Response\"L\362\206\031" +
       "H\n,\n\003GET\022\037/mlflow/experiments/get-by-nam" +
@@ -48081,12 +48081,12 @@ public final class Service {
       "mlflow.LogBatch\032\031.mlflow.LogBatch.Respon" +
       "se\"e\362\206\031a\n$\n\004POST\022\026/mlflow/runs/log-batch" +
       "\032\004\010\002\020\000\n,\n\004POST\022\036/preview/mlflow/runs/log" +
-      "-batch\032\004\010\002\020\000\020\001*\tLog Batch\022\236\001\n\010logModel\022\020" +
+      "-batch\032\004\010\002\020\000\020\001*\tLog Batch\022\234\001\n\010logModel\022\020" +
       ".mlflow.LogModel\032\031.mlflow.LogModel.Respo" +
-      "nse\"e\362\206\031a\n$\n\004POST\022\026/mlflow/runs/log-mode" +
-      "l\032\004\010\002\020\000\n,\n\004POST\022\036/preview/mlflow/runs/lo" +
-      "g-model\032\004\010\002\020\000\020\001*\tLog ModelB\036\n\024org.mlflow" +
-      ".api.proto\220\001\001\342?\002\020\001"
+      "nse\"c\362\206\031_\n#\n\003PUT\022\026/mlflow/runs/log-model" +
+      "\032\004\010\002\020\000\n+\n\003PUT\022\036/preview/mlflow/runs/log-" +
+      "model\032\004\010\002\020\000\020\001*\tLog ModelB\036\n\024org.mlflow.a" +
+      "pi.proto\220\001\001\342?\002\020\001"
     };
     com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner assigner =
         new com.google.protobuf.Descriptors.FileDescriptor.    InternalDescriptorAssigner() {

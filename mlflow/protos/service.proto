@@ -477,11 +477,11 @@ service MlflowService {
   rpc logModel (LogModel) returns (LogModel.Response) {
     option (rpc) = {
       endpoints: [{
-        method: "POST",
+        method: "PUT",
         path: "/mlflow/runs/log-model"
         since { major: 2, minor: 0 },
       }, {
-        method: "POST",
+        method: "PUT",
         path: "/preview/mlflow/runs/log-model"
         since { major: 2, minor: 0 },
       }],

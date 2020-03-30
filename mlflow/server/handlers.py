@@ -463,7 +463,7 @@ def _log_batch():
 
 
 @catch_mlflow_exception
-def _log_model():
+def _log_model_2():
     request_message = _get_request_message(LogModel())
     try:
         model = json.loads(request_message.model_json)
@@ -484,6 +484,13 @@ def _log_model():
     response.set_data(message_to_json(response_message))
     return response
 
+@catch_mlflow_exception
+def _log_model():
+    from flask import redirect
+    # presigned_url = "https://mlflow-artif-test.s3.amazonaws.com/mylocation?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Expires=3600&X-Amz-Date=20200327T194702Z&X-Amz-SignedHeaders=host&X-Amz-Security-Token=FwoGZXIvYXdzEMX%2F%2F%2F%2F%2F%2F%2F%2F%2F%2FwEaDP%2F3UC%2FfoUbMksPzeCK%2BAXr%2Bw%2F8pWodxE9zeljqtXRuGiskM93IZuIVoZo51rNA2I5VfChYLKpsckxgXFH1NvRYwZHzA2C5IPM63LYxAALJvvexxSdW%2F2gKc7TWA9Un9MvGaQLdSekkNHNKW7VBB%2F0YcscW9KZhiAEkq7FE1OEV%2B8O5FYhBbDMgHuh4JAzNJPsMePphCUGj6YPaNbRSaATyZbN0jvsxJEy2woOOf%2F9G1AyC%2B5PPVu3DFsotpGZCQgVwYZcVQGXee4InmKZsotrD58wUyLcyEGZSUGgeqDQXzFYRqcaV7sL86F2WYP7DUFzZk64ASzZvx92o%2BUcgHW0roGQ%3D%3D&X-Amz-Credential=ASIA2JMHUIXTWFFJDHET%2F20200327%2Fus-west-2%2Fs3%2Faws4_request&X-Amz-Signature=44b2f31ed43977ee1acf663ad1c25fbac508df94466896812ba48e6d253cbeea"
+    presigned_url = "https://mlflow-artif-test.s3.amazonaws.com/blah?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Expires=3600&X-Amz-Date=20200327T211816Z&X-Amz-SignedHeaders=host&X-Amz-Security-Token=FwoGZXIvYXdzEMf%2F%2F%2F%2F%2F%2F%2F%2F%2F%2FwEaDKGqiXk5c2IeTEerOSK%2BAR0jivyZz8%2F%2FYqCwN7fLnyJmOUIRgBZdu74Dq1So8hstvyQA%2B%2BqGOFls4D9fuZ5jgr4edY3InndBqxKGlK2RAzclXJ%2B5HoaamOb1BQhphBe7H6i4o%2FYiGU1TJXHDoJy5u0C4rcfKV4NoIPK9paScSuvmrlsWhaY3LFEH6rVrASRsy2%2B9uphiv%2BOGiOj5oOR92GDCzNialkV5SF8FZC7pz9jSxRrWLPSgPkdor5hH%2B9sMtljqj1KWO9Sk3h90d4gomNv58wUyLdcuVQmUkCuhlf3%2FdB8DKdzB6JlQKS3%2Fu05irEYeRgDmCJNApQ8aSVBI3oYYuw%3D%3D&X-Amz-Credential=ASIA2JMHUIXT2B4FD5PF%2F20200327%2Fus-west-2%2Fs3%2Faws4_request&X-Amz-Signature=6a2538bfd8d0fe7fa161555cc380919df952a7c5fd048677c739ef79ddb258b9"
+    return redirect(presigned_url, code=307)
+    # return response
 
 def _wrap_response(response_message):
     response = Response(mimetype='application/json')
