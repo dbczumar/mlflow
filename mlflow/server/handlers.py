@@ -25,7 +25,7 @@ from mlflow.protos.model_registry_pb2 import ModelRegistryService, CreateRegiste
     GetModelVersion, GetModelVersionDownloadUri, SearchModelVersions, RenameRegisteredModel, \
     TransitionModelVersionStage
 from mlflow.protos.projects_pb2 import (
-    ProjectsService, RunProject, SubmittedProjectRun,
+    ProjectsService, RunProject, SubmittedProjectRun, GetProjectRunStatus, ProjectRunStatus,
 )
 from mlflow.protos.databricks_pb2 import RESOURCE_DOES_NOT_EXIST, INVALID_PARAMETER_VALUE
 from mlflow.store.artifact.artifact_repository_registry import get_artifact_repository
@@ -694,10 +694,11 @@ def get_projects_endpoints(backend, backend_config):
 
 def _get_projects_handlers(backend, backend_config):
     from mlflow.server import BACKEND_STORE_URI_ENV_VAR
+    from mlflow.projects.backend.huey_backend.tasks import run_mlflow_project
+    from mlflow.projects.backend.huey_backend.config import huey
 
     @catch_mlflow_exception
     def _run_project():
-        import mlflow.projects
 
         def resolve_parameters(request):
             return {
@@ -711,26 +712,56 @@ def _get_projects_handlers(backend, backend_config):
         request = _get_request_message(RunProject())
         params = resolve_parameters(request)
 
-        submitted_run = mlflow.projects.run(
+        run_task = run_mlflow_project(
             uri=request.project,
             entry_point=request.entry_point,
             version=val_or_none(request.version),
             parameters=params,
             experiment_id=request.experiment_id,
-            run_id=val_or_none(request.run_id),
+            run_id=request.run_id,
             backend=backend,
             # TODO(czumar): Consider updating this with the request config
             backend_config=backend_config,
-            synchronous=False,
+            synchronous=True,
             tracking_backend_store_uri=os.environ.get(BACKEND_STORE_URI_ENV_VAR),
         )
 
-        submitted_run_proto = SubmittedProjectRun(run_id=submitted_run.run_id)
+        execution_id = run_task.id 
+        submitted_run_proto = SubmittedProjectRun(execution_id=execution_id)
         response = RunProject.Response(run=submitted_run_proto)
+        return _wrap_response(response)
+
+    @catch_mlflow_exception
+    def _get_project_run_status():
+        from huey.exceptions import TaskException
+
+        request = _get_request_message(GetProjectRunStatus())
+        execution_id = request.execution_id
+        
+        pending_task_ids = [task.id for task in huey.pending()]
+
+        try:
+            result = huey.result(execution_id, blocking=False)
+            if result is None:
+                if execution_id in pending_task_ids:
+                    status = ProjectRunStatus.Value('PROJECT_SCHEDULED')
+                # else:
+                #     status = ProjectRunStatus.Value('PROJECT_UNKNOWN')
+                else:
+                    status = ProjectRunStatus.Value('PROJECT_RUNNING')
+            else:
+                print("RESULT: {}".format(result))
+                status = ProjectRunStatus.Value('PROJECT_FINISHED')
+        except TaskException as e:
+            print(e)
+            status = ProjectRunStatus.Value('PROJECT_FAILED')
+
+        response = GetProjectRunStatus.Response(status=status)
         return _wrap_response(response)
 
     return {
         "runProject": _run_project,
+        "getProjectRunStatus": _get_project_run_status,
     }
 
 

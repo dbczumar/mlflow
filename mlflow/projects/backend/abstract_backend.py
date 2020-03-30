@@ -9,8 +9,8 @@ class AbstractBackend(object):
     __metaclass__ = ABCMeta
 
     @abstractmethod
-    def run(self, project_uri, entry_point, params, experiment_id, tracking_backend_store_uri,
-            run_id=None, version=None, backend_config=None):
+    def run(self, project_uri, entry_point, params, run_id, experiment_id,
+            tracking_backend_store_uri, version=None, backend_config=None):
         """
         Submit an entrypoint. It must returns a SubmittedRun object to track the execution
 

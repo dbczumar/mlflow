@@ -227,7 +227,7 @@ def _create_run(source_uri, experiment_id, work_dir, entry_point, parent_run_id=
         source_name = tracking._tracking_service.utils._get_git_url_if_present(_expand_uri(source_uri))
     else:
         source_name = _expand_uri(source_uri)
-    source_version = _get_git_commit(work_dir)
+    source_version = _get_git_commit(work_dir) if work_dir is not None else None
 
     tags = {
         MLFLOW_USER: _get_user(),

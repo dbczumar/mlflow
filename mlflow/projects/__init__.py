@@ -93,12 +93,15 @@ def _run(uri, experiment_id, tracking_backend_store_uri, entry_point="main", ver
     """
     parameters = parameters or {}
 
+
     if backend_name:
         try:
             backend = loader.load_backend(backend_name)
+            active_run = get_or_create_run(
+                run_id, uri, experiment_id, None, entry_point, tracking_backend_store_uri)
             submitted_run = backend.run(
-                uri, entry_point, parameters, experiment_id, tracking_backend_store_uri, run_id,
-                version, backend_config)
+                uri, entry_point, parameters, active_run.info.run_id, experiment_id,
+                tracking_backend_store_uri, version, backend_config)
             tracking.MlflowClient().set_tag(submitted_run.run_id, MLFLOW_PROJECT_BACKEND,
                                             backend_name)
             return submitted_run

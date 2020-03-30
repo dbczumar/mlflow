@@ -82,8 +82,9 @@ def cli():
               help="If specified, the given run ID will be used instead of creating a new run. "
                    "Note: this argument is used internally by the MLflow project APIs "
                    "and should not be specified.")
+@click.option("--synchronous", is_flag=True)
 def run(uri, entry_point, version, param_list, experiment_name, experiment_id, backend,
-        backend_config, no_conda, storage_dir, run_id):
+        backend_config, no_conda, storage_dir, run_id, synchronous):
     """
     Run an MLflow project from the given URI.
 
@@ -134,7 +135,7 @@ def run(uri, entry_point, version, param_list, experiment_name, experiment_id, b
             backend_config=backend_config,
             use_conda=(not no_conda),
             storage_dir=storage_dir,
-            synchronous=backend in ("local", "kubernetes") or backend is None,
+            synchronous=synchronous or backend in ("local", "kubernetes") or backend is None,
             run_id=run_id
         )
     except projects.ExecutionException as e:

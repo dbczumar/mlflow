@@ -109,7 +109,7 @@ def _run_server(file_store_path, default_artifact_root, host, port, static_prefi
 
     if enable_project_runner:
         project_runner_backend =\
-            project_runner_backend if project_runner_backend is not None else "huey"
+            project_runner_backend if project_runner_backend is not None else "local"
         env_map[PROJECT_RUNNER_BACKEND_ENV_VAR] = project_runner_backend
         env_map[PROJECT_RUNNER_BACKEND_CONFIG_ENV_VAR] = str(project_runner_backend_config)
 
@@ -120,7 +120,7 @@ def _run_server(file_store_path, default_artifact_root, host, port, static_prefi
         full_command = _build_gunicorn_command(gunicorn_opts, host, port, workers or 4)
     full_command_proc = exec_cmd(full_command, env=env_map, stream_output=True, synchronous=False)
 
-    if enable_project_runner and project_runner_backend == "huey":
+    if enable_project_runner:
         import mlflow.projects.backend.huey_backend
         # TODO: Huey backend config
         project_runner_command = _build_project_runner_command("-w 5")
