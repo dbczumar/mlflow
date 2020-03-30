@@ -23,7 +23,7 @@ class HueyBackend(AbstractBackend):
             experiment_id=experiment_id,
             run_id=run_id,
             tracking_backend_store_uri=tracking_backend_store_uri,
-            synchronous=True
+            synchronous=True,
         )
         return HueySubmittedRun(run_id, task)
 

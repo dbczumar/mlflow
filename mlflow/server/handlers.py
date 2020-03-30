@@ -750,10 +750,8 @@ def _get_projects_handlers(backend, backend_config):
                 else:
                     status = ProjectRunStatus.Value('PROJECT_RUNNING')
             else:
-                print("RESULT: {}".format(result))
                 status = ProjectRunStatus.Value('PROJECT_FINISHED')
         except TaskException as e:
-            print(e)
             status = ProjectRunStatus.Value('PROJECT_FAILED')
 
         response = GetProjectRunStatus.Response(status=status)

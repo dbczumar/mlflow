@@ -78,7 +78,7 @@ class RestSubmittedRun(SubmittedRun):
         import time
         while True:
             status = self.get_status()
-            print(status)
+            print("Status: {}".format(ProjectRunStatus.Name(status)))
             if status == ProjectRunStatus.Value('PROJECT_UNKNOWN'):
                 raise Exception("Unexpected error: unknown project run!")
             elif status == ProjectRunStatus.Value('PROJECT_FAILED'):
@@ -92,7 +92,6 @@ class RestSubmittedRun(SubmittedRun):
         raise NotImplementedError("Not implemented!")
 
     def get_status(self):
-        print(self._execution_id)
         get_status = GetProjectRunStatus(execution_id=self._execution_id)
         req_body = message_to_json(get_status)
         response = RestBackend._call_endpoint(GetProjectRunStatus, req_body, self._rest_host_creds)
