@@ -46,6 +46,18 @@ service ProjectsService {
   }
 }
 
+message SubmittedProjectRun {
+
+  optional string execution_id = 1;
+
+}
+
+message ProjectParameter {
+  optional string key = 1;
+
+  optional string value = 2;
+}
+
 message RunProject {
   optional string project = 1;
 
@@ -68,30 +80,6 @@ message RunProject {
   }
 }
 
-message SubmittedProjectRun {
-
-  optional string execution_id = 1;
-
-}
-
-message ProjectParameter {
-  optional string key = 1;
-
-  optional string value = 2;
-}
-
-message GetProjectRunStatus {
-  optional string execution_id = 1;
-
-  message Response {
-
-    optional ProjectRunStatus status = 1;
-
-    optional string info = 2;
-
-  }
-}
-
 enum ProjectRunStatus {
   PROJECT_SCHEDULED = 1;
 
@@ -104,10 +92,14 @@ enum ProjectRunStatus {
   PROJECT_UNKNOWN = 5;
 }
 
-message CancelProjectRun {
+message GetProjectRunStatus {
   optional string execution_id = 1;
 
   message Response {
+
+    optional ProjectRunStatus status = 1;
+
+    optional string info = 2;
 
   }
 }
