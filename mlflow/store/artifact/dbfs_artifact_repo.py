@@ -34,6 +34,9 @@ class DbfsRestArtifactRepository(ArtifactRepository):
         if not artifact_uri.startswith('dbfs:/'):
             raise MlflowException('DbfsArtifactRepository URI must start with dbfs:/')
 
+        from concurrent.futures import ThreadPoolExecutor
+        self.executor = ThreadPoolExecutor(max_workers=16)
+
     def _databricks_api_request(self, endpoint, **kwargs):
         host_creds = self.get_host_creds()
         return http_request_safe(host_creds=host_creds, endpoint=endpoint, **kwargs)
@@ -103,7 +106,8 @@ class DbfsRestArtifactRepository(ArtifactRepository):
                 artifact_subdir = posixpath.join(artifact_path, rel_path)
             for name in filenames:
                 file_path = os.path.join(dirpath, name)
-                self.log_artifact(file_path, artifact_subdir)
+                self.executor.submit(self.log_artifact, file_path, artifact_subdir)
+                # self.log_artifact(file_path, artifact_subdir)
 
     def list_artifacts(self, path=None):
         if path:
