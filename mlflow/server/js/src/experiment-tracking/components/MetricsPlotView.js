@@ -70,6 +70,9 @@ export class MetricsPlotView extends React.Component {
   getPlotPropsForLineChart = () => {
     const { metrics, xAxis, showPoint, lineSmoothness, isComparing,
       deselectedCurves } = this.props;
+
+    let props;
+
     const deselectedCurvesSet = new Set(deselectedCurves);
     const data = metrics.map((metric) => {
       const { metricKey, runDisplayName, history, runUuid } = metric;
@@ -88,15 +91,64 @@ export class MetricsPlotView extends React.Component {
         text: history.map((entry) => entry.value.toFixed(5)),
         type: 'scatter',
         mode: isSingleHistory ? 'markers' : 'lines+markers',
-        marker: {opacity: isSingleHistory || showPoint ? 1 : 0 },
+        marker: {
+          opacity: isSingleHistory || showPoint ? 1 : 0,
+        },
+        line: {
+          // color: 'rgb(164, 194, 244)',
+          color: '#1f77b4',
+        },
         hovertemplate: (isSingleHistory || (lineSmoothness === 1)) ?
-            '%{y}' : 'Value: %{text}<br>Smoothed: %{y}',
+            '%{y}' : 'Value: %{text} (Smoothed: %{y})',
+        // hovertemplate: (isSingleHistory || (lineSmoothness === 1)) ?
+        //     '%{y}' : 'Smoothed: %{y}',
         visible: visible,
         runId: runUuid,
         metricName: metricKey,
       };
     });
-    const props = { data };
+    if (lineSmoothness > 1) {
+      const data2 = metrics.map((metric) => {
+        const { metricKey, runDisplayName, history, runUuid } = metric;
+        const isSingleHistory = history.length === 0;
+        const visible = !deselectedCurvesSet.has(Utils.getCurveKey(runUuid, metricKey)) ?
+            true : "legendonly";
+        return {
+          name: MetricsPlotView.getLineLegend(metricKey, runDisplayName, isComparing),
+          x: history.map((entry) => {
+            if (xAxis === X_AXIS_STEP) {
+              return entry.step;
+            }
+            return MetricsPlotView.parseTimestamp(entry.timestamp, history, xAxis);
+          }),
+          y: history.map((entry) => entry.value),
+          // text: history.map((entry) => entry.value.toFixed(5)),
+          type: 'scatter',
+          mode: isSingleHistory ? 'markers' : 'lines+markers',
+          marker: {
+            opacity: 0,
+          },
+          line: {
+            // color: 'rgb(164, 194, 244)',
+            color: '#1f77b4',
+          },
+          // hovertemplate: (isSingleHistory || (lineSmoothness === 1)) ?
+          //     '%{y}' : 'Value: %{y}',
+          hoverinfo: 'skip',
+          visible: visible,
+          runId: runUuid,
+          metricName: metricKey,
+          opacity: 0.3,
+          showlegend: false,
+        };
+      });
+      const data3 = data.concat(data2);
+      console.log(data3);
+      props = { "data": data3 };
+    } else {
+      props = { data };
+    }
+
     props.layout = {
       ...props.layout,
       ...this.props.extraLayout,
@@ -155,6 +207,7 @@ export class MetricsPlotView extends React.Component {
       this.props.chartType === CHART_TYPE_BAR
         ? this.getPlotPropsForBarChart()
         : this.getPlotPropsForLineChart();
+    console.log(plotProps.layout);
     return (
       <div className='metrics-plot-view-container'>
         <Plot
