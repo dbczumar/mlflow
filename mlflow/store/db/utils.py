@@ -139,6 +139,9 @@ def _get_schema_version(engine):
         return mc.get_current_revision()
 
 
+def _is_initialized(engine):
+
+
 def _is_initialized_before_mlflow_1(engine):
     """
     Returns true if the database at the specified URL was initialized before MLflow 1.0, False

@@ -82,20 +82,7 @@ class SqlAlchemyStore(AbstractStore):
         self.db_type = extract_db_type_from_uri(db_uri)
         self.artifact_root_uri = default_artifact_root
         self.engine = mlflow.store.db.utils.create_sqlalchemy_engine(db_uri)
-        # On a completely fresh MLflow installation against an empty database (verify database
-        # emptiness by checking that 'experiments' etc aren't in the list of table names), run all
-        # DB migrations
-        expected_tables = [
-            SqlExperiment.__tablename__,
-            SqlRun.__tablename__,
-            SqlMetric.__tablename__,
-            SqlParam.__tablename__,
-            SqlTag.__tablename__,
-            SqlExperimentTag.__tablename__,
-            SqlLatestMetric.__tablename__,
-        ]
-        inspected_tables = set(sqlalchemy.inspect(self.engine).get_table_names())
-        if any([table not in inspected_tables for table in expected_tables]):
+        if _is_tracking_db_initialized(self.engine):
             mlflow.store.db.utils._initialize_tables(self.engine)
         Base.metadata.bind = self.engine
         SessionMaker = sqlalchemy.orm.sessionmaker(bind=self.engine)
@@ -692,6 +679,23 @@ class SqlAlchemyStore(AbstractStore):
                 value = json.dumps([model_dict])
             _validate_tag(MLFLOW_LOGGED_MODELS, value)
             session.merge(SqlTag(key=MLFLOW_LOGGED_MODELS, value=value, run_uuid=run_id))
+
+
+def _is_tracking_db_initialized(engine):
+    # On a completely fresh MLflow installation against an empty database (verify database
+    # emptiness by checking that 'experiments' etc aren't in the list of table names), run all
+    # DB migrations
+    expected_tables = [
+        SqlExperiment.__tablename__,
+        SqlRun.__tablename__,
+        SqlMetric.__tablename__,
+        SqlParam.__tablename__,
+        SqlTag.__tablename__,
+        SqlExperimentTag.__tablename__,
+        SqlLatestMetric.__tablename__,
+    ]
+    inspected_tables = set(sqlalchemy.inspect(engine).get_table_names())
+    return any([table not in inspected_tables for table in expected_tables])
 
 
 def _get_attributes_filtering_clauses(parsed):

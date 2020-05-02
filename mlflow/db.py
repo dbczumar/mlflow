@@ -1,6 +1,7 @@
 import click
 
 import mlflow.store.db.utils
+from mlflow.store.tracking.sqlalchemy_store import _is_tracking_db_initialized
 
 
 @click.group("db")
@@ -25,6 +26,10 @@ def upgrade(url):
     recover from failures.
     """
     engine = mlflow.store.db.utils.create_sqlalchemy_engine(url)
-    if mlflow.store.db.utils._is_initialized_before_mlflow_1(engine):
+    if _is_tracking_db_initialized(engine):
+        mlflow.store.db.utils._initialize_tables(engine)
+        return
+    elif mlflow.store.db.utils._is_initialized_before_mlflow_1(engine):
         mlflow.store.db.utils._upgrade_db_initialized_before_mlflow_1(engine)
-    mlflow.store.db.utils._upgrade_db(engine)
+    else:
+        mlflow.store.db.utils._upgrade_db(engine)
