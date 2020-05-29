@@ -218,6 +218,32 @@ public final class DatabricksArtifacts {
 
     /**
      * <pre>
+     * Headers
+     * </pre>
+     *
+     * <code>optional string headers = 5;</code>
+     */
+    boolean hasHeaders();
+    /**
+     * <pre>
+     * Headers
+     * </pre>
+     *
+     * <code>optional string headers = 5;</code>
+     */
+    java.lang.String getHeaders();
+    /**
+     * <pre>
+     * Headers
+     * </pre>
+     *
+     * <code>optional string headers = 5;</code>
+     */
+    com.google.protobuf.ByteString
+        getHeadersBytes();
+
+    /**
+     * <pre>
      * The type of the signed credential URI (e.g., an AWS presigned URL
      * or an Azure Shared Access Signature URI)
      * </pre>
@@ -251,6 +277,7 @@ public final class DatabricksArtifacts {
       runId_ = "";
       path_ = "";
       signedUri_ = "";
+      headers_ = "";
       type_ = 1;
     }
 
@@ -303,9 +330,15 @@ public final class DatabricksArtifacts {
               if (value == null) {
                 unknownFields.mergeVarintField(4, rawValue);
               } else {
-                bitField0_ |= 0x00000008;
+                bitField0_ |= 0x00000010;
                 type_ = rawValue;
               }
+              break;
+            }
+            case 42: {
+              com.google.protobuf.ByteString bs = input.readBytes();
+              bitField0_ |= 0x00000008;
+              headers_ = bs;
               break;
             }
             default: {
@@ -509,6 +542,60 @@ public final class DatabricksArtifacts {
       }
     }
 
+    public static final int HEADERS_FIELD_NUMBER = 5;
+    private volatile java.lang.Object headers_;
+    /**
+     * <pre>
+     * Headers
+     * </pre>
+     *
+     * <code>optional string headers = 5;</code>
+     */
+    public boolean hasHeaders() {
+      return ((bitField0_ & 0x00000008) == 0x00000008);
+    }
+    /**
+     * <pre>
+     * Headers
+     * </pre>
+     *
+     * <code>optional string headers = 5;</code>
+     */
+    public java.lang.String getHeaders() {
+      java.lang.Object ref = headers_;
+      if (ref instanceof java.lang.String) {
+        return (java.lang.String) ref;
+      } else {
+        com.google.protobuf.ByteString bs = 
+            (com.google.protobuf.ByteString) ref;
+        java.lang.String s = bs.toStringUtf8();
+        if (bs.isValidUtf8()) {
+          headers_ = s;
+        }
+        return s;
+      }
+    }
+    /**
+     * <pre>
+     * Headers
+     * </pre>
+     *
+     * <code>optional string headers = 5;</code>
+     */
+    public com.google.protobuf.ByteString
+        getHeadersBytes() {
+      java.lang.Object ref = headers_;
+      if (ref instanceof java.lang.String) {
+        com.google.protobuf.ByteString b = 
+            com.google.protobuf.ByteString.copyFromUtf8(
+                (java.lang.String) ref);
+        headers_ = b;
+        return b;
+      } else {
+        return (com.google.protobuf.ByteString) ref;
+      }
+    }
+
     public static final int TYPE_FIELD_NUMBER = 4;
     private int type_;
     /**
@@ -520,7 +607,7 @@ public final class DatabricksArtifacts {
      * <code>optional .mlflow.ArtifactCredentialType type = 4;</code>
      */
     public boolean hasType() {
-      return ((bitField0_ & 0x00000008) == 0x00000008);
+      return ((bitField0_ & 0x00000010) == 0x00000010);
     }
     /**
      * <pre>
@@ -559,8 +646,11 @@ public final class DatabricksArtifacts {
       if (((bitField0_ & 0x00000004) == 0x00000004)) {
         com.google.protobuf.GeneratedMessageV3.writeString(output, 3, signedUri_);
       }
-      if (((bitField0_ & 0x00000008) == 0x00000008)) {
+      if (((bitField0_ & 0x00000010) == 0x00000010)) {
         output.writeEnum(4, type_);
+      }
+      if (((bitField0_ & 0x00000008) == 0x00000008)) {
+        com.google.protobuf.GeneratedMessageV3.writeString(output, 5, headers_);
       }
       unknownFields.writeTo(output);
     }
@@ -580,9 +670,12 @@ public final class DatabricksArtifacts {
       if (((bitField0_ & 0x00000004) == 0x00000004)) {
         size += com.google.protobuf.GeneratedMessageV3.computeStringSize(3, signedUri_);
       }
-      if (((bitField0_ & 0x00000008) == 0x00000008)) {
+      if (((bitField0_ & 0x00000010) == 0x00000010)) {
         size += com.google.protobuf.CodedOutputStream
           .computeEnumSize(4, type_);
+      }
+      if (((bitField0_ & 0x00000008) == 0x00000008)) {
+        size += com.google.protobuf.GeneratedMessageV3.computeStringSize(5, headers_);
       }
       size += unknownFields.getSerializedSize();
       memoizedSize = size;
@@ -615,6 +708,11 @@ public final class DatabricksArtifacts {
         result = result && getSignedUri()
             .equals(other.getSignedUri());
       }
+      result = result && (hasHeaders() == other.hasHeaders());
+      if (hasHeaders()) {
+        result = result && getHeaders()
+            .equals(other.getHeaders());
+      }
       result = result && (hasType() == other.hasType());
       if (hasType()) {
         result = result && type_ == other.type_;
@@ -641,6 +739,10 @@ public final class DatabricksArtifacts {
       if (hasSignedUri()) {
         hash = (37 * hash) + SIGNED_URI_FIELD_NUMBER;
         hash = (53 * hash) + getSignedUri().hashCode();
+      }
+      if (hasHeaders()) {
+        hash = (37 * hash) + HEADERS_FIELD_NUMBER;
+        hash = (53 * hash) + getHeaders().hashCode();
       }
       if (hasType()) {
         hash = (37 * hash) + TYPE_FIELD_NUMBER;
@@ -785,8 +887,10 @@ public final class DatabricksArtifacts {
         bitField0_ = (bitField0_ & ~0x00000002);
         signedUri_ = "";
         bitField0_ = (bitField0_ & ~0x00000004);
-        type_ = 1;
+        headers_ = "";
         bitField0_ = (bitField0_ & ~0x00000008);
+        type_ = 1;
+        bitField0_ = (bitField0_ & ~0x00000010);
         return this;
       }
 
@@ -829,6 +933,10 @@ public final class DatabricksArtifacts {
         result.signedUri_ = signedUri_;
         if (((from_bitField0_ & 0x00000008) == 0x00000008)) {
           to_bitField0_ |= 0x00000008;
+        }
+        result.headers_ = headers_;
+        if (((from_bitField0_ & 0x00000010) == 0x00000010)) {
+          to_bitField0_ |= 0x00000010;
         }
         result.type_ = type_;
         result.bitField0_ = to_bitField0_;
@@ -893,6 +1001,11 @@ public final class DatabricksArtifacts {
         if (other.hasSignedUri()) {
           bitField0_ |= 0x00000004;
           signedUri_ = other.signedUri_;
+          onChanged();
+        }
+        if (other.hasHeaders()) {
+          bitField0_ |= 0x00000008;
+          headers_ = other.headers_;
           onChanged();
         }
         if (other.hasType()) {
@@ -1240,6 +1353,106 @@ public final class DatabricksArtifacts {
         return this;
       }
 
+      private java.lang.Object headers_ = "";
+      /**
+       * <pre>
+       * Headers
+       * </pre>
+       *
+       * <code>optional string headers = 5;</code>
+       */
+      public boolean hasHeaders() {
+        return ((bitField0_ & 0x00000008) == 0x00000008);
+      }
+      /**
+       * <pre>
+       * Headers
+       * </pre>
+       *
+       * <code>optional string headers = 5;</code>
+       */
+      public java.lang.String getHeaders() {
+        java.lang.Object ref = headers_;
+        if (!(ref instanceof java.lang.String)) {
+          com.google.protobuf.ByteString bs =
+              (com.google.protobuf.ByteString) ref;
+          java.lang.String s = bs.toStringUtf8();
+          if (bs.isValidUtf8()) {
+            headers_ = s;
+          }
+          return s;
+        } else {
+          return (java.lang.String) ref;
+        }
+      }
+      /**
+       * <pre>
+       * Headers
+       * </pre>
+       *
+       * <code>optional string headers = 5;</code>
+       */
+      public com.google.protobuf.ByteString
+          getHeadersBytes() {
+        java.lang.Object ref = headers_;
+        if (ref instanceof String) {
+          com.google.protobuf.ByteString b = 
+              com.google.protobuf.ByteString.copyFromUtf8(
+                  (java.lang.String) ref);
+          headers_ = b;
+          return b;
+        } else {
+          return (com.google.protobuf.ByteString) ref;
+        }
+      }
+      /**
+       * <pre>
+       * Headers
+       * </pre>
+       *
+       * <code>optional string headers = 5;</code>
+       */
+      public Builder setHeaders(
+          java.lang.String value) {
+        if (value == null) {
+    throw new NullPointerException();
+  }
+  bitField0_ |= 0x00000008;
+        headers_ = value;
+        onChanged();
+        return this;
+      }
+      /**
+       * <pre>
+       * Headers
+       * </pre>
+       *
+       * <code>optional string headers = 5;</code>
+       */
+      public Builder clearHeaders() {
+        bitField0_ = (bitField0_ & ~0x00000008);
+        headers_ = getDefaultInstance().getHeaders();
+        onChanged();
+        return this;
+      }
+      /**
+       * <pre>
+       * Headers
+       * </pre>
+       *
+       * <code>optional string headers = 5;</code>
+       */
+      public Builder setHeadersBytes(
+          com.google.protobuf.ByteString value) {
+        if (value == null) {
+    throw new NullPointerException();
+  }
+  bitField0_ |= 0x00000008;
+        headers_ = value;
+        onChanged();
+        return this;
+      }
+
       private int type_ = 1;
       /**
        * <pre>
@@ -1250,7 +1463,7 @@ public final class DatabricksArtifacts {
        * <code>optional .mlflow.ArtifactCredentialType type = 4;</code>
        */
       public boolean hasType() {
-        return ((bitField0_ & 0x00000008) == 0x00000008);
+        return ((bitField0_ & 0x00000010) == 0x00000010);
       }
       /**
        * <pre>
@@ -1277,7 +1490,7 @@ public final class DatabricksArtifacts {
         if (value == null) {
           throw new NullPointerException();
         }
-        bitField0_ |= 0x00000008;
+        bitField0_ |= 0x00000010;
         type_ = value.getNumber();
         onChanged();
         return this;
@@ -1291,7 +1504,7 @@ public final class DatabricksArtifacts {
        * <code>optional .mlflow.ArtifactCredentialType type = 4;</code>
        */
       public Builder clearType() {
-        bitField0_ = (bitField0_ & ~0x00000008);
+        bitField0_ = (bitField0_ & ~0x00000010);
         type_ = 1;
         onChanged();
         return this;
@@ -1358,7 +1571,7 @@ public final class DatabricksArtifacts {
      * The ID of the MLflow Run for which to fetch artifact read credentials
      * </pre>
      *
-     * <code>optional string run_id = 1;</code>
+     * <code>optional string run_id = 1 [(.mlflow.validate_required) = true];</code>
      */
     boolean hasRunId();
     /**
@@ -1366,7 +1579,7 @@ public final class DatabricksArtifacts {
      * The ID of the MLflow Run for which to fetch artifact read credentials
      * </pre>
      *
-     * <code>optional string run_id = 1;</code>
+     * <code>optional string run_id = 1 [(.mlflow.validate_required) = true];</code>
      */
     java.lang.String getRunId();
     /**
@@ -1374,7 +1587,7 @@ public final class DatabricksArtifacts {
      * The ID of the MLflow Run for which to fetch artifact read credentials
      * </pre>
      *
-     * <code>optional string run_id = 1;</code>
+     * <code>optional string run_id = 1 [(.mlflow.validate_required) = true];</code>
      */
     com.google.protobuf.ByteString
         getRunIdBytes();
@@ -1385,7 +1598,7 @@ public final class DatabricksArtifacts {
      * fetch artifact read credentials
      * </pre>
      *
-     * <code>optional string path = 2;</code>
+     * <code>optional string path = 2 [(.mlflow.validate_required) = true];</code>
      */
     boolean hasPath();
     /**
@@ -1394,7 +1607,7 @@ public final class DatabricksArtifacts {
      * fetch artifact read credentials
      * </pre>
      *
-     * <code>optional string path = 2;</code>
+     * <code>optional string path = 2 [(.mlflow.validate_required) = true];</code>
      */
     java.lang.String getPath();
     /**
@@ -1403,7 +1616,7 @@ public final class DatabricksArtifacts {
      * fetch artifact read credentials
      * </pre>
      *
-     * <code>optional string path = 2;</code>
+     * <code>optional string path = 2 [(.mlflow.validate_required) = true];</code>
      */
     com.google.protobuf.ByteString
         getPathBytes();
@@ -2178,7 +2391,7 @@ public final class DatabricksArtifacts {
      * The ID of the MLflow Run for which to fetch artifact read credentials
      * </pre>
      *
-     * <code>optional string run_id = 1;</code>
+     * <code>optional string run_id = 1 [(.mlflow.validate_required) = true];</code>
      */
     public boolean hasRunId() {
       return ((bitField0_ & 0x00000001) == 0x00000001);
@@ -2188,7 +2401,7 @@ public final class DatabricksArtifacts {
      * The ID of the MLflow Run for which to fetch artifact read credentials
      * </pre>
      *
-     * <code>optional string run_id = 1;</code>
+     * <code>optional string run_id = 1 [(.mlflow.validate_required) = true];</code>
      */
     public java.lang.String getRunId() {
       java.lang.Object ref = runId_;
@@ -2209,7 +2422,7 @@ public final class DatabricksArtifacts {
      * The ID of the MLflow Run for which to fetch artifact read credentials
      * </pre>
      *
-     * <code>optional string run_id = 1;</code>
+     * <code>optional string run_id = 1 [(.mlflow.validate_required) = true];</code>
      */
     public com.google.protobuf.ByteString
         getRunIdBytes() {
@@ -2233,7 +2446,7 @@ public final class DatabricksArtifacts {
      * fetch artifact read credentials
      * </pre>
      *
-     * <code>optional string path = 2;</code>
+     * <code>optional string path = 2 [(.mlflow.validate_required) = true];</code>
      */
     public boolean hasPath() {
       return ((bitField0_ & 0x00000002) == 0x00000002);
@@ -2244,7 +2457,7 @@ public final class DatabricksArtifacts {
      * fetch artifact read credentials
      * </pre>
      *
-     * <code>optional string path = 2;</code>
+     * <code>optional string path = 2 [(.mlflow.validate_required) = true];</code>
      */
     public java.lang.String getPath() {
       java.lang.Object ref = path_;
@@ -2266,7 +2479,7 @@ public final class DatabricksArtifacts {
      * fetch artifact read credentials
      * </pre>
      *
-     * <code>optional string path = 2;</code>
+     * <code>optional string path = 2 [(.mlflow.validate_required) = true];</code>
      */
     public com.google.protobuf.ByteString
         getPathBytes() {
@@ -2630,7 +2843,7 @@ public final class DatabricksArtifacts {
        * The ID of the MLflow Run for which to fetch artifact read credentials
        * </pre>
        *
-       * <code>optional string run_id = 1;</code>
+       * <code>optional string run_id = 1 [(.mlflow.validate_required) = true];</code>
        */
       public boolean hasRunId() {
         return ((bitField0_ & 0x00000001) == 0x00000001);
@@ -2640,7 +2853,7 @@ public final class DatabricksArtifacts {
        * The ID of the MLflow Run for which to fetch artifact read credentials
        * </pre>
        *
-       * <code>optional string run_id = 1;</code>
+       * <code>optional string run_id = 1 [(.mlflow.validate_required) = true];</code>
        */
       public java.lang.String getRunId() {
         java.lang.Object ref = runId_;
@@ -2661,7 +2874,7 @@ public final class DatabricksArtifacts {
        * The ID of the MLflow Run for which to fetch artifact read credentials
        * </pre>
        *
-       * <code>optional string run_id = 1;</code>
+       * <code>optional string run_id = 1 [(.mlflow.validate_required) = true];</code>
        */
       public com.google.protobuf.ByteString
           getRunIdBytes() {
@@ -2681,7 +2894,7 @@ public final class DatabricksArtifacts {
        * The ID of the MLflow Run for which to fetch artifact read credentials
        * </pre>
        *
-       * <code>optional string run_id = 1;</code>
+       * <code>optional string run_id = 1 [(.mlflow.validate_required) = true];</code>
        */
       public Builder setRunId(
           java.lang.String value) {
@@ -2698,7 +2911,7 @@ public final class DatabricksArtifacts {
        * The ID of the MLflow Run for which to fetch artifact read credentials
        * </pre>
        *
-       * <code>optional string run_id = 1;</code>
+       * <code>optional string run_id = 1 [(.mlflow.validate_required) = true];</code>
        */
       public Builder clearRunId() {
         bitField0_ = (bitField0_ & ~0x00000001);
@@ -2711,7 +2924,7 @@ public final class DatabricksArtifacts {
        * The ID of the MLflow Run for which to fetch artifact read credentials
        * </pre>
        *
-       * <code>optional string run_id = 1;</code>
+       * <code>optional string run_id = 1 [(.mlflow.validate_required) = true];</code>
        */
       public Builder setRunIdBytes(
           com.google.protobuf.ByteString value) {
@@ -2731,7 +2944,7 @@ public final class DatabricksArtifacts {
        * fetch artifact read credentials
        * </pre>
        *
-       * <code>optional string path = 2;</code>
+       * <code>optional string path = 2 [(.mlflow.validate_required) = true];</code>
        */
       public boolean hasPath() {
         return ((bitField0_ & 0x00000002) == 0x00000002);
@@ -2742,7 +2955,7 @@ public final class DatabricksArtifacts {
        * fetch artifact read credentials
        * </pre>
        *
-       * <code>optional string path = 2;</code>
+       * <code>optional string path = 2 [(.mlflow.validate_required) = true];</code>
        */
       public java.lang.String getPath() {
         java.lang.Object ref = path_;
@@ -2764,7 +2977,7 @@ public final class DatabricksArtifacts {
        * fetch artifact read credentials
        * </pre>
        *
-       * <code>optional string path = 2;</code>
+       * <code>optional string path = 2 [(.mlflow.validate_required) = true];</code>
        */
       public com.google.protobuf.ByteString
           getPathBytes() {
@@ -2785,7 +2998,7 @@ public final class DatabricksArtifacts {
        * fetch artifact read credentials
        * </pre>
        *
-       * <code>optional string path = 2;</code>
+       * <code>optional string path = 2 [(.mlflow.validate_required) = true];</code>
        */
       public Builder setPath(
           java.lang.String value) {
@@ -2803,7 +3016,7 @@ public final class DatabricksArtifacts {
        * fetch artifact read credentials
        * </pre>
        *
-       * <code>optional string path = 2;</code>
+       * <code>optional string path = 2 [(.mlflow.validate_required) = true];</code>
        */
       public Builder clearPath() {
         bitField0_ = (bitField0_ & ~0x00000002);
@@ -2817,7 +3030,7 @@ public final class DatabricksArtifacts {
        * fetch artifact read credentials
        * </pre>
        *
-       * <code>optional string path = 2;</code>
+       * <code>optional string path = 2 [(.mlflow.validate_required) = true];</code>
        */
       public Builder setPathBytes(
           com.google.protobuf.ByteString value) {
@@ -2891,7 +3104,7 @@ public final class DatabricksArtifacts {
      * The ID of the MLflow Run for which to fetch artifact write credentials
      * </pre>
      *
-     * <code>optional string run_id = 1;</code>
+     * <code>optional string run_id = 1 [(.mlflow.validate_required) = true];</code>
      */
     boolean hasRunId();
     /**
@@ -2899,7 +3112,7 @@ public final class DatabricksArtifacts {
      * The ID of the MLflow Run for which to fetch artifact write credentials
      * </pre>
      *
-     * <code>optional string run_id = 1;</code>
+     * <code>optional string run_id = 1 [(.mlflow.validate_required) = true];</code>
      */
     java.lang.String getRunId();
     /**
@@ -2907,7 +3120,7 @@ public final class DatabricksArtifacts {
      * The ID of the MLflow Run for which to fetch artifact write credentials
      * </pre>
      *
-     * <code>optional string run_id = 1;</code>
+     * <code>optional string run_id = 1 [(.mlflow.validate_required) = true];</code>
      */
     com.google.protobuf.ByteString
         getRunIdBytes();
@@ -2918,7 +3131,7 @@ public final class DatabricksArtifacts {
      * fetch artifact write credentials
      * </pre>
      *
-     * <code>optional string path = 2;</code>
+     * <code>optional string path = 2 [(.mlflow.validate_required) = true];</code>
      */
     boolean hasPath();
     /**
@@ -2927,7 +3140,7 @@ public final class DatabricksArtifacts {
      * fetch artifact write credentials
      * </pre>
      *
-     * <code>optional string path = 2;</code>
+     * <code>optional string path = 2 [(.mlflow.validate_required) = true];</code>
      */
     java.lang.String getPath();
     /**
@@ -2936,7 +3149,7 @@ public final class DatabricksArtifacts {
      * fetch artifact write credentials
      * </pre>
      *
-     * <code>optional string path = 2;</code>
+     * <code>optional string path = 2 [(.mlflow.validate_required) = true];</code>
      */
     com.google.protobuf.ByteString
         getPathBytes();
@@ -3711,7 +3924,7 @@ public final class DatabricksArtifacts {
      * The ID of the MLflow Run for which to fetch artifact write credentials
      * </pre>
      *
-     * <code>optional string run_id = 1;</code>
+     * <code>optional string run_id = 1 [(.mlflow.validate_required) = true];</code>
      */
     public boolean hasRunId() {
       return ((bitField0_ & 0x00000001) == 0x00000001);
@@ -3721,7 +3934,7 @@ public final class DatabricksArtifacts {
      * The ID of the MLflow Run for which to fetch artifact write credentials
      * </pre>
      *
-     * <code>optional string run_id = 1;</code>
+     * <code>optional string run_id = 1 [(.mlflow.validate_required) = true];</code>
      */
     public java.lang.String getRunId() {
       java.lang.Object ref = runId_;
@@ -3742,7 +3955,7 @@ public final class DatabricksArtifacts {
      * The ID of the MLflow Run for which to fetch artifact write credentials
      * </pre>
      *
-     * <code>optional string run_id = 1;</code>
+     * <code>optional string run_id = 1 [(.mlflow.validate_required) = true];</code>
      */
     public com.google.protobuf.ByteString
         getRunIdBytes() {
@@ -3766,7 +3979,7 @@ public final class DatabricksArtifacts {
      * fetch artifact write credentials
      * </pre>
      *
-     * <code>optional string path = 2;</code>
+     * <code>optional string path = 2 [(.mlflow.validate_required) = true];</code>
      */
     public boolean hasPath() {
       return ((bitField0_ & 0x00000002) == 0x00000002);
@@ -3777,7 +3990,7 @@ public final class DatabricksArtifacts {
      * fetch artifact write credentials
      * </pre>
      *
-     * <code>optional string path = 2;</code>
+     * <code>optional string path = 2 [(.mlflow.validate_required) = true];</code>
      */
     public java.lang.String getPath() {
       java.lang.Object ref = path_;
@@ -3799,7 +4012,7 @@ public final class DatabricksArtifacts {
      * fetch artifact write credentials
      * </pre>
      *
-     * <code>optional string path = 2;</code>
+     * <code>optional string path = 2 [(.mlflow.validate_required) = true];</code>
      */
     public com.google.protobuf.ByteString
         getPathBytes() {
@@ -4163,7 +4376,7 @@ public final class DatabricksArtifacts {
        * The ID of the MLflow Run for which to fetch artifact write credentials
        * </pre>
        *
-       * <code>optional string run_id = 1;</code>
+       * <code>optional string run_id = 1 [(.mlflow.validate_required) = true];</code>
        */
       public boolean hasRunId() {
         return ((bitField0_ & 0x00000001) == 0x00000001);
@@ -4173,7 +4386,7 @@ public final class DatabricksArtifacts {
        * The ID of the MLflow Run for which to fetch artifact write credentials
        * </pre>
        *
-       * <code>optional string run_id = 1;</code>
+       * <code>optional string run_id = 1 [(.mlflow.validate_required) = true];</code>
        */
       public java.lang.String getRunId() {
         java.lang.Object ref = runId_;
@@ -4194,7 +4407,7 @@ public final class DatabricksArtifacts {
        * The ID of the MLflow Run for which to fetch artifact write credentials
        * </pre>
        *
-       * <code>optional string run_id = 1;</code>
+       * <code>optional string run_id = 1 [(.mlflow.validate_required) = true];</code>
        */
       public com.google.protobuf.ByteString
           getRunIdBytes() {
@@ -4214,7 +4427,7 @@ public final class DatabricksArtifacts {
        * The ID of the MLflow Run for which to fetch artifact write credentials
        * </pre>
        *
-       * <code>optional string run_id = 1;</code>
+       * <code>optional string run_id = 1 [(.mlflow.validate_required) = true];</code>
        */
       public Builder setRunId(
           java.lang.String value) {
@@ -4231,7 +4444,7 @@ public final class DatabricksArtifacts {
        * The ID of the MLflow Run for which to fetch artifact write credentials
        * </pre>
        *
-       * <code>optional string run_id = 1;</code>
+       * <code>optional string run_id = 1 [(.mlflow.validate_required) = true];</code>
        */
       public Builder clearRunId() {
         bitField0_ = (bitField0_ & ~0x00000001);
@@ -4244,7 +4457,7 @@ public final class DatabricksArtifacts {
        * The ID of the MLflow Run for which to fetch artifact write credentials
        * </pre>
        *
-       * <code>optional string run_id = 1;</code>
+       * <code>optional string run_id = 1 [(.mlflow.validate_required) = true];</code>
        */
       public Builder setRunIdBytes(
           com.google.protobuf.ByteString value) {
@@ -4264,7 +4477,7 @@ public final class DatabricksArtifacts {
        * fetch artifact write credentials
        * </pre>
        *
-       * <code>optional string path = 2;</code>
+       * <code>optional string path = 2 [(.mlflow.validate_required) = true];</code>
        */
       public boolean hasPath() {
         return ((bitField0_ & 0x00000002) == 0x00000002);
@@ -4275,7 +4488,7 @@ public final class DatabricksArtifacts {
        * fetch artifact write credentials
        * </pre>
        *
-       * <code>optional string path = 2;</code>
+       * <code>optional string path = 2 [(.mlflow.validate_required) = true];</code>
        */
       public java.lang.String getPath() {
         java.lang.Object ref = path_;
@@ -4297,7 +4510,7 @@ public final class DatabricksArtifacts {
        * fetch artifact write credentials
        * </pre>
        *
-       * <code>optional string path = 2;</code>
+       * <code>optional string path = 2 [(.mlflow.validate_required) = true];</code>
        */
       public com.google.protobuf.ByteString
           getPathBytes() {
@@ -4318,7 +4531,7 @@ public final class DatabricksArtifacts {
        * fetch artifact write credentials
        * </pre>
        *
-       * <code>optional string path = 2;</code>
+       * <code>optional string path = 2 [(.mlflow.validate_required) = true];</code>
        */
       public Builder setPath(
           java.lang.String value) {
@@ -4336,7 +4549,7 @@ public final class DatabricksArtifacts {
        * fetch artifact write credentials
        * </pre>
        *
-       * <code>optional string path = 2;</code>
+       * <code>optional string path = 2 [(.mlflow.validate_required) = true];</code>
        */
       public Builder clearPath() {
         bitField0_ = (bitField0_ & ~0x00000002);
@@ -4350,7 +4563,7 @@ public final class DatabricksArtifacts {
        * fetch artifact write credentials
        * </pre>
        *
-       * <code>optional string path = 2;</code>
+       * <code>optional string path = 2 [(.mlflow.validate_required) = true];</code>
        */
       public Builder setPathBytes(
           com.google.protobuf.ByteString value) {
@@ -4450,31 +4663,34 @@ public final class DatabricksArtifacts {
   static {
     java.lang.String[] descriptorData = {
       "\n\032databricks_artifacts.proto\022\006mlflow\032\025sc" +
-      "alapb/scalapb.proto\032\020databricks.proto\"x\n" +
-      "\026ArtifactCredentialInfo\022\016\n\006run_id\030\001 \001(\t\022" +
-      "\014\n\004path\030\002 \001(\t\022\022\n\nsigned_uri\030\003 \001(\t\022,\n\004typ" +
-      "e\030\004 \001(\0162\036.mlflow.ArtifactCredentialType\"" +
-      "\243\001\n\025GetCredentialsForRead\022\016\n\006run_id\030\001 \001(" +
-      "\t\022\014\n\004path\030\002 \001(\t\032?\n\010Response\0223\n\013credentia" +
-      "ls\030\001 \001(\0132\036.mlflow.ArtifactCredentialInfo" +
-      ":+\342?(\n&com.databricks.rpc.RPC[$this.Resp" +
-      "onse]\"\244\001\n\026GetCredentialsForWrite\022\016\n\006run_" +
-      "id\030\001 \001(\t\022\014\n\004path\030\002 \001(\t\032?\n\010Response\0223\n\013cr" +
-      "edentials\030\001 \001(\0132\036.mlflow.ArtifactCredent" +
-      "ialInfo:+\342?(\n&com.databricks.rpc.RPC[$th" +
-      "is.Response]*B\n\026ArtifactCredentialType\022\021" +
-      "\n\rAZURE_SAS_URI\020\001\022\025\n\021AWS_PRESIGNED_URL\020\002" +
-      "2\342\002\n DatabricksMlflowArtifactsService\022\233\001" +
-      "\n\025getCredentialsForRead\022\035.mlflow.GetCred" +
-      "entialsForRead\032&.mlflow.GetCredentialsFo" +
-      "rRead.Response\";\362\206\0317\n3\n\003GET\022&/mlflow/art" +
-      "ifacts/credentials-for-read\032\004\010\002\020\000\020\003\022\237\001\n\026" +
-      "getCredentialsForWrite\022\036.mlflow.GetCrede" +
-      "ntialsForWrite\032\'.mlflow.GetCredentialsFo" +
-      "rWrite.Response\"<\362\206\0318\n4\n\003GET\022\'/mlflow/ar" +
-      "tifacts/credentials-for-write\032\004\010\002\020\000\020\003B,\n" +
-      "\037com.databricks.api.proto.mlflow\220\001\001\240\001\001\342?" +
-      "\002\020\001"
+      "alapb/scalapb.proto\032\020databricks.proto\"\211\001" +
+      "\n\026ArtifactCredentialInfo\022\016\n\006run_id\030\001 \001(\t" +
+      "\022\014\n\004path\030\002 \001(\t\022\022\n\nsigned_uri\030\003 \001(\t\022\017\n\007he" +
+      "aders\030\005 \001(\t\022,\n\004type\030\004 \001(\0162\036.mlflow.Artif" +
+      "actCredentialType\"\343\001\n\025GetCredentialsForR" +
+      "ead\022\024\n\006run_id\030\001 \001(\tB\004\370\206\031\001\022\022\n\004path\030\002 \001(\tB" +
+      "\004\370\206\031\001\032?\n\010Response\0223\n\013credentials\030\001 \001(\0132\036" +
+      ".mlflow.ArtifactCredentialInfo:_\342?(\n&com" +
+      ".databricks.rpc.RPC[$this.Response]\342?1\n/" +
+      "com.databricks.mlflow.api.MlflowTracking" +
+      "Message\"\344\001\n\026GetCredentialsForWrite\022\024\n\006ru" +
+      "n_id\030\001 \001(\tB\004\370\206\031\001\022\022\n\004path\030\002 \001(\tB\004\370\206\031\001\032?\n\010" +
+      "Response\0223\n\013credentials\030\001 \001(\0132\036.mlflow.A" +
+      "rtifactCredentialInfo:_\342?(\n&com.databric" +
+      "ks.rpc.RPC[$this.Response]\342?1\n/com.datab" +
+      "ricks.mlflow.api.MlflowTrackingMessage*B" +
+      "\n\026ArtifactCredentialType\022\021\n\rAZURE_SAS_UR" +
+      "I\020\001\022\025\n\021AWS_PRESIGNED_URL\020\0022\342\002\n Databrick" +
+      "sMlflowArtifactsService\022\233\001\n\025getCredentia" +
+      "lsForRead\022\035.mlflow.GetCredentialsForRead" +
+      "\032&.mlflow.GetCredentialsForRead.Response" +
+      "\";\362\206\0317\n3\n\003GET\022&/mlflow/artifacts/credent" +
+      "ials-for-read\032\004\010\002\020\000\020\003\022\237\001\n\026getCredentials" +
+      "ForWrite\022\036.mlflow.GetCredentialsForWrite" +
+      "\032\'.mlflow.GetCredentialsForWrite.Respons" +
+      "e\"<\362\206\0318\n4\n\003GET\022\'/mlflow/artifacts/creden" +
+      "tials-for-write\032\004\010\002\020\000\020\003B,\n\037com.databrick" +
+      "s.api.proto.mlflow\220\001\001\240\001\001\342?\002\020\001"
     };
     com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner assigner =
         new com.google.protobuf.Descriptors.FileDescriptor.    InternalDescriptorAssigner() {
@@ -4495,7 +4711,7 @@ public final class DatabricksArtifacts {
     internal_static_mlflow_ArtifactCredentialInfo_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
         internal_static_mlflow_ArtifactCredentialInfo_descriptor,
-        new java.lang.String[] { "RunId", "Path", "SignedUri", "Type", });
+        new java.lang.String[] { "RunId", "Path", "SignedUri", "Headers", "Type", });
     internal_static_mlflow_GetCredentialsForRead_descriptor =
       getDescriptor().getMessageTypes().get(1);
     internal_static_mlflow_GetCredentialsForRead_fieldAccessorTable = new
@@ -4523,6 +4739,7 @@ public final class DatabricksArtifacts {
     com.google.protobuf.ExtensionRegistry registry =
         com.google.protobuf.ExtensionRegistry.newInstance();
     registry.add(com.databricks.api.proto.databricks.Databricks.rpc);
+    registry.add(com.databricks.api.proto.databricks.Databricks.validateRequired);
     registry.add(org.mlflow.scalapb_interface.Scalapb.message);
     registry.add(org.mlflow.scalapb_interface.Scalapb.options);
     com.google.protobuf.Descriptors.FileDescriptor

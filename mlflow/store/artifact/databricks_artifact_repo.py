@@ -98,22 +98,46 @@ class DatabricksArtifactRepository(ArtifactRepository):
             raise MlflowException(err)
 
     def _aws_upload_file(self, credentials, local_file):
-        pass
+        presigned_read_url = credentials.signed_uri
+        import json
+        headers = json.loads(credentials.headers)
+        print("HEADERS: %s" % headers)
+        print(presigned_read_url)
+        import requests
+        with open(local_file, "rb") as data:
+            print("AHHH")
+            response = requests.put(
+                # presigned_read_url + "&X-Amz-acl=public-read",
+                presigned_read_url,
+                data=data,
+                headers=headers)
+                # headers={
+                #     # "x-amz-acl": "public-read",
+                #     # "x-amz-server-side-encryption": "AES256",
+                # })
+            print(response)
+            print(response.text)
 
     def _aws_download_file(self, credentials, local_path):
-        pass
+        presigned_read_url = credentials.signed_uri
+        print(presigned_read_url)
+        import requests
+        response = requests.get(presigned_read_url)
+        with open(local_path, "wb") as data:
+            print(response.content)
+            data.write(response.content)
 
     def _upload_to_cloud(self, cloud_credentials, local_file, artifact_path):
         if cloud_credentials.credentials.type == 1:
             self._azure_upload_file(cloud_credentials.credentials, local_file, artifact_path)
         else:
-            raise MlflowException('Not implemented yet')
+            self._aws_upload_file(cloud_credentials.credentials, local_file)
 
     def _download_from_cloud(self, cloud_credentials, local_path):
         if cloud_credentials.credentials.type == 1:
             self._azure_download_file(cloud_credentials.credentials, local_path)
         else:
-            raise MlflowException('Not implemented yet')
+            self._aws_download_file(cloud_credentials.credentials, local_path)
 
     def log_artifact(self, local_file, artifact_path=None):
         basename = os.path.basename(local_file)
