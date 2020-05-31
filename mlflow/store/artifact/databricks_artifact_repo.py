@@ -105,16 +105,13 @@ class DatabricksArtifactRepository(ArtifactRepository):
         print(presigned_read_url)
         import requests
         with open(local_file, "rb") as data:
-            print("AHHH")
             response = requests.put(
-                # presigned_read_url + "&X-Amz-acl=public-read",
                 presigned_read_url,
                 data=data,
                 headers=headers)
-                # headers={
-                #     # "x-amz-acl": "public-read",
-                #     # "x-amz-server-side-encryption": "AES256",
-                # })
+            # response = requests.put(
+            #     presigned_read_url,
+            #     data=data)
             print(response)
             print(response.text)
 
@@ -124,7 +121,6 @@ class DatabricksArtifactRepository(ArtifactRepository):
         import requests
         response = requests.get(presigned_read_url)
         with open(local_path, "wb") as data:
-            print(response.content)
             data.write(response.content)
 
     def _upload_to_cloud(self, cloud_credentials, local_file, artifact_path):
