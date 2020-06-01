@@ -78,7 +78,6 @@ message ArtifactCredentialInfo {
 
 message GetCredentialsForRead {
   option (scalapb.message).extends = "com.databricks.rpc.RPC[$this.Response]";
-  option (scalapb.message).extends = "com.databricks.mlflow.api.MlflowTrackingMessage";
 
   // The ID of the MLflow Run for which to fetch artifact read credentials
   optional string run_id = 1 [(validate_required) = true];
@@ -97,7 +96,6 @@ message GetCredentialsForRead {
 
 message GetCredentialsForWrite {
   option (scalapb.message).extends = "com.databricks.rpc.RPC[$this.Response]";
-  option (scalapb.message).extends = "com.databricks.mlflow.api.MlflowTrackingMessage";
 
   // The ID of the MLflow Run for which to fetch artifact write credentials
   optional string run_id = 1 [(validate_required) = true];
