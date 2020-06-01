@@ -44,19 +44,6 @@ service DatabricksMlflowArtifactsService {
   }
 }
 
-// The type of a given artifact access credential
-enum ArtifactCredentialType {
-
-  // The credential is an Azure Shared Access Signature URI. For more information, see
-  // https://docs.microsoft.com/en-us/azure/storage/common/storage-sas-overview
-  AZURE_SAS_URI = 1;
-
-  // The credential is an AWS Presigned URL. For more information, see
-  // https://docs.aws.amazon.com/AmazonS3/latest/dev/ShareObjectPreSignedURL.html
-  AWS_PRESIGNED_URL = 2;
-
-}
-
 message ArtifactCredentialInfo {
 
   // The ID of the MLflow Run containing the artifact that can be accessed
@@ -70,10 +57,28 @@ message ArtifactCredentialInfo {
   // The signed URI credential that provides access to the artifact
   optional string signed_uri = 3;
 
-  // The type of the signed credential URI (e.g., an AWS presigned URL
-  // or an Azure Shared Access Signature URI)
-  optional ArtifactCredentialType type = 4;
 
+  message AWSPresignedURLCredential {
+
+    optional string signed_uri = 1;
+
+    // If specified, one of `AES256` or `KMS`
+    optional string encryption_type = 2;
+
+    optional string kms_key_id = 3;
+
+  }
+
+  message AzureSASCredential {
+
+    optional string signed_uri = 1;
+
+  }
+
+  oneof credential {
+    AWSPresignedURLCredential aws_presigned_url = 4;
+    AzureSASCredential azure_sas = 5;
+  }
 }
 
 message GetCredentialsForRead {
