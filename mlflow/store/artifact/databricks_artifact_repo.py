@@ -90,6 +90,7 @@ class DatabricksArtifactRepository(ArtifactRepository):
         headers = dict()
         for header in credential.headers:
             headers[header.name] = header.value
+        print(headers)
         return headers
 
     def _azure_upload_file(self, credentials, local_file, artifact_path):
@@ -140,6 +141,12 @@ class DatabricksArtifactRepository(ArtifactRepository):
         try:
             headers = self._extract_headers_from_credentials(credentials)
             signed_write_uri = credentials.signed_uri
+            print(signed_write_uri)
+            # headers = {
+            #   "x-amz-server-side-encryption": "AES256",
+            # }
+            # signed_write_uri = "https://databricks-dev-storage-oregon.s3-us-west-2.amazonaws.com/mlflow-tracking/MlflowArtifactManagerIntegrationSuite-1161411340/myExperiment/myRun/my/file?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Date=20200603T213808Z&X-Amz-SignedHeaders=host%3Bx-amz-server-side-encryption&X-Amz-Expires=899&X-Amz-Credential=AKIA2JMHUIXTV5R3VBGC%2F20200603%2Fus-west-2%2Fs3%2Faws4_request&X-Amz-Signature=a2e3d996a6a2126a1b5c41b62a258ec902ed0ab3fecec41fc539fda6d273834c"
+            # signed_write_uri = "https://databricks-dev-storage-oregon.s3-us-west-2.amazonaws.com/mlflow-tracking/MlflowArtifactManagerIntegrationSuite-9486667483/myExperiment/myRun/my/file?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Date=20200603T221413Z&X-Amz-SignedHeaders=host%3Bx-amz-server-side-encryption&X-Amz-Expires=899&X-Amz-Credential=AKIA2JMHUIXT5ZZ3XNPN%2F20200603%2Fus-west-2%2Fs3%2Faws4_request&X-Amz-Signature=bb7a788fd4936fa403b1d6277134e18914b55b1c27535dd1c09de6b5ef792057"
             with open(local_file, 'rb') as file:
                 put_request = requests.put(signed_write_uri, headers=headers, data=file)
                 put_request.raise_for_status()
