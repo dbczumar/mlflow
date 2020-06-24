@@ -240,17 +240,22 @@ public class CliBasedArtifactRepository implements ArtifactRepository {
 
   @VisibleForTesting
   void setProcessEnvironment(Map<String, String> environment, MlflowHostCreds hostCreds) {
+    logger.info("SET HOST: " + hostCreds.getHost());
     environment.put("MLFLOW_TRACKING_URI", hostCreds.getHost());
     if (hostCreds.getUsername() != null) {
+      logger.info("SET USERNAME: " + hostCreds.getUsername().toString());
       environment.put("MLFLOW_TRACKING_USERNAME", hostCreds.getUsername());
     }
     if (hostCreds.getPassword() != null) {
+      logger.info("SET PASSWORD: " + hostCreds.getPassword().toString());
       environment.put("MLFLOW_TRACKING_PASSWORD", hostCreds.getPassword());
     }
     if (hostCreds.getToken() != null) {
+      logger.info("SET TOKEN: " + hostCreds.getToken().toString());
       environment.put("MLFLOW_TRACKING_TOKEN", hostCreds.getToken());
     }
     if (hostCreds.shouldIgnoreTlsVerification()) {
+      logger.info("SET TLS IGNORE TRUE");
       environment.put("MLFLOW_TRACKING_INSECURE_TLS", "true");
     }
   }

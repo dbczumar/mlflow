@@ -36,6 +36,15 @@ def log_artifact(local_file, run_id, artifact_path):
     artifact path. Run artifacts can be organized into directories, so you can
     place the artifact in a directory this way.
     """
+    import os
+    envs = ["MLFLOW_TRACKING_URI", "MLFLOW_TRACKING_TOKEN", "MLFLOW_TRACKING_USERNAME", "MLFLOW_TRACKING_PASSWORD"]
+    d = {
+        item: os.environ.get(item)
+        for item in envs
+    }
+    _logger.info(d)
+    # raise Exception(str(d))
+
     store = _get_store()
     artifact_uri = store.get_run(run_id).info.artifact_uri
     artifact_repo = get_artifact_repository(artifact_uri)

@@ -46,6 +46,12 @@ import mlflow.tracking as tracking  # noqa
 
 _configure_mlflow_loggers(root_module_name=__name__)
 
+import os
+print("MLFLOW_TRACKING_URI: %s" % os.environ.get("MLFLOW_TRACKING_URI"))
+print("MLFLOW_TRACKING_TOKEN: %s" % os.environ.get("MLFLOW_TRACKING_TOKEN"))
+print("MLFLOW_TRACKING_USERNAME: %s" % os.environ.get("MLFLOW_TRACKING_USERNAME"))
+print("MLFLOW_TRACKING_PASSWORD: %s" % os.environ.get("MLFLOW_TRACKING_PASSWORD"))
+
 if sys.version_info.major == 2:
     warnings.warn("MLflow support for Python 2 is deprecated and will be dropped in a future "
                   "release. At that point, existing Python 2 workflows that use MLflow will "
