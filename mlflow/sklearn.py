@@ -389,3 +389,29 @@ def load_model(model_uri):
     return _load_model_from_local_file(
         path=sklearn_model_artifacts_path,
         serialization_format=serialization_format)
+
+import gorilla
+from mlflow.utils.autologging_utils import try_mlflow_log
+
+def autolog():
+    import sklearn
+
+    def fit(self, *args, **kwargs):
+        """
+        To be applied to a sklearn model class that defines a `fit`
+        method and inherits from `BaseEstimator` (thereby defining
+        the `get_params()` method)
+        """
+        original_fit = gorilla.get_original_attribute(self, 'fit')
+        try_mlflow_log(mlflow.start_run)
+        try_mlflow_log(mlflow.log_params, self.get_params())
+        output = original_fit(*args, **kwargs)
+        try_mlflow_log(log_model, self, artifact_path='model')
+        try_mlflow_log(mlflow.end_run)
+
+    patch_settings = gorilla.Settings(allow_hit=True, store_hit=True)
+    all_estimators = sklearn.utils.all_estimators()
+    for canonical_name, class_def in all_estimators:
+        if hasattr(class_def, 'fit'):
+            patch = gorilla.Patch(class_def, 'fit', fit, settings=patch_settings)
+            gorilla.apply(patch)
