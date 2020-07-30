@@ -402,12 +402,25 @@ def autolog():
         method and inherits from `BaseEstimator` (thereby defining
         the `get_params()` method)
         """
-        original_fit = gorilla.get_original_attribute(self, 'fit')
-        try_mlflow_log(mlflow.start_run)
+        mlflow.start_run(nested=True)
         try_mlflow_log(mlflow.log_params, self.get_params())
-        output = original_fit(*args, **kwargs)
+        try_mlflow_log(mlflow.set_tag, "estimator_name", self.__class__.__name__)
+        try_mlflow_log(mlflow.set_tag, "estimator_class", self.__class__)
+
+        original_fit = gorilla.get_original_attribute(self, 'fit')
+        fit_output = original_fit(*args, **kwargs)
+        
         try_mlflow_log(log_model, self, artifact_path='model')
+        if hasattr(self, 'score'):
+            try:
+                training_score = self.score(args[0], args[1])
+                try_mlflow_log(mlflow.log_metric, "training_score", training_score)
+            except Exception as e:
+                print("Failed!")
+                print(e)
+
         try_mlflow_log(mlflow.end_run)
+        return fit_output
 
     patch_settings = gorilla.Settings(allow_hit=True, store_hit=True)
     all_estimators = sklearn.utils.all_estimators()
