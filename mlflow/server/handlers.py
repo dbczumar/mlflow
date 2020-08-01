@@ -709,6 +709,33 @@ def _delete_model_version_tag():
     return _wrap_response(DeleteModelVersionTag.Response())
 
 
+@catch_mlflow_exception
+def upload_artifact_handler():
+    dest_uri = "s3://mlflow-artif-test/proxyart"
+    repo = get_artifact_repository(dest_uri)
+
+    import posixpath
+    fname = posixpath.basename(request.path)
+    parsed_path = request.path.lstrip("/mlflow/artifacts")
+
+    from mlflow.utils.file_utils import TempDir
+    with TempDir() as tmp:
+        tmp_path = tmp.path(fname)
+
+        with open(tmp_path, "wb") as f:
+            chunk_size = 1024 * 1024 * 1024 * 10 # 10MB 
+            while True:
+                chunk = request.stream.read(chunk_size)
+                if len(chunk) == 0:
+                    return
+                f.write(chunk)
+
+        repo.log_artifact(tmp_path, parsed_path)
+
+        response = Response(status = 200)
+        return response
+
+
 def _add_static_prefix(route):
     prefix = os.environ.get(STATIC_PREFIX_ENV_VAR)
     if prefix:
