@@ -710,13 +710,12 @@ def _delete_model_version_tag():
 
 
 @catch_mlflow_exception
-def upload_artifact_handler():
+def upload_artifact_handler(path):
     dest_uri = "s3://mlflow-artif-test/proxyart"
     repo = get_artifact_repository(dest_uri)
 
     import posixpath
-    fname = posixpath.basename(request.path)
-    parsed_path = request.path.lstrip("/mlflow/artifacts")
+    fname = posixpath.basename(path)
 
     from mlflow.utils.file_utils import TempDir
     with TempDir() as tmp:
@@ -727,13 +726,54 @@ def upload_artifact_handler():
             while True:
                 chunk = request.stream.read(chunk_size)
                 if len(chunk) == 0:
-                    return
+                    break 
                 f.write(chunk)
 
-        repo.log_artifact(tmp_path, parsed_path)
-
+        print(tmp_path)
+        print(path)
+        import os
+        repo.log_artifact(tmp_path, os.path.dirname(path))
         response = Response(status = 200)
         return response
+
+
+@catch_mlflow_exception
+def download_artifact_handler(path):
+    dest_uri = "s3://mlflow-artif-test/proxyart"
+    repo = get_artifact_repository(dest_uri)
+
+    from flask import stream_with_context
+    import tempfile
+    tmp_dir = tempfile.mkdtemp() 
+
+    downloaded_path = repo.download_artifacts(path, tmp_dir)
+    response_content_generator = _file_generator(downloaded_path)
+    return Response(stream_with_context(response_content_generator), status=200)
+
+
+@catch_mlflow_exception
+def list_artifacts_by_path_handler():
+    dest_uri = "s3://mlflow-artif-test/proxyart"
+    repo = get_artifact_repository(dest_uri)
+
+    query_string = request.query_string.decode('utf-8')
+    request_dict = parser.parse(query_string, normalized=True)
+    path = request_dict.get('path')
+
+    data = [info.to_dictionary() for info in repo.list_artifacts(path)]
+    response = Response(status=200)
+    response.set_data(json.dumps(data))
+    return response
+
+
+def _file_generator(path):
+    with open(path, "rb") as f:
+        chunk_size = 1024 * 1024 * 1024 * 10 # 10MB 
+        while True:
+            chunk = f.read(chunk_size)
+            if len(chunk) == 0:
+                break
+            yield chunk
 
 
 def _add_static_prefix(route):

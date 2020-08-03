@@ -32,6 +32,15 @@ class FileInfo(_MLflowObject):
         """Size of the file or directory. If the FileInfo is a directory, returns None."""
         return self._bytes
 
+    def to_dictionary(self):
+        d = {
+            "path": self.path,
+            "is_dir": self.is_dir,
+        }
+        if self.file_size:
+            d["file_size"] = self.file_size
+        return d
+
     def to_proto(self):
         proto = ProtoFileInfo()
         proto.path = self.path
