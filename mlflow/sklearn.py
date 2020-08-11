@@ -507,6 +507,8 @@ def autolog():
 
     def fit_mlflow(self, fn_name, *args, **kwargs):
         mlflow.start_run(nested=True)
+        # TODO: We should not log nested estimator parameters for
+        # parameter search estimators (GridSearchCV, RandomizedSearchCV)
         try_mlflow_log(mlflow.log_params, self.get_params(deep=True))
         try_mlflow_log(mlflow.set_tag, "estimator_name", self.__class__.__name__)
         try_mlflow_log(mlflow.set_tag, "estimator_class", self.__class__)
