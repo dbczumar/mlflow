@@ -393,23 +393,127 @@ def load_model(model_uri):
 import gorilla
 from mlflow.utils.autologging_utils import try_mlflow_log
 
+
+from sklearn.base import BaseEstimator 
+
+class MlflowCVEstimator(BaseEstimator):
+    def __init__(
+        self, estimator=None, mlflow_tracking_uri=None, mlflow_run_id=None, **kwargs
+    ):
+
+        self.estimator = estimator
+        params = estimator.get_params()
+        params.update(kwargs)
+
+
+        for p in params:
+            setattr(self, p, params[p])
+
+        self._param_names = (
+            self._get_param_names() + self.estimator._get_param_names()
+        )
+
+        if hasattr(estimator, 'score'):
+            self.score = estimator.score
+
+        self.mlflow_tracking_uri = mlflow_tracking_uri
+        self.mlflow_run_id = mlflow_run_id
+
+    def get_params(self, deep=True):
+        params = BaseEstimator.get_params(self, deep=False)
+        params.update({p: getattr(self, p) for p in self._param_names})
+
+        return params
+
+    def set_params(self, **params):
+        for p in self._param_names:
+            if p in params:
+                setattr(self, p, params[p])
+
+        return self
+
+
+    def fit(self, *args, **kwargs):
+        mlflow.set_tracking_uri(self.mlflow_tracking_uri)
+        mlflow.start_run(run_id=self.mlflow_run_id, nested=True)
+        mlflow.start_run(nested=True)
+        mlflow.log_param("FOO", "BAR")
+        # original_fit = gorilla.get_original_attribute(self.estimator, 'fit')
+        # result = original_fit(*args, **kwargs)
+        result = self.estimator.fit(*args, **kwargs)
+        mlflow.end_run()
+        return result
+
+
+class SklearnTrainingSession(object):
+    _session_stack = []
+
+    def __init__(self, clazz, allow_children=True):
+        self.allow_children = allow_children
+        self.clazz = clazz
+        self._parent = None
+
+    def __enter__(self):
+        if len(SklearnTrainingSession._session_stack) > 0:
+            self._parent = SklearnTrainingSession._session_stack[-1]
+            self.allow_children = SklearnTrainingSession._session_stack[-1].allow_children and self.allow_children
+
+        SklearnTrainingSession._session_stack.append(self)
+        return self
+
+    def __exit__(self, tp, val, traceback):
+        SklearnTrainingSession._session_stack.pop()
+
+    def should_log(self):
+        return (self._parent is None) or (self._parent.allow_children and self._parent.clazz != self.clazz)
+
+
+from sklearn.model_selection import GridSearchCV, RandomizedSearchCV
+# from sklearn.ensemble import VotingClassifier
+# from sklearn.pipeline import Pipeline
+NESTED_ALLOWLIST = [
+    GridSearchCV,
+    RandomizedSearchCV,
+    # VotingClassifier,
+    # Pipeline
+]
+
+
 def autolog():
     import sklearn
 
+    def fit_predict(self, *args, **kwargs):
+        return patched_fit(self, 'fit_predict', *args, **kwargs)
+
+    def fit_transform(self, *args, **kwargs):
+        return patched_fit(self, 'fit_transform', *args, **kwargs)
+
     def fit(self, *args, **kwargs):
+        return patched_fit(self, 'fit', *args, **kwargs)
+
+    def patched_fit(self, fn_name, *args, **kwargs):
         """
         To be applied to a sklearn model class that defines a `fit`
         method and inherits from `BaseEstimator` (thereby defining
         the `get_params()` method)
         """
+        allow_children = (self.__class__ in NESTED_ALLOWLIST)
+        with SklearnTrainingSession(allow_children=allow_children, clazz=self.__class__) as t:
+            if t.should_log():
+                return fit_mlflow(self, fn_name, *args, **kwargs)
+            else:
+                original_fit = gorilla.get_original_attribute(self, fn_name)
+                return original_fit(*args, **kwargs)
+
+    def fit_mlflow(self, fn_name, *args, **kwargs):
         mlflow.start_run(nested=True)
-        try_mlflow_log(mlflow.log_params, self.get_params())
+        try_mlflow_log(mlflow.log_params, self.get_params(deep=True))
         try_mlflow_log(mlflow.set_tag, "estimator_name", self.__class__.__name__)
         try_mlflow_log(mlflow.set_tag, "estimator_class", self.__class__)
 
-        original_fit = gorilla.get_original_attribute(self, 'fit')
+        original_fit = gorilla.get_original_attribute(self, fn_name)
         fit_output = original_fit(*args, **kwargs)
-        
+
         try_mlflow_log(log_model, self, artifact_path='model')
         if hasattr(self, 'score'):
             try:
@@ -419,6 +523,21 @@ def autolog():
                 print("Failed!")
                 print(e)
 
+        if isinstance(self, GridSearchCV) or isinstance(self, RandomizedSearchCV):
+            if hasattr(self, 'cv_results_'):
+                with open("/tmp/cv_results.json", "w") as f:
+                    import pandas as pd
+                    df = pd.DataFrame.from_dict(self.cv_results_)
+                    df.to_json(f, indent=4)
+
+                try_mlflow_log(mlflow.log_artifact, "/tmp/cv_results.json")
+
+            best_to_log = {
+                "best_" + key: value
+                for key, value in self.best_params_.items()
+            }
+            try_mlflow_log(mlflow.log_params, best_to_log)
+
         try_mlflow_log(mlflow.end_run)
         return fit_output
 
@@ -427,4 +546,10 @@ def autolog():
     for canonical_name, class_def in all_estimators:
         if hasattr(class_def, 'fit'):
             patch = gorilla.Patch(class_def, 'fit', fit, settings=patch_settings)
+            gorilla.apply(patch)
+        if hasattr(class_def, 'fit_transform'):
+            patch = gorilla.Patch(class_def, 'fit_transform', fit_transform, settings=patch_settings)
+            gorilla.apply(patch)
+        if hasattr(class_def, 'fit_predict'):
+            patch = gorilla.Patch(class_def, 'fit_predict', fit_predict, settings=patch_settings)
             gorilla.apply(patch)
