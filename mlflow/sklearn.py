@@ -533,6 +533,10 @@ def all_estimators(type_filter=None):
         List of (name, class), where ``name`` is the class name as string
         and ``class`` is the actuall type of the class.
     """
+    if not _is_old_version():
+        import sklearn.utils
+        return sklearn.utils.all_estimators(type_filter=type_filter)
+
     # lazy import to avoid circular imports from sklearn.base
     import inspect
     import pkgutil
@@ -627,8 +631,10 @@ def autolog():
     if _is_old_version():
         warnings.warn(
             "Autologging utilities may not work properly on scikit-learn < 0.20.3 "
-            "(current version: {})".format(sklearn.__version__)
+            "(current version: {})".format(sklearn.__version__),
+            stacklevel=2,
         )
+        return
 
     def fit_mlflow(self, func_name, *args, **kwargs):
         active_run_exists = bool(mlflow.active_run())
@@ -657,6 +663,27 @@ def autolog():
 
         return fit_output
 
+    def _is_parameter_search_estimator(estimator):
+        from sklearn.model_selection import GridSearchCV, RandomizedSearchCV
+        param_search_estimators = [
+            GridSearchCV,
+            RandomizedSearchCV,
+        ]
+        return any([
+            isinstance(estimator, param_search_estimator)
+            for param_search_estimator in param_search_estimators
+        ])
+
+    def _log_pretraining_metadata(estimator):
+        try_mlflow_log(
+            mlflow.log_params,
+            self.get_params(deep=_is_parameter_search_estimator(estimator))
+        )
+        try_mlflow_log(
+            mlflow.set_tags,
+            {"estimator_name": self.__class__.__name__, "estimator_class": self.__class__},
+        )
+
     def patched_fit(self, func_name, *args, **kwargs):
         """
         To be applied to a sklearn model class that defines a `fit` method and
@@ -675,8 +702,12 @@ def autolog():
 
         return f
 
+    from sklearn.model_selection import GridSearchCV, RandomizedSearchCV
+
     patch_settings = gorilla.Settings(allow_hit=True, store_hit=True)
     for _, class_def in all_estimators():
+        if class_def in [GridSearchCV, RandomizedSearchCV]:
+            continue
         for func_name in ["fit", "fit_transform", "fit_predict"]:
             if hasattr(class_def, func_name):
                 original = getattr(class_def, func_name)
@@ -685,3 +716,118 @@ def autolog():
                 patch_func = functools.wraps(original)(patch_func)
                 patch = gorilla.Patch(class_def, func_name, patch_func, settings=patch_settings)
                 gorilla.apply(patch)
+
+    def fit_predict_cv(self, *args, **kwargs):
+        return patched_fit_cv(self, 'fit_predict', *args, **kwargs)
+
+    def fit_transform_cv(self, *args, **kwargs):
+        return patched_fit_cv(self, 'fit_transform', *args, **kwargs)
+
+    def fit_cv(self, *args, **kwargs):
+        return patched_fit_cv(self, 'fit', *args, **kwargs)
+
+    def patched_fit_cv(self, fn_name, *args, **kwargs):
+        """
+        To be applied to a sklearn model class that defines a `fit`
+        method and inherits from `BaseEstimator` (thereby defining
+        the `get_params()` method)
+        """
+        with _SklearnTrainingSession(allow_children=False, clazz=self.__class__) as t:
+            if t.should_log():
+                return fit_mlflow_cv(self, fn_name, *args, **kwargs)
+            else:
+                original_fit = gorilla.get_original_attribute(self, fn_name)
+                return original_fit(*args, **kwargs)
+
+    def fit_mlflow_cv(self, fn_name, *args, **kwargs):
+        try_mlflow_log(mlflow.start_run, nested=True)
+        # Perform shallow parameter logging for hyperparameter search APIs (e.g., GridSearchCV
+        # and RandomizedSearchCV) to avoid logging superfluous parameters from the seed
+        # `estimator` constructor argument; we will log the set of optimal estimator
+        # parameters, if available, once training completes
+        try_mlflow_log(mlflow.log_params, self.get_params(deep=False))
+        try_mlflow_log(mlflow.set_tag, "estimator_name", self.__class__.__name__)
+        try_mlflow_log(mlflow.set_tag, "estimator_class", self.__class__)
+
+        original_fit = gorilla.get_original_attribute(self, fn_name)
+        fit_output = original_fit(*args, **kwargs)
+
+        if hasattr(self, 'score'):
+            try:
+                training_score = self.score(args[0], args[1])
+                try_mlflow_log(mlflow.log_metric, "training_score", training_score)
+            except Exception as e:
+                print("Failed to collect scoring metrics!")
+                print(e)
+
+        try_mlflow_log(log_model, self, artifact_path='model')
+        if hasattr(self, 'best_estimator_'):
+            try_mlflow_log(log_model, self.best_estimator_, artifact_path="best_estimator")
+
+        if hasattr(self, 'best_params_'):
+            best_params = {
+                f"best_{param_name}": param_value
+                for param_name, param_value in self.best_params_.items()
+            }
+            try_mlflow_log(mlflow.log_params, best_params)
+
+        _create_child_cv_runs(cv_estimator=self)
+
+        try_mlflow_log(mlflow.end_run)
+
+    def _create_child_cv_runs(cv_estimator):
+        from mlflow.tracking.client import MlflowClient
+        from mlflow.entities import Metric, RunTag, Param
+        import pandas as pd
+        import time
+        from numbers import Number
+
+        client = MlflowClient()
+        metrics_timestamp = int(time.time() * 1000)
+
+        cv_results_df = pd.DataFrame.from_dict(cv_estimator.cv_results_)
+        for _, result_row in cv_results_df.iterrows():
+            with mlflow.start_run(nested=True):
+                params = [
+                    Param(str(key), str(value)) for key, value in result_row.get("params", {}).items()
+                ]
+                metrics = {
+                    Metric(
+                        key=key,
+                        value=value,
+                        timestamp=metrics_timestamp,
+                        step=0,
+                    )
+                    for key, value in result_row.iteritems()
+                    # Parameters values are recorded twice in the set of search `cv_results`:
+                    # once within a `params` column with dictionary values and once within
+                    # a separate dataframe column that is created for each parameter. To prevent
+                    # duplication of parameters, we log the consolidated values from the parameter
+                    # dictionary column and filter out the other parameter-specific columns with
+                    # names of the form `param_{param_name}`.
+                    if not key.startswith("param") and isinstance(value, Number)
+                }
+                tags = [
+                    RunTag(key, value) for key, value in {
+                        "estimator_name": str(cv_estimator.estimator.__class__.__name__),
+                        "estimator_class": str(cv_estimator.estimator.__class__),
+                    }.items()
+                ]
+
+                client.log_batch(
+                    run_id=mlflow.active_run().info.run_id,
+                    params=params,
+                    metrics=metrics,
+                    tags=tags,
+                )
+
+    for class_def in [GridSearchCV, RandomizedSearchCV]:
+        if hasattr(class_def, 'fit'):
+            patch = gorilla.Patch(class_def, 'fit', fit_cv, settings=patch_settings)
+            gorilla.apply(patch)
+        if hasattr(class_def, 'fit_transform'):
+            patch = gorilla.Patch(class_def, 'fit_transform_cv', fit_transform_cv, settings=patch_settings)
+            gorilla.apply(patch)
+        if hasattr(class_def, 'fit_predict'):
+            patch = gorilla.Patch(class_def, 'fit_predict_cv', fit_predict_cv, settings=patch_settings)
+            gorilla.apply(patch)
