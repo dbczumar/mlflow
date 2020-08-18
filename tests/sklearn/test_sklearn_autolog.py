@@ -1,3 +1,4 @@
+import functools
 import inspect
 from mock import mock
 
@@ -7,6 +8,7 @@ import sklearn
 import sklearn.datasets as datasets
 
 import mlflow.sklearn
+from mlflow.utils.mlflow_tags import MLFLOW_PARENT_RUN_ID
 
 
 FIT_FUNC_NAMES = ["fit", "fit_transform", "fit_predict"]
@@ -31,6 +33,10 @@ def fit_model(model, Xy, fit_func_name):
         model.fit_predict(*Xy)
 
     return model
+
+
+def get_run(run_id):
+    return mlflow.tracking.MlflowClient().get_run(run_id)
 
 
 def get_run_data(run_id):
@@ -108,18 +114,18 @@ def test_estimator(fit_func_name):
     with mlflow.start_run() as run:
         run_id = run._info.run_id
         model = fit_model(model, Xy, fit_func_name)
-        params, metrics, tags, artifacts = get_run_data(run_id)
 
-        assert params == stringify_dict_values(model.get_params(deep=True))
-        assert metrics == {TRAINING_SCORE: model.score(*Xy)}
-        assert tags == {
-            ESTIMATOR_NAME: model.__class__.__name__,
-            ESTIMATOR_CLASS: str(model.__class__),
-        }
-        assert "model" in artifacts
+    params, metrics, tags, artifacts = get_run_data(run_id)
+    assert params == stringify_dict_values(model.get_params(deep=True))
+    assert metrics == {TRAINING_SCORE: model.score(*Xy)}
+    assert tags == {
+        ESTIMATOR_NAME: model.__class__.__name__,
+        ESTIMATOR_CLASS: model.__class__.__module__ + "." + model.__class__.__name__,
+    }
+    assert "model" in artifacts
 
-        loaded_model = load_model_by_run_id(run_id)
-        np.testing.assert_array_equal(loaded_model.predict(Xy[0]), model.predict(Xy[0]))
+    loaded_model = load_model_by_run_id(run_id)
+    np.testing.assert_array_equal(loaded_model.predict(Xy[0]), model.predict(Xy[0]))
 
 
 def test_meta_estimator():
@@ -136,17 +142,50 @@ def test_meta_estimator():
         run_id = run._info.run_id
         model = fit_model(model, Xy, "fit")
 
-        params, metrics, tags, artifacts = get_run_data(run._info.run_id)
-        assert params == stringify_dict_values(model.get_params(deep=True))
-        assert metrics == {TRAINING_SCORE: model.score(*Xy)}
-        assert tags == {
-            ESTIMATOR_NAME: model.__class__.__name__,
-            ESTIMATOR_CLASS: str(model.__class__),
-        }
-        assert "model" in artifacts
+    params, metrics, tags, artifacts = get_run_data(run._info.run_id)
+    assert params == stringify_dict_values(model.get_params(deep=True))
+    assert metrics == {TRAINING_SCORE: model.score(*Xy)}
+    assert tags == {
+        ESTIMATOR_NAME: model.__class__.__name__,
+        ESTIMATOR_CLASS: model.__class__.__module__ + "." + model.__class__.__name__,
+    }
+    assert "model" in artifacts
 
-        loaded_model = load_model_by_run_id(run_id)
-        np.testing.assert_array_equal(loaded_model.predict(Xy[0]), model.predict(Xy[0]))
+    loaded_model = load_model_by_run_id(run_id)
+    np.testing.assert_array_equal(loaded_model.predict(Xy[0]), model.predict(Xy[0]))
+
+
+def test_autolog_marks_run_as_failed_when_fit_fails():
+    mlflow.sklearn.autolog()
+    run = mlflow.start_run()
+
+    with mock.patch("logging.Logger.warning") as mock_warning:
+        model = sklearn.svm.LinearSVC(C=-8).fit(*get_iris())
+
+    assert model is None
+    assert mlflow.active_run() is None
+    assert get_run(run._info.run_id)._info.status == "FAILED"
+    mock_warning.assert_called_once()
+    assert mock_warning.call_args[0][0].startswith("LinearSVC.fit failed")
+
+
+def test_autolog_emits_warning_message_when_score_fails():
+    mlflow.sklearn.autolog()
+
+    with mlflow.start_run() as run, mock.patch("logging.Logger.warning") as mock_warning:
+        model = sklearn.cluster.KMeans()
+
+        @functools.wraps(model.score)
+        def dummy_score(X, y=None, sample_weight=None):
+            raise Exception
+
+        model.score = dummy_score
+        model.fit(*get_iris())
+
+    metrics = get_run_data(run._info.run_id)[1]
+    assert metrics == {}
+    mock_warning.assert_called_once()
+    assert mock_warning.call_args[0][0].startswith("KMeans.score failed")
 
 
 def test_fit_xxx_performs_logging_only_once(fit_func_name):
@@ -161,12 +200,16 @@ def test_fit_xxx_performs_logging_only_once(fit_func_name):
         "mlflow.sklearn.log_model"
     ) as mock_log_model:
 
-        with mlflow.start_run():
+        with mlflow.start_run() as run:
             model = fit_model(model, Xy, fit_func_name)
             mock_log_params.assert_called_once()
             mock_log_metric.assert_called_once()
             mock_set_tags.assert_called_once()
             mock_log_model.assert_called_once()
+
+        query = "tags.{} = '{}'".format(MLFLOW_PARENT_RUN_ID, run._info.run_id)
+        assert len(mlflow.search_runs([run._info.experiment_id])) == 1
+        assert len(mlflow.search_runs([run._info.experiment_id], query)) == 0
 
 
 def test_meta_estimator_fit_performs_logging_only_once():
@@ -185,9 +228,13 @@ def test_meta_estimator_fit_performs_logging_only_once():
         "mlflow.sklearn.log_model"
     ) as mock_log_model:
 
-        with mlflow.start_run():
+        with mlflow.start_run() as run:
             model = fit_model(model, Xy, "fit")
             mock_log_params.assert_called_once()
             mock_log_metric.assert_called_once()
             mock_set_tags.assert_called_once()
             mock_log_model.assert_called_once()
+
+        query = "tags.{} = '{}'".format(MLFLOW_PARENT_RUN_ID, run._info.run_id)
+        assert len(mlflow.search_runs([run._info.experiment_id])) == 1
+        assert len(mlflow.search_runs([run._info.experiment_id], query)) == 0

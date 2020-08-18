@@ -19,6 +19,7 @@ import warnings
 
 import mlflow
 from mlflow import pyfunc
+from mlflow.entities.run_status import RunStatus
 from mlflow.exceptions import MlflowException
 from mlflow.models import Model
 from mlflow.models.model import MLMODEL_FILE_NAME
@@ -26,6 +27,7 @@ from mlflow.models.signature import ModelSignature
 from mlflow.models.utils import ModelInputExample, _save_example
 from mlflow.protos.databricks_pb2 import INVALID_PARAMETER_VALUE, INTERNAL_ERROR
 from mlflow.protos.databricks_pb2 import RESOURCE_ALREADY_EXISTS
+from mlflow.sklearn.utils import _all_estimators
 from mlflow.tracking.artifact_utils import _download_artifact_from_uri
 from mlflow.utils.environment import _mlflow_conda_env
 from mlflow.utils.model_utils import _get_flavor_configuration
@@ -513,115 +515,6 @@ def _is_old_version():
     return LooseVersion(__version__) < LooseVersion("0.20.3")
 
 
-def all_estimators(type_filter=None):
-    """Get a list of all estimators from sklearn.
-    This function crawls the module and gets all classes that inherit
-    from BaseEstimator. Classes that are defined in test-modules are not
-    included.
-    By default meta_estimators such as GridSearchCV are also not included.
-    Parameters
-    ----------
-    type_filter : string, list of string,  or None, default=None
-        Which kind of estimators should be returned. If None, no filter is
-        applied and all estimators are returned.  Possible values are
-        'classifier', 'regressor', 'cluster' and 'transformer' to get
-        estimators only of these specific types, or a list of these to
-        get the estimators that fit at least one of the types.
-    Returns
-    -------
-    estimators : list of tuples
-        List of (name, class), where ``name`` is the class name as string
-        and ``class`` is the actuall type of the class.
-    """
-    if not _is_old_version():
-        import sklearn.utils
-        return sklearn.utils.all_estimators(type_filter=type_filter)
-
-    # lazy import to avoid circular imports from sklearn.base
-    import inspect
-    import pkgutil
-    import platform
-    import sklearn
-    from importlib import import_module
-    from operator import itemgetter
-    from sklearn.utils.testing import ignore_warnings
-    from sklearn.base import (
-        BaseEstimator,
-        ClassifierMixin,
-        RegressorMixin,
-        TransformerMixin,
-        ClusterMixin,
-    )
-
-    IS_PYPY = platform.python_implementation() == "PyPy"
-
-    def is_abstract(c):
-        if not (hasattr(c, "__abstractmethods__")):
-            return False
-        if not len(c.__abstractmethods__):
-            return False
-        return True
-
-    all_classes = []
-    modules_to_ignore = {"tests", "externals", "setup", "conftest"}
-    root = sklearn.__path__[0]  # sklearn package
-    # Ignore deprecation warnings triggered at import time and from walking
-    # packages
-    with ignore_warnings(category=FutureWarning):
-        for _, modname, _ in pkgutil.walk_packages(path=[root], prefix="sklearn."):
-            mod_parts = modname.split(".")
-            if any(part in modules_to_ignore for part in mod_parts) or "._" in modname:
-                continue
-            module = import_module(modname)
-            classes = inspect.getmembers(module, inspect.isclass)
-            classes = [(name, est_cls) for name, est_cls in classes if not name.startswith("_")]
-
-            # TODO: Remove when FeatureHasher is implemented in PYPY
-            # Skips FeatureHasher for PYPY
-            if IS_PYPY and "feature_extraction" in modname:
-                classes = [(name, est_cls) for name, est_cls in classes if name == "FeatureHasher"]
-
-            all_classes.extend(classes)
-
-    all_classes = set(all_classes)
-
-    estimators = [
-        c for c in all_classes if (issubclass(c[1], BaseEstimator) and c[0] != "BaseEstimator")
-    ]
-    # get rid of abstract base classes
-    estimators = [c for c in estimators if not is_abstract(c[1])]
-
-    if type_filter is not None:
-        if not isinstance(type_filter, list):
-            type_filter = [type_filter]
-        else:
-            type_filter = list(type_filter)  # copy
-        filtered_estimators = []
-        filters = {
-            "classifier": ClassifierMixin,
-            "regressor": RegressorMixin,
-            "transformer": TransformerMixin,
-            "cluster": ClusterMixin,
-        }
-        for name, mixin in filters.items():
-            if name in type_filter:
-                type_filter.remove(name)
-                filtered_estimators.extend([est for est in estimators if issubclass(est[1], mixin)])
-        estimators = filtered_estimators
-        if type_filter:
-            raise ValueError(
-                "Parameter type_filter must be 'classifier', "
-                "'regressor', 'transformer', 'cluster' or "
-                "None, got"
-                " %s." % repr(type_filter)
-            )
-
-    # drop duplicates, sort for reproducibility
-    # itemgetter is used to ensure the sort does not extend to the 2nd item of
-    # the tuple
-    return sorted(set(estimators), key=itemgetter(0))
-
-
 def autolog():
     """
     Enable autologging for scikit-learn.
@@ -637,26 +530,21 @@ def autolog():
         return
 
     def fit_mlflow(self, func_name, *args, **kwargs):
-        active_run_exists = bool(mlflow.active_run())
+        active_run_exists = mlflow.active_run() is not None
         if not active_run_exists:
             try_mlflow_log(mlflow.start_run)
 
-        # TODO: We should not log nested estimator parameters for
-        # parameter search estimators (GridSearchCV, RandomizedSearchCV)
-        try_mlflow_log(mlflow.log_params, self.get_params(deep=True))
-        try_mlflow_log(
-            mlflow.set_tags,
-            {"estimator_name": self.__class__.__name__, "estimator_class": self.__class__},
-        )
+        _log_pretraining_metadata(self, *args, **kwargs)
 
         original_fit = gorilla.get_original_attribute(self, func_name)
-        fit_output = original_fit(*args, **kwargs)
+        try:
+            fit_output = original_fit(*args, **kwargs)
+        except Exception as e:
+            _logger.warning("{} failed: {}".format(original_fit.__qualname__, str(e)))
+            mlflow.end_run(RunStatus.to_string(RunStatus.FAILED))
+            return
 
-        if hasattr(self, "score"):
-            training_score = self.score(*args, **kwargs)
-            try_mlflow_log(mlflow.log_metric, "training_score", training_score)
-
-        try_mlflow_log(log_model, self, artifact_path="model")
+        _log_posttraining_metadata(self, *args, **kwargs)
 
         if not active_run_exists:
             try_mlflow_log(mlflow.end_run)
@@ -674,106 +562,39 @@ def autolog():
             for param_search_estimator in param_search_estimators
         ])
 
-    def _log_pretraining_metadata(estimator):
+    def _log_pretraining_metadata(estimator, *args, **kwargs):
+        should_log_params_deeply = not _is_parameter_search_estimator(estimator)
         try_mlflow_log(
             mlflow.log_params,
-            self.get_params(deep=_is_parameter_search_estimator(estimator))
+            estimator.get_params(deep=should_log_params_deeply)
         )
         try_mlflow_log(
             mlflow.set_tags,
-            {"estimator_name": self.__class__.__name__, "estimator_class": self.__class__},
+            {"estimator_name": estimator.__class__.__name__, "estimator_class": estimator.__class__},
         )
 
-    def patched_fit(self, func_name, *args, **kwargs):
-        """
-        To be applied to a sklearn model class that defines a `fit` method and
-        inherits from `BaseEstimator` (thereby defining the `get_params()` method)
-        """
-        with _SklearnTrainingSession(clazz=self.__class__, allow_children=False) as t:
-            if t.should_log():
-                return fit_mlflow(self, func_name, *args, **kwargs)
-            else:
-                original_fit = gorilla.get_original_attribute(self, func_name)
-                return original_fit(*args, **kwargs)
-
-    def create_patch_func(func_name):
-        def f(self, *args, **kwargs):
-            return patched_fit(self, func_name, *args, **kwargs)
-
-        return f
-
-    from sklearn.model_selection import GridSearchCV, RandomizedSearchCV
-
-    patch_settings = gorilla.Settings(allow_hit=True, store_hit=True)
-    for _, class_def in all_estimators():
-        if class_def in [GridSearchCV, RandomizedSearchCV]:
-            continue
-        for func_name in ["fit", "fit_transform", "fit_predict"]:
-            if hasattr(class_def, func_name):
-                original = getattr(class_def, func_name)
-                patch_func = create_patch_func(func_name)
-                # preserve original function attributes
-                patch_func = functools.wraps(original)(patch_func)
-                patch = gorilla.Patch(class_def, func_name, patch_func, settings=patch_settings)
-                gorilla.apply(patch)
-
-    def fit_predict_cv(self, *args, **kwargs):
-        return patched_fit_cv(self, 'fit_predict', *args, **kwargs)
-
-    def fit_transform_cv(self, *args, **kwargs):
-        return patched_fit_cv(self, 'fit_transform', *args, **kwargs)
-
-    def fit_cv(self, *args, **kwargs):
-        return patched_fit_cv(self, 'fit', *args, **kwargs)
-
-    def patched_fit_cv(self, fn_name, *args, **kwargs):
-        """
-        To be applied to a sklearn model class that defines a `fit`
-        method and inherits from `BaseEstimator` (thereby defining
-        the `get_params()` method)
-        """
-        with _SklearnTrainingSession(allow_children=False, clazz=self.__class__) as t:
-            if t.should_log():
-                return fit_mlflow_cv(self, fn_name, *args, **kwargs)
-            else:
-                original_fit = gorilla.get_original_attribute(self, fn_name)
-                return original_fit(*args, **kwargs)
-
-    def fit_mlflow_cv(self, fn_name, *args, **kwargs):
-        try_mlflow_log(mlflow.start_run, nested=True)
-        # Perform shallow parameter logging for hyperparameter search APIs (e.g., GridSearchCV
-        # and RandomizedSearchCV) to avoid logging superfluous parameters from the seed
-        # `estimator` constructor argument; we will log the set of optimal estimator
-        # parameters, if available, once training completes
-        try_mlflow_log(mlflow.log_params, self.get_params(deep=False))
-        try_mlflow_log(mlflow.set_tag, "estimator_name", self.__class__.__name__)
-        try_mlflow_log(mlflow.set_tag, "estimator_class", self.__class__)
-
-        original_fit = gorilla.get_original_attribute(self, fn_name)
-        fit_output = original_fit(*args, **kwargs)
-
-        if hasattr(self, 'score'):
+    def _log_posttraining_metadata(estimator, *args, **kwargs):
+        if hasattr(estimator, "score"):
             try:
-                training_score = self.score(args[0], args[1])
+                training_score = estimator.score(*args, **kwargs)
                 try_mlflow_log(mlflow.log_metric, "training_score", training_score)
             except Exception as e:
-                print("Failed to collect scoring metrics!")
-                print(e)
+                _logger.warning("{} failed: {}".format(estimator.score.__qualname__, str(e)))
 
-        try_mlflow_log(log_model, self, artifact_path='model')
-        if hasattr(self, 'best_estimator_'):
-            try_mlflow_log(log_model, self.best_estimator_, artifact_path="best_estimator")
+        try_mlflow_log(log_model, estimator, artifact_path="model")
 
-        if hasattr(self, 'best_params_'):
-            best_params = {
-                f"best_{param_name}": param_value
-                for param_name, param_value in self.best_params_.items()
-            }
-            try_mlflow_log(mlflow.log_params, best_params)
+        if _is_parameter_search_estimator(estimator):
+            if hasattr(estimator, 'best_estimator_'):
+                try_mlflow_log(log_model, estimator.best_estimator_, artifact_path="best_estimator")
 
-        _create_child_cv_runs(cv_estimator=self)
+            if hasattr(estimator, 'best_params_'):
+                best_params = {
+                    f"best_{param_name}": param_value
+                    for param_name, param_value in estimator.best_params_.items()
+                }
+                try_mlflow_log(mlflow.log_params, best_params)
 
-        try_mlflow_log(mlflow.end_run)
+            _create_child_cv_runs(estimator)
 
     def _create_child_cv_runs(cv_estimator):
         from mlflow.tracking.client import MlflowClient
@@ -821,13 +642,36 @@ def autolog():
                     tags=tags,
                 )
 
-    for class_def in [GridSearchCV, RandomizedSearchCV]:
-        if hasattr(class_def, 'fit'):
-            patch = gorilla.Patch(class_def, 'fit', fit_cv, settings=patch_settings)
-            gorilla.apply(patch)
-        if hasattr(class_def, 'fit_transform'):
-            patch = gorilla.Patch(class_def, 'fit_transform_cv', fit_transform_cv, settings=patch_settings)
-            gorilla.apply(patch)
-        if hasattr(class_def, 'fit_predict'):
-            patch = gorilla.Patch(class_def, 'fit_predict_cv', fit_predict_cv, settings=patch_settings)
-            gorilla.apply(patch)
+    def patched_fit(self, func_name, *args, **kwargs):
+        """
+        To be applied to a sklearn model class that defines a `fit` method and
+        inherits from `BaseEstimator` (thereby defining the `get_params()` method)
+        """
+        with _SklearnTrainingSession(clazz=self.__class__, allow_children=False) as t:
+            if t.should_log():
+                return fit_mlflow(self, func_name, *args, **kwargs)
+            else:
+                original_fit = gorilla.get_original_attribute(self, func_name)
+                return original_fit(*args, **kwargs)
+
+    def create_patch_func(func_name):
+        def f(self, *args, **kwargs):
+            return patched_fit(self, func_name, *args, **kwargs)
+
+        return f
+
+    patch_settings = gorilla.Settings(allow_hit=True, store_hit=True)
+    try:
+        from sklearn.utils import all_estimators
+    except ImportError:
+        all_estimators = _all_estimators
+
+    for _, class_def in all_estimators():
+        for func_name in ["fit", "fit_transform", "fit_predict"]:
+            if hasattr(class_def, func_name):
+                original = getattr(class_def, func_name)
+                patch_func = create_patch_func(func_name)
+                # preserve original function attributes
+                patch_func = functools.wraps(original)(patch_func)
+                patch = gorilla.Patch(class_def, func_name, patch_func, settings=patch_settings)
+                gorilla.apply(patch)
