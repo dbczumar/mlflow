@@ -238,3 +238,31 @@ def test_meta_estimator_fit_performs_logging_only_once():
         query = "tags.{} = '{}'".format(MLFLOW_PARENT_RUN_ID, run._info.run_id)
         assert len(mlflow.search_runs([run._info.experiment_id])) == 1
         assert len(mlflow.search_runs([run._info.experiment_id], query)) == 0
+
+
+def test_parameter_search_estimators_produce_expected_outputs():
+    mlflow.sklearn.autolog()
+
+    with mlflow.start_run() as run:
+        parameters = {'kernel':('linear', 'rbf'), 'C':[1, 5, 10]}
+        svc = sklearn.svm.SVC()
+        cv = sklearn.model_selection.GridSearchCV(svc, parameters, n_jobs=1)
+        cv.fit(*get_iris())
+
+        run_id = run.info.run_id
+
+        from mlflow.tracking.client import MlflowClient
+        client = MlflowClient()
+        # print(client.get_run(run_id).data)
+        # print(get_run_data(run_id))
+
+        child_runs = client.search_runs(run.info.experiment_id, f"tags.`mlflow.parentRunId` = '{run_id}'")
+        # We expect to have created a child run for each point in the parameter grid, which consists
+        # of 6 elements (all possible combinations of two kernels and three 'C' values)
+        assert len(child_runs) == 6
+
+        artifact_paths = set([artifact.path for artifact in client.list_artifacts(run_id)])
+        assert set(["model", "best_estimator"]).issubset(artifact_paths)
+
+
+    
