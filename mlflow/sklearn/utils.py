@@ -1,24 +1,27 @@
 from distutils.version import LooseVersion
 import inspect
 from itertools import islice
+import json
+import logging
+from numbers import Number
+import time
+
+from mlflow.entities import Metric, RunTag, Param, RunStatus
+from mlflow.tracking.client import MlflowClient
+from mlflow.utils.autologging_utils import try_mlflow_log
+from mlflow.utils.file_utils import TempDir
+from mlflow.utils.mlflow_tags import MLFLOW_PARENT_RUN_ID
+from mlflow.utils.validation import (
+    MAX_PARAMS_TAGS_PER_BATCH,
+    MAX_METRICS_PER_BATCH,
+    MAX_PARAM_KEY_LENGTH,
+    MAX_PARAM_VAL_LENGTH,
+)
+
+_logger = logging.getLogger(__name__)
 
 _SAMPLE_WEIGHT = "sample_weight"
-
-
-def _is_old_version():
-    import sklearn
-
-    return LooseVersion(sklearn.__version__) < LooseVersion("0.20.3")
-
-
-def _all_estimators():
-    import sklearn
-
-    return (
-        sklearn.utils.all_estimators()
-        if hasattr(sklearn.utils, "all_estimators")
-        else _backported_all_estimators()
-    )
+_MIN_SKLEARN_VERSION = "0.20.3"
 
 
 def _get_estimator_info_tags(estimator):
@@ -34,22 +37,27 @@ def _get_estimator_info_tags(estimator):
     }
 
 
-def _get_Xy(args, kwargs):
+def _get_Xy(args, kwargs, X_var_name, y_var_name):
+    # corresponds to: model.fit(X, y)
     if len(args) >= 2:
         return args[:2]
 
+    # corresponds to: model.fit(X, <y_var_name>=y)
     if len(args) == 1:
-        return args[0], kwargs["y"]
+        return args[0], kwargs[y_var_name]
 
-    return kwargs["X"], kwargs["y"]
+    # corresponds to: model.fit(<X_var_name>=X, <y_var_name>=y)
+    return kwargs[X_var_name], kwargs[y_var_name]
 
 
-def _get_sample_weight(args_list, args, kwargs):
-    sample_weight_index = args_list.index(_SAMPLE_WEIGHT)
+def _get_sample_weight(arg_names, args, kwargs):
+    sample_weight_index = arg_names.index(_SAMPLE_WEIGHT)
 
+    # corresponds to: model.fit(X, y, ..., sample_weight)
     if len(args) > sample_weight_index:
         return args[sample_weight_index]
 
+    # corresponds to: model.fit(X, y, ..., sample_weight=sample_weight)
     if _SAMPLE_WEIGHT in kwargs:
         return kwargs[_SAMPLE_WEIGHT]
 
@@ -58,18 +66,37 @@ def _get_sample_weight(args_list, args, kwargs):
 
 def _get_arg_names(f):
     # `inspect.getargspec` doesn't return a wrapped function's argspec
-    # See: https://hynek.me/articles/decorators/
+    # See: https://hynek.me/articles/decorators#mangled-signatures
     return list(inspect.signature(f).parameters.keys())
 
 
-def _get_args_for_score(fit_func, score_func, args, kwargs):
-    fit_args = _get_arg_names(fit_func)
-    score_args = _get_arg_names(score_func)
+def _get_args_for_score(score_func, fit_func, fit_args, fit_kwargs):
+    """
+    Get arguments to pass to score_func in the following steps.
 
-    Xy = _get_Xy(args, kwargs)
+    1. Extract X and y from fit_args and fit_kwargs.
+    2. If the sample_weight argument exists in both score_func and fit_func,
+       extract it from fit_args or fit_kwargs and return (X, y, sample_weight),
+       otherwise return (X, y)
 
-    if (_SAMPLE_WEIGHT in score_args) and (_SAMPLE_WEIGHT in fit_args):
-        sample_weight = _get_sample_weight(fit_args, args, kwargs)
+    :param score_func: A score function object.
+    :param fit_func: A fit function object.
+    :param fit_args: Positional arguments given to fit_func.
+    :param fit_kwargs: Keyword arguments given to fit_func.
+
+    :return A tuple of either (X, y, sample_weight) or (X, y).
+    """
+    score_arg_names = _get_arg_names(score_func)
+    fit_arg_names = _get_arg_names(fit_func)
+
+    # In most cases, X_var_name and y_var_name become "X" and "y", respectively.
+    # However, certain sklearn models use different variable names for X and y.
+    # See: https://scikit-learn.org/stable/modules/generated/sklearn.covariance.GraphicalLasso.html#sklearn.covariance.GraphicalLasso.score # noqa: E501
+    X_var_name, y_var_name = fit_arg_names[:2]
+    Xy = _get_Xy(fit_args, fit_kwargs, X_var_name, y_var_name)
+
+    if (_SAMPLE_WEIGHT in fit_arg_names) and (_SAMPLE_WEIGHT in score_arg_names):
+        sample_weight = _get_sample_weight(fit_arg_names, fit_args, fit_kwargs)
         return (*Xy, sample_weight)
 
     return Xy
@@ -83,11 +110,36 @@ def _chunk_dict(d, chunk_size):
         yield {k: d[k] for k in islice(it, chunk_size)}
 
 
-def _truncate_dict_values(d, max_length):
-    return {k: str(v)[:max_length] for k, v in d.items()}
+def _truncate_dict(d, max_key_length=None, max_value_length=None):
+    key_is_none = max_key_length is None
+    val_is_none = max_value_length is None
+
+    if key_is_none and val_is_none:
+        raise ValueError("Must specify at least either `max_key_length` or `max_value_length`")
+
+    truncated = {}
+    for k, v in d.items():
+        should_truncate_key = (not key_is_none) and (len(str(k)) > max_key_length)
+        should_truncate_val = (not key_is_none) and (len(str(v)) > max_value_length)
+
+        new_k = str(k)[:max_key_length] if should_truncate_key else k
+        if should_truncate_key:
+            _logger.warning("Truncated the key `{}`".format(k))
+
+        new_v = str(v)[:max_value_length] if should_truncate_val else v
+        if should_truncate_val:
+            _logger.warning("Truncated the value `{}` (in the key `{}`)".format(v, k))
+
+        truncated[new_k] = new_v
+
+    return truncated
 
 
 def _is_parameter_search_estimator(estimator):
+    """
+    :return: `True` if the specified scikit-learn estimator is a parameter search estimator,
+             such as `GridSearchCV`. `False` otherwise.
+    """
     from sklearn.model_selection import GridSearchCV, RandomizedSearchCV
     param_search_estimators = [
         GridSearchCV,
@@ -97,6 +149,137 @@ def _is_parameter_search_estimator(estimator):
         isinstance(estimator, param_search_estimator)
         for param_search_estimator in param_search_estimators
     ])
+
+
+def _log_parameter_search_results_as_artifact(cv_results_df, run_id):
+    """
+    Records a collection of parameter search results as an MLflow artifact
+    for the specified run.
+
+    :param cv_results_df: A Pandas DataFrame containing the results of a parameter search
+                          training session, which may be obtained by parsing the `cv_results_`
+                          attribute of a trained parameter search estimator such as
+                          `GridSearchCV`.
+    :param run_id: The ID of the MLflow Run to which the artifact should be recorded.
+    """
+    with TempDir() as t:
+        results_path = t.path("cv_results.csv")
+        cv_results_df.to_csv(results_path)
+        try_mlflow_log(MlflowClient().log_artifact, run_id, results_path)
+
+
+def _create_child_runs_for_parameter_search(cv_estimator, parent_run, child_tags=None):
+    """
+    Creates a collection of child runs for a parameter search training session.
+    Runs are reconstructed from the `cv_results_` attribute of the specified trained
+    parameter search estimator - `cv_estimator`, which provides relevant performance
+    metrics for each point in the parameter search space. One child run is created
+    for each point in the parameter search space. For additional information, see
+    `https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.GridSearchCV.html`_. # noqa: E501
+
+    :param cv_estimator: The trained parameter search estimator for which to create
+                         child runs.
+    :param parent_run: A py:class:`mlflow.entities.Run` object referring to the parent
+                       parameter search run for which child runs should be created.
+    :param child_tags: An optional dictionary of MLflow tag keys and values to log
+                       for each child run.
+    """
+    import pandas as pd
+
+    client = MlflowClient()
+    # Use the start time of the parent parameter search run as a rough estimate for the
+    # start time of child runs, since we cannot precisely determine when each point
+    # in the parameter search space was explored
+    child_run_start_time = parent_run.info.start_time
+    child_run_end_time = int(time.time() * 1000)
+
+    seed_estimator = cv_estimator.estimator
+    # In the unlikely case that a seed of a parameter search estimator is,
+    # itself a parameter search estimator, we should avoid logging the untuned
+    # parameters of the seeds's seed estimator
+    should_log_params_deeply = not _is_parameter_search_estimator(seed_estimator)
+    # Each row of `cv_results_` only provides parameters that vary across
+    # the user-specified parameter grid. In order to log the complete set
+    # of parameters for each child run, we fetch the parameters defined by
+    # the seed estimator and update them with parameter subset specified
+    # in the result row
+    base_params = seed_estimator.get_params(deep=should_log_params_deeply)
+
+    cv_results_df = pd.DataFrame.from_dict(cv_estimator.cv_results_)
+    for _, result_row in cv_results_df.iterrows():
+        tags_to_log = dict(child_tags) if child_tags else {}
+        tags_to_log.update({
+            MLFLOW_PARENT_RUN_ID: parent_run.info.run_id,
+        })
+        tags_to_log.update(_get_estimator_info_tags(seed_estimator))
+        child_run = client.create_run(
+            experiment_id=parent_run.info.experiment_id,
+            start_time=child_run_start_time,
+            tags=tags_to_log,
+        )
+
+        from itertools import zip_longest
+        params_to_log = dict(base_params)
+        params_to_log.update(result_row.get("params", {}))
+        param_batches_to_log = _chunk_dict(params_to_log, chunk_size=MAX_PARAMS_TAGS_PER_BATCH)
+
+        # Parameters values are recorded twice in the set of search `cv_results_`:
+        # once within a `params` column with dictionary values and once within
+        # a separate dataframe column that is created for each parameter. To prevent
+        # duplication of parameters, we log the consolidated values from the parameter
+        # dictionary column and filter out the other parameter-specific columns with
+        # names of the form `param_{param_name}`. Additionally, `cv_results_` produces
+        # metrics for each training split, which is fairly verbose; accordingly, we filter
+        # out per-split metrics in favor of aggregate metrics (mean, std, etc.)
+        excluded_metric_prefixes = ["param", "split"]
+        metric_batches_to_log = _chunk_dict(
+            {
+                key: value
+                for key, value in result_row.iteritems()
+                if not any([key.startswith(prefix) for prefix in excluded_metric_prefixes])
+                and isinstance(value, Number)
+
+            },
+            chunk_size=MAX_METRICS_PER_BATCH,
+        )
+
+        for params_batch, metrics_batch in zip_longest(
+                param_batches_to_log, metric_batches_to_log, fillvalue={}):
+            client.log_batch(
+                run_id=child_run.info.run_id,
+                params=[
+                    Param(str(key), str(value)) for key, value in params_batch.items()
+                ],
+                metrics=[
+                    Metric(
+                        key=key,
+                        value=value,
+                        timestamp=child_run_end_time,
+                        step=0,
+                    )
+                    for key, value in metrics_batch.items()
+                ],
+            )
+
+        client.set_terminated(
+            run_id=child_run.info.run_id,
+            end_time=child_run_end_time
+        )
+
+
+def _is_old_version():
+    import sklearn
+
+    return LooseVersion(sklearn.__version__) < LooseVersion(_MIN_SKLEARN_VERSION)
+
+
+def _all_estimators():
+    try:
+        from sklearn.utils import all_estimators
+
+        return all_estimators()
+    except ImportError:
+        return _backported_all_estimators()
 
 
 def _backported_all_estimators(type_filter=None):
