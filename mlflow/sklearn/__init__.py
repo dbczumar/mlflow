@@ -543,7 +543,6 @@ def autolog():
             + "(current version: {})".format(sklearn.__version__),
             stacklevel=2,
         )
-        return
 
     def fit_mlflow(self, func_name, *args, **kwargs):
         should_start_run = mlflow.active_run() is None
