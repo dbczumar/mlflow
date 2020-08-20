@@ -1,4 +1,105 @@
-def _all_estimators(type_filter=None):
+from distutils.version import LooseVersion
+import inspect
+from itertools import islice
+
+_SAMPLE_WEIGHT = "sample_weight"
+
+
+def _is_old_version():
+    import sklearn
+
+    return LooseVersion(sklearn.__version__) < LooseVersion("0.20.3")
+
+
+def _all_estimators():
+    import sklearn
+
+    return (
+        sklearn.utils.all_estimators()
+        if hasattr(sklearn.utils, "all_estimators")
+        else _backported_all_estimators()
+    )
+
+
+def _get_estimator_info_tags(estimator):
+    """
+    :return: A dictionary of MLflow run tag keys and values
+             describing the specified estimator.
+    """
+    return {
+        "estimator_name": estimator.__class__.__name__,
+        "estimator_class": (
+            estimator.__class__.__module__ + "." + estimator.__class__.__name__
+        ),
+    }
+
+
+def _get_Xy(args, kwargs):
+    if len(args) >= 2:
+        return args[:2]
+
+    if len(args) == 1:
+        return args[0], kwargs["y"]
+
+    return kwargs["X"], kwargs["y"]
+
+
+def _get_sample_weight(args_list, args, kwargs):
+    sample_weight_index = args_list.index(_SAMPLE_WEIGHT)
+
+    if len(args) > sample_weight_index:
+        return args[sample_weight_index]
+
+    if _SAMPLE_WEIGHT in kwargs:
+        return kwargs[_SAMPLE_WEIGHT]
+
+    return None
+
+
+def _get_arg_names(f):
+    # `inspect.getargspec` doesn't return a wrapped function's argspec
+    # See: https://hynek.me/articles/decorators/
+    return list(inspect.signature(f).parameters.keys())
+
+
+def _get_args_for_score(fit_func, score_func, args, kwargs):
+    fit_args = _get_arg_names(fit_func)
+    score_args = _get_arg_names(score_func)
+
+    Xy = _get_Xy(args, kwargs)
+
+    if (_SAMPLE_WEIGHT in score_args) and (_SAMPLE_WEIGHT in fit_args):
+        sample_weight = _get_sample_weight(fit_args, args, kwargs)
+        return (*Xy, sample_weight)
+
+    return Xy
+
+
+def _chunk_dict(d, chunk_size):
+    # Copied from: https://stackoverflow.com/a/22878842
+
+    it = iter(d)
+    for _ in range(0, len(d), chunk_size):
+        yield {k: d[k] for k in islice(it, chunk_size)}
+
+
+def _truncate_dict_values(d, max_length):
+    return {k: str(v)[:max_length] for k, v in d.items()}
+
+
+def _is_parameter_search_estimator(estimator):
+    from sklearn.model_selection import GridSearchCV, RandomizedSearchCV
+    param_search_estimators = [
+        GridSearchCV,
+        RandomizedSearchCV,
+    ]
+    return any([
+        isinstance(estimator, param_search_estimator)
+        for param_search_estimator in param_search_estimators
+    ])
+
+
+def _backported_all_estimators(type_filter=None):
     """
     Backported from scikit-learn 0.23.2:
     https://github.com/scikit-learn/scikit-learn/blob/0.23.2/sklearn/utils/__init__.py#L1146
@@ -31,7 +132,6 @@ def _all_estimators(type_filter=None):
         and ``class`` is the actuall type of the class.
     """
     # lazy import to avoid circular imports from sklearn.base
-    import inspect
     import pkgutil
     import platform
     from importlib import import_module

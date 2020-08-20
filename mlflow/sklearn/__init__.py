@@ -8,7 +8,6 @@ Python (native) `pickle <https://scikit-learn.org/stable/modules/model_persisten
 :py:mod:`mlflow.pyfunc`
     Produced for use by generic pyfunc-based deployment tools and batch inference.
 """
-from distutils.version import LooseVersion
 import functools
 import gorilla
 import os
@@ -27,7 +26,6 @@ from mlflow.models.signature import ModelSignature
 from mlflow.models.utils import ModelInputExample, _save_example
 from mlflow.protos.databricks_pb2 import INVALID_PARAMETER_VALUE, INTERNAL_ERROR
 from mlflow.protos.databricks_pb2 import RESOURCE_ALREADY_EXISTS
-from mlflow.sklearn.utils import _all_estimators
 from mlflow.tracking.artifact_utils import _download_artifact_from_uri
 from mlflow.utils.environment import _mlflow_conda_env
 from mlflow.utils.model_utils import _get_flavor_configuration
@@ -509,17 +507,26 @@ class _SklearnTrainingSession(object):
         )
 
 
-def _is_old_version():
-    from sklearn import __version__
-
-    return LooseVersion(__version__) < LooseVersion("0.20.3")
-
-
 def autolog():
     """
     Enable autologging for scikit-learn.
     """
     import sklearn
+    import pandas as pd
+    from mlflow.sklearn.utils import (
+        _is_old_version,
+        _chunk_dict,
+        _get_args_for_score,
+        _all_estimators,
+        _truncate_dict_values,
+        _get_estimator_info_tags,
+        _is_parameter_search_estimator,
+    )
+    from mlflow.utils.validation import (
+        MAX_PARAMS_TAGS_PER_BATCH, MAX_METRICS_PER_BATCH, MAX_PARAM_VAL_LENGTH,
+    )
+
+    sklearn.set_config(print_changed_only=True)
 
     if _is_old_version():
         warnings.warn(
@@ -530,8 +537,8 @@ def autolog():
         return
 
     def fit_mlflow(self, func_name, *args, **kwargs):
-        active_run_exists = mlflow.active_run() is not None
-        if not active_run_exists:
+        should_start_run = mlflow.active_run() is None
+        if should_start_run:
             try_mlflow_log(mlflow.start_run)
 
         _log_pretraining_metadata(self, *args, **kwargs)
@@ -540,46 +547,44 @@ def autolog():
         try:
             fit_output = original_fit(*args, **kwargs)
         except Exception as e:
-            _logger.warning("{} failed: {}".format(original_fit.__qualname__, str(e)))
-            mlflow.end_run(RunStatus.to_string(RunStatus.FAILED))
-            return
+            if should_start_run:
+                mlflow.end_run(RunStatus.to_string(RunStatus.FAILED))
+
+            raise e
 
         _log_posttraining_metadata(self, *args, **kwargs)
 
-        if not active_run_exists:
+        if should_start_run:
             try_mlflow_log(mlflow.end_run)
 
         return fit_output
 
-    def _is_parameter_search_estimator(estimator):
-        from sklearn.model_selection import GridSearchCV, RandomizedSearchCV
-        param_search_estimators = [
-            GridSearchCV,
-            RandomizedSearchCV,
-        ]
-        return any([
-            isinstance(estimator, param_search_estimator)
-            for param_search_estimator in param_search_estimators
-        ])
 
     def _log_pretraining_metadata(estimator, *args, **kwargs):
+        # Deep parameter logging includes parameters from children of a given
+        # estimator. For some meta estimators (e.g., pipelines), recording
+        # these parameters is desirable. For parameter search estimators,
+        # however, child estimators act as seeds for the parameter search
+        # process; accordingly, we avoid logging initial, untuned parameters
+        # for these seed estimators.
         should_log_params_deeply = not _is_parameter_search_estimator(estimator)
-        try_mlflow_log(
-            mlflow.log_params,
-            estimator.get_params(deep=should_log_params_deeply)
-        )
-        try_mlflow_log(
-            mlflow.set_tags,
-            {"estimator_name": estimator.__class__.__name__, "estimator_class": estimator.__class__},
-        )
+        # Chunk model parameters to avoid hitting the log_batch API limit
+        for chunk in _chunk_dict(estimator.get_params(deep=should_log_params_deeply),
+                                 chunk_size=MAX_PARAMS_TAGS_PER_BATCH):
+            try_mlflow_log(mlflow.log_params, _truncate_dict_values(chunk, MAX_PARAM_VAL_LENGTH))
+
+        try_mlflow_log(mlflow.set_tags, _get_estimator_info_tags(estimator))
+
 
     def _log_posttraining_metadata(estimator, *args, **kwargs):
         if hasattr(estimator, "score"):
             try:
-                training_score = estimator.score(*args, **kwargs)
+                score_args = _get_args_for_score(estimator.fit, estimator.score, args, kwargs)
+                training_score = estimator.score(*score_args)
                 try_mlflow_log(mlflow.log_metric, "training_score", training_score)
-            except Exception as e:
-                _logger.warning("{} failed: {}".format(estimator.score.__qualname__, str(e)))
+            except Exception as e:  # pylint: disable=broad-except
+                msg = "{} failed: {}".format(estimator.score.__qualname__, str(e))
+                _logger.warning(msg)
 
         try_mlflow_log(log_model, estimator, artifact_path="model")
 
@@ -594,53 +599,114 @@ def autolog():
                 }
                 try_mlflow_log(mlflow.log_params, best_params)
 
-            _create_child_cv_runs(estimator)
+            if hasattr(estimator, 'cv_results_'):
+                try:
+                    _create_child_cv_runs(estimator, mlflow.active_run())
+                except Exception as e:
+                    raise e
+                    msg = (
+                        "Encountered exception during creation of child runs for parameter search."
+                        " Child runs may be missing. Exception: {}".format(str(e))
+                    )
+                    _logger.warning(msg)
 
-    def _create_child_cv_runs(cv_estimator):
+    def _log_cv_results(cv_results):
+        import json
+        from mlflow.utils.file_utils import TempDir
+
+        cv_results_df = pd.DataFrame.from_dict(cv_estimator.cv_results_)
+        with TempDir() as t:
+
+
+
+    def _create_child_cv_runs(cv_estimator, parent_run):
+        """
+        :param cv_estimator: The trained parameter search estimator for which to create
+                             child runs.
+        :param parent_run: A py:class:`mlflow.entities.Run` object referring to the parent
+                           parameter search run for which child runs should be created.
+        """
+        from mlflow.entities import Metric, RunTag, Param, RunStatus
+        from mlflow.utils.mlflow_tags import MLFLOW_PARENT_RUN_ID
         from mlflow.tracking.client import MlflowClient
-        from mlflow.entities import Metric, RunTag, Param
-        import pandas as pd
+        from mlflow.tracking.context import registry as context_registry
         import time
         from numbers import Number
 
         client = MlflowClient()
-        metrics_timestamp = int(time.time() * 1000)
+        child_timestamp = int(time.time() * 1000)
+        seed_estimator = cv_estimator.estimator
+        # In the unlikely case that a seed of a parameter search estimator is,
+        # itself a parameter search estimator, we should avoid logging the untuned
+        # parameters of the seeds's seed estimator
+        should_log_params_deeply = not _is_parameter_search_estimator(seed_estimator)
+        # Each row of `cv_results_` only provides parameters that vary across
+        # the user-specified parameter grid. In order to log the complete set
+        # of parameters for each child run, we fetch the parameters defined by
+        # the seed estimator and update them with parameter subset specified
+        # in the result row
+        base_params = seed_estimator.get_params(deep=should_log_params_deeply)
 
         cv_results_df = pd.DataFrame.from_dict(cv_estimator.cv_results_)
         for _, result_row in cv_results_df.iterrows():
-            with mlflow.start_run(nested=True):
-                params = [
-                    Param(str(key), str(value)) for key, value in result_row.get("params", {}).items()
-                ]
-                metrics = {
-                    Metric(
-                        key=key,
-                        value=value,
-                        timestamp=metrics_timestamp,
-                        step=0,
-                    )
-                    for key, value in result_row.iteritems()
-                    # Parameters values are recorded twice in the set of search `cv_results`:
-                    # once within a `params` column with dictionary values and once within
-                    # a separate dataframe column that is created for each parameter. To prevent
-                    # duplication of parameters, we log the consolidated values from the parameter
-                    # dictionary column and filter out the other parameter-specific columns with
-                    # names of the form `param_{param_name}`.
-                    if not key.startswith("param") and isinstance(value, Number)
-                }
-                tags = [
-                    RunTag(key, value) for key, value in {
-                        "estimator_name": str(cv_estimator.estimator.__class__.__name__),
-                        "estimator_class": str(cv_estimator.estimator.__class__),
-                    }.items()
-                ]
+            # Fetch environment-specific tags (e.g., user and source) to ensure that lineage
+            # information is consistent with the parent run
+            child_tags = context_registry.resolve_tags({
+                MLFLOW_PARENT_RUN_ID: parent_run.info.run_id,
+            })
+            child_tags.update(_get_estimator_info_tags(seed_estimator))
+            child_run = client.create_run(
+                experiment_id=parent_run.info.experiment_id,
+                start_time=child_timestamp,
+                tags=child_tags,
+            )
 
+            from itertools import zip_longest
+            params_to_log = dict(base_params)
+            params_to_log.update(result_row.get("params", {}))
+            param_batches_to_log = _chunk_dict(params_to_log, chunk_size=MAX_PARAMS_TAGS_PER_BATCH)
+
+            # Parameters values are recorded twice in the set of search `cv_results_`:
+            # once within a `params` column with dictionary values and once within
+            # a separate dataframe column that is created for each parameter. To prevent
+            # duplication of parameters, we log the consolidated values from the parameter
+            # dictionary column and filter out the other parameter-specific columns with
+            # names of the form `param_{param_name}`. Additionally, `cv_results_` produces
+            # metrics for each training split, which is fairly verbose; accordingly, we filter
+            # out per-split metrics in favor of aggregate metrics (mean, std, etc).
+            excluded_metric_prefixes = ["param", "split"]
+            metric_batches_to_log = _chunk_dict(
+                {
+                    key: value
+                    for key, value in result_row.iteritems()
+                    if not any([key.startswith(prefix) for prefix in excluded_metric_prefixes])
+                    and isinstance(value, Number)
+
+                },
+                chunk_size=MAX_METRICS_PER_BATCH,
+            )
+
+            for params_batch, metrics_batch in zip_longest(
+                    param_batches_to_log, metric_batches_to_log, fillvalue={}):
                 client.log_batch(
-                    run_id=mlflow.active_run().info.run_id,
-                    params=params,
-                    metrics=metrics,
-                    tags=tags,
+                    run_id=child_run.info.run_id,
+                    params=[
+                        Param(str(key), str(value)) for key, value in params_batch.items()
+                    ],
+                    metrics=[
+                        Metric(
+                            key=key,
+                            value=value,
+                            timestamp=child_timestamp,
+                            step=0,
+                        )
+                        for key, value in metrics_batch.items()
+                    ],
                 )
+
+            client.set_terminated(
+                run_id=child_run.info.run_id,
+            )
 
     def patched_fit(self, func_name, *args, **kwargs):
         """
@@ -670,6 +736,11 @@ def autolog():
         for func_name in ["fit", "fit_transform", "fit_predict"]:
             if hasattr(class_def, func_name):
                 original = getattr(class_def, func_name)
+
+                # Exclude property methods from patching
+                if isinstance(original, property):
+                    continue
+
                 patch_func = create_patch_func(func_name)
                 # preserve original function attributes
                 patch_func = functools.wraps(original)(patch_func)

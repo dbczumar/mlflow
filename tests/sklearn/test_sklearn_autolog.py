@@ -5,11 +5,11 @@ from mock import mock
 import numpy as np
 import pytest
 import sklearn
-import sklearn.datasets as datasets
 
 import mlflow.sklearn
+from mlflow.sklearn.utils import _get_arg_names
 from mlflow.utils.mlflow_tags import MLFLOW_PARENT_RUN_ID
-
+from mlflow.utils.validation import MAX_PARAMS_TAGS_PER_BATCH, MAX_PARAM_VAL_LENGTH
 
 FIT_FUNC_NAMES = ["fit", "fit_transform", "fit_predict"]
 TRAINING_SCORE = "training_score"
@@ -18,7 +18,7 @@ ESTIMATOR_NAME = "estimator_name"
 
 
 def get_iris():
-    iris = datasets.load_iris()
+    iris = sklearn.datasets.load_iris()
     return iris.data[:, :2], iris.target
 
 
@@ -75,19 +75,23 @@ def test_autolog_preserves_original_function_attributes():
         attrs = {}
         for method_name in FIT_FUNC_NAMES:
             if hasattr(cls, method_name):
-                attrs[method_name] = get_func_attrs(getattr(cls, method_name))
+                attr = getattr(cls, method_name)
+                if isinstance(attr, property):
+                    continue
+
+                attrs[method_name] = get_func_attrs(attr)
         return attrs
 
-    before = [get_cls_attrs(cls) for _, cls in mlflow.sklearn._get_all_estimators()]
+    before = [get_cls_attrs(cls) for _, cls in mlflow.sklearn.utils._all_estimators()]
     mlflow.sklearn.autolog()
-    after = [get_cls_attrs(cls) for _, cls in mlflow.sklearn._get_all_estimators()]
+    after = [get_cls_attrs(cls) for _, cls in mlflow.sklearn.utils._all_estimators()]
 
     for b, a in zip(before, after):
         assert b == a
 
 
 @pytest.mark.skipif(
-    not mlflow.sklearn._is_old_version(), reason="This test fails on sklearn>=0.20.3"
+    not mlflow.sklearn.utils._is_old_version(), reason="This test fails on sklearn>=0.20.3"
 )
 def test_autolog_emits_warning_on_older_versions_of_sklearn():
     with pytest.warns(
@@ -112,9 +116,9 @@ def test_estimator(fit_func_name):
     Xy = get_iris()
 
     with mlflow.start_run() as run:
-        run_id = run._info.run_id
         model = fit_model(model, Xy, fit_func_name)
 
+    run_id = run._info.run_id
     params, metrics, tags, artifacts = get_run_data(run_id)
     assert params == stringify_dict_values(model.get_params(deep=True))
     assert metrics == {TRAINING_SCORE: model.score(*Xy)}
@@ -139,10 +143,10 @@ def test_meta_estimator():
     Xy = get_iris()
 
     with mlflow.start_run() as run:
-        run_id = run._info.run_id
-        model = fit_model(model, Xy, "fit")
+        model.fit(*Xy)
 
-    params, metrics, tags, artifacts = get_run_data(run._info.run_id)
+    run_id = run._info.run_id
+    params, metrics, tags, artifacts = get_run_data(run_id)
     assert params == stringify_dict_values(model.get_params(deep=True))
     assert metrics == {TRAINING_SCORE: model.score(*Xy)}
     assert tags == {
@@ -155,37 +159,185 @@ def test_meta_estimator():
     np.testing.assert_array_equal(loaded_model.predict(Xy[0]), model.predict(Xy[0]))
 
 
-def test_autolog_marks_run_as_failed_when_fit_fails():
+def test_get_params_returns_dict_that_has_more_keys_than_max_params_tags_per_batch():
+    mlflow.sklearn.autolog()
+
+    large_params = {str(i): str(i) for i in range(MAX_PARAMS_TAGS_PER_BATCH + 1)}
+    Xy = get_iris()
+
+    with mock.patch("sklearn.cluster.KMeans.get_params", return_value=large_params):
+        with mlflow.start_run() as run:
+            model = sklearn.cluster.KMeans()
+            model.fit(*Xy)
+
+    run_id = run._info.run_id
+    params, metrics, tags, artifacts = get_run_data(run._info.run_id)
+    assert params == large_params
+    assert metrics == {TRAINING_SCORE: model.score(*Xy)}
+    assert tags == {
+        ESTIMATOR_NAME: model.__class__.__name__,
+        ESTIMATOR_CLASS: model.__class__.__module__ + "." + model.__class__.__name__,
+    }
+    assert "model" in artifacts
+
+    loaded_model = load_model_by_run_id(run_id)
+    np.testing.assert_array_equal(loaded_model.predict(Xy[0]), model.predict(Xy[0]))
+
+
+def test_get_params_returns_dict_with_value_longer_than_max_param_val_length():
+    mlflow.sklearn.autolog()
+
+    long_params = {"name": "a" * (MAX_PARAM_VAL_LENGTH + 1)}
+    Xy = get_iris()
+
+    with mock.patch("sklearn.cluster.KMeans.get_params", return_value=long_params):
+        with mlflow.start_run() as run:
+            model = sklearn.cluster.KMeans()
+            model.fit(*Xy)
+
+    run_id = run._info.run_id
+    params, metrics, tags, artifacts = get_run_data(run._info.run_id)
+    assert params == {"name": "a" * MAX_PARAM_VAL_LENGTH}
+    assert metrics == {TRAINING_SCORE: model.score(*Xy)}
+    assert tags == {
+        ESTIMATOR_NAME: model.__class__.__name__,
+        ESTIMATOR_CLASS: model.__class__.__module__ + "." + model.__class__.__name__,
+    }
+    assert "model" in artifacts
+
+    loaded_model = load_model_by_run_id(run_id)
+    np.testing.assert_array_equal(loaded_model.predict(Xy[0]), model.predict(Xy[0]))
+
+
+def test_call_fit_with_arguments_score_does_not_accept():
+    mlflow.sklearn.autolog()
+
+    model = sklearn.linear_model.SGDRegressor()
+
+    assert "intercept_init" in _get_arg_names(model.fit)
+    assert "intercept_init" not in _get_arg_names(model.score)
+
+    with mlflow.start_run():
+        Xy = get_iris()
+        model.fit(*Xy, intercept_init=0)
+
+
+def test_both_fit_and_score_contain_sample_weight():
+    mlflow.sklearn.autolog()
+
+    model = sklearn.linear_model.SGDRegressor()
+
+    # ensure that we use an appropriate model for this test
+    assert "sample_weight" in _get_arg_names(model.fit)
+    assert "sample_weight" in _get_arg_names(model.score)
+
+    mock_obj = mock.Mock()
+
+    def mock_score(X, y, sample_weight=None):
+        mock_obj(X, y, sample_weight)
+        return 0
+
+    assert inspect.signature(model.score) == inspect.signature(mock_score)
+
+    model.score = mock_score
+
+    with mlflow.start_run():
+        Xy = get_iris()
+        sample_weight = abs(np.random.randn(len(Xy[0])))
+        model.fit(*Xy, sample_weight=sample_weight)
+        mock_obj.assert_called_once_with(*Xy, sample_weight)
+
+
+def test_only_fit_contains_sample_weight():
+    mlflow.sklearn.autolog()
+
+    model = sklearn.linear_model.RANSACRegressor()
+
+    assert "sample_weight" in _get_arg_names(model.fit)
+    assert "sample_weight" not in _get_arg_names(model.score)
+
+    mock_obj = mock.Mock()
+
+    def mock_score(X, y):
+        mock_obj(X, y)
+        return 0
+
+    assert inspect.signature(model.score) == inspect.signature(mock_score)
+
+    model.score = mock_score
+
+    with mlflow.start_run():
+        Xy = get_iris()
+        model.fit(*Xy)
+        mock_obj.assert_called_once_with(*Xy)
+
+
+def test_only_score_contains_sample_weight():
+    mlflow.sklearn.autolog()
+
+    model = sklearn.gaussian_process.GaussianProcessRegressor()
+
+    assert "sample_weight" not in _get_arg_names(model.fit)
+    assert "sample_weight" in _get_arg_names(model.score)
+
+    mock_obj = mock.Mock()
+
+    def mock_score(X, y, sample_weight=None):
+        mock_obj(X, y, sample_weight)
+        return 0
+
+    assert inspect.signature(model.score) == inspect.signature(mock_score)
+
+    model.score = mock_score
+
+    with mlflow.start_run():
+        Xy = get_iris()
+        model.fit(*Xy)
+        mock_obj.assert_called_once_with(*Xy, None)
+
+
+def test_autolog_terminates_run_when_active_run_does_not_exist_and_fit_fails():
+    mlflow.sklearn.autolog()
+
+    with pytest.raises(ValueError, match="Penalty term must be positive"):
+        sklearn.svm.LinearSVC(C=-1).fit(*get_iris())
+
+    latest_run = mlflow.search_runs().iloc[0]
+    assert mlflow.active_run() is None
+    assert latest_run.status == "FAILED"
+
+
+def test_autolog_does_not_terminate_run_when_active_run_exists_and_fit_fails():
     mlflow.sklearn.autolog()
     run = mlflow.start_run()
 
-    with mock.patch("logging.Logger.warning") as mock_warning:
-        model = sklearn.svm.LinearSVC(C=-8).fit(*get_iris())
+    with pytest.raises(ValueError, match="Penalty term must be positive"):
+        sklearn.svm.LinearSVC(C=-1).fit(*get_iris())
 
-    assert model is None
-    assert mlflow.active_run() is None
-    assert get_run(run._info.run_id)._info.status == "FAILED"
-    mock_warning.assert_called_once()
-    assert mock_warning.call_args[0][0].startswith("LinearSVC.fit failed")
+    assert mlflow.active_run() is not None
+    assert mlflow.active_run() is run
+    mlflow.end_run()
 
 
 def test_autolog_emits_warning_message_when_score_fails():
     mlflow.sklearn.autolog()
 
+    model = sklearn.cluster.KMeans()
+
+    @functools.wraps(model.score)
+    def throwing_score(X, y=None, sample_weight=None):
+        # pylint: disable=unused-argument
+        raise Exception("EXCEPTION")
+
+    model.score = throwing_score
+
     with mlflow.start_run() as run, mock.patch("logging.Logger.warning") as mock_warning:
-        model = sklearn.cluster.KMeans()
-
-        @functools.wraps(model.score)
-        def dummy_score(X, y=None, sample_weight=None):
-            raise Exception
-
-        model.score = dummy_score
         model.fit(*get_iris())
 
     metrics = get_run_data(run._info.run_id)[1]
     assert metrics == {}
     mock_warning.assert_called_once()
-    assert mock_warning.call_args[0][0].startswith("KMeans.score failed")
+    assert mock_warning.call_args[0][0] == ("KMeans.score failed: EXCEPTION")
 
 
 def test_fit_xxx_performs_logging_only_once(fit_func_name):
@@ -229,7 +381,7 @@ def test_meta_estimator_fit_performs_logging_only_once():
     ) as mock_log_model:
 
         with mlflow.start_run() as run:
-            model = fit_model(model, Xy, "fit")
+            model.fit(*Xy)
             mock_log_params.assert_called_once()
             mock_log_metric.assert_called_once()
             mock_set_tags.assert_called_once()
