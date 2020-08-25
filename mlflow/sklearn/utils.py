@@ -224,7 +224,7 @@ def _create_child_runs_for_parameter_search(cv_estimator, parent_run, child_tags
 
     seed_estimator = cv_estimator.estimator
     # In the unlikely case that a seed of a parameter search estimator is,
-    # itself a parameter search estimator, we should avoid logging the untuned
+    # itself, a parameter search estimator, we should avoid logging the untuned
     # parameters of the seeds's seed estimator
     should_log_params_deeply = not _is_parameter_search_estimator(seed_estimator)
     # Each row of `cv_results_` only provides parameters that vary across
