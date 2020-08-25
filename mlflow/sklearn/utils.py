@@ -21,8 +21,11 @@ from mlflow.utils.validation import (
 
 _logger = logging.getLogger(__name__)
 
-_SAMPLE_WEIGHT = "sample_weight"
+# The earliest version we're guaranteed to support. Autologging utilities may not work properly
+# on scikit-learn older than this version.
 _MIN_SKLEARN_VERSION = "0.20.3"
+
+_SAMPLE_WEIGHT = "sample_weight"
 
 
 def _get_estimator_info_tags(estimator):
@@ -85,7 +88,7 @@ def _get_args_for_score(score_func, fit_func, fit_args, fit_kwargs):
     :param fit_args: Positional arguments given to fit_func.
     :param fit_kwargs: Keyword arguments given to fit_func.
 
-    :return A tuple of either (X, y, sample_weight) or (X, y).
+    :returns: A tuple of either (X, y, sample_weight) or (X, y).
     """
     score_arg_names = _get_arg_names(score_func)
     fit_arg_names = _get_arg_names(fit_func)
@@ -145,7 +148,7 @@ def _truncate_dict(d, max_key_length=None, max_value_length=None):
 
 def _get_meta_estimators_for_autologging():
     """
-    :return: A list of meta estimator class definitions 
+    :return: A list of meta estimator class definitions
              (e.g., `sklearn.model_selection.GridSearchCV`) that should be included
              when patching training functions for autologging
     """
@@ -297,10 +300,10 @@ def _create_child_runs_for_parameter_search(cv_estimator, parent_run, child_tags
         )
 
 
-def _is_old_version():
+def _is_supported_version():
     import sklearn
 
-    return LooseVersion(sklearn.__version__) < LooseVersion(_MIN_SKLEARN_VERSION)
+    return LooseVersion(sklearn.__version__) >= LooseVersion(_MIN_SKLEARN_VERSION)
 
 
 def _all_estimators():
@@ -349,7 +352,7 @@ def _backported_all_estimators(type_filter=None):
     import platform
     from importlib import import_module
     from operator import itemgetter
-    from sklearn.utils.testing import ignore_warnings
+    from sklearn.utils.testing import ignore_warnings  # pylint: disable=no-name-in-module
     from sklearn.base import (
         BaseEstimator,
         ClassifierMixin,

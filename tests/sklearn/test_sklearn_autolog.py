@@ -12,14 +12,18 @@ import sklearn.model_selection
 from scipy.stats import uniform
 
 import mlflow.sklearn
-from mlflow.sklearn.utils import _MIN_SKLEARN_VERSION, _get_arg_names, _truncate_dict
+from mlflow.sklearn.utils import (
+    _is_supported_version,
+    _get_arg_names,
+    _truncate_dict,
+)
 from mlflow.utils.mlflow_tags import MLFLOW_PARENT_RUN_ID
 from mlflow.utils.autologging_utils import try_mlflow_log
 from mlflow.utils.validation import (
     MAX_PARAMS_TAGS_PER_BATCH,
     MAX_METRICS_PER_BATCH,
-    MAX_PARAM_KEY_LENGTH,
     MAX_PARAM_VAL_LENGTH,
+    MAX_ENTITY_KEY_LENGTH,
 )
 
 FIT_FUNC_NAMES = ["fit", "fit_transform", "fit_predict"]
@@ -72,7 +76,7 @@ def stringify_dict_values(d):
 
 
 def truncate_dict(d):
-    return _truncate_dict(d, MAX_PARAM_KEY_LENGTH, MAX_PARAM_VAL_LENGTH)
+    return _truncate_dict(d, MAX_ENTITY_KEY_LENGTH, MAX_PARAM_VAL_LENGTH)
 
 
 def get_expected_class_tags(model):
@@ -93,10 +97,9 @@ def fit_func_name(request):
 
 @pytest.fixture(autouse=True, scope="function")
 def force_try_mlflow_log_to_fail(request):
-    # autolog contains multiple `try_mlflow_log`. They may hide unintentional errors (often
-    # caused by incorrect test settings) and allow tests that should not pass to pass
-    # (without us noticing). To prevent that, temporarily turns a warning emitted by
-    # `try_mlflow_log` into errors.
+    # autolog contains multiple `try_mlflow_log`. They unexpectedly allow tests that
+    # should fail to pass (without us noticing). To prevent that, temporarily turns
+    # warnings emitted by `try_mlflow_log` into errors.
     if "disable_force_try_mlflow_log_to_fail" in request.keywords:
         yield
     else:
@@ -149,10 +152,9 @@ def test_autolog_preserves_original_function_attributes():
 
 
 @pytest.mark.skipif(
-    not mlflow.sklearn.utils._is_old_version(),
-    reason="This test fails on sklearn>={}".format(_MIN_SKLEARN_VERSION),
+    _is_supported_version(), reason="This test fails on supported versions of sklearn"
 )
-def test_autolog_emits_warning_on_older_versions_of_sklearn():
+def test_autolog_emits_warning_on_unsupported_versions_of_sklearn():
     with pytest.warns(
         UserWarning, match="Autologging utilities may not work properly on scikit-learn"
     ):
@@ -235,12 +237,12 @@ def test_get_params_returns_dict_that_has_more_keys_than_max_params_tags_per_bat
     "long_params, messages",
     [
         # key exceeds the limit
-        ({("a" * (MAX_PARAM_KEY_LENGTH + 1)): "b"}, ["Truncated the key"]),
+        ({("a" * (MAX_ENTITY_KEY_LENGTH + 1)): "b"}, ["Truncated the key"]),
         # value exceeds the limit
         ({"a": "b" * (MAX_PARAM_VAL_LENGTH + 1)}, ["Truncated the value"]),
         # both key and value exceed the limit
         (
-            {("a" * (MAX_PARAM_KEY_LENGTH + 1)): "b" * (MAX_PARAM_VAL_LENGTH + 1)},
+            {("a" * (MAX_ENTITY_KEY_LENGTH + 1)): "b" * (MAX_PARAM_VAL_LENGTH + 1)},
             ["Truncated the key", "Truncated the value"],
         ),
     ],

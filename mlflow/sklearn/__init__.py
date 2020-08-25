@@ -523,9 +523,8 @@ def autolog():
     **Logged information**
       **Parameters**
         - Parameters obtained by ``estimator.get_params(deep=True)``. Note that ``get_params``
-          is called with ``deep=True``. This means when you fit a meta estimator
-          (e.g. `sklearn.pipeline.Pipeline`_), the parameters of its child estimators
-          are also logged.
+          is called with ``deep=True``. This means when you fit a meta estimator that chains
+          a series of estimators, the parameters of these child estimators are also logged.
 
       **Metrics**
         - A training score obtained by ``estimator.score``. Note that the training score is
@@ -533,39 +532,38 @@ def autolog():
 
       **Tags**
         - An estimator class name (e.g. "LinearRegression").
-        - A qualified estimator class name (e.g. "sklearn.linear_model._base.LinearRegression").
+        - A fully qualified estimator class name
+          (e.g. "sklearn.linear_model._base.LinearRegression").
 
       **Artifacts**
         - A fitted estimator (logged by :py:func:`mlflow.sklearn.log_model()`).
 
-    **Meta estimators**
-      When a meta estimator (e.g., `sklearn.pipeline.Pipeline`_) calls ``fit()``, it internally 
-      calls ``fit()`` on its child estimators. Autologging does NOT perform logging on these 
-      constituent ``fit()`` calls.
+    **How does autologging work for meta estimators?**
+      When a meta estimator (e.g. `Pipeline`_, `GridSearchCV`_) calls ``fit()``, it internally calls
+      ``fit()`` on its child estimators. Autologging does NOT perform logging on these constituent
+      ``fit()`` calls.
 
       **Parameter search**
           In addition to recording the information discussed above, autologging for parameter
-          search meta estimators (`sklearn.model_selection.GridSearchCV`_ and 
-          `sklearn.model_selection.RandomizedSearchCV`_) records child runs with metrics
-          for each set of explored parameters, as well as artifacts and parameters for the
-          best model (if available).
+          search meta estimators (`GridSearchCV`_ and `RandomizedSearchCV`_) records child runs 
+          with metrics for each set of explored parameters, as well as artifacts and parameters 
+          for the best model (if available).
 
     **Supported estimators**
-      - All estimators obtained by `sklearn.utils.all_estimators`_
-      - `sklearn.pipeline.Pipeline`_
-      - Parameter search estimators (`sklearn.model_selection.GridSearchCV`_
-        and `sklearn.model_selection.RandomizedSearchCV`_)
+      - All estimators obtained by `sklearn.utils.all_estimators`_ (including meta estimators).
+      - `Pipeline`_
+      - Parameter search estimators (`GridSearchCV`_ and `RandomizedSearchCV`_)
 
     .. _sklearn.utils.all_estimators:
         https://scikit-learn.org/stable/modules/generated/sklearn.utils.all_estimators.html
 
-    .. _sklearn.pipeline.Pipeline:
+    .. _Pipeline:
         https://scikit-learn.org/stable/modules/generated/sklearn.pipeline.Pipeline.html
 
-    .. _sklearn.model_selection.GridSearchCV: 
+    .. _GridSearchCV:
         https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.GridSearchCV.html
     
-    .. _sklearn.model_selection.RandomizedSearchCV: 
+    .. _RandomizedSearchCV:
         https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.RandomizedSearchCV.html
 
     **Example**
@@ -617,7 +615,7 @@ def autolog():
     import pandas as pd
     from mlflow.sklearn.utils import (
         _MIN_SKLEARN_VERSION,
-        _is_old_version,
+        _is_supported_version,
         _chunk_dict,
         _get_args_for_score,
         _all_estimators,
@@ -632,11 +630,11 @@ def autolog():
     from mlflow.utils.validation import (
         MAX_PARAMS_TAGS_PER_BATCH,
         MAX_METRICS_PER_BATCH,
-        MAX_PARAM_KEY_LENGTH,
         MAX_PARAM_VAL_LENGTH,
+        MAX_ENTITY_KEY_LENGTH,
     )
 
-    if _is_old_version():
+    if not _is_supported_version():
         warnings.warn(
             "Autologging utilities may not work properly on scikit-learn < {} ".format(
                 _MIN_SKLEARN_VERSION
@@ -691,7 +689,7 @@ def autolog():
         # Chunk model parameters to avoid hitting the log_batch API limit
         for chunk in _chunk_dict(estimator.get_params(deep=should_log_params_deeply),
                                  chunk_size=MAX_PARAMS_TAGS_PER_BATCH):
-            truncated = _truncate_dict(chunk, MAX_PARAM_KEY_LENGTH, MAX_PARAM_VAL_LENGTH)
+            truncated = _truncate_dict(chunk, MAX_ENTITY_KEY_LENGTH, MAX_PARAM_VAL_LENGTH)
             try_mlflow_log(mlflow.log_params, truncated)
 
         try_mlflow_log(mlflow.set_tags, _get_estimator_info_tags(estimator))
@@ -797,11 +795,26 @@ def autolog():
             if hasattr(class_def, func_name):
                 original = getattr(class_def, func_name)
 
-                # Exclude property methods from patching
+                # A couple of estimators use property methods to return fitting functions,
+                # rather than defining the fitting functions on the estimator class directly.
+                #
+                # Example: https://github.com/scikit-learn/scikit-learn/blob/0.23.2/sklearn/neighbors/_lof.py#L183  # noqa
+                #
+                # We currently exclude these property fitting methods from patching because
+                # it's challenging to patch them correctly.
+                #
+                # Excluded fitting methods:
+                # - sklearn.cluster._agglomerative.FeatureAgglomeration.fit_predict
+                # - sklearn.neighbors._lof.LocalOutlierFactor.fit_predict
+                #
+                # You can list property fitting methods by inserting "print(class_def, func_name)"
+                # in the if clause below.
                 if isinstance(original, property):
                     continue
 
                 patch_func = create_patch_func(func_name)
+                # TODO(harupy): Package this wrap & patch routine into a utility function so we can
+                # reuse it in other autologging integrations.
                 # preserve original function attributes
                 patch_func = functools.wraps(original)(patch_func)
                 patch = gorilla.Patch(class_def, func_name, patch_func, settings=patch_settings)
