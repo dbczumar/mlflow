@@ -4,9 +4,12 @@ from mock import mock
 import warnings
 
 import numpy as np
+import pandas as pd
 import pytest
 import sklearn
 import sklearn.datasets
+import sklearn.model_selection
+from scipy.stats import uniform
 
 import mlflow.sklearn
 from mlflow.sklearn.utils import _MIN_SKLEARN_VERSION, _get_arg_names, _truncate_dict
@@ -14,6 +17,7 @@ from mlflow.utils.mlflow_tags import MLFLOW_PARENT_RUN_ID
 from mlflow.utils.autologging_utils import try_mlflow_log
 from mlflow.utils.validation import (
     MAX_PARAMS_TAGS_PER_BATCH,
+    MAX_METRICS_PER_BATCH,
     MAX_PARAM_KEY_LENGTH,
     MAX_PARAM_VAL_LENGTH,
 )
@@ -88,21 +92,31 @@ def fit_func_name(request):
 
 
 @pytest.fixture(autouse=True, scope="function")
-def throw_if_try_mlflow_log_has_emitted_warnings():
-    # autolog contains multiple try_mlflow_log. They may hide unintentional errors (often caused by
-    # incorrect test settings) and allow tests that should not pass to pass (without us noticing).
-    # To prevent that, throw if try_mlflow_log has emitted warnings during test execution.
-    with warnings.catch_warnings(record=True) as ws:
+def force_try_mlflow_log_to_fail(request):
+    # autolog contains multiple `try_mlflow_log`. They may hide unintentional errors (often
+    # caused by incorrect test settings) and allow tests that should not pass to pass
+    # (without us noticing). To prevent that, temporarily turns a warning emitted by
+    # `try_mlflow_log` into errors.
+    if "disable_force_try_mlflow_log_to_fail" in request.keywords:
         yield
-        mlflow_warnings = [w for w in ws if str(w.message).startswith("Logging to MLflow failed")]
-        assert len(mlflow_warnings) == 0
+    else:
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "error", message=r"^Logging to MLflow failed", category=UserWarning,
+            )
+            yield
 
 
-@pytest.mark.xfail
-def test_throw_if_try_mlflow_log_has_emitted_warnings():
+@pytest.mark.xfail(strict=True, raises=UserWarning)
+def test_force_try_mlflow_log_to_fail():
     with mlflow.start_run():
-        # This line should emit a warning because a metric value must be a float value.
-        try_mlflow_log(mlflow.log_metric, "m", "m")
+        try_mlflow_log(lambda: 1 / 0)
+
+
+@pytest.mark.disable_force_try_mlflow_log_to_fail
+def test_no_force_try_mlflow_log_to_fail():
+    with mlflow.start_run():
+        try_mlflow_log(lambda: 1 / 0)
 
 
 def test_autolog_preserves_original_function_attributes():
@@ -255,19 +269,19 @@ def test_get_params_returns_dict_whose_key_or_value_exceeds_length_limit(long_pa
     assert_predict_equal(loaded_model, model, X)
 
 
-@pytest.mark.parametrize("pattern", ["only_y_kwarg", "both_kwarg", "both_kwargs_swapped"])
-def test_fit_takes_Xy_as_keyword_arguments(pattern):
+@pytest.mark.parametrize("Xy_passed_as", ["only_y_kwarg", "both_kwarg", "both_kwargs_swapped"])
+def test_fit_takes_Xy_as_keyword_arguments(Xy_passed_as):
     mlflow.sklearn.autolog()
 
     model = sklearn.cluster.KMeans()
     X, y = get_iris()
 
     with mlflow.start_run() as run:
-        if pattern == "only_y_kwarg":
+        if Xy_passed_as == "only_y_kwarg":
             model.fit(X, y=y)
-        elif pattern == "both_kwarg":
+        elif Xy_passed_as == "both_kwarg":
             model.fit(X=X, y=y)
-        elif pattern == "both_kwargs_swapped":
+        elif Xy_passed_as == "both_kwargs_swapped":
             model.fit(y=y, X=X)
 
     run_id = run._info.run_id
@@ -289,7 +303,7 @@ def test_call_fit_with_arguments_score_does_not_accept():
 
     mock_obj = mock.Mock()
 
-    def mock_score(self, X, y, sample_weight=None):
+    def mock_score(self, X, y, sample_weight=None):  # pylint: disable=unused-argument
         mock_obj(X, y, sample_weight)
         return 0
 
@@ -312,8 +326,8 @@ def test_call_fit_with_arguments_score_does_not_accept():
     assert_predict_equal(load_model_by_run_id(run_id), model, X)
 
 
-@pytest.mark.parametrize("pass_sample_weight_as", ["positional", "keyword"])
-def test_both_fit_and_score_contain_sample_weight(pass_sample_weight_as):
+@pytest.mark.parametrize("sample_weight_passed_as", ["positional", "keyword"])
+def test_both_fit_and_score_contain_sample_weight(sample_weight_passed_as):
     mlflow.sklearn.autolog()
 
     from sklearn.linear_model import SGDRegressor
@@ -324,7 +338,7 @@ def test_both_fit_and_score_contain_sample_weight(pass_sample_weight_as):
 
     mock_obj = mock.Mock()
 
-    def mock_score(self, X, y, sample_weight=None):
+    def mock_score(self, X, y, sample_weight=None):  # pylint: disable=unused-argument
         mock_obj(X, y, sample_weight)
         return 0
 
@@ -336,9 +350,9 @@ def test_both_fit_and_score_contain_sample_weight(pass_sample_weight_as):
     sample_weight = abs(np.random.randn(len(X)))
 
     with mlflow.start_run() as run:
-        if pass_sample_weight_as == "positional":
+        if sample_weight_passed_as == "positional":
             model.fit(X, y, None, None, sample_weight)
-        elif pass_sample_weight_as == "keyword":
+        elif sample_weight_passed_as == "keyword":
             model.fit(X, y, sample_weight=sample_weight)
         mock_obj.assert_called_once_with(X, y, sample_weight)
 
@@ -361,7 +375,7 @@ def test_only_fit_contains_sample_weight():
 
     mock_obj = mock.Mock()
 
-    def mock_score(self, X, y):
+    def mock_score(self, X, y):  # pylint: disable=unused-argument
         mock_obj(X, y)
         return 0
 
@@ -394,7 +408,7 @@ def test_only_score_contains_sample_weight():
 
     mock_obj = mock.Mock()
 
-    def mock_score(self, X, y, sample_weight=None):
+    def mock_score(self, X, y, sample_weight=None):  # pylint: disable=unused-argument
         mock_obj(X, y, sample_weight)
         return 0
 
@@ -446,22 +460,21 @@ def test_autolog_emits_warning_message_when_score_fails():
     model = sklearn.cluster.KMeans()
 
     @functools.wraps(model.score)
-    def throwing_score(X, y=None, sample_weight=None):
-        # pylint: disable=unused-argument
+    def throwing_score(X, y=None, sample_weight=None):  # pylint: disable=unused-argument
         raise Exception("EXCEPTION")
 
     model.score = throwing_score
 
     with mlflow.start_run() as run, mock.patch("mlflow.sklearn._logger.warning") as mock_warning:
         model.fit(*get_iris())
+        mock_warning.assert_called_once()
+        mock_warning.called_once_with(
+            "KMeans.score failed. The 'training_score' metric will not be recorded. "
+            "Scoring error: EXCEPTION"
+        )
 
     metrics = get_run_data(run._info.run_id)[1]
     assert metrics == {}
-    mock_warning.assert_called_once()
-    mock_warning.called_once_with(
-        "KMeans.score failed. The 'training_score' metric will not be recorded. "
-        "Scoring error: EXCEPTION"
-    )
 
 
 def test_fit_xxx_performs_logging_only_once(fit_func_name):
@@ -516,29 +529,125 @@ def test_meta_estimator_fit_performs_logging_only_once():
         assert len(mlflow.search_runs([run._info.experiment_id], query)) == 0
 
 
-def test_parameter_search_estimators_produce_expected_outputs():
+@pytest.mark.parametrize(
+    "estimator_class_and_space",
+    [
+        (sklearn.model_selection.GridSearchCV, {'kernel':('linear', 'rbf'), 'C':[1, 5, 10]}),
+        (sklearn.model_selection.RandomizedSearchCV, {'C': uniform(loc=0, scale=4)}),
+    ],
+)
+@pytest.mark.parametrize("backend", [None, "threading", "loky"])
+def test_parameter_search_estimators_produce_expected_outputs(estimator_class_and_space, backend):
     mlflow.sklearn.autolog()
 
-    with mlflow.start_run() as run:
-        parameters = {'kernel':('linear', 'rbf'), 'C':[1, 5, 10]}
-        svc = sklearn.svm.SVC()
-        cv = sklearn.model_selection.GridSearchCV(svc, parameters, n_jobs=1)
-        cv.fit(*get_iris())
+    estimator_class, search_space = estimator_class_and_space
+    svc = sklearn.svm.SVC()
+    cv_model = estimator_class(svc, search_space, n_jobs=1, return_train_score=True)
+    X, y = get_iris()
 
+    def train_cv_model():
+        if backend is None:
+            cv_model.fit(X, y)
+        else:
+            with sklearn.utils.parallel_backend(backend=backend):
+                cv_model.fit(X, y)
+
+    with mlflow.start_run() as run:
+        cv_model.fit(X, y)
         run_id = run.info.run_id
 
-        from mlflow.tracking.client import MlflowClient
-        client = MlflowClient()
-        # print(client.get_run(run_id).data)
-        # print(get_run_data(run_id))
+    params, metrics, tags, artifacts = get_run_data(run_id)
+    expected_cv_params = truncate_dict(stringify_dict_values(cv_model.get_params(deep=False)))
+    assert expected_cv_params.items() <= params.items()
+    assert metrics == {TRAINING_SCORE: cv_model.score(X, y)}
+    assert tags == get_expected_class_tags(cv_model)
+    assert MODEL_DIR in artifacts
+    assert "best_estimator" in artifacts
+    assert "cv_results.csv" in artifacts
 
-        child_runs = client.search_runs(run.info.experiment_id, f"tags.`mlflow.parentRunId` = '{run_id}'")
-        # We expect to have created a child run for each point in the parameter grid, which consists
-        # of 6 elements (all possible combinations of two kernels and three 'C' values)
-        assert len(child_runs) == 6
+    client = mlflow.tracking.MlflowClient()
+    child_runs = client.search_runs(run.info.experiment_id, f"tags.`mlflow.parentRunId` = '{run_id}'")
+    cv_results = pd.DataFrame.from_dict(cv_model.cv_results_)
+    # We expect to have created a child run for each point in the parameter search space
+    assert len(child_runs) == len(cv_results)
 
-        artifact_paths = set([artifact.path for artifact in client.list_artifacts(run_id)])
-        assert set(["model", "best_estimator"]).issubset(artifact_paths)
+    # Verify that each set of parameter search results has a corresponding MLflow run
+    # with the expected data
+    for _, result in cv_results.iterrows():
+        result_params = result.get("params", {})
+        params_search_clause = " and ".join(
+            [f"params.`{key}` = '{value}'" for key, value in result_params.items()]
+        )
+        search_filter = f"tags.`mlflow.parentRunId` = '{run_id}' and {params_search_clause}"
+        child_runs = client.search_runs(run.info.experiment_id, search_filter)
+        assert len(child_runs) == 1
+        child_run = child_runs[0]
+
+        child_params, child_metrics, child_tags, child_artifacts = get_run_data(child_run.info.run_id)
+        assert child_tags == get_expected_class_tags(svc)
+        assert "mean_test_score" in child_metrics.keys()
+        assert "std_test_score" in child_metrics.keys()
+        # Ensure that we do not capture separate metrics for each cross validation split, which
+        # would produce very noisy metrics results
+        assert len([metric for metric in child_metrics.keys() if metric.startswith("split")]) == 0
 
 
-    
+def test_parameter_search_handles_large_volume_of_metric_outputs():
+    mlflow.sklearn.autolog()
+
+    metrics_size = MAX_METRICS_PER_BATCH + 10
+    metrics_to_log = {
+        "score_{}".format(i): sklearn.metrics.make_scorer(lambda y, y_pred, **kwargs: i)
+        for i in range(metrics_size)
+    }
+
+    with mlflow.start_run() as run:
+        svc = sklearn.svm.SVC()
+        cv_model = sklearn.model_selection.GridSearchCV(svc, {'C': [1]}, n_jobs=1, scoring=metrics_to_log, refit=False)
+        cv_model.fit(*get_iris())
+        run_id = run.info.run_id
+
+    client = mlflow.tracking.MlflowClient()
+    child_runs = client.search_runs(run.info.experiment_id, f"tags.`mlflow.parentRunId` = '{run_id}'")
+    assert len(child_runs) == 1
+    child_run = child_runs[0]
+
+    assert len(child_run.data.metrics) >= metrics_size
+
+
+@pytest.mark.disable_force_try_mlflow_log_to_fail
+@pytest.mark.parametrize(
+    "failing_specialization",
+    [
+        "mlflow.sklearn.utils._log_parameter_search_results_as_artifact",
+        "mlflow.sklearn.utils._create_child_runs_for_parameter_search",
+    ],
+)
+def test_autolog_does_not_throw_when_parameter_search_logging_fails(failing_specialization):
+    with mock.patch(failing_specialization, side_effect=Exception("Failed")) as mock_func:
+        # Enable autologging after mocking the parameter search specialization function
+        # to ensure that the mock is applied before the function is imported
+        mlflow.sklearn.autolog()
+        svc = sklearn.svm.SVC()
+        cv_model = sklearn.model_selection.GridSearchCV(svc, {'C': [1]}, n_jobs=1)
+        cv_model.fit(*get_iris())
+        mock_func.assert_called_once()
+
+
+@pytest.mark.disable_force_try_mlflow_log_to_fail
+@pytest.mark.parametrize(
+    "func_to_fail",
+    ["mlflow.log_params", "mlflow.log_metric", "mlflow.set_tags", "mlflow.sklearn.log_model"],
+)
+def test_autolog_does_not_throw_when_mlflow_logging_fails(func_to_fail):
+    mlflow.sklearn.autolog()
+
+    model = sklearn.cluster.KMeans()
+    X, y = get_iris()
+
+    with mlflow.start_run(), mock.patch(
+        func_to_fail, side_effect=Exception(func_to_fail)
+    ) as mock_func:
+
+        model.fit(X, y)
+        mock_func.assert_called_once()

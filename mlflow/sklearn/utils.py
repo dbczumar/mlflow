@@ -14,7 +14,8 @@ from mlflow.utils.mlflow_tags import MLFLOW_PARENT_RUN_ID
 from mlflow.utils.validation import (
     MAX_PARAMS_TAGS_PER_BATCH,
     MAX_METRICS_PER_BATCH,
-    MAX_PARAM_KEY_LENGTH,
+    MAX_ENTITIES_PER_BATCH,
+    MAX_ENTITY_KEY_LENGTH,
     MAX_PARAM_VAL_LENGTH,
 )
 
@@ -111,6 +112,9 @@ def _chunk_dict(d, chunk_size):
 
 
 def _truncate_dict(d, max_key_length=None, max_value_length=None):
+    def _truncate_and_ellipsize(value, max_length):
+        return str(value)[:(max_length - 3)] + "..."
+
     key_is_none = max_key_length is None
     val_is_none = max_value_length is None
 
@@ -120,19 +124,39 @@ def _truncate_dict(d, max_key_length=None, max_value_length=None):
     truncated = {}
     for k, v in d.items():
         should_truncate_key = (not key_is_none) and (len(str(k)) > max_key_length)
-        should_truncate_val = (not key_is_none) and (len(str(v)) > max_value_length)
+        should_truncate_val = (not val_is_none) and (len(str(v)) > max_value_length)
 
-        new_k = str(k)[:max_key_length] if should_truncate_key else k
+        new_k = _truncate_and_ellipsize(k, max_key_length) if should_truncate_key else k
         if should_truncate_key:
-            _logger.warning("Truncated the key `{}`".format(k))
+            # Use the truncated key for warning logs to avoid noisy printing to stdout
+            msg = "Truncated the key `{}`".format(new_k)
+            _logger.warning(msg)
 
-        new_v = str(v)[:max_value_length] if should_truncate_val else v
+        new_v = _truncate_and_ellipsize(v, max_value_length) if should_truncate_val else v
         if should_truncate_val:
-            _logger.warning("Truncated the value `{}` (in the key `{}`)".format(v, k))
+            # Use the truncated key and value for warning logs to avoid noisy printing to stdout
+            msg = "Truncated the value of the key `{}`. Truncated value: `{}`".format(new_k, new_v)
+            _logger.warning(msg)
 
         truncated[new_k] = new_v
 
     return truncated
+
+
+def _get_meta_estimators_for_autologging():
+    """
+    :return: A list of meta estimator class definitions 
+             (e.g., `sklearn.model_selection.GridSearchCV`) that should be included
+             when patching training functions for autologging
+    """
+    from sklearn.model_selection import GridSearchCV, RandomizedSearchCV
+    from sklearn.pipeline import Pipeline
+
+    return [
+        GridSearchCV,
+        RandomizedSearchCV,
+        Pipeline,
+    ]
 
 
 def _is_parameter_search_estimator(estimator):
@@ -141,13 +165,14 @@ def _is_parameter_search_estimator(estimator):
              such as `GridSearchCV`. `False` otherwise.
     """
     from sklearn.model_selection import GridSearchCV, RandomizedSearchCV
-    param_search_estimators = [
+    parameter_search_estimators = [
         GridSearchCV,
         RandomizedSearchCV,
     ]
+
     return any([
         isinstance(estimator, param_search_estimator)
-        for param_search_estimator in param_search_estimators
+        for param_search_estimator in parameter_search_estimators 
     ])
 
 
@@ -240,15 +265,20 @@ def _create_child_runs_for_parameter_search(cv_estimator, parent_run, child_tags
                 and isinstance(value, Number)
 
             },
-            chunk_size=MAX_METRICS_PER_BATCH,
+            chunk_size=min(MAX_ENTITIES_PER_BATCH - MAX_PARAMS_TAGS_PER_BATCH, MAX_METRICS_PER_BATCH),
         )
 
         for params_batch, metrics_batch in zip_longest(
                 param_batches_to_log, metric_batches_to_log, fillvalue={}):
+            # Trim any parameter keys / values and metric keys that exceed the limits
+            # imposed by corresponding MLflow Tracking APIs (e.g., LogParam, LogMetric)
+            truncated_params_batch = _truncate_dict(params_batch, MAX_ENTITY_KEY_LENGTH, MAX_PARAM_VAL_LENGTH) 
+            truncated_metrics_batch = _truncate_dict(metrics_batch, max_key_length=MAX_ENTITY_KEY_LENGTH) 
             client.log_batch(
                 run_id=child_run.info.run_id,
                 params=[
-                    Param(str(key), str(value)) for key, value in params_batch.items()
+                    Param(str(key), str(value)) 
+                    for key, value in truncated_params_batch.items()
                 ],
                 metrics=[
                     Metric(
@@ -257,7 +287,7 @@ def _create_child_runs_for_parameter_search(cv_estimator, parent_run, child_tags
                         timestamp=child_run_end_time,
                         step=0,
                     )
-                    for key, value in metrics_batch.items()
+                    for key, value in truncated_metrics_batch.items()
                 ],
             )
 
