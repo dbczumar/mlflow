@@ -629,9 +629,8 @@ def autolog():
     from mlflow.tracking.context import registry as context_registry
     from mlflow.utils.validation import (
         MAX_PARAMS_TAGS_PER_BATCH,
-        MAX_METRICS_PER_BATCH,
-        MAX_PARAM_VAL_LENGTH,
         MAX_ENTITY_KEY_LENGTH,
+        MAX_METRICS_PER_BATCH,
     )
 
     if not _is_supported_version():
@@ -782,12 +781,7 @@ def autolog():
         return f
 
     patch_settings = gorilla.Settings(allow_hit=True, store_hit=True)
-    try:
-        from sklearn.utils import all_estimators
-    except ImportError:
-        all_estimators = _all_estimators
-
-    _, estimators_to_patch = zip(*all_estimators())
+    _, estimators_to_patch = zip(*_all_estimators())
     # Ensure that relevant meta estimators (e.g. GridSearchCV, Pipeline) are selected
     # for patching if they are not already included in the output of `all_estimators()`
     estimators_to_patch = set(estimators_to_patch).union(

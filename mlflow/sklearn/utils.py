@@ -349,6 +349,7 @@ def _backported_all_estimators(type_filter=None):
     # lazy import to avoid circular imports from sklearn.base
     import pkgutil
     import platform
+    import sklearn
     from importlib import import_module
     from operator import itemgetter
     from sklearn.utils.testing import ignore_warnings  # pylint: disable=no-name-in-module
