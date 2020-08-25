@@ -629,6 +629,7 @@ def autolog():
     from mlflow.tracking.context import registry as context_registry
     from mlflow.utils.validation import (
         MAX_PARAMS_TAGS_PER_BATCH,
+        MAX_PARAM_VAL_LENGTH,
         MAX_ENTITY_KEY_LENGTH,
         MAX_METRICS_PER_BATCH,
     )
