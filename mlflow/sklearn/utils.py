@@ -175,7 +175,7 @@ def _is_parameter_search_estimator(estimator):
 
     return any([
         isinstance(estimator, param_search_estimator)
-        for param_search_estimator in parameter_search_estimators 
+        for param_search_estimator in parameter_search_estimators
     ])
 
 
@@ -275,12 +275,12 @@ def _create_child_runs_for_parameter_search(cv_estimator, parent_run, child_tags
                 param_batches_to_log, metric_batches_to_log, fillvalue={}):
             # Trim any parameter keys / values and metric keys that exceed the limits
             # imposed by corresponding MLflow Tracking APIs (e.g., LogParam, LogMetric)
-            truncated_params_batch = _truncate_dict(params_batch, MAX_ENTITY_KEY_LENGTH, MAX_PARAM_VAL_LENGTH) 
-            truncated_metrics_batch = _truncate_dict(metrics_batch, max_key_length=MAX_ENTITY_KEY_LENGTH) 
+            truncated_params_batch = _truncate_dict(params_batch, MAX_ENTITY_KEY_LENGTH, MAX_PARAM_VAL_LENGTH)
+            truncated_metrics_batch = _truncate_dict(metrics_batch, max_key_length=MAX_ENTITY_KEY_LENGTH)
             client.log_batch(
                 run_id=child_run.info.run_id,
                 params=[
-                    Param(str(key), str(value)) 
+                    Param(str(key), str(value))
                     for key, value in truncated_params_batch.items()
                 ],
                 metrics=[

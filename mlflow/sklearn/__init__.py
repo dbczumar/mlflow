@@ -545,8 +545,8 @@ def autolog():
 
       **Parameter search**
           In addition to recording the information discussed above, autologging for parameter
-          search meta estimators (`GridSearchCV`_ and `RandomizedSearchCV`_) records child runs 
-          with metrics for each set of explored parameters, as well as artifacts and parameters 
+          search meta estimators (`GridSearchCV`_ and `RandomizedSearchCV`_) records child runs
+          with metrics for each set of explored parameters, as well as artifacts and parameters
           for the best model (if available).
 
     **Supported estimators**
@@ -562,7 +562,7 @@ def autolog():
 
     .. _GridSearchCV:
         https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.GridSearchCV.html
-    
+
     .. _RandomizedSearchCV:
         https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.RandomizedSearchCV.html
 
@@ -740,8 +740,8 @@ def autolog():
                     # information is consistent with the parent run
                     environment_tags = context_registry.resolve_tags()
                     _create_child_runs_for_parameter_search(
-                        cv_estimator=estimator, 
-                        parent_run=mlflow.active_run(), 
+                        cv_estimator=estimator,
+                        parent_run=mlflow.active_run(),
                         child_tags=environment_tags,
                     )
                 except Exception as e:
