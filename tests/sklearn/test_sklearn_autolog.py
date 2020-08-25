@@ -12,6 +12,7 @@ import sklearn.model_selection
 from scipy.stats import uniform
 
 import mlflow.sklearn
+from mlflow.entities import RunStatus
 from mlflow.sklearn.utils import (
     _is_supported_version,
     _get_arg_names,
@@ -544,7 +545,7 @@ def test_parameter_search_estimators_produce_expected_outputs(estimator_class_an
 
     estimator_class, search_space = estimator_class_and_space
     svc = sklearn.svm.SVC()
-    cv_model = estimator_class(svc, search_space, n_jobs=1, return_train_score=True)
+    cv_model = estimator_class(svc, search_space, n_jobs=5, return_train_score=True)
     X, y = get_iris()
 
     def train_cv_model():
@@ -560,7 +561,11 @@ def test_parameter_search_estimators_produce_expected_outputs(estimator_class_an
 
     params, metrics, tags, artifacts = get_run_data(run_id)
     expected_cv_params = truncate_dict(stringify_dict_values(cv_model.get_params(deep=False)))
-    assert expected_cv_params.items() <= params.items()
+    expected_cv_params.update({
+        "best_{}".format(param_name): str(param_value)
+        for param_name, param_value in cv_model.best_params_.items()
+    })
+    assert params == expected_cv_params
     assert metrics == {TRAINING_SCORE: cv_model.score(X, y)}
     assert tags == get_expected_class_tags(cv_model)
     assert MODEL_DIR in artifacts
@@ -569,7 +574,7 @@ def test_parameter_search_estimators_produce_expected_outputs(estimator_class_an
 
     client = mlflow.tracking.MlflowClient()
     child_runs = client.search_runs(
-        run.info.experiment_id, f"tags.`mlflow.parentRunId` = '{run_id}'"
+        run.info.experiment_id, "tags.`mlflow.parentRunId` = '{}'".format(run_id)
     )
     cv_results = pd.DataFrame.from_dict(cv_model.cv_results_)
     # We expect to have created a child run for each point in the parameter search space
@@ -580,13 +585,13 @@ def test_parameter_search_estimators_produce_expected_outputs(estimator_class_an
     for _, result in cv_results.iterrows():
         result_params = result.get("params", {})
         params_search_clause = " and ".join(
-            [f"params.`{key}` = '{value}'" for key, value in result_params.items()]
+            ["params.`{}` = '{}'".format(key, value) for key, value in result_params.items()]
         )
-        search_filter = f"tags.`mlflow.parentRunId` = '{run_id}' and {params_search_clause}"
+        search_filter = "tags.`mlflow.parentRunId` = '{}' and {}".format(run_id, params_search_clause)
         child_runs = client.search_runs(run.info.experiment_id, search_filter)
         assert len(child_runs) == 1
         child_run = child_runs[0]
-
+        assert child_run.info.status == RunStatus.to_string(RunStatus.FINISHED)
         child_params, child_metrics, child_tags, child_artifacts = get_run_data(
             child_run.info.run_id
         )
@@ -617,7 +622,7 @@ def test_parameter_search_handles_large_volume_of_metric_outputs():
 
     client = mlflow.tracking.MlflowClient()
     child_runs = client.search_runs(
-        run.info.experiment_id, f"tags.`mlflow.parentRunId` = '{run_id}'"
+        run.info.experiment_id, "tags.`mlflow.parentRunId` = '{}'".format(run_id)
     )
     assert len(child_runs) == 1
     child_run = child_runs[0]

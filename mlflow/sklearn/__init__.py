@@ -729,7 +729,7 @@ def autolog():
 
             if hasattr(estimator, "best_params_"):
                 best_params = {
-                    f"best_{param_name}": param_value
+                    "best_{param_name}".format(param_name=param_name): param_value
                     for param_name, param_value in estimator.best_params_.items()
                 }
                 try_mlflow_log(mlflow.log_params, best_params)
