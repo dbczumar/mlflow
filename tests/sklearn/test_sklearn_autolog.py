@@ -534,8 +534,8 @@ def test_meta_estimator_fit_performs_logging_only_once():
 @pytest.mark.parametrize(
     "estimator_class_and_space",
     [
-        (sklearn.model_selection.GridSearchCV, {'kernel':('linear', 'rbf'), 'C':[1, 5, 10]}),
-        (sklearn.model_selection.RandomizedSearchCV, {'C': uniform(loc=0, scale=4)}),
+        (sklearn.model_selection.GridSearchCV, {"kernel": ("linear", "rbf"), "C": [1, 5, 10]}),
+        (sklearn.model_selection.RandomizedSearchCV, {"C": uniform(loc=0, scale=4)}),
     ],
 )
 @pytest.mark.parametrize("backend", [None, "threading", "loky"])
@@ -568,7 +568,9 @@ def test_parameter_search_estimators_produce_expected_outputs(estimator_class_an
     assert "cv_results.csv" in artifacts
 
     client = mlflow.tracking.MlflowClient()
-    child_runs = client.search_runs(run.info.experiment_id, f"tags.`mlflow.parentRunId` = '{run_id}'")
+    child_runs = client.search_runs(
+        run.info.experiment_id, f"tags.`mlflow.parentRunId` = '{run_id}'"
+    )
     cv_results = pd.DataFrame.from_dict(cv_model.cv_results_)
     # We expect to have created a child run for each point in the parameter search space
     assert len(child_runs) == len(cv_results)
@@ -585,7 +587,9 @@ def test_parameter_search_estimators_produce_expected_outputs(estimator_class_an
         assert len(child_runs) == 1
         child_run = child_runs[0]
 
-        child_params, child_metrics, child_tags, child_artifacts = get_run_data(child_run.info.run_id)
+        child_params, child_metrics, child_tags, child_artifacts = get_run_data(
+            child_run.info.run_id
+        )
         assert child_tags == get_expected_class_tags(svc)
         assert "mean_test_score" in child_metrics.keys()
         assert "std_test_score" in child_metrics.keys()
@@ -605,12 +609,16 @@ def test_parameter_search_handles_large_volume_of_metric_outputs():
 
     with mlflow.start_run() as run:
         svc = sklearn.svm.SVC()
-        cv_model = sklearn.model_selection.GridSearchCV(svc, {'C': [1]}, n_jobs=1, scoring=metrics_to_log, refit=False)
+        cv_model = sklearn.model_selection.GridSearchCV(
+            svc, {"C": [1]}, n_jobs=1, scoring=metrics_to_log, refit=False
+        )
         cv_model.fit(*get_iris())
         run_id = run.info.run_id
 
     client = mlflow.tracking.MlflowClient()
-    child_runs = client.search_runs(run.info.experiment_id, f"tags.`mlflow.parentRunId` = '{run_id}'")
+    child_runs = client.search_runs(
+        run.info.experiment_id, f"tags.`mlflow.parentRunId` = '{run_id}'"
+    )
     assert len(child_runs) == 1
     child_run = child_runs[0]
 
@@ -631,7 +639,7 @@ def test_autolog_does_not_throw_when_parameter_search_logging_fails(failing_spec
         # to ensure that the mock is applied before the function is imported
         mlflow.sklearn.autolog()
         svc = sklearn.svm.SVC()
-        cv_model = sklearn.model_selection.GridSearchCV(svc, {'C': [1]}, n_jobs=1)
+        cv_model = sklearn.model_selection.GridSearchCV(svc, {"C": [1]}, n_jobs=1)
         cv_model.fit(*get_iris())
         mock_func.assert_called_once()
 

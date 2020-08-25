@@ -666,7 +666,6 @@ def autolog():
 
         return fit_output
 
-
     def _log_pretraining_metadata(estimator, *args, **kwargs):
         """
         Records metadata (e.g., params and tags) for a scikit-learn estimator prior to training.
@@ -687,13 +686,14 @@ def autolog():
         # for these seed estimators.
         should_log_params_deeply = not _is_parameter_search_estimator(estimator)
         # Chunk model parameters to avoid hitting the log_batch API limit
-        for chunk in _chunk_dict(estimator.get_params(deep=should_log_params_deeply),
-                                 chunk_size=MAX_PARAMS_TAGS_PER_BATCH):
+        for chunk in _chunk_dict(
+            estimator.get_params(deep=should_log_params_deeply),
+            chunk_size=MAX_PARAMS_TAGS_PER_BATCH,
+        ):
             truncated = _truncate_dict(chunk, MAX_ENTITY_KEY_LENGTH, MAX_PARAM_VAL_LENGTH)
             try_mlflow_log(mlflow.log_params, truncated)
 
         try_mlflow_log(mlflow.set_tags, _get_estimator_info_tags(estimator))
-
 
     def _log_posttraining_metadata(estimator, *args, **kwargs):
         """
@@ -724,17 +724,17 @@ def autolog():
         try_mlflow_log(log_model, estimator, artifact_path="model")
 
         if _is_parameter_search_estimator(estimator):
-            if hasattr(estimator, 'best_estimator_'):
+            if hasattr(estimator, "best_estimator_"):
                 try_mlflow_log(log_model, estimator.best_estimator_, artifact_path="best_estimator")
 
-            if hasattr(estimator, 'best_params_'):
+            if hasattr(estimator, "best_params_"):
                 best_params = {
                     f"best_{param_name}": param_value
                     for param_name, param_value in estimator.best_params_.items()
                 }
                 try_mlflow_log(mlflow.log_params, best_params)
 
-            if hasattr(estimator, 'cv_results_'):
+            if hasattr(estimator, "cv_results_"):
                 try:
                     # Fetch environment-specific tags (e.g., user and source) to ensure that lineage
                     # information is consistent with the parent run
@@ -754,7 +754,8 @@ def autolog():
                 try:
                     cv_results_df = pd.DataFrame.from_dict(estimator.cv_results_)
                     _log_parameter_search_results_as_artifact(
-                        cv_results_df, mlflow.active_run().info.run_id)
+                        cv_results_df, mlflow.active_run().info.run_id
+                    )
                 except Exception as e:
                     msg = (
                         "Failed to log parameter search results as an artifact."
@@ -789,7 +790,9 @@ def autolog():
     _, estimators_to_patch = zip(*all_estimators())
     # Ensure that relevant meta estimators (e.g. GridSearchCV, Pipeline) are selected
     # for patching if they are not already included in the output of `all_estimators()`
-    estimators_to_patch = set(estimators_to_patch).union(set(_get_meta_estimators_for_autologging()))
+    estimators_to_patch = set(estimators_to_patch).union(
+        set(_get_meta_estimators_for_autologging())
+    )
     for class_def in estimators_to_patch:
         for func_name in ["fit", "fit_transform", "fit_predict"]:
             if hasattr(class_def, func_name):

@@ -35,9 +35,7 @@ def _get_estimator_info_tags(estimator):
     """
     return {
         "estimator_name": estimator.__class__.__name__,
-        "estimator_class": (
-            estimator.__class__.__module__ + "." + estimator.__class__.__name__
-        ),
+        "estimator_class": (estimator.__class__.__module__ + "." + estimator.__class__.__name__),
     }
 
 
@@ -116,7 +114,7 @@ def _chunk_dict(d, chunk_size):
 
 def _truncate_dict(d, max_key_length=None, max_value_length=None):
     def _truncate_and_ellipsize(value, max_length):
-        return str(value)[:(max_length - 3)] + "..."
+        return str(value)[: (max_length - 3)] + "..."
 
     key_is_none = max_key_length is None
     val_is_none = max_value_length is None
@@ -168,15 +166,18 @@ def _is_parameter_search_estimator(estimator):
              such as `GridSearchCV`. `False` otherwise.
     """
     from sklearn.model_selection import GridSearchCV, RandomizedSearchCV
+
     parameter_search_estimators = [
         GridSearchCV,
         RandomizedSearchCV,
     ]
 
-    return any([
-        isinstance(estimator, param_search_estimator)
-        for param_search_estimator in parameter_search_estimators
-    ])
+    return any(
+        [
+            isinstance(estimator, param_search_estimator)
+            for param_search_estimator in parameter_search_estimators
+        ]
+    )
 
 
 def _log_parameter_search_results_as_artifact(cv_results_df, run_id):
@@ -236,9 +237,9 @@ def _create_child_runs_for_parameter_search(cv_estimator, parent_run, child_tags
     cv_results_df = pd.DataFrame.from_dict(cv_estimator.cv_results_)
     for _, result_row in cv_results_df.iterrows():
         tags_to_log = dict(child_tags) if child_tags else {}
-        tags_to_log.update({
-            MLFLOW_PARENT_RUN_ID: parent_run.info.run_id,
-        })
+        tags_to_log.update(
+            {MLFLOW_PARENT_RUN_ID: parent_run.info.run_id,}
+        )
         tags_to_log.update(_get_estimator_info_tags(seed_estimator))
         child_run = client.create_run(
             experiment_id=parent_run.info.experiment_id,
@@ -247,6 +248,7 @@ def _create_child_runs_for_parameter_search(cv_estimator, parent_run, child_tags
         )
 
         from itertools import zip_longest
+
         params_to_log = dict(base_params)
         params_to_log.update(result_row.get("params", {}))
         param_batches_to_log = _chunk_dict(params_to_log, chunk_size=MAX_PARAMS_TAGS_PER_BATCH)
@@ -266,38 +268,35 @@ def _create_child_runs_for_parameter_search(cv_estimator, parent_run, child_tags
                 for key, value in result_row.iteritems()
                 if not any([key.startswith(prefix) for prefix in excluded_metric_prefixes])
                 and isinstance(value, Number)
-
             },
-            chunk_size=min(MAX_ENTITIES_PER_BATCH - MAX_PARAMS_TAGS_PER_BATCH, MAX_METRICS_PER_BATCH),
+            chunk_size=min(
+                MAX_ENTITIES_PER_BATCH - MAX_PARAMS_TAGS_PER_BATCH, MAX_METRICS_PER_BATCH
+            ),
         )
 
         for params_batch, metrics_batch in zip_longest(
-                param_batches_to_log, metric_batches_to_log, fillvalue={}):
+            param_batches_to_log, metric_batches_to_log, fillvalue={}
+        ):
             # Trim any parameter keys / values and metric keys that exceed the limits
             # imposed by corresponding MLflow Tracking APIs (e.g., LogParam, LogMetric)
-            truncated_params_batch = _truncate_dict(params_batch, MAX_ENTITY_KEY_LENGTH, MAX_PARAM_VAL_LENGTH)
-            truncated_metrics_batch = _truncate_dict(metrics_batch, max_key_length=MAX_ENTITY_KEY_LENGTH)
+            truncated_params_batch = _truncate_dict(
+                params_batch, MAX_ENTITY_KEY_LENGTH, MAX_PARAM_VAL_LENGTH
+            )
+            truncated_metrics_batch = _truncate_dict(
+                metrics_batch, max_key_length=MAX_ENTITY_KEY_LENGTH
+            )
             client.log_batch(
                 run_id=child_run.info.run_id,
                 params=[
-                    Param(str(key), str(value))
-                    for key, value in truncated_params_batch.items()
+                    Param(str(key), str(value)) for key, value in truncated_params_batch.items()
                 ],
                 metrics=[
-                    Metric(
-                        key=key,
-                        value=value,
-                        timestamp=child_run_end_time,
-                        step=0,
-                    )
+                    Metric(key=key, value=value, timestamp=child_run_end_time, step=0,)
                     for key, value in truncated_metrics_batch.items()
                 ],
             )
 
-        client.set_terminated(
-            run_id=child_run.info.run_id,
-            end_time=child_run_end_time
-        )
+        client.set_terminated(run_id=child_run.info.run_id, end_time=child_run_end_time)
 
 
 def _is_supported_version():
