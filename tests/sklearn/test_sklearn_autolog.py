@@ -561,10 +561,12 @@ def test_parameter_search_estimators_produce_expected_outputs(estimator_class_an
 
     params, metrics, tags, artifacts = get_run_data(run_id)
     expected_cv_params = truncate_dict(stringify_dict_values(cv_model.get_params(deep=False)))
-    expected_cv_params.update({
-        "best_{}".format(param_name): str(param_value)
-        for param_name, param_value in cv_model.best_params_.items()
-    })
+    expected_cv_params.update(
+        {
+            "best_{}".format(param_name): str(param_value)
+            for param_name, param_value in cv_model.best_params_.items()
+        }
+    )
     assert params == expected_cv_params
     assert metrics == {TRAINING_SCORE: cv_model.score(X, y)}
     assert tags == get_expected_class_tags(cv_model)
@@ -587,7 +589,9 @@ def test_parameter_search_estimators_produce_expected_outputs(estimator_class_an
         params_search_clause = " and ".join(
             ["params.`{}` = '{}'".format(key, value) for key, value in result_params.items()]
         )
-        search_filter = "tags.`mlflow.parentRunId` = '{}' and {}".format(run_id, params_search_clause)
+        search_filter = "tags.`mlflow.parentRunId` = '{}' and {}".format(
+            run_id, params_search_clause
+        )
         child_runs = client.search_runs(run.info.experiment_id, search_filter)
         assert len(child_runs) == 1
         child_run = child_runs[0]
