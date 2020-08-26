@@ -600,9 +600,7 @@ def test_parameter_search_estimators_produce_expected_outputs(cv_class, search_s
         assert len(child_runs) == 1
         child_run = child_runs[0]
         assert child_run.info.status == RunStatus.to_string(RunStatus.FINISHED)
-        _, child_metrics, child_tags, _ = get_run_data(
-            child_run.info.run_id
-        )
+        _, child_metrics, child_tags, _ = get_run_data(child_run.info.run_id)
         assert child_tags == get_expected_class_tags(svc)
         assert "mean_test_score" in child_metrics.keys()
         assert "std_test_score" in child_metrics.keys()
