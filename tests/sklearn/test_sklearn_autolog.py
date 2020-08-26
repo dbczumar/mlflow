@@ -533,18 +533,18 @@ def test_meta_estimator_fit_performs_logging_only_once():
 
 
 @pytest.mark.parametrize(
-    "estimator_class, search_space",
+    "cv_class, search_space",
     [
         (sklearn.model_selection.GridSearchCV, {"kernel": ("linear", "rbf"), "C": [1, 5, 10]}),
         (sklearn.model_selection.RandomizedSearchCV, {"C": uniform(loc=0, scale=4)}),
     ],
 )
 @pytest.mark.parametrize("backend", [None, "threading", "loky"])
-def test_parameter_search_estimators_produce_expected_outputs(estimator_class, search_space, backend):
+def test_parameter_search_estimators_produce_expected_outputs(cv_class, search_space, backend):
     mlflow.sklearn.autolog()
 
     svc = sklearn.svm.SVC()
-    cv_model = estimator_class(svc, search_space, n_jobs=5, return_train_score=True)
+    cv_model = cv_class(svc, search_space, n_jobs=5, return_train_score=True)
     X, y = get_iris()
 
     def train_cv_model():
@@ -576,7 +576,7 @@ def test_parameter_search_estimators_produce_expected_outputs(estimator_class, s
     best_estimator = mlflow.sklearn.load_model("runs:/{}/best_estimator".format(run_id))
     assert isinstance(best_estimator, sklearn.svm.SVC)
     cv_model = mlflow.sklearn.load_model("runs:/{}/{}".format(run_id, MODEL_DIR))
-    assert isinstance(cv_model, estimator_class)
+    assert isinstance(cv_model, cv_class)
 
     client = mlflow.tracking.MlflowClient()
     child_runs = client.search_runs(

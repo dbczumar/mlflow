@@ -238,7 +238,7 @@ def _create_child_runs_for_parameter_search(cv_estimator, parent_run, child_tags
     for _, result_row in cv_results_df.iterrows():
         tags_to_log = dict(child_tags) if child_tags else {}
         tags_to_log.update(
-            { MLFLOW_PARENT_RUN_ID: parent_run.info.run_id, }
+            {MLFLOW_PARENT_RUN_ID: parent_run.info.run_id}
         )
         tags_to_log.update(_get_estimator_info_tags(seed_estimator))
         child_run = client.create_run(
