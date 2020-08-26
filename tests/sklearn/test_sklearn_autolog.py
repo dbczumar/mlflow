@@ -556,7 +556,7 @@ def test_parameter_search_estimators_produce_expected_outputs(estimator_class_an
                 cv_model.fit(X, y)
 
     with mlflow.start_run() as run:
-        cv_model.fit(X, y)
+        train_cv_model()
         run_id = run.info.run_id
 
     params, metrics, tags, artifacts = get_run_data(run_id)
