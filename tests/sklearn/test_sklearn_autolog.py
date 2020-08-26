@@ -180,7 +180,7 @@ def test_estimator(fit_func_name):
     with mlflow.start_run() as run:
         model = fit_model(model, X, y, fit_func_name)
 
-    run_id = run._info.run_id
+    run_id = run.info.run_id
     params, metrics, tags, artifacts = get_run_data(run_id)
     assert params == truncate_dict(stringify_dict_values(model.get_params(deep=True)))
     assert metrics == {TRAINING_SCORE: model.score(X, y)}
@@ -204,7 +204,7 @@ def test_meta_estimator():
     with mlflow.start_run() as run:
         model.fit(X, y)
 
-    run_id = run._info.run_id
+    run_id = run.info.run_id
     params, metrics, tags, artifacts = get_run_data(run_id)
     assert params == truncate_dict(stringify_dict_values(model.get_params(deep=True)))
     assert metrics == {TRAINING_SCORE: model.score(X, y)}
@@ -224,8 +224,8 @@ def test_get_params_returns_dict_that_has_more_keys_than_max_params_tags_per_bat
             model = sklearn.cluster.KMeans()
             model.fit(X, y)
 
-    run_id = run._info.run_id
-    params, metrics, tags, artifacts = get_run_data(run._info.run_id)
+    run_id = run.info.run_id
+    params, metrics, tags, artifacts = get_run_data(run.info.run_id)
     assert params == large_params
     assert metrics == {TRAINING_SCORE: model.score(X, y)}
     assert tags == get_expected_class_tags(model)
@@ -262,8 +262,8 @@ def test_get_params_returns_dict_whose_key_or_value_exceeds_length_limit(long_pa
     for idx, msg in enumerate(messages):
         assert mock_warning.call_args_list[idx].startswith(msg)
 
-    run_id = run._info.run_id
-    params, metrics, tags, artifacts = get_run_data(run._info.run_id)
+    run_id = run.info.run_id
+    params, metrics, tags, artifacts = get_run_data(run.info.run_id)
     assert params == truncate_dict(long_params)
     assert metrics == {TRAINING_SCORE: model.score(X, y)}
     assert tags == get_expected_class_tags(model)
@@ -287,7 +287,7 @@ def test_fit_takes_Xy_as_keyword_arguments(Xy_passed_as):
         elif Xy_passed_as == "both_kwargs_swapped":
             model.fit(y=y, X=X)
 
-    run_id = run._info.run_id
+    run_id = run.info.run_id
     params, metrics, tags, artifacts = get_run_data(run_id)
     assert params == truncate_dict(stringify_dict_values(model.get_params(deep=True)))
     assert metrics == {TRAINING_SCORE: model.score(X, y)}
@@ -320,7 +320,7 @@ def test_call_fit_with_arguments_score_does_not_accept():
         model.fit(X, y, intercept_init=0)
         mock_obj.assert_called_once_with(X, y, None)
 
-    run_id = run._info.run_id
+    run_id = run.info.run_id
     params, metrics, tags, artifacts = get_run_data(run_id)
     assert params == truncate_dict(stringify_dict_values(model.get_params(deep=True)))
     assert metrics == {TRAINING_SCORE: model.score(X, y)}
@@ -359,7 +359,7 @@ def test_both_fit_and_score_contain_sample_weight(sample_weight_passed_as):
             model.fit(X, y, sample_weight=sample_weight)
         mock_obj.assert_called_once_with(X, y, sample_weight)
 
-    run_id = run._info.run_id
+    run_id = run.info.run_id
     params, metrics, tags, artifacts = get_run_data(run_id)
     assert params == truncate_dict(stringify_dict_values(model.get_params(deep=True)))
     assert metrics == {TRAINING_SCORE: model.score(X, y)}
@@ -392,7 +392,7 @@ def test_only_fit_contains_sample_weight():
         model.fit(X, y)
         mock_obj.assert_called_once_with(X, y)
 
-    run_id = run._info.run_id
+    run_id = run.info.run_id
     params, metrics, tags, artifacts = get_run_data(run_id)
     assert params == truncate_dict(stringify_dict_values(model.get_params(deep=True)))
     assert metrics == {TRAINING_SCORE: model.score(X, y)}
@@ -425,7 +425,7 @@ def test_only_score_contains_sample_weight():
         model.fit(X, y)
         mock_obj.assert_called_once_with(X, y, None)
 
-    run_id = run._info.run_id
+    run_id = run.info.run_id
     params, metrics, tags, artifacts = get_run_data(run_id)
     assert params == truncate_dict(stringify_dict_values(model.get_params(deep=True)))
     assert metrics == {TRAINING_SCORE: model.score(X, y)}
@@ -476,7 +476,7 @@ def test_autolog_emits_warning_message_when_score_fails():
             "Scoring error: EXCEPTION"
         )
 
-    metrics = get_run_data(run._info.run_id)[1]
+    metrics = get_run_data(run.info.run_id)[1]
     assert metrics == {}
 
 
@@ -499,9 +499,9 @@ def test_fit_xxx_performs_logging_only_once(fit_func_name):
             mock_set_tags.assert_called_once()
             mock_log_model.assert_called_once()
 
-        query = "tags.{} = '{}'".format(MLFLOW_PARENT_RUN_ID, run._info.run_id)
-        assert len(mlflow.search_runs([run._info.experiment_id])) == 1
-        assert len(mlflow.search_runs([run._info.experiment_id], query)) == 0
+        query = "tags.{} = '{}'".format(MLFLOW_PARENT_RUN_ID, run.info.run_id)
+        assert len(mlflow.search_runs([run.info.experiment_id])) == 1
+        assert len(mlflow.search_runs([run.info.experiment_id], query)) == 0
 
 
 def test_meta_estimator_fit_performs_logging_only_once():
@@ -527,23 +527,22 @@ def test_meta_estimator_fit_performs_logging_only_once():
             mock_set_tags.assert_called_once()
             mock_log_model.assert_called_once()
 
-        query = "tags.{} = '{}'".format(MLFLOW_PARENT_RUN_ID, run._info.run_id)
-        assert len(mlflow.search_runs([run._info.experiment_id])) == 1
-        assert len(mlflow.search_runs([run._info.experiment_id], query)) == 0
+        query = "tags.{} = '{}'".format(MLFLOW_PARENT_RUN_ID, run.info.run_id)
+        assert len(mlflow.search_runs([run.info.experiment_id])) == 1
+        assert len(mlflow.search_runs([run.info.experiment_id], query)) == 0
 
 
 @pytest.mark.parametrize(
-    "estimator_class_and_space",
+    "estimator_class, search_space",
     [
         (sklearn.model_selection.GridSearchCV, {"kernel": ("linear", "rbf"), "C": [1, 5, 10]}),
         (sklearn.model_selection.RandomizedSearchCV, {"C": uniform(loc=0, scale=4)}),
     ],
 )
 @pytest.mark.parametrize("backend", [None, "threading", "loky"])
-def test_parameter_search_estimators_produce_expected_outputs(estimator_class_and_space, backend):
+def test_parameter_search_estimators_produce_expected_outputs(estimator_class, search_space, backend):
     mlflow.sklearn.autolog()
 
-    estimator_class, search_space = estimator_class_and_space
     svc = sklearn.svm.SVC()
     cv_model = estimator_class(svc, search_space, n_jobs=5, return_train_score=True)
     X, y = get_iris()
@@ -573,6 +572,11 @@ def test_parameter_search_estimators_produce_expected_outputs(estimator_class_an
     assert MODEL_DIR in artifacts
     assert "best_estimator" in artifacts
     assert "cv_results.csv" in artifacts
+
+    best_estimator = mlflow.sklearn.load_model("runs:/{}/best_estimator".format(run_id))
+    assert isinstance(best_estimator, sklearn.svm.SVC) 
+    cv_model = mlflow.sklearn.load_model("runs:/{}/{}".format(run_id, MODEL_DIR))
+    assert isinstance(cv_model, estimator_class) 
 
     client = mlflow.tracking.MlflowClient()
     child_runs = client.search_runs(

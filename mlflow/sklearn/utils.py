@@ -93,7 +93,7 @@ def _get_args_for_score(score_func, fit_func, fit_args, fit_kwargs):
 
     # In most cases, X_var_name and y_var_name become "X" and "y", respectively.
     # However, certain sklearn models use different variable names for X and y.
-    # See: https://scikit-learn.org/stable/modules/generated/sklearn.covariance.GraphicalLasso.html#sklearn.covariance.GraphicalLasso.score # noqa: E501
+    # E.g., see: https://scikit-learn.org/stable/modules/generated/sklearn.multioutput.MultiOutputClassifier.html#sklearn.multioutput.MultiOutputClassifier.fit # noqa: E501
     X_var_name, y_var_name = fit_arg_names[:2]
     Xy = _get_Xy(fit_args, fit_kwargs, X_var_name, y_var_name)
 
@@ -193,7 +193,7 @@ def _log_parameter_search_results_as_artifact(cv_results_df, run_id):
     """
     with TempDir() as t:
         results_path = t.path("cv_results.csv")
-        cv_results_df.to_csv(results_path)
+        cv_results_df.to_csv(results_path, index=False)
         try_mlflow_log(MlflowClient().log_artifact, run_id, results_path)
 
 
@@ -238,7 +238,7 @@ def _create_child_runs_for_parameter_search(cv_estimator, parent_run, child_tags
     for _, result_row in cv_results_df.iterrows():
         tags_to_log = dict(child_tags) if child_tags else {}
         tags_to_log.update(
-            {MLFLOW_PARENT_RUN_ID: parent_run.info.run_id,}
+            { MLFLOW_PARENT_RUN_ID: parent_run.info.run_id, }
         )
         tags_to_log.update(_get_estimator_info_tags(seed_estimator))
         child_run = client.create_run(
@@ -291,7 +291,7 @@ def _create_child_runs_for_parameter_search(cv_estimator, parent_run, child_tags
                     Param(str(key), str(value)) for key, value in truncated_params_batch.items()
                 ],
                 metrics=[
-                    Metric(key=str(key), value=value, timestamp=child_run_end_time, step=0,)
+                    Metric(key=str(key), value=value, timestamp=child_run_end_time, step=0)
                     for key, value in truncated_metrics_batch.items()
                 ],
             )
