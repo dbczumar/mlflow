@@ -631,7 +631,6 @@ def autolog():
         MAX_PARAMS_TAGS_PER_BATCH,
         MAX_PARAM_VAL_LENGTH,
         MAX_ENTITY_KEY_LENGTH,
-        MAX_METRICS_PER_BATCH,
     )
 
     if not _is_supported_version():
@@ -666,7 +665,7 @@ def autolog():
 
         return fit_output
 
-    def _log_pretraining_metadata(estimator, *args, **kwargs):
+    def _log_pretraining_metadata(estimator, *args, **kwargs): # pylint: disable=unused-argument
         """
         Records metadata (e.g., params and tags) for a scikit-learn estimator prior to training.
         This is intended to be invoked within a patched scikit-learn training routine
@@ -744,7 +743,8 @@ def autolog():
                         parent_run=mlflow.active_run(),
                         child_tags=environment_tags,
                     )
-                except Exception as e:
+                except Exception as e: # pylint: disable=broad-except
+
                     msg = (
                         "Encountered exception during creation of child runs for parameter search."
                         " Child runs may be missing. Exception: {}".format(str(e))
@@ -756,7 +756,8 @@ def autolog():
                     _log_parameter_search_results_as_artifact(
                         cv_results_df, mlflow.active_run().info.run_id
                     )
-                except Exception as e:
+                except Exception as e: # pylint: disable=broad-except
+
                     msg = (
                         "Failed to log parameter search results as an artifact."
                         " Exception: {}".format(str(e))

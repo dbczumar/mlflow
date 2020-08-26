@@ -600,7 +600,7 @@ def test_parameter_search_estimators_produce_expected_outputs(cv_class, search_s
         assert len(child_runs) == 1
         child_run = child_runs[0]
         assert child_run.info.status == RunStatus.to_string(RunStatus.FINISHED)
-        child_params, child_metrics, child_tags, child_artifacts = get_run_data(
+        _, child_metrics, child_tags, _ = get_run_data(
             child_run.info.run_id
         )
         assert child_tags == get_expected_class_tags(svc)
@@ -616,7 +616,7 @@ def test_parameter_search_handles_large_volume_of_metric_outputs():
 
     metrics_size = MAX_METRICS_PER_BATCH + 10
     metrics_to_log = {
-        "score_{}".format(i): sklearn.metrics.make_scorer(lambda y, y_pred, **kwargs: i)
+        "score_{}".format(i): sklearn.metrics.make_scorer(lambda y, y_pred, **kwargs: 10)
         for i in range(metrics_size)
     }
 

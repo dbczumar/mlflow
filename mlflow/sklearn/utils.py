@@ -1,12 +1,11 @@
 from distutils.version import LooseVersion
 import inspect
 from itertools import islice
-import json
 import logging
 from numbers import Number
 import time
 
-from mlflow.entities import Metric, RunTag, Param, RunStatus
+from mlflow.entities import Metric, Param
 from mlflow.tracking.client import MlflowClient
 from mlflow.utils.autologging_utils import try_mlflow_log
 from mlflow.utils.file_utils import TempDir
