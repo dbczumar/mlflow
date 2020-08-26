@@ -574,9 +574,9 @@ def test_parameter_search_estimators_produce_expected_outputs(estimator_class, s
     assert "cv_results.csv" in artifacts
 
     best_estimator = mlflow.sklearn.load_model("runs:/{}/best_estimator".format(run_id))
-    assert isinstance(best_estimator, sklearn.svm.SVC) 
+    assert isinstance(best_estimator, sklearn.svm.SVC)
     cv_model = mlflow.sklearn.load_model("runs:/{}/{}".format(run_id, MODEL_DIR))
-    assert isinstance(cv_model, estimator_class) 
+    assert isinstance(cv_model, estimator_class)
 
     client = mlflow.tracking.MlflowClient()
     child_runs = client.search_runs(
