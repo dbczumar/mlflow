@@ -36,4 +36,4 @@ kubernetes==9.0.0
 fastai==1.0.60
 matplotlib==3.2.1
 # test plugin
-tests/resources/mlflow-test-plugin/
+../tests/resources/mlflow-test-plugin/
