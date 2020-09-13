@@ -1,13 +1,8 @@
 import os
 
 import gorilla
-import mxnet as mx
 import pandas as pd
 import yaml
-from mxnet import gluon
-from mxnet import sym
-from mxnet.gluon.contrib.estimator import Estimator, EpochEnd, TrainBegin, TrainEnd
-from mxnet.gluon.nn import HybridSequential
 
 import mlflow
 from mlflow import pyfunc
@@ -17,8 +12,8 @@ from mlflow.models.model import MLMODEL_FILE_NAME
 from mlflow.models.signature import ModelSignature
 from mlflow.models.utils import ModelInputExample, _save_example
 from mlflow.tracking.artifact_utils import _download_artifact_from_uri
-from mlflow.utils import experimental
-from mlflow.utils.autologging_utils import try_mlflow_log
+from mlflow.utils.annotations import experimental
+from mlflow.utils.autologging_utils import try_mlflow_log, wrap_patch
 from mlflow.utils.environment import _mlflow_conda_env
 
 FLAVOR_NAME = "gluon"
@@ -53,6 +48,9 @@ def load_model(model_uri, ctx):
         model = mlflow.gluon.load_model("runs:/" + gluon_random_data_run.info.run_id + "/model")
         model(nd.array(np.random.rand(1000, 1, 32)))
     """
+    from mxnet import gluon
+    from mxnet import sym
+
     local_model_path = _download_artifact_from_uri(artifact_uri=model_uri)
 
     model_arch_path = os.path.join(local_model_path, "data", _MODEL_SAVE_PATH) + "-symbol.json"
@@ -75,6 +73,8 @@ class _GluonModelWrapper:
         :return: A Pandas DataFrame containing output array values. The underlying MXNet array
                  can be extracted from the output DataFrame as `ndarray = mx.nd.array(df.values)`.
         """
+        import mxnet as mx
+
         ndarray = mx.nd.array(df.values)
         return pd.DataFrame(self.gluon_model(ndarray).asnumpy())
 
@@ -85,6 +85,8 @@ def _load_pyfunc(path):
 
     :param path: Local filesystem path to the MLflow Model with the ``gluon`` flavor.
     """
+    import mxnet as mx
+
     m = load_model(path, mx.current_context())
     return _GluonModelWrapper(m)
 
@@ -201,6 +203,8 @@ def get_default_conda_env():
     :return: The default Conda environment for MLflow Models produced by calls to
              :func:`save_model()` and :func:`log_model()`.
     """
+    import mxnet as mx
+
     pip_deps = ["mxnet=={}".format(mx.__version__)]
 
     return _mlflow_conda_env(additional_pip_deps=pip_deps)
@@ -305,6 +309,9 @@ def autolog():
     are logged as artifacts to a 'models' directory.
     """
 
+    from mxnet.gluon.contrib.estimator import Estimator, EpochEnd, TrainBegin, TrainEnd
+    from mxnet.gluon.nn import HybridSequential
+
     class __MLflowGluonCallback(EpochEnd, TrainEnd, TrainBegin):
         def __init__(self):
             self.current_epoch = 0
@@ -338,7 +345,6 @@ def autolog():
             if isinstance(estimator.net, HybridSequential):
                 try_mlflow_log(log_model, estimator.net, artifact_path="model")
 
-    @gorilla.patch(Estimator)
     def fit(self, *args, **kwargs):
         if not mlflow.active_run():
             auto_end_run = True
@@ -359,5 +365,4 @@ def autolog():
             mlflow.end_run()
         return result
 
-    settings = gorilla.Settings(allow_hit=True, store_hit=True)
-    gorilla.apply(gorilla.Patch(Estimator, "fit", fit, settings=settings))
+    wrap_patch(Estimator, "fit", fit)

@@ -3,11 +3,11 @@ import random
 import uuid
 import inspect
 
-import mock
 import numpy as np
 import pandas as pd
 import pytest
 from six.moves import reload_module as reload
+from unittest import mock
 
 import mlflow
 import mlflow.tracking.context.registry
@@ -120,7 +120,7 @@ def test_all_fluent_apis_are_included_in_dunder_all():
         for a in dir(mlflow)
         if _is_function_or_class(getattr(mlflow, a)) and not a.startswith("_")
     ]
-    assert sorted(apis) == sorted(mlflow.__all__)
+    assert set(apis).issubset(set(mlflow.__all__))
 
 
 def test_get_experiment_id_from_env():

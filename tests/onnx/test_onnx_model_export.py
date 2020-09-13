@@ -1,7 +1,7 @@
 import sys
 import os
 import pytest
-import mock
+from unittest import mock
 
 from keras.models import Sequential
 from keras.layers import Dense
@@ -11,8 +11,6 @@ import numpy as np
 import yaml
 
 import tensorflow as tf
-import mlflow
-import mlflow.keras
 import mlflow.pyfunc.scoring_server as pyfunc_scoring_server
 from mlflow import pyfunc
 from mlflow.models import infer_signature, Model
@@ -22,6 +20,7 @@ from tests.helper_functions import pyfunc_serve_and_score_model
 from mlflow.tracking.artifact_utils import _download_artifact_from_uri
 from mlflow.utils.environment import _mlflow_conda_env
 from mlflow.utils.model_utils import _get_flavor_configuration
+from mlflow.tracking._model_registry import DEFAULT_AWAIT_MAX_SLEEP_SECONDS
 
 pytestmark = pytest.mark.skipif(
     (sys.version_info < (3, 6)), reason="Tests require Python 3 to run!"
@@ -89,7 +88,7 @@ def tf_model_multiple_inputs_float64():
         t_in1 = tf.placeholder(tf.float64, 10, name="first_input")
         t_in2 = tf.placeholder(tf.float64, 10, name="second_input")
         t_out = tf.multiply(t_in1, t_in2)
-        t_out_named = tf.identity(t_out, name="output")
+        tf.identity(t_out, name="output")
     return graph
 
 
@@ -100,7 +99,7 @@ def tf_model_multiple_inputs_float32():
         t_in1 = tf.placeholder(tf.float32, 10, name="first_input")
         t_in2 = tf.placeholder(tf.float32, 10, name="second_input")
         t_out = tf.multiply(t_in1, t_in2)
-        t_out_named = tf.identity(t_out, name="output")
+        tf.identity(t_out, name="output")
     return graph
 
 
@@ -215,10 +214,9 @@ def test_signature_and_examples_are_saved_correctly(onnx_model, data, onnx_custo
 # TODO: Mark this as large once MLflow's Travis build supports the onnxruntime library
 @pytest.mark.release
 def test_model_save_load_evaluate_pyfunc_format(onnx_model, model_path, data, predicted):
-    import onnx
     import mlflow.onnx
 
-    x, y = data
+    x = data[0]
     mlflow.onnx.save_model(onnx_model, model_path)
 
     # Loading pyfunc model
@@ -263,7 +261,6 @@ def test_model_save_load_multiple_inputs(
 def test_model_save_load_evaluate_pyfunc_format_multiple_inputs(
     onnx_model_multiple_inputs_float64, data_multiple_inputs, predicted_multiple_inputs, model_path
 ):
-    import onnx
     import mlflow.onnx
 
     mlflow.onnx.save_model(onnx_model_multiple_inputs_float64, model_path)
@@ -307,7 +304,6 @@ def test_pyfunc_representation_of_float32_model_casts_and_evalutes_float64_input
     precision (e.g., 32-bit floats may be converted to 64-bit floats when persisting a
     DataFrame as JSON).
     """
-    import onnx
     import mlflow.onnx
 
     mlflow.onnx.save_model(onnx_model_multiple_inputs_float32, model_path)
@@ -370,7 +366,9 @@ def test_log_model_calls_register_model(onnx_model, onnx_custom_env):
         model_uri = "runs:/{run_id}/{artifact_path}".format(
             run_id=mlflow.active_run().info.run_id, artifact_path=artifact_path
         )
-        mlflow.register_model.assert_called_once_with(model_uri, "AdsModel1")
+        mlflow.register_model.assert_called_once_with(
+            model_uri, "AdsModel1", await_registration_for=DEFAULT_AWAIT_MAX_SLEEP_SECONDS
+        )
 
 
 def test_log_model_no_registered_model_name(onnx_model, onnx_custom_env):
@@ -388,10 +386,9 @@ def test_log_model_no_registered_model_name(onnx_model, onnx_custom_env):
 # TODO: Mark this as large once MLflow's Travis build supports the onnxruntime library
 @pytest.mark.release
 def test_model_log_evaluate_pyfunc_format(onnx_model, data, predicted):
-    import onnx
     import mlflow.onnx
 
-    x, y = data
+    x = data[0]
     # should_start_run tests whether or not calling log_model() automatically starts a run.
     for should_start_run in [False, True]:
         try:
@@ -525,11 +522,9 @@ def test_pyfunc_predict_supports_models_with_list_outputs(onnx_sklearn_model, mo
     The issue resulted in an error because MLflow assumed it would be a numpy array. Therefore,
     the this test validates the service does not receive that error when using such a model.
     """
-    import onnx
     import mlflow.onnx
-    import skl2onnx
 
-    x, y = data
+    x = data[0]
     mlflow.onnx.save_model(onnx_sklearn_model, model_path)
     wrapper = mlflow.pyfunc.load_model(model_path)
     wrapper.predict(pd.DataFrame(x))

@@ -5,13 +5,12 @@ import importlib
 import os
 import json
 import logging
-import mock
 import pickle
+from unittest import mock
 
 import pytest
 import numpy as np
 import pandas as pd
-import pandas.testing
 import sklearn.datasets as datasets
 import yaml
 
@@ -28,6 +27,7 @@ from mlflow.tracking.artifact_utils import _download_artifact_from_uri
 from mlflow.utils.environment import _mlflow_conda_env
 from mlflow.utils.file_utils import TempDir
 from mlflow.utils.model_utils import _get_flavor_configuration
+from mlflow.tracking._model_registry import DEFAULT_AWAIT_MAX_SLEEP_SECONDS
 
 
 _logger = logging.getLogger(__name__)
@@ -105,6 +105,7 @@ def get_subclassed_model_definition():
             self.linear = torch.nn.Linear(4, 1)
 
         def forward(self, x):
+            # pylint: disable=arguments-differ
             y_pred = self.linear(x)
             return y_pred
 
@@ -240,7 +241,9 @@ def test_log_model_calls_register_model(module_scoped_subclassed_model):
         model_uri = "runs:/{run_id}/{artifact_path}".format(
             run_id=mlflow.active_run().info.run_id, artifact_path=artifact_path
         )
-        mlflow.register_model.assert_called_once_with(model_uri, "AdsModel1")
+        mlflow.register_model.assert_called_once_with(
+            model_uri, "AdsModel1", await_registration_for=DEFAULT_AWAIT_MAX_SLEEP_SECONDS
+        )
 
 
 def test_log_model_no_registered_model_name(module_scoped_subclassed_model):
@@ -478,6 +481,7 @@ def test_pyfunc_model_serving_with_module_scoped_subclassed_model_and_default_co
 def test_save_model_with_wrong_codepaths_fails_corrrectly(
     module_scoped_subclassed_model, model_path, data
 ):
+    # pylint: disable=unused-argument
     with pytest.raises(TypeError) as exc_info:
         mlflow.pytorch.save_model(
             path=model_path,
@@ -536,6 +540,7 @@ def test_load_model_succeeds_with_dependencies_specified_via_code_paths(
     # `mlflow.pytorch.load_model`
     class TorchValidatorModel(pyfunc.PythonModel):
         def load_context(self, context):
+            # pylint: disable=attribute-defined-outside-init
             self.pytorch_model = mlflow.pytorch.load_model(context.artifacts["pytorch_model"])
 
         def predict(self, context, model_input):

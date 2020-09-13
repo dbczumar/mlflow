@@ -1,12 +1,12 @@
 # pep8: disable=E501
 
 import collections
-import mock
 import os
 import shutil
 import pytest
 import yaml
 import json
+from unittest import mock
 
 import numpy as np
 import pandas as pd
@@ -23,6 +23,7 @@ from mlflow.store.artifact.s3_artifact_repo import S3ArtifactRepository
 from mlflow.tracking.artifact_utils import _download_artifact_from_uri
 from mlflow.utils.environment import _mlflow_conda_env
 from mlflow.utils.model_utils import _get_flavor_configuration
+from mlflow.tracking._model_registry import DEFAULT_AWAIT_MAX_SLEEP_SECONDS
 
 from tests.helper_functions import score_model_in_sagemaker_docker_container
 from tests.helper_functions import set_boto_credentials  # pylint: disable=unused-import
@@ -369,7 +370,7 @@ def test_load_model_loads_artifacts_from_specified_model_directory(saved_tf_iris
     # loaded from the specified MLflow model path
     shutil.rmtree(saved_tf_iris_model.path)
     with tf.Session(graph=tf.Graph()) as tf_sess:
-        signature_def = mlflow.tensorflow.load_model(model_uri=model_path, tf_sess=tf_sess)
+        mlflow.tensorflow.load_model(model_uri=model_path, tf_sess=tf_sess)
 
 
 def test_log_model_with_non_keyword_args_fails(saved_tf_iris_model):
@@ -426,7 +427,9 @@ def test_log_model_calls_register_model(saved_tf_iris_model):
         model_uri = "runs:/{run_id}/{artifact_path}".format(
             run_id=mlflow.active_run().info.run_id, artifact_path=artifact_path
         )
-        mlflow.register_model.assert_called_once_with(model_uri, "AdsModel1")
+        mlflow.register_model.assert_called_once_with(
+            model_uri, "AdsModel1", await_registration_for=DEFAULT_AWAIT_MAX_SLEEP_SECONDS
+        )
 
 
 def test_log_model_no_registered_model_name(saved_tf_iris_model):
