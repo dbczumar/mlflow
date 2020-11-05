@@ -48,6 +48,8 @@ from mlflow.utils.autologging_utils import (
 )
 from mlflow.tracking._model_registry import DEFAULT_AWAIT_MAX_SLEEP_SECONDS
 
+from mlflow.autolog import autologging_integration, apply_patch
+
 FLAVOR_NAME = "xgboost"
 
 _logger = logging.getLogger(__name__)
@@ -282,8 +284,9 @@ class _XGBModelWrapper:
 
 
 @experimental
+@autologging_integration(FLAVOR_NAME)
 def autolog(
-    importance_types=["weight"], log_input_examples=False, log_model_signatures=True
+    importance_types=["weight"], log_input_examples=False, log_model_signatures=True, disable=False,
 ):  # pylint: disable=W0102
     """
     Enables automatic logging from XGBoost to MLflow. Logs the following.
@@ -507,5 +510,5 @@ def autolog(
             try_mlflow_log(mlflow.end_run)
         return model
 
-    wrap_patch(xgboost, "train", train)
-    wrap_patch(xgboost.DMatrix, "__init__", __init__)
+    apply_patch(FLAVOR_NAME, xgboost, "train", train)
+    apply_patch(FLAVOR_NAME, xgboost.DMatrix, "__init__", __init__)

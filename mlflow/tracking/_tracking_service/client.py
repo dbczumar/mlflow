@@ -188,6 +188,8 @@ class TrackingServiceClient(object):
         """
         _validate_param_name(key)
         param = Param(key, str(value))
+        print(param)
+        print(value)
         self.store.log_param(run_id, param)
 
     def set_experiment_tag(self, experiment_id, key, value):

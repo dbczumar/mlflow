@@ -48,6 +48,7 @@ def main():
 
     # enable auto logging
     mlflow.xgboost.autolog()
+    mlflow.xgboost.autolog(disable=True)
 
     dtrain = xgb.DMatrix(X_train, label=y_train)
     dtest = xgb.DMatrix(X_test, label=y_test)

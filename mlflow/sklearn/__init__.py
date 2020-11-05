@@ -18,6 +18,7 @@ import warnings
 
 import mlflow
 from mlflow import pyfunc
+from mlflow.autolog import autologging_integration, apply_patch
 from mlflow.entities.run_status import RunStatus
 from mlflow.exceptions import MlflowException
 from mlflow.models import Model
@@ -532,7 +533,8 @@ class _SklearnTrainingSession(object):
 
 
 @experimental
-def autolog(log_input_examples=False, log_model_signatures=True):
+@autologging_integration(FLAVOR_NAME)
+def autolog(log_input_examples=False, log_model_signatures=True, disable=False):
     """
     Enables autologging for scikit-learn estimators.
 
@@ -741,7 +743,7 @@ def autolog(log_input_examples=False, log_model_signatures=True):
             stacklevel=2,
         )
 
-    def fit_mlflow(self, clazz, func_name, *args, **kwargs):
+    def fit_mlflow(get_original, self, *args, **kwargs):
         """
         Autologging function that performs model training by executing the training method
         referred to be `func_name` on the instance of `clazz` referred to by `self` & records
@@ -753,13 +755,12 @@ def autolog(log_input_examples=False, log_model_signatures=True):
 
         _log_pretraining_metadata(self, *args, **kwargs)
 
-        original_fit = gorilla.get_original_attribute(clazz, func_name)
+        original_fit = get_original()
         try:
             fit_output = original_fit(self, *args, **kwargs)
         except Exception as e:
             if should_start_run:
                 try_mlflow_log(mlflow.end_run, RunStatus.to_string(RunStatus.FAILED))
-
             raise e
 
         _log_posttraining_metadata(self, *args, **kwargs)
@@ -913,7 +914,7 @@ def autolog(log_input_examples=False, log_model_signatures=True):
                     )
                     _logger.warning(msg)
 
-    def patched_fit(self, clazz, func_name, *args, **kwargs):
+    def patched_fit(get_original, self, *args, **kwargs):
         """
         Autologging patch function to be applied to a sklearn model class that defines a `fit`
         method and inherits from `BaseEstimator` (thereby defining the `get_params()` method)
@@ -924,18 +925,18 @@ def autolog(log_input_examples=False, log_model_signatures=True):
                           for autologging (e.g., specify "fit" in order to indicate that
                           `sklearn.linear_model.LogisticRegression.fit()` is being patched)
         """
-        with _SklearnTrainingSession(clazz=clazz, allow_children=False) as t:
+        with _SklearnTrainingSession(clazz=self.__class__, allow_children=False) as t:
             if t.should_log():
-                return fit_mlflow(self, clazz, func_name, *args, **kwargs)
+                return fit_mlflow(get_original, self, *args, **kwargs)
             else:
-                original_fit = gorilla.get_original_attribute(clazz, func_name)
+                original_fit = get_original
                 return original_fit(self, *args, **kwargs)
 
-    def create_patch_func(clazz, func_name):
-        def f(self, *args, **kwargs):
-            return patched_fit(self, clazz, func_name, *args, **kwargs)
+    # def create_patch_func(clazz, func_name):
+    #     def f(self, *args, **kwargs):
+    #         return patched_fit(self, clazz, func_name, *args, **kwargs)
 
-        return f
+        # return f
 
     _, estimators_to_patch = zip(*_all_estimators())
     # Ensure that relevant meta estimators (e.g. GridSearchCV, Pipeline) are selected
@@ -966,6 +967,7 @@ def autolog(log_input_examples=False, log_model_signatures=True):
         )
     ]
 
+    patches = []
     for class_def in estimators_to_patch:
         for func_name in ["fit", "fit_transform", "fit_predict"]:
             if hasattr(class_def, func_name):
@@ -988,5 +990,6 @@ def autolog(log_input_examples=False, log_model_signatures=True):
                 if isinstance(original, property):
                     continue
 
-                patch_func = create_patch_func(class_def, func_name)
-                wrap_patch(class_def, func_name, patch_func)
+                apply_patch(FLAVOR_NAME, class_def, func_name, patched_fit)
+
+    return patches
