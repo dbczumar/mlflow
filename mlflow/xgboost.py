@@ -318,9 +318,9 @@ def autolog(
     #   to use as an input example and for inferring the model signature.
     #   (there is no way to get the data back from a DMatrix object)
     # We store it on the DMatrix object so the train function is able to read it.
-    def __init__(self, *args, **kwargs):
+    def __init__(get_original, self, *args, **kwargs):
         data = args[0] if len(args) > 0 else kwargs.get("data")
-        original = gorilla.get_original_attribute(xgboost.DMatrix, "__init__")
+        original = get_original(xgboost.DMatrix, "__init__")
 
         if data is not None:
             try:
@@ -393,7 +393,7 @@ def autolog(
                 plt.close(fig)
                 shutil.rmtree(tmpdir)
 
-        original = gorilla.get_original_attribute(xgboost, "train")
+        original = get_original(xgboost, "train")
 
         # logging booster params separately via mlflow.log_params to extract key/value pairs
         # and make it easier to compare them across runs.

@@ -756,14 +756,11 @@ def autolog(log_input_examples=False, log_model_signatures=True, disable=False):
         _log_pretraining_metadata(self, *args, **kwargs)
 
         original_fit = get_original()
-        try:
-            fit_output = original_fit(self, *args, **kwargs)
-        except Exception as e:
-            if should_start_run:
-                try_mlflow_log(mlflow.end_run, RunStatus.to_string(RunStatus.FAILED))
-            raise e
+
+        fit_output = original_fit(self, *args, **kwargs)
 
         _log_posttraining_metadata(self, *args, **kwargs)
+
 
         if should_start_run:
             try_mlflow_log(mlflow.end_run)
