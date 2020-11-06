@@ -14,8 +14,8 @@ def apply_patch(autologging_integration, destination, name, function):
 
     def patched_train(inst, *args, **kwargs):
         preexisting_run = mlflow.active_run()
-        failed_during_original = False
         original_result = None
+        failed_during_original = False
 
         def get_original():
             original = gorilla.get_original_attribute(destination, name)
@@ -45,8 +45,8 @@ def apply_patch(autologging_integration, destination, name, function):
 
             if failed_during_original:
                 raise
-            
-            print("Encountered unexpected error during autologging: " + str(e)) 
+
+            print("Encountered unexpected error during autologging: " + str(e))
 
             if original_result:
                 return original
@@ -64,7 +64,7 @@ def autologging_integration(name):
 
         def autolog(*args, **kwargs):
             AUTOLOGGING_INTEGRATIONS[name] = kwargs
-            
+
             try:
                 _autolog(**kwargs)
             except Exception as e:
@@ -75,5 +75,20 @@ def autologging_integration(name):
 
     return wrapper
 
-class TrainingExecutionException(Exception):
-    pass
+
+def catch_exception(f):
+    @functools.wraps(f)
+    def func(*args, **kwargs):
+        try:
+            return f(*args, **kwargs)
+        except Exception as e:
+            print("Encountered unexpected error during autologging: " + str(e))
+    return func
+
+
+class ErrorCatcher(type):
+    def __new__(cls, name, bases, dct):
+        for m in dct:
+            if hasattr(dct[m], '__call__'):
+                dct[m] = catch_exception(dct[m])
+        return type.__new__(cls, name, bases, dct)

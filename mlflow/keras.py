@@ -31,6 +31,8 @@ from mlflow.utils.annotations import experimental
 from mlflow.utils.autologging_utils import try_mlflow_log, log_fn_args_as_params, wrap_patch
 from mlflow.tracking._model_registry import DEFAULT_AWAIT_MAX_SLEEP_SECONDS
 
+from mlflow.autolog import autologging_integration, apply_patch, ErrorCatcher
+
 
 FLAVOR_NAME = "keras"
 # File name to which custom objects cloudpickle is saved - used during save and load
@@ -499,6 +501,7 @@ def load_model(model_uri, **kwargs):
 
 
 @experimental
+@autologging_integration(FLAVOR_NAME)
 def autolog():
     # pylint: disable=E0611
     """
@@ -549,7 +552,7 @@ def autolog():
     """
     import keras
 
-    class __MLflowKerasCallback(keras.callbacks.Callback):
+    class __MLflowKerasCallback(keras.callbacks.Callback, metaclass=ErrorCatcher):
         """
         Callback for auto-logging metrics and parameters.
         Records available logs after each epoch.
@@ -691,15 +694,15 @@ def autolog():
 
         return history
 
-    def fit(self, *args, **kwargs):
-        original = gorilla.get_original_attribute(keras.Model, "fit")
+    def fit(get_original, self, *args, **kwargs):
+        original = get_original()
         unlogged_params = ["self", "x", "y", "callbacks", "validation_data", "verbose"]
         return _run_and_log_function(self, original, args, kwargs, unlogged_params, 5)
 
-    def fit_generator(self, *args, **kwargs):
-        original = gorilla.get_original_attribute(keras.Model, "fit_generator")
+    def fit_generator(get_original, self, *args, **kwargs):
+        original = get_original()
         unlogged_params = ["self", "generator", "callbacks", "validation_data", "verbose"]
         return _run_and_log_function(self, original, args, kwargs, unlogged_params, 4)
 
-    wrap_patch(keras.Model, "fit", fit)
-    wrap_patch(keras.Model, "fit_generator", fit_generator)
+    apply_patch(FLAVOR_NAME, keras.Model, "fit", fit)
+    apply_patch(FLAVOR_NAME, keras.Model, "fit_generator", fit_generator)
