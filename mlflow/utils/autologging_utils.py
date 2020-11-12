@@ -1,8 +1,10 @@
 import inspect
 import functools
 import warnings
+import logging
 
 import mlflow
+from mlflow.entities.run_status import RunStatus
 from mlflow.utils import gorilla
 
 
@@ -10,6 +12,10 @@ INPUT_EXAMPLE_SAMPLE_ROWS = 5
 ENSURE_AUTOLOGGING_ENABLED_TEXT = (
     "please ensure that autologging is enabled before constructing the dataset."
 )
+
+AUTOLOGGING_INTEGRATIONS = {}
+
+_logger = logging.getLogger(__name__)
 
 
 def try_mlflow_log(fn, *args, **kwargs):
@@ -187,3 +193,111 @@ def resolve_input_example_and_signature(
         logger.warning(model_signature_user_msg)
 
     return input_example if log_input_example else None, model_signature
+
+
+
+
+def safe_patch(autologging_integration, destination, function_name, function):
+    """
+    Patches the specified `function_name` on the specified `destination` class for autologging
+    purposes, replacing its implementation with an error-safe copy of the specified `function`.
+
+    :param autologging_integration: The name of the autologging integration associated with the
+                                    patch.
+    :param destination: The Python class on which the patch function is being defined.
+    :param function_name: The name of the function to patch on the specified `destination` class.
+    :param function: The patch function to apply. This first argument to this function should be
+                     reserved for an `original` method argument representing the underlying /
+                     original function. Subsequent arguments should be identical to those of the
+                     original function being patched.
+    """
+    def patched_train(*args, **kwargs):
+        preexisting_run = mlflow.active_run()
+        original_result = None
+        failed_during_original = False
+
+        def call_original(*args, **kwargs):
+            original = gorilla.get_original_attribute(destination, function_name)
+
+            def wrapped_original(*args, **kwargs):
+                try:
+                    nonlocal original_result
+                    original_result = original(*args, **kwargs)
+                    return original_result
+                except Exception:
+                    nonlocal failed_during_original
+                    failed_during_original = True
+                    raise
+
+            return wrapped_original(*args, **kwargs)
+
+        original = gorilla.get_original_attribute(destination, function_name)
+        config = AUTOLOGGING_INTEGRATIONS[autologging_integration]
+        if config.get("disable", False):
+            return original(*args, **kwargs)
+
+        try:
+            return function(call_original, *args, **kwargs)
+        except Exception as e:
+            if not preexisting_run and mlflow.active_run():
+                try_mlflow_log(mlflow.end_run, RunStatus.to_string(RunStatus.FAILED))
+
+            if failed_during_original:
+                raise
+
+            _logger.warning("Encountered unexpected error during %s autologging: %s", autologging_integration, e)
+
+            if original_result:
+                return original
+            else:
+                return original(*args, **kwargs)
+
+    wrap_patch(destination, function_name, patched_train)
+
+
+def autologging_integration(name):
+
+    AUTOLOGGING_INTEGRATIONS[name] = {}
+
+    def wrapper(_autolog):
+
+        def autolog(*args, **kwargs):
+            AUTOLOGGING_INTEGRATIONS[name] = kwargs
+            _autolog(**kwargs)
+
+        wrapped_autolog = functools.wraps(_autolog)(autolog)
+        return wrapped_autolog
+
+    return wrapper
+
+
+def handle_exceptions(function):
+    """
+    Wraps the specified function with broad exception handling to guard
+    against unexpected errors during autologging.
+    """
+    @functools.wraps(function)
+    def safe_function(*args, **kwargs):
+        try:
+            return function(*args, **kwargs)
+        except Exception as e:
+            _logger.warning("Encountered unexpected error during autologging: %s", e)
+    return safe_function
+
+
+class ExceptionSafeClass(type):
+    """
+    Metaclass that wraps all functions defined on the specified class with broad error handling
+    logic to guard against unexpected errors during autlogging.
+
+    Rationale: Patched autologging functions commonly pass additional class instances as arguments
+    to their underlying original training routines; for example, Keras autologging constructs
+    a subclass of `keras.callbacks.Callback` and forwards it to `Model.fit()`. To prevent errors
+    encountered during method execution within such classes from disrupting model training,
+    this metaclass wraps all class functions in a broad try / catch statement.
+    """
+    def __new__(cls, name, bases, dct):
+        for m in dct:
+            if hasattr(dct[m], '__call__'):
+                dct[m] = handle_exceptions(dct[m])
+        return type.__new__(cls, name, bases, dct)

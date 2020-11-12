@@ -38,9 +38,10 @@ from mlflow.utils.model_utils import _get_flavor_configuration
 from mlflow.exceptions import MlflowException
 from mlflow.utils.annotations import experimental
 from mlflow.utils.autologging_utils import (
+    autologging_integration,
+    safe_patch,
     try_mlflow_log,
     log_fn_args_as_params,
-    wrap_patch,
     INPUT_EXAMPLE_SAMPLE_ROWS,
     resolve_input_example_and_signature,
     _InputExampleInfo,
@@ -48,7 +49,6 @@ from mlflow.utils.autologging_utils import (
 )
 from mlflow.tracking._model_registry import DEFAULT_AWAIT_MAX_SLEEP_SECONDS
 
-from mlflow.autolog import autologging_integration, apply_patch
 
 FLAVOR_NAME = "xgboost"
 
@@ -318,9 +318,8 @@ def autolog(
     #   to use as an input example and for inferring the model signature.
     #   (there is no way to get the data back from a DMatrix object)
     # We store it on the DMatrix object so the train function is able to read it.
-    def __init__(get_original, self, *args, **kwargs):
+    def __init__(original, self, *args, **kwargs):
         data = args[0] if len(args) > 0 else kwargs.get("data")
-        original = get_original(xgboost.DMatrix, "__init__")
 
         if data is not None:
             try:
@@ -392,8 +391,6 @@ def autolog(
             finally:
                 plt.close(fig)
                 shutil.rmtree(tmpdir)
-
-        original = get_original(xgboost, "train")
 
         # logging booster params separately via mlflow.log_params to extract key/value pairs
         # and make it easier to compare them across runs.
@@ -510,5 +507,5 @@ def autolog(
             try_mlflow_log(mlflow.end_run)
         return model
 
-    apply_patch(FLAVOR_NAME, xgboost, "train", train)
-    apply_patch(FLAVOR_NAME, xgboost.DMatrix, "__init__", __init__)
+    safe_patch(FLAVOR_NAME, xgboost, "train", train)
+    safe_patch(FLAVOR_NAME, xgboost.DMatrix, "__init__", __init__)

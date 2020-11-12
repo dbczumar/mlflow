@@ -28,10 +28,14 @@ from mlflow.utils import gorilla
 from mlflow.utils.environment import _mlflow_conda_env
 from mlflow.utils.model_utils import _get_flavor_configuration
 from mlflow.utils.annotations import experimental
-from mlflow.utils.autologging_utils import try_mlflow_log, log_fn_args_as_params, wrap_patch
+from mlflow.utils.autologging_utils import (
+    autologging_integration,
+    safe_patch,
+    ExceptionSafeClass,
+    try_mlflow_log,
+    log_fn_args_as_params,
+)
 from mlflow.tracking._model_registry import DEFAULT_AWAIT_MAX_SLEEP_SECONDS
-
-from mlflow.autolog import autologging_integration, apply_patch, ErrorCatcher
 
 
 FLAVOR_NAME = "keras"
@@ -552,7 +556,7 @@ def autolog():
     """
     import keras
 
-    class __MLflowKerasCallback(keras.callbacks.Callback, metaclass=ErrorCatcher):
+    class __MLflowKerasCallback(keras.callbacks.Callback, metaclass=ExceptionSafeClass):
         """
         Callback for auto-logging metrics and parameters.
         Records available logs after each epoch.
@@ -560,6 +564,7 @@ def autolog():
         """
 
         def on_train_begin(self, logs=None):  # pylint: disable=unused-argument
+            1/0
             try_mlflow_log(mlflow.log_param, "num_layers", len(self.model.layers))
             try_mlflow_log(mlflow.log_param, "optimizer_name", type(self.model.optimizer).__name__)
             if hasattr(self.model.optimizer, "lr"):
@@ -694,15 +699,13 @@ def autolog():
 
         return history
 
-    def fit(get_original, self, *args, **kwargs):
-        original = get_original()
+    def fit(original, self, *args, **kwargs):
         unlogged_params = ["self", "x", "y", "callbacks", "validation_data", "verbose"]
         return _run_and_log_function(self, original, args, kwargs, unlogged_params, 5)
 
-    def fit_generator(get_original, self, *args, **kwargs):
-        original = get_original()
+    def fit_generator(original, self, *args, **kwargs):
         unlogged_params = ["self", "generator", "callbacks", "validation_data", "verbose"]
         return _run_and_log_function(self, original, args, kwargs, unlogged_params, 4)
 
-    apply_patch(FLAVOR_NAME, keras.Model, "fit", fit)
-    apply_patch(FLAVOR_NAME, keras.Model, "fit_generator", fit_generator)
+    safe_patch(FLAVOR_NAME, keras.Model, "fit", fit)
+    safe_patch(FLAVOR_NAME, keras.Model, "fit_generator", fit_generator)
