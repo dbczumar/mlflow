@@ -22,6 +22,8 @@ Test suite intended to test the following:
     - `safe_patch` ends runs created by patch code when exceptions are encountered
     - `safe_patch` preserves the documentation and signature of the patched method
     - `safe_patch` preserves the documentation and signature of the `original` function argument
+    - `safe_patch` invokes the underlying / original function directly if the associated autologging
+      integration is disabled
 
     - `safe_patch` propagates exceptions raised by patch code in test mode
     - `safe_patch` performs argument consistency / exception safety validation in test mode
