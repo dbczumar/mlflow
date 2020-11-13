@@ -10,5 +10,6 @@ export MLFLOW_SKINNY='true'
 pytest --verbose tests/test_skinny.py
 python -m pip install sqlalchemy alembic sqlparse
 pytest --verbose tests/tracking/test_client.py
+pytest --verbose tests/projects/test_projects.py
 
 test $err = 0
