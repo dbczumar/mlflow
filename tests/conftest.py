@@ -21,7 +21,7 @@ def reset_mock():
 
 
 @pytest.fixture(autouse=True)
-def tracking_uri_mock(tmpdir, request, reset_active_experiment):
+def tracking_uri_mock(tmpdir, request):
     from mlflow.utils.file_utils import path_to_local_sqlite_uri
 
     try:

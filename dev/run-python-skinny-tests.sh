@@ -9,6 +9,6 @@ export MLFLOW_SKINNY='true'
 
 pytest --verbose tests/test_skinny.py
 python -m pip install sqlalchemy
-pytest --verbose tests/tracking
+pytest --verbose tests/tracking/test_client.py
 
 test $err = 0
