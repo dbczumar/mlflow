@@ -20,12 +20,6 @@ def reset_mock():
     cache[:] = []
 
 
-@pytest.fixture
-def reset_active_experiment():
-    yield
-    mlflow.tracking.fluent._active_experiment_id = None
-
-
 @pytest.fixture(autouse=True)
 def tracking_uri_mock(tmpdir, request, reset_active_experiment):
     from mlflow.utils.file_utils import path_to_local_sqlite_uri
@@ -39,5 +33,6 @@ def tracking_uri_mock(tmpdir, request, reset_active_experiment):
         yield tmpdir
     finally:
         mlflow.set_tracking_uri(None)
+        mlflow.tracking.fluent._active_experiment_id = None
         if "notrackingurimock" not in request.keywords:
             del os.environ["MLFLOW_TRACKING_URI"]
