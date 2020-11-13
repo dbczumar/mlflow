@@ -51,7 +51,6 @@ from mlflow.utils.autologging_utils import (
 )
 from mlflow.tracking._model_registry import DEFAULT_AWAIT_MAX_SLEEP_SECONDS
 
-
 FLAVOR_NAME = "xgboost"
 
 _logger = logging.getLogger(__name__)
