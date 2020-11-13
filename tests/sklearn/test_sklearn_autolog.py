@@ -587,15 +587,15 @@ def test_only_score_contains_sample_weight():
     assert_predict_equal(load_model_by_run_id(run_id), model, X)
 
 
-# def test_autolog_terminates_run_when_active_run_does_not_exist_and_fit_fails():
-#     mlflow.sklearn.autolog()
-#
-#     with pytest.raises(ValueError, match="Penalty term must be positive"):
-#         sklearn.svm.LinearSVC(C=-1).fit(*get_iris())
-#
-#     latest_run = mlflow.search_runs().iloc[0]
-#     assert mlflow.active_run() is None
-#     assert latest_run.status == "FAILED"
+def test_autolog_terminates_run_when_active_run_does_not_exist_and_fit_fails():
+    mlflow.sklearn.autolog()
+
+    with pytest.raises(ValueError, match="Penalty term must be positive"):
+        sklearn.svm.LinearSVC(C=-1).fit(*get_iris())
+
+    latest_run = mlflow.search_runs().iloc[0]
+    assert mlflow.active_run() is None
+    assert latest_run.status == "FAILED"
 
 
 def test_autolog_does_not_terminate_run_when_active_run_exists_and_fit_fails():
