@@ -54,10 +54,8 @@ if not _is_mlflow_skinny:
             "alembic<=1.4.1",
             # Required
             "azure-storage-blob",
-            "cloudpickle",
             "docker>=4.0.0",
             "Flask",
-            "gitpython>=2.1.0",
             "gunicorn; platform_system != 'Windows'",
             "prometheus-flask-exporter",
             "querystring_parser",
