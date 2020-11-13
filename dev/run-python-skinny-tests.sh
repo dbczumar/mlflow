@@ -8,7 +8,7 @@ export MLFLOW_HOME=$(pwd)
 export MLFLOW_SKINNY='true'
 
 pytest --verbose tests/test_skinny.py
-python -m pip install sqlalchemy
+python -m pip install sqlalchemy alembic
 pytest --verbose tests/tracking/test_client.py
 
 test $err = 0
