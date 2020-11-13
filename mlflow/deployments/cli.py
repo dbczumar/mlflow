@@ -4,7 +4,6 @@ import json
 import pandas as pd
 from mlflow.utils import cli_args
 from mlflow.deployments import interface
-from mlflow.pyfunc.scoring_server import _get_jsonable_obj
 from mlflow.utils.proto_json_utils import NumpyEncoder
 
 
@@ -237,6 +236,7 @@ def run_local(flavor, model_uri, target, name, config):
 
 
 def predictions_to_json(raw_predictions, output):
+    from mlflow.pyfunc.scoring_server import _get_jsonable_obj
     predictions = _get_jsonable_obj(raw_predictions, pandas_orient="records")
     json.dump(predictions, output, cls=NumpyEncoder)
 
