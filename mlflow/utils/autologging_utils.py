@@ -399,6 +399,7 @@ def exception_safe_function(function):
             else:
                 _logger.warning("Encountered unexpected error during autologging: %s", e)
 
+    safe_function.__signature__ = inspect.signature(function)
     return safe_function
 
 

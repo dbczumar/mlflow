@@ -32,6 +32,7 @@ Test suite intended to test the following:
 
     - `exception_safe_function` catches exceptions raised outside of test mode
     - `exception_safe_function` propagates exceptions in test mode
+    - `exception_safe_function` preserves the documentation and signature of the wrapped function
 
     - Methods on an `ExceptionSafeClass` catch exceptions raised outside of test mode
     - Methods on an `ExceptionSafeClass` propagate exceptions in test mode
