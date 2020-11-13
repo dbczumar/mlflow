@@ -314,7 +314,7 @@ def safe_patch(autologging_integration, destination, function_name, function):
                                     patch.
     :param destination: The Python class on which the patch function is being defined.
     :param function_name: The name of the function to patch on the specified `destination` class.
-    :param function: The patch function to apply. This first argument to this function should be
+    :param function: The patch function to apply. The first argument to this function should be
                      reserved for an `original` method argument representing the underlying /
                      original function. Subsequent arguments should be identical to those of the
                      original function being patched.
