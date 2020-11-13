@@ -68,7 +68,7 @@ parse_custom_arguments = click.option(
 )
 
 parse_input = click.option(
-    "--input-path", "-I", required=True, help="Path to input json file for prediction",
+    "--input-path", "-I", required=True, help="Path to input json file for prediction"
 )
 
 parse_output = click.option(
@@ -237,6 +237,7 @@ def run_local(flavor, model_uri, target, name, config):
 
 def predictions_to_json(raw_predictions, output):
     from mlflow.pyfunc.scoring_server import _get_jsonable_obj
+
     predictions = _get_jsonable_obj(raw_predictions, pandas_orient="records")
     json.dump(predictions, output, cls=NumpyEncoder)
 

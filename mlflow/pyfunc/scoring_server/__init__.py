@@ -158,6 +158,7 @@ def init(model: PyFuncModel):
     Initialize the server. Loads pyfunc model from the path.
     """
     import flask
+
     app = flask.Flask(__name__)
     input_schema = model.metadata.get_input_schema()
 
@@ -180,6 +181,7 @@ def init(model: PyFuncModel):
         generate predictions and convert them back to json.
         """
         import flask
+
         # Convert from CSV to pandas
         if flask.request.content_type == CONTENT_TYPE_CSV:
             data = flask.request.data.decode("utf-8")

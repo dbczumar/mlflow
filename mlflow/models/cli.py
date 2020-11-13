@@ -169,6 +169,7 @@ def build_docker(model_uri, name, install_mlflow):
 
 def _get_flavor_backend(model_uri, **kwargs):
     from mlflow.models.flavor_backend_registry import get_flavor_backend
+
     with TempDir() as tmp:
         if ModelsArtifactRepository.is_models_uri(model_uri):
             underlying_model_uri = ModelsArtifactRepository.get_underlying_uri(model_uri)
