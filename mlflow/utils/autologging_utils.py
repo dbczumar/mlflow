@@ -350,7 +350,7 @@ def _validate_args(user_call_args, user_call_kwargs, autologging_call_args, auto
           to the original training function
         - Any additional arguments supplied to the original function are exception safe (i.e.
           they are either functions decorated with the `@exception_safe_function` decorator
-          or are classes / instances of classes with type `ExceptionSafeClass` 
+          or classes / instances of classes with type `ExceptionSafeClass` 
     """
     def _validate_new_arg(arg):
         if type(arg) == list:
