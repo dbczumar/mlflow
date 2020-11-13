@@ -956,7 +956,6 @@ def autolog(log_input_examples=False, log_model_signatures=True, disable=False):
         )
     ]
 
-    patches = []
     for class_def in estimators_to_patch:
         for func_name in ["fit", "fit_transform", "fit_predict"]:
             if hasattr(class_def, func_name):
@@ -980,5 +979,3 @@ def autolog(log_input_examples=False, log_model_signatures=True, disable=False):
                     continue
 
                 safe_patch(FLAVOR_NAME, class_def, func_name, patched_fit)
-
-    return patches

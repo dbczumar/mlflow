@@ -286,7 +286,7 @@ def batch_metrics_logger(run_id):
 
 def autologging_integration(name):
     """
-    Wraps an autologging function in order to store its configuration arguments. This enables 
+    Wraps an autologging function in order to store its configuration arguments. This enables
     patch functions to broadly obey certain configurations (e.g., disable=True) without
     requiring specific logic to be present in each autologging integration. **All autologging
     integrations should be decorated with this wrapper.**
@@ -323,6 +323,7 @@ def safe_patch(autologging_integration, destination, function_name, function):
     def patched_train(*args, **kwargs):
         preexisting_run = mlflow.active_run()
         original_result = None
+        called_original = False
         failed_during_original = False
 
         def call_original(*og_args, **og_kwargs):
@@ -333,6 +334,7 @@ def safe_patch(autologging_integration, destination, function_name, function):
 
             def wrapped_original(*args, **kwargs):
                 try:
+                    called_original = True
                     nonlocal original_result
                     original_result = original(*args, **kwargs)
                     return original_result
@@ -345,7 +347,7 @@ def safe_patch(autologging_integration, destination, function_name, function):
 
         original = gorilla.get_original_attribute(destination, function_name)
         call_original = functools.wraps(original)(call_original)
-        call_original.__signature__ = inspect.signature(original) 
+        call_original.__signature__ = inspect.signature(original)
 
         config = AUTOLOGGING_INTEGRATIONS[autologging_integration]
         if config.get("disable", False):
@@ -365,10 +367,10 @@ def safe_patch(autologging_integration, destination, function_name, function):
 
             _logger.warning("Encountered unexpected error during %s autologging: %s", autologging_integration, e)
 
-            if original_result:
-                return original
-            else:
-                return original(*args, **kwargs)
+        if called_original:
+            return original_result
+        else:
+            return original(*args, **kwargs)
 
     wrap_patch(destination, function_name, patched_train)
 

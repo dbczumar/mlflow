@@ -1,54 +1,33 @@
-import pytest
-import mlflow
-from mlflow.utils.autologging_utils import safe_patch
+"""
+Test suite intended to test the following:
 
+- Correctness conditions for autologging integrations:
 
-from unittest import mock
+    - All autologging functions are decorated with the `autologging_integration` decorator
+      and can be disabled via the `disable=True` flag
+    - Autologging patch functions are applied using `safe_patch`
 
+- Correctness conditions for autologging safety utilities
 
-TESTED_INTEGRATIONS = [
-    mlflow.keras.autolog,
-    mlflow.sklearn.autolog,
-    mlflow.xgboost.autolog,
-]
+    - `autologging_integration` stores configuration attributes as expected
 
+    - `safe_patch` catches exceptions raised by patch code outside of test mode
+    - `safe_patch` invokes the underlying / original function when patch code terminates without
+      doing so (due to an exception in patch code or due to omission of an original function call)
+    - `safe_patch` does not invoke the underlying / original function again when a patch code failure
+      occurs during or after the underlying function call
+    - `safe_patch` propagates exceptions raised by original function calls
+    - `safe_patch` does not perform argument consistency / exception safety validation outside
+      of test mode
+    
+    - `safe_patch` propagates exceptions raised by patch code in test mode
+    - `safe_patch` performs argument consistency / exception safety validation in test mode
+    - `safe_patch`, `exception_safe_function`, and `ExceptionSafeClass` do not operate in test mode
+      unless test mode is enabled via the associated environment variable
 
-@pytest.mark.parametrize("autologging_integration", TESTED_INTEGRATIONS)
-def test_integration_applies_safe_patches_with_safe_functions_and_objects(autologging_integration):
-    patches = []
+    - `exception_safe_function` catches exceptions raised outside of test mode
+    - `exception_safe_function` propagates exceptions in test mode
 
-    def safe_patch_with_mock_destination(autologging_integration, destination, function_name, function):
-        class MockDest:
-            pass
-
-        def dummy_original(*args, **kwargs):
-            print("BAHHH")
-            return
-
-        setattr(MockDest, function_name, dummy_original)
-        patches.append((MockDest, function_name, dummy_original))
-
-        return safe_patch(autologging_integration, MockDest, function_name, function)
-
-    with mock.patch(autologging_integration.__module__ + ".safe_patch", wraps=safe_patch_with_mock_destination) as mock_safe_patch:
-        autologging_integration()
-
-    for clazz, fn_name, original_fn in patches:
-        patch_fn = getattr(clazz, fn_name)
-        patch_fn()
-    # for call_args in mock_safe_patch.call_args_list:
-    #     _, patched_class, patched_fn_name, _ = call_args[0]
-    #     patched_fn = getattr(patched_class, patched_fn_name)
-    #     print(patched_fn)
-        # patched_fn()
-    #     with mock
-    #
-    #
-    #     print(patch_info)
-
-    #
-    # with mock.patch("mlflow.utils.autologging_utils.safe_patch") as mock_safe_patch:
-    #     autologging_integration()
-    #     mock_safe_patch.assert_called()
-    #
-    #
+    - Methods on an `ExceptionSafeClass` catch exceptions raised outside of test mode
+    - Methods on an `ExceptionSafeClass` propagate exceptions in test mode
+"""
