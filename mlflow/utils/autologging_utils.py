@@ -369,10 +369,10 @@ def safe_patch(autologging_integration, destination, function_name, function):
                 "Encountered unexpected error during %s autologging: %s", autologging_integration, e
             )
 
-        if called_original:
-            return original_result
-        else:
-            return original(*args, **kwargs)
+            if called_original:
+                return original_result
+            else:
+                return original(*args, **kwargs)
 
     wrap_patch(destination, function_name, patched_train)
 
