@@ -19,7 +19,7 @@ Test suite intended to test the following:
     - `safe_patch` propagates exceptions raised by original function calls
     - `safe_patch` does not perform argument consistency / exception safety validation outside
       of test mode
-    
+
     - `safe_patch` propagates exceptions raised by patch code in test mode
     - `safe_patch` performs argument consistency / exception safety validation in test mode
     - `safe_patch`, `exception_safe_function`, and `ExceptionSafeClass` do not operate in test mode

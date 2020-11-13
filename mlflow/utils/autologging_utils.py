@@ -125,7 +125,7 @@ def wrap_patch(destination, name, patch, settings=None):
 
     original = getattr(destination, name)
     wrapped = functools.wraps(original)(patch)
-    wrapped.__signature__ = inspect.signature(original) 
+    wrapped.__signature__ = inspect.signature(original)
     patch = gorilla.Patch(destination, name, wrapped, settings=settings)
     gorilla.apply(patch)
 
@@ -421,15 +421,15 @@ class ExceptionSafeClass(type):
 def _is_testing():
     """
     Indicates whether or not autologging functionality is running in test mode (as determined
-    by the `MLFLOW_AUTOLOGGING_TESTING` environment variable). Test mode performs additional 
+    by the `MLFLOW_AUTOLOGGING_TESTING` environment variable). Test mode performs additional
     validation during autologging, including:
         - Checks for the exception safety of arguments passed to model training functions
           (i.e. all additional arguments should be "exception safe" functions or classes)
         - Disables exception handling for patched function logic, ensuring that patch code
-          executes without errors during testing 
+          executes without errors during testing
     """
     import os
-    return os.environ.get("MLFLOW_AUTOLOGGING_TESTING", "false") == "true" 
+    return os.environ.get("MLFLOW_AUTOLOGGING_TESTING", "false") == "true"
 
 
 def _validate_args(user_call_args, user_call_kwargs, autologging_call_args, autologging_call_kwargs):
@@ -440,7 +440,7 @@ def _validate_args(user_call_args, user_call_kwargs, autologging_call_args, auto
           to the original training function
         - Any additional arguments supplied to the original function are exception safe (i.e.
           they are either functions decorated with the `@exception_safe_function` decorator
-          or classes / instances of classes with type `ExceptionSafeClass` 
+          or classes / instances of classes with type `ExceptionSafeClass`
     """
     def _validate_new_arg(arg):
         if type(arg) == list:
@@ -469,6 +469,6 @@ def _validate_args(user_call_args, user_call_kwargs, autologging_call_args, auto
                 _validate(autologging_kwarg[key], user_kwarg.get(key))
         else:
             assert autologging_kwarg is user_kwarg or autologging_kwarg == user_kwarg
-   
+
     _validate(autologging_call_args, user_call_args)
     _validate(autologging_call_kwargs, user_call_kwargs)

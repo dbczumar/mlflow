@@ -926,7 +926,7 @@ def autolog(log_input_examples=False, log_model_signatures=True, disable=False):
             else:
                 return original(self, *args, **kwargs)
 
-    
+
     _, estimators_to_patch = zip(*_all_estimators())
     # Ensure that relevant meta estimators (e.g. GridSearchCV, Pipeline) are selected
     # for patching if they are not already included in the output of `all_estimators()`
