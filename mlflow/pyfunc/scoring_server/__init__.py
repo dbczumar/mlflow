@@ -11,7 +11,6 @@ Defines two endpoints:
     /invocations used for scoring
 """
 from collections import OrderedDict
-import flask
 import json
 import logging
 import numpy as np
@@ -158,6 +157,7 @@ def init(model: PyFuncModel):
     """
     Initialize the server. Loads pyfunc model from the path.
     """
+    import flask
     app = flask.Flask(__name__)
     input_schema = model.metadata.get_input_schema()
 
@@ -179,6 +179,7 @@ def init(model: PyFuncModel):
         we take data as CSV or json, convert it to a Pandas DataFrame or Numpy,
         generate predictions and convert them back to json.
         """
+        import flask
         # Convert from CSV to pandas
         if flask.request.content_type == CONTENT_TYPE_CSV:
             data = flask.request.data.decode("utf-8")
