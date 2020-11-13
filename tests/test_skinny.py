@@ -7,6 +7,7 @@ import os
 )
 def test_fails_sqlalchemy_import():
     import mlflow
+    assert mlflow is not None  # pylint or flake8 disabling is not working
     with pytest.raises(ImportError):
         import sqlalchemy  # pylint: disable=unused-import
 
