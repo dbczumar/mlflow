@@ -759,7 +759,6 @@ def autolog(log_input_examples=False, log_model_signatures=True, disable=False):
 
         _log_posttraining_metadata(self, *args, **kwargs)
 
-
         if should_start_run:
             try_mlflow_log(mlflow.end_run)
 
@@ -925,7 +924,6 @@ def autolog(log_input_examples=False, log_model_signatures=True, disable=False):
                 return fit_mlflow(original, self, *args, **kwargs)
             else:
                 return original(self, *args, **kwargs)
-
 
     _, estimators_to_patch = zip(*_all_estimators())
     # Ensure that relevant meta estimators (e.g. GridSearchCV, Pipeline) are selected

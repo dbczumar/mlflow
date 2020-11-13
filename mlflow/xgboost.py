@@ -345,6 +345,7 @@ def autolog(
             """
             Create a callback function that records evaluation results.
             """
+
             @exception_safe_function
             def callback(env):
                 metrics_logger.record_metrics(dict(env.evaluation_result_list), env.iteration)

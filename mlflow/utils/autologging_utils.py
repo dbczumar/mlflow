@@ -295,7 +295,6 @@ def autologging_integration(name):
     AUTOLOGGING_INTEGRATIONS[name] = {}
 
     def wrapper(_autolog):
-
         def autolog(*args, **kwargs):
             AUTOLOGGING_INTEGRATIONS[name] = kwargs
             _autolog(**kwargs)
@@ -320,6 +319,7 @@ def safe_patch(autologging_integration, destination, function_name, function):
                      original function. Subsequent arguments should be identical to those of the
                      original function being patched.
     """
+
     def patched_train(*args, **kwargs):
         preexisting_run = mlflow.active_run()
         original_result = None
@@ -365,7 +365,9 @@ def safe_patch(autologging_integration, destination, function_name, function):
             if failed_during_original:
                 raise
 
-            _logger.warning("Encountered unexpected error during %s autologging: %s", autologging_integration, e)
+            _logger.warning(
+                "Encountered unexpected error during %s autologging: %s", autologging_integration, e
+            )
 
         if called_original:
             return original_result
@@ -411,9 +413,10 @@ class ExceptionSafeClass(type):
     encountered during method execution within such classes from disrupting model training,
     this metaclass wraps all class functions in a broad try / catch statement.
     """
+
     def __new__(cls, name, bases, dct):
         for m in dct:
-            if hasattr(dct[m], '__call__'):
+            if hasattr(dct[m], "__call__"):
                 dct[m] = exception_safe_function(dct[m])
         return type.__new__(cls, name, bases, dct)
 
@@ -429,10 +432,13 @@ def _is_testing():
           executes without errors during testing
     """
     import os
+
     return os.environ.get("MLFLOW_AUTOLOGGING_TESTING", "false") == "true"
 
 
-def _validate_args(user_call_args, user_call_kwargs, autologging_call_args, autologging_call_kwargs):
+def _validate_args(
+    user_call_args, user_call_kwargs, autologging_call_args, autologging_call_kwargs
+):
     """
     Used for testing purposes to verify that, when a patched model training function calls its
     underlying / original training function, the following properties are satisfied:
@@ -442,6 +448,7 @@ def _validate_args(user_call_args, user_call_kwargs, autologging_call_args, auto
           they are either functions decorated with the `@exception_safe_function` decorator
           or classes / instances of classes with type `ExceptionSafeClass`
     """
+
     def _validate_new_arg(arg):
         if type(arg) == list:
             for item in arg:
@@ -450,6 +457,7 @@ def _validate_args(user_call_args, user_call_kwargs, autologging_call_args, auto
             assert getattr(arg, _ATTRIBUTE_EXCEPTION_SAFE, False)
         else:
             import inspect
+
             assert inspect.isclass(type(arg))
             assert type(arg.__class__) == ExceptionSafeClass
 
