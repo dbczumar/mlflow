@@ -8,6 +8,7 @@ export MLFLOW_HOME=$(pwd)
 export MLFLOW_SKINNY='true'
 
 pytest --verbose tests/test_skinny.py
-pytest --verbose tests/tracking/service/
+python -m pip install sqlalchemy
+pytest --verbose tests/tracking
 
 test $err = 0

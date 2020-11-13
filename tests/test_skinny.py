@@ -6,6 +6,7 @@ import os
     "MLFLOW_SKINNY" not in os.environ, reason="This test is only valid for the skinny client"
 )
 def test_fails_sqlalchemy_import():
+    import mlflow
     with pytest.raises(ImportError):
         import sqlalchemy  # pylint: disable=unused-import
 
