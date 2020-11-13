@@ -564,7 +564,6 @@ def autolog():
         """
 
         def on_train_begin(self, logs=None):  # pylint: disable=unused-argument
-            1/0
             try_mlflow_log(mlflow.log_param, "num_layers", len(self.model.layers))
             try_mlflow_log(mlflow.log_param, "optimizer_name", type(self.model.optimizer).__name__)
             if hasattr(self.model.optimizer, "lr"):

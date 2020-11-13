@@ -120,6 +120,7 @@ def wrap_patch(destination, name, patch, settings=None):
 
     original = getattr(destination, name)
     wrapped = functools.wraps(original)(patch)
+    wrapped.__signature__ = inspect.signature(original) 
     patch = gorilla.Patch(destination, name, wrapped, settings=settings)
     gorilla.apply(patch)
 
@@ -195,6 +196,26 @@ def resolve_input_example_and_signature(
     return input_example if log_input_example else None, model_signature
 
 
+def autologging_integration(name):
+    """
+    Wraps an autologging function in order to store its configuration arguments. This enables 
+    patch functions to broadly obey certain configurations (e.g., disable=True) without
+    requiring specific logic to be present in each autologging integration. **All autologging
+    integrations should be decorated with this wrapper.**
+    """
+
+    AUTOLOGGING_INTEGRATIONS[name] = {}
+
+    def wrapper(_autolog):
+
+        def autolog(*args, **kwargs):
+            AUTOLOGGING_INTEGRATIONS[name] = kwargs
+            _autolog(**kwargs)
+
+        wrapped_autolog = functools.wraps(_autolog)(autolog)
+        return wrapped_autolog
+
+    return wrapper
 
 
 def safe_patch(autologging_integration, destination, function_name, function):
@@ -216,8 +237,11 @@ def safe_patch(autologging_integration, destination, function_name, function):
         original_result = None
         failed_during_original = False
 
-        def call_original(*args, **kwargs):
+        def call_original(*og_args, **og_kwargs):
             original = gorilla.get_original_attribute(destination, function_name)
+
+            if _is_testing():
+                _validate_args(args, kwargs, og_args, og_kwargs)
 
             def wrapped_original(*args, **kwargs):
                 try:
@@ -229,9 +253,12 @@ def safe_patch(autologging_integration, destination, function_name, function):
                     failed_during_original = True
                     raise
 
-            return wrapped_original(*args, **kwargs)
+            return wrapped_original(*og_args, **og_kwargs)
 
         original = gorilla.get_original_attribute(destination, function_name)
+        call_original = functools.wraps(original)(call_original)
+        call_original.__signature__ = inspect.signature(original) 
+
         config = AUTOLOGGING_INTEGRATIONS[autologging_integration]
         if config.get("disable", False):
             return original(*args, **kwargs)
@@ -239,6 +266,9 @@ def safe_patch(autologging_integration, destination, function_name, function):
         try:
             return function(call_original, *args, **kwargs)
         except Exception as e:
+            if _is_testing():
+                raise
+
             if not preexisting_run and mlflow.active_run():
                 try_mlflow_log(mlflow.end_run, RunStatus.to_string(RunStatus.FAILED))
 
@@ -255,33 +285,28 @@ def safe_patch(autologging_integration, destination, function_name, function):
     wrap_patch(destination, function_name, patched_train)
 
 
-def autologging_integration(name):
-
-    AUTOLOGGING_INTEGRATIONS[name] = {}
-
-    def wrapper(_autolog):
-
-        def autolog(*args, **kwargs):
-            AUTOLOGGING_INTEGRATIONS[name] = kwargs
-            _autolog(**kwargs)
-
-        wrapped_autolog = functools.wraps(_autolog)(autolog)
-        return wrapped_autolog
-
-    return wrapper
+_ATTRIBUTE_EXCEPTION_SAFE = "exception_safe"
 
 
-def handle_exceptions(function):
+def exception_safe_function(function):
     """
     Wraps the specified function with broad exception handling to guard
     against unexpected errors during autologging.
     """
+    if _is_testing():
+        setattr(function, _ATTRIBUTE_EXCEPTION_SAFE, True)
+
     @functools.wraps(function)
     def safe_function(*args, **kwargs):
+
         try:
             return function(*args, **kwargs)
         except Exception as e:
-            _logger.warning("Encountered unexpected error during autologging: %s", e)
+            if _is_testing():
+                raise
+            else:
+                _logger.warning("Encountered unexpected error during autologging: %s", e)
+
     return safe_function
 
 
@@ -299,5 +324,61 @@ class ExceptionSafeClass(type):
     def __new__(cls, name, bases, dct):
         for m in dct:
             if hasattr(dct[m], '__call__'):
-                dct[m] = handle_exceptions(dct[m])
+                dct[m] = exception_safe_function(dct[m])
         return type.__new__(cls, name, bases, dct)
+
+
+def _is_testing():
+    """
+    Indicates whether or not autologging functionality is running in test mode (as determined
+    by the `MLFLOW_AUTOLOGGING_TESTING` environment variable). Test mode performs additional 
+    validation during autologging, including:
+        - Checks for the exception safety of arguments passed to model training functions
+          (i.e. all additional arguments should be "exception safe" functions or classes)
+        - Disables exception handling for patched function logic, ensuring that patch code
+          executes without errors during testing 
+    """
+    import os
+    return os.environ.get("MLFLOW_AUTOLOGGING_TESTING", "false") == "true" 
+
+
+def _validate_args(user_call_args, user_call_kwargs, autologging_call_args, autologging_call_kwargs):
+    """
+    Used for testing purposes to verify that, when a patched model training function calls its
+    underlying / original training function, the following properties are satisfied:
+        - All arguments supplied to the patched model training function are forwarded
+          to the original training function
+        - Any additional arguments supplied to the original function are exception safe (i.e.
+          they are either functions decorated with the `@exception_safe_function` decorator
+          or are classes / instances of classes with type `ExceptionSafeClass` 
+    """
+    def _validate_new_arg(arg):
+        if type(arg) == list:
+            for item in arg:
+                _validate_new_arg(item)
+        elif callable(arg):
+            assert getattr(arg, _ATTRIBUTE_EXCEPTION_SAFE, False)
+        else:
+            import inspect
+            assert inspect.isclass(type(arg))
+            assert type(arg.__class__) == ExceptionSafeClass
+
+    def _validate(autologging_kwarg, user_kwarg=None):
+        if user_kwarg is None and autologging_kwarg is not None:
+            _validate_new_arg(autologging_kwarg)
+            return
+
+        assert type(autologging_kwarg) == type(user_kwarg)
+        if type(autologging_kwarg) == list:
+            user_kwarg = user_kwarg + ([None] * (len(autologging_kwarg) - len(user_kwarg)))
+            for a, u in zip(autologging_kwarg, user_kwarg):
+                _validate(a, u)
+        elif type(autologging_kwarg) == dict:
+            assert set(user_kwarg.keys()).issubset(set(autologging_kwarg.keys()))
+            for key in autologging_kwarg.keys():
+                _validate(autologging_kwarg[key], user_kwarg.get(key))
+        else:
+            assert autologging_kwarg is user_kwarg or autologging_kwarg == user_kwarg
+   
+    _validate(autologging_call_args, user_call_args)
+    _validate(autologging_call_kwargs, user_call_kwargs)

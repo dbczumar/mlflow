@@ -40,6 +40,7 @@ from mlflow.utils.annotations import experimental
 from mlflow.utils.autologging_utils import (
     autologging_integration,
     safe_patch,
+    exception_safe_function,
     try_mlflow_log,
     log_fn_args_as_params,
     INPUT_EXAMPLE_SAMPLE_ROWS,
@@ -338,12 +339,12 @@ def autolog(
 
         original(self, *args, **kwargs)
 
-    def train(*args, **kwargs):
+    def train(original, *args, **kwargs):
         def record_eval_results(eval_results):
             """
             Create a callback function that records evaluation results.
             """
-
+            @exception_safe_function
             def callback(env):
                 eval_results.append(dict(env.evaluation_result_list))
 
