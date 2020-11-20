@@ -328,16 +328,16 @@ class PatchFunction:
     @abstractmethod
     def on_exception(self, exception):
         """
-        Called when an unhandled exception prematurely terminates the execution 
+        Called when an unhandled exception prematurely terminates the execution
         of `invoke_patch`.
 
-        :param exception: The unhandled exception thrown by `invoke_patch`. 
+        :param exception: The unhandled exception thrown by `invoke_patch`.
         """
         pass
 
 
 def with_cleanup_autologging_run_on_exception(patch_function):
-    """ 
+    """
     Given a patch_function, returns an augmented patch_function that performs autologging
     run cleanup in the event of an unhandled exception. The augmented function will terminate
     the top run of MLflow's fluent active runs stack with status `FAILED`, if it was created during
@@ -349,7 +349,7 @@ def with_cleanup_autologging_run_on_exception(patch_function):
                            compatible with `safe_patch`.
     """
 
-    if inspect.isclass(patch_function): 
+    if inspect.isclass(patch_function):
 
         class PatchWithRunCleanup(patch_function):
 
@@ -421,7 +421,7 @@ def safe_patch(autologging_integration, destination, function_name, patch_functi
             def wrapped_original(*args, **kwargs):
                 try:
                     nonlocal original_result
-                    nonlocal called_original 
+                    nonlocal called_original
                     called_original = True
                     original_result = original(*args, **kwargs)
                     return original_result
@@ -460,7 +460,7 @@ def safe_patch(autologging_integration, destination, function_name, patch_functi
             _logger.warning(
                 "Encountered unexpected error during %s autologging: %s", autologging_integration, e
             )
-        
+
             if called_original:
                 return original_result
             else:
