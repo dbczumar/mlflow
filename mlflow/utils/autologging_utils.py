@@ -19,6 +19,7 @@ ENSURE_AUTOLOGGING_ENABLED_TEXT = (
     "please ensure that autologging is enabled before constructing the dataset."
 )
 
+# Dict mapping integration name to its config.
 AUTOLOGGING_INTEGRATIONS = {}
 
 _logger = logging.getLogger(__name__)
