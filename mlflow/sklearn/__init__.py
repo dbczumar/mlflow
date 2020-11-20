@@ -977,4 +977,4 @@ def autolog(log_input_examples=False, log_model_signatures=True, disable=False):
                 if isinstance(original, property):
                     continue
 
-                safe_patch(FLAVOR_NAME, class_def, func_name, with_cleanup_autologging_run_on_error(patched_fit))
+                safe_patch(FLAVOR_NAME, class_def, func_name, with_cleanup_autologging_run_on_exception(patched_fit))
