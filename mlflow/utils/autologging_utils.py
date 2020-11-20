@@ -4,6 +4,7 @@ import warnings
 import logging
 import time
 import contextlib
+from abc import abstractmethod
 
 import mlflow
 from mlflow.entities.run_status import RunStatus
@@ -125,7 +126,12 @@ def wrap_patch(destination, name, patch, settings=None):
 
     original = getattr(destination, name)
     wrapped = functools.wraps(original)(patch)
-    wrapped.__signature__ = inspect.signature(original)
+    try:
+        wrapped.__signature__ = inspect.signature(original)
+    except Exception:
+        _logger.warn(
+            "Failed to restore original signature for patched copy of {}".format(original)
+        )
     patch = gorilla.Patch(destination, name, wrapped, settings=settings)
     gorilla.apply(patch)
 
@@ -305,23 +311,103 @@ def autologging_integration(name):
     return wrapper
 
 
-def safe_patch(autologging_integration, destination, function_name, function):
+class PatchFunction:
+
+    @abstractmethod
+    def invoke_patch(self, original, *args, **kwargs):
+        """
+        Invokes the patch function code.
+
+        :param original: The original, underlying function over which the `PatchFunction`
+                         is being applied.
+        :param *args: The positional arguments passed to the original function.
+        :param **kwargs: The keyword arguments passed to the original function.
+        """
+        pass
+
+    @abstractmethod
+    def on_exception(self, exception):
+        """
+        Called when an unhandled exception prematurely terminates the execution 
+        of `invoke_patch`.
+
+        :param exception: The unhandled exception thrown by `invoke_patch`. 
+        """
+        pass
+
+
+def with_cleanup_autologging_run_on_exception(patch_function):
+    """ 
+    Given a patch_function, returns an augmented patch_function that performs autologging
+    run cleanup in the event of an unhandled exception. The augmented function will terminate
+    the top run of MLflow's fluent active runs stack with status `FAILED`, if it was created during
+    the execution of `patch_function`. If nested runs or non-fluent runs are created by
+    `patch_function`, `patch_function` is responsible for terminating them via the
+    :py:func:`PatchFunction.on_exception` method.
+
+    :param patch_function: A `PatchFunction` class definition or a function object
+                           compatible with `safe_patch`.
+    """
+
+    if inspect.isclass(patch_function): 
+
+        class PatchWithRunCleanup(patch_function):
+
+            def __init__(self):
+                super(PatchWithRunCleanup, self).__init__()
+                self.preexisting_run = None
+
+            def invoke_patch(self, original, *args, **kwargs):
+                self.preexisting_run = mlflow.active_run()
+                return super(PatchWithRunCleanup, self).invoke_patch(original, *args, **kwargs)
+
+            def on_exception(self, e):
+                super(PatchWithRunCleanup, self).on_exception(e)
+                if self.preexisting_run is None and mlflow.active_run():
+                    try_mlflow_log(mlflow.end_run, RunStatus.to_string(RunStatus.FAILED))
+
+        return PatchWithRunCleanup
+
+    else:
+
+        def patch_with_run_cleanup(original, *args, **kwargs):
+            preexisting_run = mlflow.active_run()
+            try:
+                return patch_function(original, *args, **kwargs)
+            except Exception:
+                if preexisting_run is None and mlflow.active_run():
+                    try_mlflow_log(mlflow.end_run, RunStatus.to_string(RunStatus.FAILED))
+                raise
+
+        return patch_with_run_cleanup
+
+
+def safe_patch(autologging_integration, destination, function_name, patch_function):
     """
     Patches the specified `function_name` on the specified `destination` class for autologging
-    purposes, replacing its implementation with an error-safe copy of the specified `function`.
+    purposes, replacing its implementation with an error-safe copy of the specified patch
+    `function`.
 
     :param autologging_integration: The name of the autologging integration associated with the
                                     patch.
-    :param destination: The Python class on which the patch function is being defined.
+    :param destination: The Python class on which the patch is being defined.
     :param function_name: The name of the function to patch on the specified `destination` class.
-    :param function: The patch function to apply. The first argument to this function should be
-                     reserved for an `original` method argument representing the underlying /
-                     original function. Subsequent arguments should be identical to those of the
-                     original function being patched.
+    :param function: The patched function code to apply. This is either a `PatchFunction` class
+                     definition or a function object. If it is a function object, the first argument
+                     should be reserved for an `original` method argument representing the
+                     underlying / original function. Subsequent arguments should be identical to
+                     those of the original function being patched.
     """
 
-    def patched_train(*args, **kwargs):
-        preexisting_run = mlflow.active_run()
+    patch_is_class = inspect.isclass(patch_function)
+
+    def safe_on_exception(patch_instance, e):
+        try:
+            patch_instance.on_exception(e)
+        except Exception:
+            pass
+
+    def safe_patch_function(*args, **kwargs):
         original_result = None
         called_original = False
         failed_during_original = False
@@ -334,8 +420,9 @@ def safe_patch(autologging_integration, destination, function_name, function):
 
             def wrapped_original(*args, **kwargs):
                 try:
-                    called_original = True
                     nonlocal original_result
+                    nonlocal called_original 
+                    called_original = True
                     original_result = original(*args, **kwargs)
                     return original_result
                 except Exception:
@@ -353,14 +440,19 @@ def safe_patch(autologging_integration, destination, function_name, function):
         if config.get("disable", False):
             return original(*args, **kwargs)
 
+        patch_instance = None
         try:
-            return function(call_original, *args, **kwargs)
+            if patch_is_class:
+                patch_instance = patch_function()
+                return patch_instance.invoke_patch(call_original, *args, **kwargs)
+            else:
+                return patch_function(call_original, *args, **kwargs)
         except Exception as e:
+            if patch_instance:
+                safe_on_exception(patch_instance, e)
+
             if _is_testing():
                 raise
-
-            if not preexisting_run and mlflow.active_run():
-                try_mlflow_log(mlflow.end_run, RunStatus.to_string(RunStatus.FAILED))
 
             if failed_during_original:
                 raise
@@ -368,13 +460,13 @@ def safe_patch(autologging_integration, destination, function_name, function):
             _logger.warning(
                 "Encountered unexpected error during %s autologging: %s", autologging_integration, e
             )
-
+        
             if called_original:
                 return original_result
             else:
                 return original(*args, **kwargs)
 
-    wrap_patch(destination, function_name, patched_train)
+    wrap_patch(destination, function_name, safe_patch_function)
 
 
 _ATTRIBUTE_EXCEPTION_SAFE = "exception_safe"
@@ -457,8 +549,6 @@ def _validate_args(
         elif callable(arg):
             assert getattr(arg, _ATTRIBUTE_EXCEPTION_SAFE, False)
         else:
-            import inspect
-
             assert inspect.isclass(type(arg))
             assert type(arg.__class__) == ExceptionSafeClass
 

@@ -34,6 +34,7 @@ from mlflow.utils.model_utils import _get_flavor_configuration
 from mlflow.utils.autologging_utils import (
     autologging_integration,
     safe_patch,
+    with_cleanup_autologging_run_on_exception,
     try_mlflow_log,
     INPUT_EXAMPLE_SAMPLE_ROWS,
     resolve_input_example_and_signature,
@@ -976,4 +977,4 @@ def autolog(log_input_examples=False, log_model_signatures=True, disable=False):
                 if isinstance(original, property):
                     continue
 
-                safe_patch(FLAVOR_NAME, class_def, func_name, patched_fit)
+                safe_patch(FLAVOR_NAME, class_def, func_name, with_cleanup_autologging_run_on_error(patched_fit))

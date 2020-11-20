@@ -36,7 +36,16 @@ from mlflow.utils.annotations import keyword_only, experimental
 from mlflow.utils.environment import _mlflow_conda_env
 from mlflow.utils.file_utils import _copy_file_or_tree
 from mlflow.utils.model_utils import _get_flavor_configuration
-from mlflow.utils.autologging_utils import try_mlflow_log, log_fn_args_as_params, wrap_patch
+from mlflow.utils.autologging_utils import (
+    try_mlflow_log,
+    log_fn_args_as_params,
+    wrap_patch,
+    autologging_integration,
+    safe_patch,
+    PatchFunction,
+    with_cleanup_autologging_run_on_exception,
+)
+
 from mlflow.entities import Metric
 from mlflow.tracking._model_registry import DEFAULT_AWAIT_MAX_SLEEP_SECONDS
 
@@ -765,6 +774,7 @@ def _setup_callbacks(lst):
 
 
 @experimental
+@autologging_integration(FLAVOR_NAME)
 def autolog(every_n_iter=100):
     # pylint: disable=E0611
     """
@@ -975,41 +985,54 @@ def autolog(every_n_iter=100):
                     last_epoch = len(history.history[metric_key])
                     try_mlflow_log(mlflow.log_metrics, restored_metrics, step=last_epoch)
 
-    def fit(self, *args, **kwargs):
-        with _manage_active_run():
-            original = gorilla.get_original_attribute(tensorflow.keras.Model, "fit")
 
-            unlogged_params = ["self", "x", "y", "callbacks", "validation_data", "verbose"]
+    class FitPatch(PatchFunction):
 
-            log_fn_args_as_params(original, args, kwargs, unlogged_params)
-            early_stop_callback = None
+        def __init__(self):
+            self.log_dir = None
 
-            # Checking if the 'callback' argument of fit() is set
-            if len(args) >= 6:
-                tmp_list = list(args)
-                early_stop_callback = _early_stop_check(tmp_list[5])
-                tmp_list[5], log_dir = _setup_callbacks(tmp_list[5])
-                args = tuple(tmp_list)
-            elif "callbacks" in kwargs:
-                early_stop_callback = _early_stop_check(kwargs["callbacks"])
-                kwargs["callbacks"], log_dir = _setup_callbacks(kwargs["callbacks"])
-            else:
-                kwargs["callbacks"], log_dir = _setup_callbacks([])
+        def invoke_patch(self, original, inst, *args, **kwargs):
+            with _manage_active_run():
+                unlogged_params = ["self", "x", "y", "callbacks", "validation_data", "verbose"]
 
-            _log_early_stop_callback_params(early_stop_callback)
+                log_fn_args_as_params(original, args, kwargs, unlogged_params)
+                early_stop_callback = None
 
-            history = original(self, *args, **kwargs)
+                # Checking if the 'callback' argument of fit() is set
+                if len(args) >= 6:
+                    tmp_list = list(args)
+                    early_stop_callback = _early_stop_check(tmp_list[5])
+                    tmp_list[5], self.log_dir = _setup_callbacks(tmp_list[5])
+                    args = tuple(tmp_list)
+                elif "callbacks" in kwargs:
+                    early_stop_callback = _early_stop_check(kwargs["callbacks"])
+                    kwargs["callbacks"], self.log_dir = _setup_callbacks(kwargs["callbacks"])
+                else:
+                    kwargs["callbacks"], self.log_dir = _setup_callbacks([])
 
-            _log_early_stop_callback_metrics(early_stop_callback, history)
+                print(self.log_dir)
 
-            _flush_queue()
-            _log_artifacts_with_warning(
-                local_dir=log_dir.location, artifact_path="tensorboard_logs"
-            )
-            if log_dir.is_temp:
-                shutil.rmtree(log_dir.location)
+                _log_early_stop_callback_params(early_stop_callback)
 
-            return history
+                history = original(inst, *args, **kwargs)
+
+                _log_early_stop_callback_metrics(early_stop_callback, history)
+                _flush_queue()
+                _log_artifacts_with_warning(
+                    local_dir=self.log_dir.location, artifact_path="tensorboard_logs"
+                )
+                if self.log_dir.is_temp:
+                    shutil.rmtree(self.log_dir.location)
+
+                return history
+
+        def on_exception(self, exception):
+            if self.log_dir is not None and self.log_dir.is_temp and os.path.exists(self.log_dir.location):
+                shutil.rmtree(self.log_dir.location)
+
+
+    safe_patch(FLAVOR_NAME, tensorflow.keras.Model, "fit", with_cleanup_autologging_run_on_exception(FitPatch))
+
 
     def fit_generator(self, *args, **kwargs):
         with _manage_active_run():
@@ -1053,7 +1076,6 @@ def autolog(every_n_iter=100):
         (EventFileWriter, "add_event", add_event),
         (EventFileWriterV2, "add_event", add_event),
         (tensorflow.estimator.Estimator, "train", train),
-        (tensorflow.keras.Model, "fit", fit),
         (tensorflow.keras.Model, "fit_generator", fit_generator),
         (tensorflow.estimator.Estimator, "export_saved_model", export_saved_model),
         (tensorflow.estimator.Estimator, "export_savedmodel", export_savedmodel),
