@@ -305,79 +305,151 @@ def autologging_integration(name):
     return wrapper
 
 
-def safe_patch(autologging_integration, destination, function_name, function):
-    """
-    Patches the specified `function_name` on the specified `destination` class for autologging
-    purposes, replacing its implementation with an error-safe copy of the specified `function`.
+# def safe_patch(autologging_integration, destination, function_name, function):
+#     """
+#     Patches the specified `function_name` on the specified `destination` class for autologging
+#     purposes, replacing its implementation with an error-safe copy of the specified `function`.
+#
+#     :param autologging_integration: The name of the autologging integration associated with the
+#                                     patch.
+#     :param destination: The Python class on which the patch function is being defined.
+#     :param function_name: The name of the function to patch on the specified `destination` class.
+#     :param function: The patch function to apply. The first argument to this function should be
+#                      reserved for an `original` method argument representing the underlying /
+#                      original function. Subsequent arguments should be identical to those of the
+#                      original function being patched.
+#     """
+#
+#     def patched_train(*args, **kwargs):
+#         preexisting_run = mlflow.active_run()
+#         original_result = None
+#         called_original = False
+#         failed_during_original = False
+#
+#         def call_original(*og_args, **og_kwargs):
+#             original = gorilla.get_original_attribute(destination, function_name)
+#
+#             if _is_testing():
+#                 _validate_args(args, kwargs, og_args, og_kwargs)
+#
+#             def wrapped_original(*args, **kwargs):
+#                 try:
+#                     called_original = True
+#                     nonlocal original_result
+#                     original_result = original(*args, **kwargs)
+#                     return original_result
+#                 except Exception:
+#                     nonlocal failed_during_original
+#                     failed_during_original = True
+#                     raise
+#
+#             return wrapped_original(*og_args, **og_kwargs)
+#
+#         original = gorilla.get_original_attribute(destination, function_name)
+#         call_original = functools.wraps(original)(call_original)
+#         call_original.__signature__ = inspect.signature(original)
+#
+#         config = AUTOLOGGING_INTEGRATIONS[autologging_integration]
+#         if config.get("disable", False):
+#             return original(*args, **kwargs)
+#
+#         try:
+#             return function(call_original, *args, **kwargs)
+#         except Exception as e:
+#             if _is_testing():
+#                 raise
+#
+#             if not preexisting_run and mlflow.active_run():
+#                 try_mlflow_log(mlflow.end_run, RunStatus.to_string(RunStatus.FAILED))
+#
+#             if failed_during_original:
+#                 raise
+#
+#             _logger.warning(
+#                 "Encountered unexpected error during %s autologging: %s", autologging_integration, e
+#             )
+#
+#             if called_original:
+#                 return original_result
+#             else:
+#                 return original(*args, **kwargs)
+#
+#     wrap_patch(destination, function_name, patched_train)
 
-    :param autologging_integration: The name of the autologging integration associated with the
-                                    patch.
-    :param destination: The Python class on which the patch function is being defined.
-    :param function_name: The name of the function to patch on the specified `destination` class.
-    :param function: The patch function to apply. The first argument to this function should be
-                     reserved for an `original` method argument representing the underlying /
-                     original function. Subsequent arguments should be identical to those of the
-                     original function being patched.
-    """
+
+_ATTRIBUTE_EXCEPTION_SAFE = "exception_safe"
+
+
+def safe_patch(integration, destination, name, patch_class):
+
+    def safe_on_error(patch, stage):
+        try:
+            patch.on_error(stage)
+        except Exception as e:
+            pass
 
     def patched_train(*args, **kwargs):
-        preexisting_run = mlflow.active_run()
-        original_result = None
-        called_original = False
-        failed_during_original = False
+        patch = patch_class()
 
-        def call_original(*og_args, **og_kwargs):
-            original = gorilla.get_original_attribute(destination, function_name)
-
-            if _is_testing():
-                _validate_args(args, kwargs, og_args, og_kwargs)
-
-            def wrapped_original(*args, **kwargs):
-                try:
-                    called_original = True
-                    nonlocal original_result
-                    original_result = original(*args, **kwargs)
-                    return original_result
-                except Exception:
-                    nonlocal failed_during_original
-                    failed_during_original = True
-                    raise
-
-            return wrapped_original(*og_args, **og_kwargs)
-
-        original = gorilla.get_original_attribute(destination, function_name)
-        call_original = functools.wraps(original)(call_original)
-        call_original.__signature__ = inspect.signature(original)
-
-        config = AUTOLOGGING_INTEGRATIONS[autologging_integration]
+        original = gorilla.get_original_attribute(destination, name)
+        config = AUTOLOGGING_INTEGRATIONS[integration]
         if config.get("disable", False):
             return original(*args, **kwargs)
 
         try:
-            return function(call_original, *args, **kwargs)
+            new_args, new_kwargs = patch.preamble(*args, **kwargs)
         except Exception as e:
             if _is_testing():
                 raise
 
-            if not preexisting_run and mlflow.active_run():
-                try_mlflow_log(mlflow.end_run, RunStatus.to_string(RunStatus.FAILED))
+            _logger.warning(
+                "Encountered unexpected error during %s autologging: %s", integration, e
+            )
+            safe_on_error(patch, AutologgingPatch.STAGE_PREAMBLE)
+            return original(*args, **kwargs)
 
-            if failed_during_original:
+        if _is_testing():
+            _validate_args(new_args, new_kwargs, args, kwargs)
+
+        try:
+            original_result = original(*new_args, **new_kwargs)
+        except Exception as e:
+            safe_on_error(patch, AutologgingPatch.STAGE_ORIGINAL)
+            raise
+
+        try:
+            patch.postamble(original_result, *args, **kwargs)
+        except Exception as e:
+            if _is_testing():
                 raise
 
             _logger.warning(
-                "Encountered unexpected error during %s autologging: %s", autologging_integration, e
+                "Encountered unexpected error during %s autologging: %s", integration, e
             )
+            safe_on_error(patch, AutologgingPatch.STAGE_POSTAMBLE)
+        
+        return original_result
 
-            if called_original:
-                return original_result
-            else:
-                return original(*args, **kwargs)
-
-    wrap_patch(destination, function_name, patched_train)
+    wrap_patch(destination, name, patched_train)
 
 
-_ATTRIBUTE_EXCEPTION_SAFE = "exception_safe"
+from abc import abstractmethod
+
+class AutologgingPatch:
+
+    STAGE_PREAMBLE = "preamble"
+    STAGE_ORIGINAL = "original"
+    STAGE_POSTAMBLE = "postamble"
+
+    @abstractmethod
+    def preamble(self, *args, **kwargs):
+        pass
+
+    def postamble(self, *args, **kwargs):
+        pass
+
+    def on_error(self, stage):
+        pass
 
 
 def exception_safe_function(function):
