@@ -1010,8 +1010,6 @@ def autolog(every_n_iter=100):
                 else:
                     kwargs["callbacks"], self.log_dir = _setup_callbacks([])
 
-                print(self.log_dir)
-
                 _log_early_stop_callback_params(early_stop_callback)
 
                 history = original(inst, *args, **kwargs)
