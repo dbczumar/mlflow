@@ -2,8 +2,12 @@ import os
 from setuptools import setup, find_packages
 
 
-# Remove mlflow dependency for dev environment, it can cause tests to run against pypi
-requirements = [] if "MLFLOW_HOME" in os.environ else ["mlflow"]
+try:
+    # Remove mlflow dependency for dev environment, it can cause tests to run against pypi
+    import mlflow
+    requirements = []
+except ImportError:
+    requirements = ["mlflow"]
 
 setup(
     name="mlflow-test-plugin",

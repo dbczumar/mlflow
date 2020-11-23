@@ -31,9 +31,9 @@ python --version
 pip install --upgrade pip==19.3.1
 
 if [[ "$MLFLOW_SKINNY" == "true" ]]; then
-  pip install .
+  pip install . --upgrade
 else
-  pip install .[extras]
+  pip install .[extras] --upgrade
 fi
 export MLFLOW_HOME=$(pwd)
 

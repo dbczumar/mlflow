@@ -27,7 +27,3 @@ def test_fails_import_flask():
         import flask
 
         assert flask is not None
-
-
-def test_verify_is_build():
-    assert "MLFLOW_HOME" in os.environ
