@@ -30,6 +30,18 @@ source activate test-environment
 python --version
 pip install --upgrade pip==19.3.1
 
+if [[ "$MLFLOW_SKINNY" == "true" ]]; then
+  pip install .
+else
+  pip install .[extras]
+fi
+export MLFLOW_HOME=$(pwd)
+
+# Print current environment info
+pip list
+which mlflow
+echo $MLFLOW_HOME
+
 # Install Python test dependencies only if we're running Python tests
 if [[ "$INSTALL_SMALL_PYTHON_DEPS" == "true" ]]; then
   # When downloading large packages from PyPI, the connection is sometimes aborted by the
@@ -47,18 +59,6 @@ if [[ "$INSTALL_LARGE_PYTHON_DEPS" == "true" ]]; then
   chmod 777 $(find $CONDA_DIR/envs/test-environment/ -path "*bin/spark-*")
   ls -lha $(find $CONDA_DIR/envs/test-environment/ -path "*bin/spark-*")
 fi
-
-if [[ "$MLFLOW_SKINNY" == "true" ]]; then
-  pip install .
-else
-  pip install .[extras]
-fi
-export MLFLOW_HOME=$(pwd)
-
-# Print current environment info
-pip list
-which mlflow
-echo $MLFLOW_HOME
 
 # Turn off trace output & exit-on-errors
 set +ex
