@@ -29,7 +29,13 @@ alembic_files = [
     "../mlflow/temporary_db_migrations_for_pre_1_users/alembic.ini",
 ]
 
-requirements = [
+"""
+Minimal requirements for the skinny MLflow client which provides a limited
+subset of functionality such as: RESTful client functionality for Tracking and
+Model Registry, as well as support for Project execution against local backends
+and Databricks.
+"""
+SKINNY_REQUIREMENTS = [
     "click>=7.0",
     "cloudpickle",
     "databricks-cli>=0.8.7",
@@ -48,31 +54,34 @@ requirements = [
 _is_mlflow_skinny = bool(os.environ.get(_MLFLOW_SKINNY_ENV_VAR))
 logging.debug("{} env var is set: {}".format(_MLFLOW_SKINNY_ENV_VAR, _is_mlflow_skinny))
 
-if not _is_mlflow_skinny:
-    requirements.extend(
-        [
-            "alembic<=1.4.1",
-            # Required
-            "azure-storage-blob",
-            "docker>=4.0.0",
-            "Flask",
-            "gunicorn; platform_system != 'Windows'",
-            "prometheus-flask-exporter",
-            "querystring_parser",
-            # Pin sqlparse for: https://github.com/mlflow/mlflow/issues/3433
-            "sqlparse>=0.3.1",
-            # Required to run the MLflow server against SQL-backed storage
-            "sqlalchemy<=1.3.13",
-            "waitress; platform_system == 'Windows'",
-        ]
-    )
+"""
+These are the core requirements for the complete MLflow platform, which augments
+the skinny client functionality with support for running the MLflow Tracking
+Server & UI. It also adds project backends such as Docker and Kubernetes among
+other capabilities.
+"""
+CORE_REQUIREMENTS = SKINNY_REQUIREMENTS + [
+    "alembic<=1.4.1",
+    # Required
+    "azure-storage-blob",
+    "docker>=4.0.0",
+    "Flask",
+    "gunicorn; platform_system != 'Windows'",
+    "prometheus-flask-exporter",
+    "querystring_parser",
+    # Pin sqlparse for: https://github.com/mlflow/mlflow/issues/3433
+    "sqlparse>=0.3.1",
+    # Required to run the MLflow server against SQL-backed storage
+    "sqlalchemy<=1.3.13",
+    "waitress; platform_system == 'Windows'",
+]
 
 setup(
     name="mlflow",
     version=version,
     packages=find_packages(exclude=["tests", "tests.*"]),
     package_data={"mlflow": js_files + models_container_server_files + alembic_files},
-    install_requires=requirements,
+    install_requires=SKINNY_REQUIREMENTS if _is_mlflow_skinny else CORE_REQUIREMENTS,
     extras_require={
         "extras": [
             "scikit-learn",

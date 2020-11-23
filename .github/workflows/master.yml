@@ -97,7 +97,7 @@ jobs:
     - name: Install dependencies
       env:
         INSTALL_SMALL_PYTHON_DEPS: true
-        SKINNY_CLIENT: true
+        MLFLOW_SKINNY: true
       run: |
         source ./dev/install-common-deps.sh
     - name: Run tests

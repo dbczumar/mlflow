@@ -1,5 +1,9 @@
+import os
 from setuptools import setup, find_packages
 
+
+# Remove mlflow dependency for dev environment, it can cause tests to run against pypi
+requirements = [] if "MLFLOW_HOME" in os.environ else ["mlflow"]
 
 setup(
     name="mlflow-test-plugin",
@@ -8,7 +12,7 @@ setup(
     packages=find_packages(),
     # Require MLflow as a dependency of the plugin, so that plugin users can simply install
     # the plugin & then immediately use it with MLflow
-    install_requires=[],  # Remove mlflow dependency, it can cause tests to run against pypi
+    install_requires=requirements,
     entry_points={
         # Define a Tracking Store plugin for tracking URIs with scheme 'file-plugin'
         "mlflow.tracking_store": "file-plugin=mlflow_test_plugin.file_store:PluginFileStore",

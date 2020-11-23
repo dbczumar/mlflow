@@ -4,12 +4,11 @@ set -x
 # https://stackoverflow.com/a/42219754
 err=0
 trap 'err=1' ERR
-export MLFLOW_HOME=$(pwd)
 export MLFLOW_SKINNY='true'
 
 pytest --verbose tests/test_skinny.py
 python -m pip install sqlalchemy alembic sqlparse
-pytest --verbose tests/tracking/test_client.py
+pytest --verbose tests/tracking/
 pytest --verbose tests/projects/test_projects.py
 
 test $err = 0
