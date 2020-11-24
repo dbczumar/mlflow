@@ -11,5 +11,6 @@ python -m pip install sqlalchemy alembic sqlparse
 pytest --verbose tests/tracking/test_client.py
 pytest --verbose tests/tracking/test_tracking.py
 pytest --verbose tests/projects/test_projects.py
+pytest --verbose tests/deployments/test_cli.py
 
 test $err = 0

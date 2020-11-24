@@ -17,7 +17,7 @@ from mlflow.protos.databricks_pb2 import ErrorCode, MALFORMED_REQUEST, BAD_REQUE
 from mlflow.pyfunc import PythonModel
 from mlflow.types import Schema, ColSpec, DataType
 from mlflow.utils.file_utils import TempDir
-from mlflow.utils.proto_json_utils import NumpyEncoder
+from mlflow.utils.proto_json_utils import NumpyEncoder, _get_jsonable_obj, parse_json_input
 
 from tests.helper_functions import pyfunc_serve_and_score_model, random_int, random_str
 
@@ -227,7 +227,7 @@ def test_parse_json_input_records_oriented():
         "col_a": [random_int() for _ in range(size)],
     }
     p1 = pd.DataFrame.from_dict(data)
-    p2 = pyfunc_scoring_server.parse_json_input(p1.to_json(orient="records"), orient="records")
+    p2 = parse_json_input(p1.to_json(orient="records"), orient="records")
     # "records" orient may shuffle column ordering. Hence comparing each column Series
     for col in data.keys():
         assert all(p1[col] == p2[col])
@@ -242,7 +242,7 @@ def test_parse_json_input_split_oriented():
         "col_a": [random_int() for _ in range(size)],
     }
     p1 = pd.DataFrame.from_dict(data)
-    p2 = pyfunc_scoring_server.parse_json_input(p1.to_json(orient="split"), orient="split")
+    p2 = parse_json_input(p1.to_json(orient="split"), orient="split")
     assert all(p1 == p2)
 
 
@@ -275,7 +275,7 @@ def test_records_oriented_json_to_df():
         '{"zip":"95128","cost":12.1,"score":10}'
         "]"
     )
-    df = pyfunc_scoring_server.parse_json_input(jstr, orient="records")
+    df = parse_json_input(jstr, orient="records")
 
     assert set(df.columns) == {"zip", "cost", "score"}
     assert set(str(dt) for dt in df.dtypes) == {"object", "float64", "int64"}
@@ -294,7 +294,7 @@ def test_split_oriented_json_to_df():
         '{"columns":["zip","cost","count"],"index":[0,1,2],'
         '"data":[["95120",10.45,-8],["95128",23.0,-1],["95128",12.1,1000]]}'
     )
-    df = pyfunc_scoring_server.parse_json_input(jstr, orient="split")
+    df = parse_json_input(jstr, orient="split")
 
     assert set(df.columns) == {"zip", "cost", "count"}
     assert set(str(dt) for dt in df.dtypes) == {"object", "float64", "int64"}
@@ -304,9 +304,9 @@ def test_parse_with_schema(pandas_df_with_all_types):
     schema = Schema([ColSpec(c, c) for c in pandas_df_with_all_types.columns])
     df = _shuffle_pdf(pandas_df_with_all_types)
     json_str = json.dumps(df.to_dict(orient="split"), cls=NumpyEncoder)
-    df = pyfunc_scoring_server.parse_json_input(json_str, orient="split", schema=schema)
+    df = parse_json_input(json_str, orient="split", schema=schema)
     json_str = json.dumps(df.to_dict(orient="records"), cls=NumpyEncoder)
-    df = pyfunc_scoring_server.parse_json_input(json_str, orient="records", schema=schema)
+    df = parse_json_input(json_str, orient="records", schema=schema)
     assert schema == infer_signature(df[schema.column_names()]).inputs
 
     # The current behavior with pandas json parse with type hints is weird. In some cases, the
@@ -329,7 +329,7 @@ def test_parse_with_schema(pandas_df_with_all_types):
             ColSpec("boolean", "bad_boolean"),
         ]
     )
-    df = pyfunc_scoring_server.parse_json_input(bad_df, orient="split", schema=schema)
+    df = parse_json_input(bad_df, orient="split", schema=schema)
     # Unfortunately, the current behavior of pandas parse is to force numbers to int32 even if
     # they don't fit:
     assert df["bad_integer"].dtype == np.int32
@@ -391,7 +391,6 @@ def test_split_oriented_json_to_numpy_array():
 
 
 def test_get_jsonnable_obj():
-    from mlflow.pyfunc.scoring_server import _get_jsonable_obj
 
     py_ary = [["a", "b", "c"], ["e", "f", "g"]]
     np_ary = _get_jsonable_obj(np.array(py_ary))

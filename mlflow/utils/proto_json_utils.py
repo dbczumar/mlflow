@@ -108,3 +108,45 @@ def _dataframe_from_json(
         return pd.read_json(
             path_or_str, orient=pandas_orient, dtype=False, precise_float=precise_float
         )
+
+def parse_json_input(json_input, orient="split", schema: Schema = None):
+    """
+    :param json_input: A JSON-formatted string representation of a Pandas DataFrame, or a stream
+                       containing such a string representation.
+    :param orient: The Pandas DataFrame orientation of the JSON input.
+                   This is either 'split' or 'records'.
+    :param schema: Optional schema specification to be used during parsing.
+    """
+    # pylint: disable=broad-except
+    try:
+        return _dataframe_from_json(json_input, pandas_orient=orient, schema=schema)
+    except Exception:
+        _handle_serving_error(
+            error_message=(
+               "Failed to parse input as a Pandas DataFrame. Ensure that the input is"
+               " a valid JSON-formatted Pandas DataFrame the `{orient}` orient"
+               " produced using the das.DataFrame.to_json(..., orient='{orient}')`"
+               " method.".format(orient=orient)
+           ),
+           error_code=MALFORMED_REQUEST,
+       )
+
+
+
+def _get_jsonable_obj(data, pandas_orient="records"):
+    """Attempt to make the data json-able via standard library.
+    Look for some commonly used types that are not jsonable and convert them into json-able ones.
+    Unknown data types are returned as is.
+
+    :param data: data to be converted, works with pandas and numpy, rest will be returned as is.
+    :param pandas_orient: If `data` is a Pandas DataFrame, it will be converted to a JSON
+                          dictionary using this Pandas serialization orientation.
+    """
+    if isinstance(data, np.ndarray):
+        return data.tolist()
+    if isinstance(data, pd.DataFrame):
+        return data.to_dict(orient=pandas_orient)
+    if isinstance(data, pd.Series):
+        return pd.DataFrame(data).to_dict(orient=pandas_orient)
+    else:  # by default just return whatever this is and hope for the best
+        return data
