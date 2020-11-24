@@ -11,6 +11,7 @@ Defines two endpoints:
     /invocations used for scoring
 """
 from collections import OrderedDict
+import flask
 import json
 import logging
 import numpy as np
@@ -26,8 +27,7 @@ import traceback
 # ALl of the mlfow dependencies below need to be backwards compatible.
 from mlflow.exceptions import MlflowException
 from mlflow.types import Schema
-from mlflow.utils.proto_json_utils import (NumpyEncoder, _dataframe_from_json,
-                                           _get_jsonable_obj, parse_json_input)
+from mlflow.utils.proto_json_utils import NumpyEncoder, _dataframe_from_json, _get_jsonable_obj
 
 try:
     from mlflow.pyfunc import load_model, PyFuncModel
@@ -58,6 +58,29 @@ CONTENT_TYPES = [
 ]
 
 _logger = logging.getLogger(__name__)
+
+
+def parse_json_input(json_input, orient="split", schema: Schema = None):
+    """
+    :param json_input: A JSON-formatted string representation of a Pandas DataFrame, or a stream
+                       containing such a string representation.
+    :param orient: The Pandas DataFrame orientation of the JSON input. This is either 'split'
+                   or 'records'.
+    :param schema: Optional schema specification to be used during parsing.
+    """
+    # pylint: disable=broad-except
+    try:
+        return _dataframe_from_json(json_input, pandas_orient=orient, schema=schema)
+    except Exception:
+        _handle_serving_error(
+            error_message=(
+                "Failed to parse input as a Pandas DataFrame. Ensure that the input is"
+                " a valid JSON-formatted Pandas DataFrame with the `{orient}` orient"
+                " produced using the `pandas.DataFrame.to_json(..., orient='{orient}')`"
+                " method.".format(orient=orient)
+            ),
+            error_code=MALFORMED_REQUEST,
+        )
 
 
 def parse_csv_input(csv_input):
@@ -135,8 +158,6 @@ def init(model: PyFuncModel):
     """
     Initialize the server. Loads pyfunc model from the path.
     """
-    import flask
-
     app = flask.Flask(__name__)
     input_schema = model.metadata.get_input_schema()
 
@@ -158,8 +179,6 @@ def init(model: PyFuncModel):
         we take data as CSV or json, convert it to a Pandas DataFrame or Numpy,
         generate predictions and convert them back to json.
         """
-        import flask
-
         # Convert from CSV to pandas
         if flask.request.content_type == CONTENT_TYPE_CSV:
             data = flask.request.data.decode("utf-8")
