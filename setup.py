@@ -60,14 +60,14 @@ other capabilities.
 CORE_REQUIREMENTS = SKINNY_REQUIREMENTS + [
     "alembic<=1.4.1",
     # Required
-    "azure-storage-blob",
+    "azure-storage-blob>=12.0.0",
     "docker>=4.0.0",
     "Flask",
     "gunicorn; platform_system != 'Windows'",
     "prometheus-flask-exporter",
     "querystring_parser",
     # Pin sqlparse for: https://github.com/mlflow/mlflow/issues/3433
-    "sqlparse>=0.3.1",
+    "sqlparse",
     # Required to run the MLflow server against SQL-backed storage
     "sqlalchemy<=1.3.13",
     "waitress; platform_system == 'Windows'",
