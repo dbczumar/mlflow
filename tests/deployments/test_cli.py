@@ -91,3 +91,13 @@ def test_target_help():
     runner = CliRunner()
     res = runner.invoke(cli.target_help, ["--target", f_target])
     assert "Target help is called" in res.stdout
+
+
+def test_run_local():
+    runner = CliRunner()
+    res = runner.invoke(
+        cli.run_local, ["-f", f_flavor, "-m", f_model_uri, "-t", f_target, "--name", f_name]
+    )
+    assert "Deployed locally at the key {}".format(f_name) in res.stdout
+    assert "using the model from {}.".format(f_model_uri) in res.stdout
+    assert "It's flavor is {} and config is {}".format(f_flavor, str({})) in res.stdout

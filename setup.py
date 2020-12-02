@@ -51,9 +51,6 @@ SKINNY_REQUIREMENTS = [
     "simplejson",
 ]
 
-_is_mlflow_skinny = bool(os.environ.get(_MLFLOW_SKINNY_ENV_VAR))
-logging.debug("{} env var is set: {}".format(_MLFLOW_SKINNY_ENV_VAR, _is_mlflow_skinny))
-
 """
 These are the core requirements for the complete MLflow platform, which augments
 the skinny client functionality with support for running the MLflow Tracking
@@ -75,6 +72,9 @@ CORE_REQUIREMENTS = SKINNY_REQUIREMENTS + [
     "sqlalchemy<=1.3.13",
     "waitress; platform_system == 'Windows'",
 ]
+
+_is_mlflow_skinny = bool(os.environ.get(_MLFLOW_SKINNY_ENV_VAR))
+logging.debug("{} env var is set: {}".format(_MLFLOW_SKINNY_ENV_VAR, _is_mlflow_skinny))
 
 setup(
     name="mlflow",
