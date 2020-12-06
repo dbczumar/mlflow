@@ -14,6 +14,8 @@ from mxnet.metric import Accuracy
 
 import mlflow
 import mlflow.gluon
+from mlflow.utils.autologging_utils import BatchMetricsLogger
+from unittest.mock import patch
 
 
 class LogsDataset(Dataset):
@@ -28,8 +30,8 @@ class LogsDataset(Dataset):
 
 
 @pytest.fixture
-def gluon_random_data_run():
-    mlflow.gluon.autolog()
+def gluon_random_data_run(log_models=True):
+    mlflow.gluon.autolog(log_models)
 
     with mlflow.start_run() as run:
         data = DataLoader(LogsDataset(), batch_size=128, last_batch="discard")
@@ -71,6 +73,35 @@ def test_gluon_autolog_logs_expected_data(gluon_random_data_run):
 
 
 @pytest.mark.large
+def test_gluon_autolog_batch_metrics_logger_logs_expected_metrics():
+    patched_metrics_data = []
+
+    # Mock patching BatchMetricsLogger.record_metrics()
+    # to ensure that expected metrics are being logged.
+    original = BatchMetricsLogger.record_metrics
+
+    with patch(
+        "mlflow.utils.autologging_utils.BatchMetricsLogger.record_metrics", autospec=True
+    ) as record_metrics_mock:
+
+        def record_metrics_side_effect(self, metrics, step=None):
+            patched_metrics_data.extend(metrics.items())
+            original(self, metrics, step)
+
+        record_metrics_mock.side_effect = record_metrics_side_effect
+        run = gluon_random_data_run()
+
+    patched_metrics_data = dict(patched_metrics_data)
+    original_metrics = run.data.metrics
+    for metric_name in original_metrics:
+        assert metric_name in patched_metrics_data
+        assert original_metrics[metric_name] == patched_metrics_data[metric_name]
+
+    assert "train accuracy" in original_metrics
+    assert "train accuracy" in patched_metrics_data
+
+
+@pytest.mark.large
 def test_gluon_autolog_model_can_load_from_artifact(gluon_random_data_run):
     client = mlflow.tracking.MlflowClient()
     artifacts = client.list_artifacts(gluon_random_data_run.info.run_id)
@@ -79,6 +110,16 @@ def test_gluon_autolog_model_can_load_from_artifact(gluon_random_data_run):
     ctx = mx.cpu()
     model = mlflow.gluon.load_model("runs:/" + gluon_random_data_run.info.run_id + "/model", ctx)
     model(nd.array(np.random.rand(1000, 1, 32)))
+
+
+@pytest.mark.large
+@pytest.mark.parametrize("log_models", [True, False])
+def test_gluon_autolog_log_models_configuration(log_models):
+    random_data_run = gluon_random_data_run(log_models)
+    client = mlflow.tracking.MlflowClient()
+    artifacts = client.list_artifacts(random_data_run.info.run_id)
+    artifacts = list(map(lambda x: x.path, artifacts))
+    assert ("model" in artifacts) == log_models
 
 
 @pytest.mark.large
