@@ -1003,7 +1003,9 @@ def autolog(every_n_iter=100, log_models=True, disable=False):
                     if len(args) >= 6:
                         tmp_list = list(args)
                         early_stop_callback = _early_stop_check(tmp_list[5])
-                        tmp_list[5], self.log_dir = _setup_callbacks(tmp_list[5], log_models, metrics_logger)
+                        tmp_list[5], self.log_dir = _setup_callbacks(
+                            tmp_list[5], log_models, metrics_logger
+                        )
                         args = tuple(tmp_list)
                     elif kwargs.get("callbacks"):
                         early_stop_callback = _early_stop_check(kwargs["callbacks"])
@@ -1011,7 +1013,9 @@ def autolog(every_n_iter=100, log_models=True, disable=False):
                             kwargs["callbacks"], log_models, metrics_logger
                         )
                     else:
-                        kwargs["callbacks"], self.log_dir = _setup_callbacks([], log_models, metrics_logger)
+                        kwargs["callbacks"], self.log_dir = _setup_callbacks(
+                            [], log_models, metrics_logger
+                        )
 
                     _log_early_stop_callback_params(early_stop_callback)
 
