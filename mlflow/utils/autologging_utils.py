@@ -11,7 +11,6 @@ from mlflow.entities.run_status import RunStatus
 from mlflow.utils import gorilla
 from mlflow.entities import Metric
 from mlflow.tracking.client import MlflowClient
-from mlflow.utils.annotations import deprecated
 from mlflow.utils.validation import MAX_METRICS_PER_BATCH
 
 
