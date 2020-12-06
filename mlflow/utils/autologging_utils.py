@@ -604,7 +604,7 @@ def _validate_args(
     Used for testing purposes to verify that, when a patched ML function calls its underlying
     / original ML function, the following properties are satisfied:
 
-        - All arguments supplied to the patched ML function are forwarded to the 
+        - All arguments supplied to the patched ML function are forwarded to the
           original ML function
         - Any additional arguments supplied to the original function are exception safe (i.e.
           they are either functions decorated with the `@exception_safe_function` decorator
@@ -614,7 +614,7 @@ def _validate_args(
     def _validate_new_input(inp):
         """
         Validates a new input (arg or kwarg) introduced to the underlying / original ML function
-        call during the execution of a patched ML function. The new input is valid if: 
+        call during the execution of a patched ML function. The new input is valid if:
 
             - The new input is a function that has been decorated with `exception_safe_function`
             - OR the new input is a class with the `ExceptionSafeClass` metaclass
@@ -631,8 +631,8 @@ def _validate_args(
         elif inspect.isclass(type(inp)):
             assert type(inp.__class__) == ExceptionSafeClass,\
                 ("New class argument '{}' passed to original function is not exception-safe."
-                 " Please specify the `ExceptionSafeClass` metaclass" 
-                 " in the class definition.".format(inp))  
+                 " Please specify the `ExceptionSafeClass` metaclass"
+                 " in the class definition.".format(inp))
         else:
             raise Exception(
                 "Invalid new input '{}'. New args / kwargs introduced to `original` function"
@@ -653,13 +653,13 @@ def _validate_args(
             length_difference = len(autologging_call_input) - len(user_call_input)
             assert length_difference >= 0,\
                 ("%d expected args / kwargs are missing from the call"
-                 " to the original function.".format(length_difference)) 
+                 " to the original function.".format(length_difference))
             user_call_input = user_call_input + ([None] * (length_difference))
             for a, u in zip(autologging_call_input, user_call_input):
                 _validate(a, u)
         elif type(autologging_call_input) == dict:
             assert set(user_call_input.keys()).issubset(set(autologging_call_input.keys())),\
-                ("Keyword or dictionary arguments to original function omit" 
+                ("Keyword or dictionary arguments to original function omit"
                  " one or more expected keys: '{}'".format(
                      set(user_call_input.keys()) - set(autologging_call_input.keys()))
                 )
@@ -667,7 +667,7 @@ def _validate_args(
                 _validate(autologging_call_input[key], user_call_input.get(key, None))
         else:
             assert (
-                autologging_call_input is user_call_input 
+                autologging_call_input is user_call_input
                 or autologging_call_input == user_call_input
             ),\
             (
