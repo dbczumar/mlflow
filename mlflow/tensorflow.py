@@ -985,9 +985,7 @@ def autolog(every_n_iter=100):
                     last_epoch = len(history.history[metric_key])
                     try_mlflow_log(mlflow.log_metrics, restored_metrics, step=last_epoch)
 
-
     class FitPatch(PatchFunction):
-
         def __init__(self):
             self.log_dir = None
 
@@ -1025,12 +1023,19 @@ def autolog(every_n_iter=100):
                 return history
 
         def on_exception(self, exception):
-            if self.log_dir is not None and self.log_dir.is_temp and os.path.exists(self.log_dir.location):
+            if (
+                self.log_dir is not None
+                and self.log_dir.is_temp
+                and os.path.exists(self.log_dir.location)
+            ):
                 shutil.rmtree(self.log_dir.location)
 
-
-    safe_patch(FLAVOR_NAME, tensorflow.keras.Model, "fit", with_cleanup_autologging_run_on_exception(FitPatch))
-
+    safe_patch(
+        FLAVOR_NAME,
+        tensorflow.keras.Model,
+        "fit",
+        with_cleanup_autologging_run_on_exception(FitPatch),
+    )
 
     def fit_generator(self, *args, **kwargs):
         with _manage_active_run():

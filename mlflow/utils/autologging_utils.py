@@ -130,9 +130,7 @@ def _update_wrapper_extended(wrapper, wrapped):
     try:
         updated_wrapper.__signature__ = inspect.signature(wrapped)
     except Exception:  # pylint: disable=broad-except
-        _logger.warn(
-            "Failed to restore original signature for wrapper around {}".format(wrapped)
-        )
+        _logger.warn("Failed to restore original signature for wrapper around {}".format(wrapped))
     return updated_wrapper
 
 
@@ -460,14 +458,15 @@ def with_cleanup_autologging_run_on_exception(patch_function):
     if inspect.isclass(patch_function):
 
         class PatchWithRunCleanup(patch_function):
-
             def __init__(self):
                 super(PatchWithRunCleanup, self).__init__()
                 self.preexisting_run = None
 
             def _patch_implementation(self, original, *args, **kwargs):
                 self.preexisting_run = mlflow.active_run()
-                return super(PatchWithRunCleanup, self)._patch_implementation(original, *args, **kwargs)
+                return super(PatchWithRunCleanup, self)._patch_implementation(
+                    original, *args, **kwargs
+                )
 
             def _on_exception(self, e):
                 super(PatchWithRunCleanup, self).on_exception(e)
@@ -552,6 +551,7 @@ def safe_patch(autologging_integration, destination, function_name, patch_functi
         failed_during_original = False
 
         try:
+
             def call_original(*og_args, **og_kwargs):
                 try:
                     if _is_testing():
