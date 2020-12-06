@@ -140,7 +140,7 @@ def wrap_patch(destination, name, patch, settings=None):
     """
     Apply a patch while preserving the attributes (e.g. __doc__) of an original function.
 
-    TODO(dbczumar): Convert this to an internal method once existing `wrap_patch` calls 
+    TODO(dbczumar): Convert this to an internal method once existing `wrap_patch` calls
                     outside of `autologging_utils` have been converted to `safe_patch`
 
     :param destination: Patch destination
@@ -153,7 +153,7 @@ def wrap_patch(destination, name, patch, settings=None):
 
     original = getattr(destination, name)
     wrapped = _update_wrapper_extended(patch, original)
-    
+
     patch = gorilla.Patch(destination, name, wrapped, settings=settings)
     gorilla.apply(patch)
 
@@ -318,7 +318,7 @@ def autologging_integration(name):
 
     Wraps an autologging function in order to store its configuration arguments. This enables
     patch functions to broadly obey certain configurations (e.g., disable=True) without
-    requiring specific logic to be present in each autologging integration. 
+    requiring specific logic to be present in each autologging integration.
     """
 
     AUTOLOGGING_INTEGRATIONS[name] = {}
@@ -496,7 +496,7 @@ def safe_patch(autologging_integration, destination, function_name, patch_functi
     purposes, replacing its implementation with an error-safe copy of the specified patch
     `function` with the following error handling behavior:
 
-        - Exceptions thrown from the underlying / original function 
+        - Exceptions thrown from the underlying / original function
           (`<destination>.<function_name>`) are propagated to the caller.
 
         - Exceptions thrown from other parts of the patched implementation (`patch_function`)
@@ -523,7 +523,7 @@ def safe_patch(autologging_integration, destination, function_name, patch_functi
         """
         A safe wrapper around the specified `patch_function` implementation designed to
         handle exceptions thrown during the execution of `patch_function`. This wrapper
-        distinguishes exceptions thrown from the underlying / original function 
+        distinguishes exceptions thrown from the underlying / original function
         (`<destination>.<function_name>`) from exceptions thrown from other parts of
         `patch_function`. This distinction is made by passing an augmented version of the
         underlying / original function to `patch_function` that uses nonlocal state to track
@@ -534,7 +534,7 @@ def safe_patch(autologging_integration, destination, function_name, patch_functi
         warnings.
         """
         original = gorilla.get_original_attribute(destination, function_name)
-        
+
         config = AUTOLOGGING_INTEGRATIONS.get(autologging_integration)
         # If the autologging integration associated with this patch is disabled,
         # call the original function and return
@@ -550,7 +550,7 @@ def safe_patch(autologging_integration, destination, function_name, patch_functi
         # Whether or not an exception was raised from within the original / underlying function
         # during the execution of patched code
         failed_during_original = False
-        
+
         try:
             def call_original(*og_args, **og_kwargs):
                 try:
@@ -567,10 +567,10 @@ def safe_patch(autologging_integration, destination, function_name, patch_functi
                     nonlocal failed_during_original
                     failed_during_original = True
                     raise
-           
+
             # Apply the name, docstring, and signature of `original` to `call_original`.
             # This is important because several autologging patch implementations inspect
-            # the signature of the `original` argument during execution 
+            # the signature of the `original` argument during execution
             call_original = _update_wrapper_extended(call_original, original)
 
             if patch_is_class:
@@ -581,7 +581,7 @@ def safe_patch(autologging_integration, destination, function_name, patch_functi
         except Exception as e:
             # Exceptions thrown during execution of the original function should be propagated
             # to the caller. Additionally, exceptions encountered during test mode should be
-            # reraised to detect bugs in autologging implementations 
+            # reraised to detect bugs in autologging implementations
             if failed_during_original or _is_testing():
                 raise
 
