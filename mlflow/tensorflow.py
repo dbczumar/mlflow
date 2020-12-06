@@ -991,7 +991,7 @@ def autolog(every_n_iter=100, log_models=True, disable=False):
             self.log_dir = None
 
         def _patch_implementation(self, original, inst, *args, **kwargs):
-            with _manage_active_run():
+            with _manage_active_run() as run:
                 unlogged_params = ["self", "x", "y", "callbacks", "validation_data", "verbose"]
 
                 log_fn_args_as_params(original, args, kwargs, unlogged_params)

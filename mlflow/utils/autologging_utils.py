@@ -91,7 +91,7 @@ def _update_wrapper_extended(wrapper, wrapped):
     try:
         updated_wrapper.__signature__ = inspect.signature(wrapped)
     except Exception:  # pylint: disable=broad-except
-        _logger.warn("Failed to restore original signature for wrapper around {}".format(wrapped))
+        _logger.debug("Failed to restore original signature for wrapper around {}".format(wrapped))
     return updated_wrapper
 
 
