@@ -11,6 +11,7 @@ from mlflow.entities.run_status import RunStatus
 from mlflow.utils import gorilla
 from mlflow.entities import Metric
 from mlflow.tracking.client import MlflowClient
+from mlflow.utils.annotations import deprecated
 from mlflow.utils.validation import MAX_METRICS_PER_BATCH
 
 
@@ -113,9 +114,34 @@ def log_fn_args_as_params(fn, args, kwargs, unlogged=[]):  # pylint: disable=W01
             try_mlflow_log(mlflow.log_param, param_name, kwargs[param_name])
 
 
+def _update_wrapper_extended(wrapper, wrapped):
+    """
+    Update a `wrapper` function to look like the `wrapped` function. This is an extension of
+    `functools.update_wrapper` that applies the docstring *and* signature of `wrapped` to
+    `wrapper`, producing a new function.
+
+    :return: A new function with the same implementation as `wrapper` and the same docstring
+             & signature as `wrapped`.
+    """
+    updated_wrapper = functools.update_wrapper(wrapper, wrapped)
+    # Assign the signature of the `wrapped` function to the updated wrapper function.
+    # Certain frameworks may disallow signature inspection, causing `inspect.signature()` to throw.
+    # One such example is the `tensorflow.estimator.Estimator.export_savedmodel()` function
+    try:
+        updated_wrapper.__signature__ = inspect.signature(wrapped)
+    except Exception:  # pylint: disable=broad-except
+        _logger.warn(
+            "Failed to restore original signature for wrapper around {}".format(wrapped)
+        )
+    return updated_wrapper
+
+
 def wrap_patch(destination, name, patch, settings=None):
     """
     Apply a patch while preserving the attributes (e.g. __doc__) of an original function.
+
+    TODO(dbczumar): Convert this to an internal method once existing `wrap_patch` calls 
+                    outside of `autologging_utils` have been converted to `safe_patch`
 
     :param destination: Patch destination
     :param name: Name of the attribute at the destination
@@ -126,13 +152,8 @@ def wrap_patch(destination, name, patch, settings=None):
         settings = gorilla.Settings(allow_hit=True, store_hit=True)
 
     original = getattr(destination, name)
-    wrapped = functools.wraps(original)(patch)
-    try:
-        wrapped.__signature__ = inspect.signature(original)
-    except Exception:
-        _logger.warn(
-            "Failed to restore original signature for patched copy of {}".format(original)
-        )
+    wrapped = _update_wrapper_extended(patch, original)
+    
     patch = gorilla.Patch(destination, name, wrapped, settings=settings)
     gorilla.apply(patch)
 
@@ -293,10 +314,11 @@ def batch_metrics_logger(run_id):
 
 def autologging_integration(name):
     """
+    **All autologging integrations should be decorated with this wrapper.**
+
     Wraps an autologging function in order to store its configuration arguments. This enables
     patch functions to broadly obey certain configurations (e.g., disable=True) without
-    requiring specific logic to be present in each autologging integration. **All autologging
-    integrations should be decorated with this wrapper.**
+    requiring specific logic to be present in each autologging integration. 
     """
 
     AUTOLOGGING_INTEGRATIONS[name] = {}
@@ -312,10 +334,80 @@ def autologging_integration(name):
     return wrapper
 
 
+def _is_testing():
+    """
+    Indicates whether or not autologging functionality is running in test mode (as determined
+    by the `MLFLOW_AUTOLOGGING_TESTING` environment variable). Test mode performs additional
+    validation during autologging, including:
+
+        - Checks for the exception safety of arguments passed to model training functions
+          (i.e. all additional arguments should be "exception safe" functions or classes)
+        - Disables exception handling for patched function logic, ensuring that patch code
+          executes without errors during testing
+    """
+    import os
+
+    return os.environ.get("MLFLOW_AUTOLOGGING_TESTING", "false") == "true"
+
+
+# Function attribute used for testing purposes to verify that a given function
+# has been wrapped with the `exception_safe_function` decorator
+_ATTRIBUTE_EXCEPTION_SAFE = "exception_safe"
+
+
+def exception_safe_function(function):
+    """
+    Wraps the specified function with broad exception handling to guard
+    against unexpected errors during autologging.
+    """
+    if _is_testing():
+        setattr(function, _ATTRIBUTE_EXCEPTION_SAFE, True)
+
+    def safe_function(*args, **kwargs):
+
+        try:
+            return function(*args, **kwargs)
+        except Exception as e:
+            if _is_testing():
+                raise
+            else:
+                _logger.warning("Encountered unexpected error during autologging: %s", e)
+
+    safe_function = _update_wrapper_extended(safe_function, function)
+    return safe_function
+
+
+class ExceptionSafeClass(type):
+    """
+    Metaclass that wraps all functions defined on the specified class with broad error handling
+    logic to guard against unexpected errors during autlogging.
+
+    Rationale: Patched autologging functions commonly pass additional class instances as arguments
+    to their underlying original training routines; for example, Keras autologging constructs
+    a subclass of `keras.callbacks.Callback` and forwards it to `Model.fit()`. To prevent errors
+    encountered during method execution within such classes from disrupting model training,
+    this metaclass wraps all class functions in a broad try / catch statement.
+    """
+
+    def __new__(cls, name, bases, dct):
+        for m in dct:
+            if hasattr(dct[m], "__call__"):
+                dct[m] = exception_safe_function(dct[m])
+        return type.__new__(cls, name, bases, dct)
+
+
 class PatchFunction:
+    """
+    Base class representing a function patch implementation with a callback for error handling.
+    `PatchFunction` should be subclassed and used in conjunction with `safe_patch` to
+    safely modify the implementation of a function. Subclasses of `PatchFunction` should
+    use `_patch_implementation` to define modified ("patched") function implementations and
+    `_on_exception` to define cleanup logic when `_patch_implementation` terminates due
+    to an unhandled exception.
+    """
 
     @abstractmethod
-    def invoke_patch(self, original, *args, **kwargs):
+    def _patch_implementation(self, original, *args, **kwargs):
         """
         Invokes the patch function code.
 
@@ -327,14 +419,29 @@ class PatchFunction:
         pass
 
     @abstractmethod
-    def on_exception(self, exception):
+    def _on_exception(self, exception):
         """
         Called when an unhandled exception prematurely terminates the execution
-        of `invoke_patch`.
+        of `_patch_implementation`.
 
-        :param exception: The unhandled exception thrown by `invoke_patch`.
+        :param exception: The unhandled exception thrown by `_patch_implementation`.
         """
         pass
+
+    @classmethod
+    def call(cls, original, *args, **kwargs):
+        return cls().__call__(original, *args, **kwargs)
+
+    def __call__(self, original, *args, **kwargs):
+        try:
+            return self._patch_implementation(original, *args, **kwargs)
+        except Exception as e:  # pylint: disable=broad-except
+            try:
+                self._on_exception(e)
+            finally:
+                # Regardless of what happens during the `_on_exception` callback, reraise
+                # the original implementation exception once the callback completes
+                raise e
 
 
 def with_cleanup_autologging_run_on_exception(patch_function):
@@ -358,11 +465,11 @@ def with_cleanup_autologging_run_on_exception(patch_function):
                 super(PatchWithRunCleanup, self).__init__()
                 self.preexisting_run = None
 
-            def invoke_patch(self, original, *args, **kwargs):
+            def _patch_implementation(self, original, *args, **kwargs):
                 self.preexisting_run = mlflow.active_run()
-                return super(PatchWithRunCleanup, self).invoke_patch(original, *args, **kwargs)
+                return super(PatchWithRunCleanup, self)._patch_implementation(original, *args, **kwargs)
 
-            def on_exception(self, e):
+            def _on_exception(self, e):
                 super(PatchWithRunCleanup, self).on_exception(e)
                 if self.preexisting_run is None and mlflow.active_run():
                     try_mlflow_log(mlflow.end_run, RunStatus.to_string(RunStatus.FAILED))
@@ -387,7 +494,14 @@ def safe_patch(autologging_integration, destination, function_name, patch_functi
     """
     Patches the specified `function_name` on the specified `destination` class for autologging
     purposes, replacing its implementation with an error-safe copy of the specified patch
-    `function`.
+    `function` with the following error handling behavior:
+
+        - Exceptions thrown from the underlying / original function 
+          (`<destination>.<function_name>`) are propagated to the caller.
+
+        - Exceptions thrown from other parts of the patched implementation (`patch_function`)
+          are caught and logged as warnings.
+
 
     :param autologging_integration: The name of the autologging integration associated with the
                                     patch.
@@ -399,135 +513,88 @@ def safe_patch(autologging_integration, destination, function_name, patch_functi
                      underlying / original function. Subsequent arguments should be identical to
                      those of the original function being patched.
     """
-
     patch_is_class = inspect.isclass(patch_function)
-
-    def safe_on_exception(patch_instance, e):
-        try:
-            patch_instance.on_exception(e)
-        except Exception:
-            pass
+    if patch_is_class:
+        assert issubclass(patch_function, PatchFunction)
+    else:
+        assert callable(patch_function)
 
     def safe_patch_function(*args, **kwargs):
+        """
+        A safe wrapper around the specified `patch_function` implementation designed to
+        handle exceptions thrown during the execution of `patch_function`. This wrapper
+        distinguishes exceptions thrown from the underlying / original function 
+        (`<destination>.<function_name>`) from exceptions thrown from other parts of
+        `patch_function`. This distinction is made by passing an augmented version of the
+        underlying / original function to `patch_function` that uses nonlocal state to track
+        whether or not it has been executed and whether or not it threw an exception.
+
+        Exceptions thrown from the underlying / original function are propagated to the caller,
+        while exceptions thrown from other parts of `patch_function` are caught and logged as
+        warnings.
+        """
+        original = gorilla.get_original_attribute(destination, function_name)
+        
+        config = AUTOLOGGING_INTEGRATIONS.get(autologging_integration)
+        # If the autologging integration associated with this patch is disabled,
+        # call the original function and return
+        if config is not None and config.get("disable", False):
+            return original(*args, **kwargs)
+
+        # Whether or not the original / underlying function has been called during the
+        # execution of patched code
+        original_has_been_called = False
+        # The value returned by the call to the original / underlying function during
+        # the execution of patched code
         original_result = None
-        called_original = False
+        # Whether or not an exception was raised from within the original / underlying function
+        # during the execution of patched code
         failed_during_original = False
-
-        def call_original(*og_args, **og_kwargs):
-            original = gorilla.get_original_attribute(destination, function_name)
-
-            if _is_testing():
-                _validate_args(args, kwargs, og_args, og_kwargs)
-
-            def wrapped_original(*args, **kwargs):
+        
+        try:
+            def call_original(*og_args, **og_kwargs):
                 try:
+                    if _is_testing():
+                        _validate_args(args, kwargs, og_args, og_kwargs)
+
+                    nonlocal original_has_been_called
+                    original_has_been_called = True
+
                     nonlocal original_result
-                    nonlocal called_original
-                    called_original = True
                     original_result = original(*args, **kwargs)
                     return original_result
                 except Exception:
                     nonlocal failed_during_original
                     failed_during_original = True
                     raise
+           
+            # Apply the name, docstring, and signature of `original` to `call_original`.
+            # This is important because several autologging patch implementations inspect
+            # the signature of the `original` argument during execution 
+            call_original = _update_wrapper_extended(call_original, original)
 
-            return wrapped_original(*og_args, **og_kwargs)
-
-        original = gorilla.get_original_attribute(destination, function_name)
-        call_original = functools.wraps(original)(call_original)
-        call_original.__signature__ = inspect.signature(original)
-
-        config = AUTOLOGGING_INTEGRATIONS[autologging_integration]
-        if config.get("disable", False):
-            return original(*args, **kwargs)
-
-        patch_instance = None
-        try:
             if patch_is_class:
-                patch_instance = patch_function()
-                return patch_instance.invoke_patch(call_original, *args, **kwargs)
+                patch_function.call(call_original, *args, **kwargs)
             else:
-                return patch_function(call_original, *args, **kwargs)
+                patch_function(call_original, *args, **kwargs)
+
         except Exception as e:
-            if patch_instance:
-                safe_on_exception(patch_instance, e)
-
-            if _is_testing():
-                raise
-
-            if failed_during_original:
+            # Exceptions thrown during execution of the original function should be propagated
+            # to the caller. Additionally, exceptions encountered during test mode should be
+            # reraised to detect bugs in autologging implementations 
+            if failed_during_original or _is_testing():
                 raise
 
             _logger.warning(
                 "Encountered unexpected error during %s autologging: %s", autologging_integration, e
             )
 
-            if called_original:
-                return original_result
-            else:
-                return original(*args, **kwargs)
+        if original_has_been_called:
+            return original_result
+        else:
+            return original(*args, **kwargs)
 
     wrap_patch(destination, function_name, safe_patch_function)
-
-
-_ATTRIBUTE_EXCEPTION_SAFE = "exception_safe"
-
-
-def exception_safe_function(function):
-    """
-    Wraps the specified function with broad exception handling to guard
-    against unexpected errors during autologging.
-    """
-    if _is_testing():
-        setattr(function, _ATTRIBUTE_EXCEPTION_SAFE, True)
-
-    @functools.wraps(function)
-    def safe_function(*args, **kwargs):
-
-        try:
-            return function(*args, **kwargs)
-        except Exception as e:
-            if _is_testing():
-                raise
-            else:
-                _logger.warning("Encountered unexpected error during autologging: %s", e)
-
-    safe_function.__signature__ = inspect.signature(function)
-    return safe_function
-
-
-class ExceptionSafeClass(type):
-    """
-    Metaclass that wraps all functions defined on the specified class with broad error handling
-    logic to guard against unexpected errors during autlogging.
-
-    Rationale: Patched autologging functions commonly pass additional class instances as arguments
-    to their underlying original training routines; for example, Keras autologging constructs
-    a subclass of `keras.callbacks.Callback` and forwards it to `Model.fit()`. To prevent errors
-    encountered during method execution within such classes from disrupting model training,
-    this metaclass wraps all class functions in a broad try / catch statement.
-    """
-
-    def __new__(cls, name, bases, dct):
-        for m in dct:
-            if hasattr(dct[m], "__call__"):
-                dct[m] = exception_safe_function(dct[m])
-        return type.__new__(cls, name, bases, dct)
-
-
-def _is_testing():
-    """
-    Indicates whether or not autologging functionality is running in test mode (as determined
-    by the `MLFLOW_AUTOLOGGING_TESTING` environment variable). Test mode performs additional
-    validation during autologging, including:
-        - Checks for the exception safety of arguments passed to model training functions
-          (i.e. all additional arguments should be "exception safe" functions or classes)
-        - Disables exception handling for patched function logic, ensuring that patch code
-          executes without errors during testing
-    """
-    import os
-
-    return os.environ.get("MLFLOW_AUTOLOGGING_TESTING", "false") == "true"
 
 
 def _validate_args(
@@ -536,6 +603,7 @@ def _validate_args(
     """
     Used for testing purposes to verify that, when a patched model training function calls its
     underlying / original training function, the following properties are satisfied:
+
         - All arguments supplied to the patched model training function are forwarded
           to the original training function
         - Any additional arguments supplied to the original function are exception safe (i.e.
