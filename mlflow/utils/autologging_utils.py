@@ -625,14 +625,16 @@ def _validate_args(
             for item in inp:
                 _validate_new_input(item)
         elif callable(inp):
-            assert getattr(inp, _ATTRIBUTE_EXCEPTION_SAFE, False),\
-                ("New function argument '{}' passed to original function is not exception-safe."
-                 " Please decorate the function with `exception_safe_function`.".format(inp))
+            assert getattr(inp, _ATTRIBUTE_EXCEPTION_SAFE, False), (
+                "New function argument '{}' passed to original function is not exception-safe."
+                " Please decorate the function with `exception_safe_function`.".format(inp)
+            )
         elif inspect.isclass(type(inp)):
-            assert type(inp.__class__) == ExceptionSafeClass,\
-                ("New class argument '{}' passed to original function is not exception-safe."
-                 " Please specify the `ExceptionSafeClass` metaclass"
-                 " in the class definition.".format(inp))
+            assert type(inp.__class__) == ExceptionSafeClass, (
+                "New class argument '{}' passed to original function is not exception-safe."
+                " Please specify the `ExceptionSafeClass` metaclass"
+                " in the class definition.".format(inp)
+            )
         else:
             raise Exception(
                 "Invalid new input '{}'. New args / kwargs introduced to `original` function"
@@ -645,35 +647,37 @@ def _validate_args(
             _validate_new_input(autologging_call_input)
             return
 
-        assert type(autologging_call_input) == type(user_call_input),\
-            ("Type of input to original function '{}' does not match expected type '{}'".format(
-             type(autologging_call_input), type(user_call_input)))
+        assert type(autologging_call_input) == type(
+            user_call_input
+        ), "Type of input to original function '{}' does not match expected type '{}'".format(
+            type(autologging_call_input), type(user_call_input)
+        )
 
         if type(autologging_call_input) == list:
             length_difference = len(autologging_call_input) - len(user_call_input)
-            assert length_difference >= 0,\
-                ("%d expected args / kwargs are missing from the call"
-                 " to the original function.".format(length_difference))
+            assert length_difference >= 0, (
+                "%d expected args / kwargs are missing from the call"
+                " to the original function.".format(length_difference)
+            )
             user_call_input = user_call_input + ([None] * (length_difference))
             for a, u in zip(autologging_call_input, user_call_input):
                 _validate(a, u)
         elif type(autologging_call_input) == dict:
-            assert set(user_call_input.keys()).issubset(set(autologging_call_input.keys())),\
-                ("Keyword or dictionary arguments to original function omit"
-                 " one or more expected keys: '{}'".format(
-                     set(user_call_input.keys()) - set(autologging_call_input.keys()))
+            assert set(user_call_input.keys()).issubset(set(autologging_call_input.keys())), (
+                "Keyword or dictionary arguments to original function omit"
+                " one or more expected keys: '{}'".format(
+                    set(user_call_input.keys()) - set(autologging_call_input.keys())
                 )
+            )
             for key in autologging_call_input.keys():
                 _validate(autologging_call_input[key], user_call_input.get(key, None))
         else:
             assert (
                 autologging_call_input is user_call_input
                 or autologging_call_input == user_call_input
-            ),\
-            (
-                    "Input to original function does not match expected input."
-                    " Original: '{}'. Expected: '{}'".format(
-                    autologging_call_input, user_call_input)
+            ), (
+                "Input to original function does not match expected input."
+                " Original: '{}'. Expected: '{}'".format(autologging_call_input, user_call_input)
             )
 
     _validate(autologging_call_args, user_call_args)
