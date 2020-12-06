@@ -601,42 +601,80 @@ def _validate_args(
     user_call_args, user_call_kwargs, autologging_call_args, autologging_call_kwargs
 ):
     """
-    Used for testing purposes to verify that, when a patched model training function calls its
-    underlying / original training function, the following properties are satisfied:
+    Used for testing purposes to verify that, when a patched ML function calls its underlying
+    / original ML function, the following properties are satisfied:
 
-        - All arguments supplied to the patched model training function are forwarded
-          to the original training function
+        - All arguments supplied to the patched ML function are forwarded to the 
+          original ML function
         - Any additional arguments supplied to the original function are exception safe (i.e.
           they are either functions decorated with the `@exception_safe_function` decorator
           or classes / instances of classes with type `ExceptionSafeClass`
     """
 
-    def _validate_new_arg(arg):
-        if type(arg) == list:
-            for item in arg:
-                _validate_new_arg(item)
-        elif callable(arg):
-            assert getattr(arg, _ATTRIBUTE_EXCEPTION_SAFE, False)
-        else:
-            assert inspect.isclass(type(arg))
-            assert type(arg.__class__) == ExceptionSafeClass
+    def _validate_new_input(inp):
+        """
+        Validates a new input (arg or kwarg) introduced to the underlying / original ML function
+        call during the execution of a patched ML function. The new input is valid if: 
 
-    def _validate(autologging_kwarg, user_kwarg=None):
-        if user_kwarg is None and autologging_kwarg is not None:
-            _validate_new_arg(autologging_kwarg)
+            - The new input is a function that has been decorated with `exception_safe_function`
+            - OR the new input is a class with the `ExceptionSafeClass` metaclass
+            - OR the new input is a list and each of its elements is valid according to the
+              these criteria
+        """
+        if type(inp) == list:
+            for item in inp:
+                _validate_new_input(item)
+        elif callable(inp):
+            assert getattr(inp, _ATTRIBUTE_EXCEPTION_SAFE, False),\
+                ("New function argument '{}' passed to original function is not exception-safe."
+                 " Please decorate the function with `exception_safe_function`.".format(inp))
+        elif inspect.isclass(type(inp)):
+            assert type(inp.__class__) == ExceptionSafeClass,\
+                ("New class argument '{}' passed to original function is not exception-safe."
+                 " Please specify the `ExceptionSafeClass` metaclass" 
+                 " in the class definition.".format(inp))  
+        else:
+            raise Exception(
+                "Invalid new input '{}'. New args / kwargs introduced to `original` function"
+                " calls by patched code must either be exception safe functions, exception safe"
+                " classes, or lists of exceptions safe functions / classes.".format(inp)
+            )
+
+    def _validate(autologging_call_input, user_call_input=None):
+        if user_call_input is None and autologging_call_input is not None:
+            _validate_new_input(autologging_call_input)
             return
 
-        assert type(autologging_kwarg) == type(user_kwarg)
-        if type(autologging_kwarg) == list:
-            user_kwarg = user_kwarg + ([None] * (len(autologging_kwarg) - len(user_kwarg)))
-            for a, u in zip(autologging_kwarg, user_kwarg):
+        assert type(autologging_call_input) == type(user_call_input),\
+            ("Type of input to original function '{}' does not match expected type '{}'".format(
+             type(autologging_call_input), type(user_call_input)))
+
+        if type(autologging_call_input) == list:
+            length_difference = len(autologging_call_input) - len(user_call_input)
+            assert length_difference >= 0,\
+                ("%d expected args / kwargs are missing from the call"
+                 " to the original function.".format(length_difference)) 
+            user_call_input = user_call_input + ([None] * (length_difference))
+            for a, u in zip(autologging_call_input, user_call_input):
                 _validate(a, u)
-        elif type(autologging_kwarg) == dict:
-            assert set(user_kwarg.keys()).issubset(set(autologging_kwarg.keys()))
-            for key in autologging_kwarg.keys():
-                _validate(autologging_kwarg[key], user_kwarg.get(key))
+        elif type(autologging_call_input) == dict:
+            assert set(user_call_input.keys()).issubset(set(autologging_call_input.keys())),\
+                ("Keyword or dictionary arguments to original function omit" 
+                 " one or more expected keys: '{}'".format(
+                     set(user_call_input.keys()) - set(autologging_call_input.keys()))
+                )
+            for key in autologging_call_input.keys():
+                _validate(autologging_call_input[key], user_call_input.get(key, None))
         else:
-            assert autologging_kwarg is user_kwarg or autologging_kwarg == user_kwarg
+            assert (
+                autologging_call_input is user_call_input 
+                or autologging_call_input == user_call_input
+            ),\
+            (
+                    "Input to original function does not match expected input."
+                    " Original: '{}'. Expected: '{}'".format(
+                    autologging_call_input, user_call_input)
+            )
 
     _validate(autologging_call_args, user_call_args)
     _validate(autologging_call_kwargs, user_call_kwargs)

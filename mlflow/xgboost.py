@@ -339,7 +339,7 @@ def autolog(
 
         original(self, *args, **kwargs)
 
-    def train(*args, **kwargs):
+    def train(original, *args, **kwargs):
         def record_eval_results(eval_results, metrics_logger):
             """
             Create a callback function that records evaluation results.
