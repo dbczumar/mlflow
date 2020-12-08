@@ -426,53 +426,6 @@ class PatchFunction:
                 raise e
 
 
-def with_cleanup_autologging_run_on_exception(patch_function):
-    """
-    Given a patch_function, returns an augmented patch_function that performs autologging
-    run cleanup in the event of an unhandled exception. The augmented function will terminate
-    the top run of MLflow's fluent active runs stack with status `FAILED`, if it was created during
-    the execution of `patch_function`. If nested runs or non-fluent runs are created by
-    `patch_function`, `patch_function` is responsible for terminating them via the
-    :py:func:`PatchFunction.on_exception` method.
-
-    :param patch_function: A `PatchFunction` class definition or a function object
-                           compatible with `safe_patch`.
-    """
-
-    if inspect.isclass(patch_function):
-
-        class PatchWithRunCleanup(patch_function):
-            def __init__(self):
-                super(PatchWithRunCleanup, self).__init__()
-                self.preexisting_run = None
-
-            def _patch_implementation(self, original, *args, **kwargs):
-                self.preexisting_run = mlflow.active_run()
-                return super(PatchWithRunCleanup, self)._patch_implementation(
-                    original, *args, **kwargs
-                )
-
-            def _on_exception(self, e):
-                super(PatchWithRunCleanup, self).on_exception(e)
-                if self.preexisting_run is None and mlflow.active_run():
-                    try_mlflow_log(mlflow.end_run, RunStatus.to_string(RunStatus.FAILED))
-
-        return PatchWithRunCleanup
-
-    else:
-
-        def patch_with_run_cleanup(original, *args, **kwargs):
-            preexisting_run = mlflow.active_run()
-            try:
-                return patch_function(original, *args, **kwargs)
-            except Exception:
-                if preexisting_run is None and mlflow.active_run():
-                    try_mlflow_log(mlflow.end_run, RunStatus.to_string(RunStatus.FAILED))
-                raise
-
-        return patch_with_run_cleanup
-
-
 def with_managed_run(patch_function):
     """
     Given a `patch_function`, returns an `augmented_patch_function` that wraps the execution of
@@ -515,9 +468,9 @@ def with_managed_run(patch_function):
                 return result
 
             def _on_exception(self, e):
-                super(PatchWithManagedRun, self)._on_exception(e)
                 if self.managed_run:
                     try_mlflow_log(mlflow.end_run, RunStatus.to_string(RunStatus.FAILED))
+                super(PatchWithManagedRun, self)._on_exception(e)
 
         return PatchWithManagedRun
 
@@ -531,7 +484,8 @@ def with_managed_run(patch_function):
             try:
                 result = patch_function(original, *args, **kwargs)
             except:
-                try_mlflow_log(mlflow.end_run, RunStatus.to_string(RunStatus.FAILED))
+                if managed_run:
+                    try_mlflow_log(mlflow.end_run, RunStatus.to_string(RunStatus.FAILED))
                 raise
             else:
                 if managed_run:
@@ -623,7 +577,7 @@ def safe_patch(
                     original_has_been_called = True
 
                     nonlocal original_result
-                    original_result = original(*args, **kwargs)
+                    original_result = original(*og_args, **og_kwargs)
                     return original_result
                 except Exception:
                     nonlocal failed_during_original
