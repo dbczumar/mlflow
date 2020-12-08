@@ -44,7 +44,6 @@ from mlflow.utils.autologging_utils import (
     autologging_integration,
     safe_patch,
     PatchFunction,
-    with_cleanup_autologging_run_on_exception,
 )
 from mlflow.entities import Metric
 from mlflow.tracking._model_registry import DEFAULT_AWAIT_MAX_SLEEP_SECONDS
@@ -1035,7 +1034,8 @@ def autolog(every_n_iter=100, log_models=True, disable=False):
         FLAVOR_NAME,
         tensorflow.keras.Model,
         "fit",
-        with_cleanup_autologging_run_on_exception(FitPatch),
+        FitPatch,
+        manage_run=True,
     )
 
     def fit_generator(self, *args, **kwargs):

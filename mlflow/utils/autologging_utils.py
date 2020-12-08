@@ -30,7 +30,7 @@ def try_mlflow_log(fn, *args, **kwargs):
     Catch exceptions and log a warning to avoid autolog throwing.
     """
     try:
-        fn(*args, **kwargs)
+        return fn(*args, **kwargs)
     except Exception as e:  # pylint: disable=broad-except
         warnings.warn("Logging to MLflow failed: " + str(e), stacklevel=2)
 
@@ -473,7 +473,75 @@ def with_cleanup_autologging_run_on_exception(patch_function):
         return patch_with_run_cleanup
 
 
-def safe_patch(autologging_integration, destination, function_name, patch_function):
+def with_managed_run(patch_function):
+    """
+    Given a `patch_function`, returns an `augmented_patch_function` that wraps the execution of 
+    `patch_function` with an active MLflow run. The following properties apply: 
+
+        - An MLflow run is only created if there is no active run present when the
+          patch function is executed
+
+        - If an active run is created by the `augmented_patch_function`, it is terminated
+          with the `FINISHED` state at the end of function execution
+
+        - If an active run is created by the `augmented_patch_function`, it is terminated
+          with the `FAILED` if an unhandled exception is thrown during function execution
+
+    Note that, if nested runs or non-fluent runs are created by `patch_function`, `patch_function`
+    is responsible for terminating them by the time it terminates (or in the event of an exception).
+
+    :param patch_function: A `PatchFunction` class definition or a function object
+                           compatible with `safe_patch`.
+    """
+
+    if inspect.isclass(patch_function):
+
+        class PatchWithManagedRun(patch_function):
+            def __init__(self):
+                super(PatchWithManagedRun, self).__init__()
+                self.managed_run = None
+
+            def _patch_implementation(self, original, *args, **kwargs):
+                if not mlflow.active_run():
+                    self.managed_run = try_mlflow_log(mlflow.start_run)
+
+                result = super(PatchWithManagedRun, self)._patch_implementation(
+                    original, *args, **kwargs
+                )
+                
+                if self.managed_run:
+                    try_mlflow_log(mlflow.end_run, RunStatus.to_string(RunStatus.FINISHED))
+
+                return result
+
+            def _on_exception(self, e):
+                super(PatchWithManagedRun, self)._on_exception(e)
+                if self.managed_run:
+                    try_mlflow_log(mlflow.end_run, RunStatus.to_string(RunStatus.FAILED))
+
+        return PatchWithManagedRun
+
+    else:
+
+        def patch_with_managed_run(original, *args, **kwargs):
+            managed_run = None
+            if not mlflow.active_run():
+                managed_run = try_mlflow_log(mlflow.start_run)
+
+            try:
+                result = patch_function(original, *args, **kwargs)
+            except:
+                try_mlflow_log(mlflow.end_run, RunStatus.to_string(RunStatus.FAILED))
+                raise
+            else:
+                if managed_run:
+                    try_mlflow_log(mlflow.end_run, RunStatus.to_string(RunStatus.FINISHED))
+                return result
+
+        return patch_with_managed_run
+
+
+def safe_patch(autologging_integration, destination, function_name, patch_function, manage_run=False):
     """
     Patches the specified `function_name` on the specified `destination` class for autologging
     purposes, replacing its implementation with an error-safe copy of the specified patch
@@ -495,7 +563,15 @@ def safe_patch(autologging_integration, destination, function_name, patch_functi
                      should be reserved for an `original` method argument representing the
                      underlying / original function. Subsequent arguments should be identical to
                      those of the original function being patched.
+    :param manage_run: If `True`, applies the `with_managed_run` wrapper to the specified 
+                       `patch_function`, which automatically creates & terminates an MLflow
+                       active run during patch code execution if necessary. If `False`,
+                       does not apply the `with_managed_run` wrapper to the specified
+                       `patch_function`.
     """
+    if manage_run:
+        patch_function = with_managed_run(patch_function)
+
     patch_is_class = inspect.isclass(patch_function)
     if patch_is_class:
         assert issubclass(patch_function, PatchFunction)

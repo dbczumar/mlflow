@@ -367,12 +367,6 @@ def autolog(
 
             return callback
 
-        if not mlflow.active_run():
-            try_mlflow_log(mlflow.start_run)
-            auto_end_run = True
-        else:
-            auto_end_run = False
-
         def log_feature_importance_plot(features, importance, importance_type):
             """
             Log feature importance plot.
@@ -523,9 +517,7 @@ def autolog(
                 input_example=input_example,
             )
 
-        if auto_end_run:
-            try_mlflow_log(mlflow.end_run)
         return model
 
     safe_patch(FLAVOR_NAME, xgboost, "train", train)
-    safe_patch(FLAVOR_NAME, xgboost.DMatrix, "__init__", __init__)
+    safe_patch(FLAVOR_NAME, xgboost.DMatrix, "__init__", __init__, manage_run=True)

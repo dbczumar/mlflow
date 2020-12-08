@@ -727,12 +727,6 @@ def autolog(log_models=True, disable=False):
                     metrics_logger.record_metrics(restored_metrics, last_epoch)
 
     def _run_and_log_function(self, original, args, kwargs, unlogged_params, callback_arg_index):
-        if not mlflow.active_run():
-            try_mlflow_log(mlflow.start_run)
-            auto_end_run = True
-        else:
-            auto_end_run = False
-
         log_fn_args_as_params(original, args, kwargs, unlogged_params)
         early_stop_callback = None
 
@@ -757,9 +751,6 @@ def autolog(log_models=True, disable=False):
 
             _log_early_stop_callback_metrics(early_stop_callback, history, metrics_logger)
 
-        if auto_end_run:
-            try_mlflow_log(mlflow.end_run)
-
         return history
 
     def fit(original, self, *args, **kwargs):
@@ -776,10 +767,10 @@ def autolog(log_models=True, disable=False):
         unlogged_params = ["self", "generator", "callbacks", "validation_data", "verbose"]
         return _run_and_log_function(self, original, args, kwargs, unlogged_params, 4)
 
-    safe_patch(FLAVOR_NAME, keras.Model, "fit", fit)
+    safe_patch(FLAVOR_NAME, keras.Model, "fit", fit, manage_run=True)
     # `fit_generator()` is deprecated in Keras >= 2.4.0 and simply wraps `fit()`.
     # To avoid unintentional creation of nested MLflow runs caused by a patched
     # `fit_generator()` method calling a patched `fit()` method, we only patch
     # `fit_generator()` in Keras < 2.4.0.
     if LooseVersion(keras.__version__) < LooseVersion("2.4.0"):
-        safe_patch(FLAVOR_NAME, keras.Model, "fit_generator", fit_generator)
+        safe_patch(FLAVOR_NAME, keras.Model, "fit_generator", fit_generator, manage_run=True)

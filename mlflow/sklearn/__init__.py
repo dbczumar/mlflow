@@ -34,7 +34,6 @@ from mlflow.utils.model_utils import _get_flavor_configuration
 from mlflow.utils.autologging_utils import (
     autologging_integration,
     safe_patch,
-    with_cleanup_autologging_run_on_exception,
     try_mlflow_log,
     INPUT_EXAMPLE_SAMPLE_ROWS,
     resolve_input_example_and_signature,
@@ -758,19 +757,9 @@ def autolog(log_input_examples=False, log_model_signatures=True, log_models=True
         referred to be `func_name` on the instance of `clazz` referred to by `self` & records
         MLflow parameters, metrics, tags, and artifacts to a corresponding MLflow Run.
         """
-        should_start_run = mlflow.active_run() is None
-        if should_start_run:
-            try_mlflow_log(mlflow.start_run)
-
         _log_pretraining_metadata(self, *args, **kwargs)
-
         fit_output = original(self, *args, **kwargs)
-
         _log_posttraining_metadata(self, *args, **kwargs)
-
-        if should_start_run:
-            try_mlflow_log(mlflow.end_run)
-
         return fit_output
 
     def _log_pretraining_metadata(estimator, *args, **kwargs):  # pylint: disable=unused-argument
@@ -991,5 +980,6 @@ def autolog(log_input_examples=False, log_model_signatures=True, log_models=True
                     FLAVOR_NAME,
                     class_def,
                     func_name,
-                    with_cleanup_autologging_run_on_exception(patched_fit),
+                    patched_fit,
+                    manage_run=True,
                 )
