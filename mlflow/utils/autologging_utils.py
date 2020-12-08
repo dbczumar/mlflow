@@ -541,7 +541,9 @@ def with_managed_run(patch_function):
         return patch_with_managed_run
 
 
-def safe_patch(autologging_integration, destination, function_name, patch_function, manage_run=False):
+def safe_patch(
+    autologging_integration, destination, function_name, patch_function, manage_run=False
+):
     """
     Patches the specified `function_name` on the specified `destination` class for autologging
     purposes, replacing its implementation with an error-safe copy of the specified patch

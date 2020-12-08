@@ -1031,11 +1031,7 @@ def autolog(every_n_iter=100, log_models=True, disable=False):
                 shutil.rmtree(self.log_dir.location)
 
     safe_patch(
-        FLAVOR_NAME,
-        tensorflow.keras.Model,
-        "fit",
-        FitPatch,
-        manage_run=True,
+        FLAVOR_NAME, tensorflow.keras.Model, "fit", FitPatch, manage_run=True,
     )
 
     def fit_generator(self, *args, **kwargs):

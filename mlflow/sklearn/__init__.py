@@ -977,9 +977,5 @@ def autolog(log_input_examples=False, log_model_signatures=True, log_models=True
                     continue
 
                 safe_patch(
-                    FLAVOR_NAME,
-                    class_def,
-                    func_name,
-                    patched_fit,
-                    manage_run=True,
+                    FLAVOR_NAME, class_def, func_name, patched_fit, manage_run=True,
                 )
