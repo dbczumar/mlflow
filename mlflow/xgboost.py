@@ -519,5 +519,5 @@ def autolog(
 
         return model
 
-    safe_patch(FLAVOR_NAME, xgboost, "train", train)
-    safe_patch(FLAVOR_NAME, xgboost.DMatrix, "__init__", __init__, manage_run=True)
+    safe_patch(FLAVOR_NAME, xgboost, "train", train, manage_run=True)
+    safe_patch(FLAVOR_NAME, xgboost.DMatrix, "__init__", __init__)
