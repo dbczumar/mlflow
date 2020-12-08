@@ -475,8 +475,8 @@ def with_cleanup_autologging_run_on_exception(patch_function):
 
 def with_managed_run(patch_function):
     """
-    Given a `patch_function`, returns an `augmented_patch_function` that wraps the execution of 
-    `patch_function` with an active MLflow run. The following properties apply: 
+    Given a `patch_function`, returns an `augmented_patch_function` that wraps the execution of
+    `patch_function` with an active MLflow run. The following properties apply:
 
         - An MLflow run is only created if there is no active run present when the
           patch function is executed
@@ -508,7 +508,7 @@ def with_managed_run(patch_function):
                 result = super(PatchWithManagedRun, self)._patch_implementation(
                     original, *args, **kwargs
                 )
-                
+
                 if self.managed_run:
                     try_mlflow_log(mlflow.end_run, RunStatus.to_string(RunStatus.FINISHED))
 
@@ -563,7 +563,7 @@ def safe_patch(autologging_integration, destination, function_name, patch_functi
                      should be reserved for an `original` method argument representing the
                      underlying / original function. Subsequent arguments should be identical to
                      those of the original function being patched.
-    :param manage_run: If `True`, applies the `with_managed_run` wrapper to the specified 
+    :param manage_run: If `True`, applies the `with_managed_run` wrapper to the specified
                        `patch_function`, which automatically creates & terminates an MLflow
                        active run during patch code execution if necessary. If `False`,
                        does not apply the `with_managed_run` wrapper to the specified
