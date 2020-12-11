@@ -426,6 +426,20 @@ class PatchFunction:
                 raise e
 
 
+class _AutologgingSessionManager:
+    _session = False
+
+    @classmethod
+    def start_session(cls):
+        cls._session = True
+
+    @classmethod
+    def active_session(cls):
+        return cls._session
+
+
+
+
 def with_managed_run(patch_function):
     """
     Given a `patch_function`, returns an `augmented_patch_function` that wraps the execution of
@@ -565,6 +579,37 @@ def safe_patch(
         # Whether or not an exception was raised from within the original / underlying function
         # during the execution of patched code
         failed_during_original = False
+        # Whether or not to exclude auto-autologged content from content explicitly logged via
+        # `mlflow.start_run()`
+        exclusive = config.get("exclusive", False)
+
+        active_run = mlflow.active_run()
+
+        if active_run and exclusive and not _AutologgingSessionManager.active_session():
+            return original(*args, **kwargs)
+
+        # if active_run:
+        #   # there is an active run. could have been produced via user mlflow.start_run() OR a
+        #   # previously invoked, patched function.
+        #     if came from user (equivalent to "are we not in an autologging session?"):
+        #         if exclusive:
+        #             # dont patch the function; run original function. we dont want new content to be added
+        #             # to the run, or a child run to be created.
+        #             return original
+        #         else:
+        #             # carry on, patch the function, let the autologged content be added to that run
+        #             pass
+        #     else:
+        #         # must have come from us. patch function
+        #         pass
+        # else:
+        #     # need to start a run. patch function
+        #     pass
+
+        # Marker for all future function patches that will have to go through this process;
+        # now, when a run is active for those functions, they know it came from autologging and not from
+        # user, so they can go ahead and patch
+        _AutologgingSessionManager.start_session()
 
         try:
 
