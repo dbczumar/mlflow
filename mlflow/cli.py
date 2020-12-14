@@ -459,7 +459,7 @@ def gc(backend_store_uri, run_ids):
         print("Run with ID %s has been permanently deleted." % str(run_id))
 
 
-def add_commands(cli):
+def _add_commands(cli):
     cli.add_command(mlflow.store.artifact.cli.commands)
     cli.add_command(mlflow.models.cli.commands)
     cli.add_command(mlflow.deployments.cli.commands)
@@ -487,6 +487,8 @@ def add_commands(cli):
     except (ImportError, ModuleNotFoundError) as e:
         _logger.warning("Failed to import mlflow.db with {}".format(e))
 
+
+_add_commands(cli)
 
 if __name__ == "__main__":
     cli()
