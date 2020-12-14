@@ -463,21 +463,21 @@ def _add_commands(cli):
 
         cli.add_command(mlflow.sagemaker.cli.commands)
     except (ImportError, ModuleNotFoundError) as e:
-        _logger.warning("Failed to import mlflow.sagemaker.cli with %." % e)
+        _logger.warning("Failed to import mlflow.sagemaker.cli with %s.", e)
 
     try:
         import mlflow.azureml.cli
 
         cli.add_command(mlflow.azureml.cli.commands)
     except (ImportError, ModuleNotFoundError) as e:
-        _logger.warning("Failed to import mlflow.azureml.cli with {}".format(e))
+        _logger.warning("Failed to import mlflow.azureml.cli with %s.", e)
 
     try:
         import mlflow.db
 
         cli.add_command(mlflow.db.commands)
     except (ImportError, ModuleNotFoundError) as e:
-        _logger.warning("Failed to import mlflow.db with {}".format(e))
+        _logger.warning("Failed to import mlflow.db with %s.", e)
 
 
 _add_commands(cli)
