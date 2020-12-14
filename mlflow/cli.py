@@ -436,8 +436,8 @@ def gc(backend_store_uri, run_ids):
         run = backend_store.get_run(run_id)
         if run.info.lifecycle_stage != LifecycleStage.DELETED:
             raise MlflowException(
-                "Run {} is not in `deleted` lifecycle stage. Only runs in "
-                "`deleted` lifecycle stage can be deleted.".format(run_id)
+                "Run % is not in `deleted` lifecycle stage. Only runs in "
+                "`deleted` lifecycle stage can be deleted." % run_id
             )
         artifact_repo = get_artifact_repository(run.info.artifact_uri)
         artifact_repo.delete_artifacts()
@@ -463,7 +463,7 @@ def _add_commands(cli):
 
         cli.add_command(mlflow.sagemaker.cli.commands)
     except (ImportError, ModuleNotFoundError) as e:
-        _logger.warning("Failed to import mlflow.sagemaker.cli with {}".format(e))
+        _logger.warning("Failed to import mlflow.sagemaker.cli with %." % e)
 
     try:
         import mlflow.azureml.cli
