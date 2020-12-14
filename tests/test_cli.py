@@ -3,23 +3,11 @@ from unittest import mock
 import numpy as np
 import os
 import pandas as pd
-import pytest
 import shutil
 import tempfile
 import textwrap
-import time
-import subprocess
 
-from urllib.request import url2pathname
-from urllib.parse import urlparse, unquote
-
-from mlflow.cli import run, server, ui
-from mlflow.server import handlers
 from mlflow import experiments
-from mlflow.store.tracking.sqlalchemy_store import SqlAlchemyStore
-from mlflow.store.tracking.file_store import FileStore
-from mlflow.exceptions import MlflowException
-from mlflow.entities import ViewType
 
 
 def test_csv_generation():
