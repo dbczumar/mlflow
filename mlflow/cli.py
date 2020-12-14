@@ -6,13 +6,7 @@ import logging
 import click
 from click import UsageError
 
-import mlflow.experiments
-import mlflow.models.cli
-import mlflow.deployments.cli
 import mlflow.projects as projects
-import mlflow.runs
-import mlflow.store.artifact.cli
-import mlflow.store.db.utils
 from mlflow import tracking
 from mlflow.store.tracking import DEFAULT_LOCAL_FILE_AND_ARTIFACT_PATH
 from mlflow.store.artifact.artifact_repository_registry import get_artifact_repository
@@ -460,6 +454,12 @@ def gc(backend_store_uri, run_ids):
 
 
 def _add_commands(cli):
+    import mlflow.experiments
+    import mlflow.models.cli
+    import mlflow.store.artifact.cli
+    import mlflow.deployments.cli
+    import mlflow.runs
+
     cli.add_command(mlflow.store.artifact.cli.commands)
     cli.add_command(mlflow.models.cli.commands)
     cli.add_command(mlflow.deployments.cli.commands)
@@ -468,21 +468,18 @@ def _add_commands(cli):
 
     try:
         import mlflow.sagemaker.cli
-
         cli.add_command(mlflow.sagemaker.cli.commands)
     except (ImportError, ModuleNotFoundError) as e:
         _logger.warning("Failed to import mlflow.sagemaker.cli with {}".format(e))
 
     try:
         import mlflow.azureml.cli
-
         cli.add_command(mlflow.azureml.cli.commands)
     except (ImportError, ModuleNotFoundError) as e:
         _logger.warning("Failed to import mlflow.azureml.cli with {}".format(e))
 
     try:
         import mlflow.db
-
         cli.add_command(mlflow.db.commands)
     except (ImportError, ModuleNotFoundError) as e:
         _logger.warning("Failed to import mlflow.db with {}".format(e))
