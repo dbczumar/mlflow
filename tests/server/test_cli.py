@@ -84,9 +84,7 @@ def test_tracking_uri_validation_sql_driver_uris(command):
         tracking_store_mock.assert_called_once_with(
             "mysql+pymysql://user:pwd@host:5432/mydb", "./mlruns"
         )
-        registry_store_mock.assert_called_once_with(
-            "mysql+pymysql://user:pwd@host:5432/mydb"
-        )
+        registry_store_mock.assert_called_once_with("mysql+pymysql://user:pwd@host:5432/mydb")
         run_server_mock.assert_called()
 
 
@@ -129,9 +127,7 @@ def test_mlflow_gc_sqlite(sqlite_store):
     run = _create_run_in_store(store)
     store.delete_run(run.info.run_uuid)
     subprocess.check_output(["mlflow", "gc", "--backend-store-uri", sqlite_store[1]])
-    runs = store.search_runs(
-        experiment_ids=["0"], filter_string="", run_view_type=ViewType.ALL
-    )
+    runs = store.search_runs(experiment_ids=["0"], filter_string="", run_view_type=ViewType.ALL)
     assert len(runs) == 0
     with pytest.raises(MlflowException):
         store.get_run(run.info.run_uuid)
@@ -142,9 +138,7 @@ def test_mlflow_gc_file_store(file_store):
     run = _create_run_in_store(store)
     store.delete_run(run.info.run_uuid)
     subprocess.check_output(["mlflow", "gc", "--backend-store-uri", file_store[1]])
-    runs = store.search_runs(
-        experiment_ids=["0"], filter_string="", run_view_type=ViewType.ALL
-    )
+    runs = store.search_runs(experiment_ids=["0"], filter_string="", run_view_type=ViewType.ALL)
     assert len(runs) == 0
     with pytest.raises(MlflowException):
         store.get_run(run.info.run_uuid)
@@ -155,18 +149,9 @@ def test_mlflow_gc_file_store_passing_explicit_run_ids(file_store):
     run = _create_run_in_store(store)
     store.delete_run(run.info.run_uuid)
     subprocess.check_output(
-        [
-            "mlflow",
-            "gc",
-            "--backend-store-uri",
-            file_store[1],
-            "--run-ids",
-            run.info.run_uuid,
-        ]
+        ["mlflow", "gc", "--backend-store-uri", file_store[1], "--run-ids", run.info.run_uuid]
     )
-    runs = store.search_runs(
-        experiment_ids=["0"], filter_string="", run_view_type=ViewType.ALL
-    )
+    runs = store.search_runs(experiment_ids=["0"], filter_string="", run_view_type=ViewType.ALL)
     assert len(runs) == 0
     with pytest.raises(MlflowException):
         store.get_run(run.info.run_uuid)
@@ -177,16 +162,7 @@ def test_mlflow_gc_not_deleted_run(file_store):
     run = _create_run_in_store(store)
     with pytest.raises(subprocess.CalledProcessError):
         subprocess.check_output(
-            [
-                "mlflow",
-                "gc",
-                "--backend-store-uri",
-                file_store[1],
-                "--run-ids",
-                run.info.run_uuid,
-            ]
+            ["mlflow", "gc", "--backend-store-uri", file_store[1], "--run-ids", run.info.run_uuid]
         )
-    runs = store.search_runs(
-        experiment_ids=["0"], filter_string="", run_view_type=ViewType.ALL
-    )
+    runs = store.search_runs(experiment_ids=["0"], filter_string="", run_view_type=ViewType.ALL)
     assert len(runs) == 1
