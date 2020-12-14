@@ -12,7 +12,9 @@ from mlflow import cli
 from mlflow.tracking.client import MlflowClient
 from mlflow.utils import process
 from tests.integration.utils import invoke_cli_runner
-from tests.projects.utils import docker_example_base_image  # pylint: disable=unused-import
+from tests.projects.utils import (
+    docker_example_base_image,
+)  # pylint: disable=unused-import
 from tests.projects.utils import (
     TEST_PROJECT_DIR,
     GIT_PROJECT_URI,
@@ -45,14 +47,20 @@ def test_run_local_params(name):
 
 
 @pytest.mark.large
-def test_run_local_with_docker_args(docker_example_base_image):  # pylint: disable=unused-argument
+def test_run_local_with_docker_args(
+    docker_example_base_image,
+):  # pylint: disable=unused-argument
     # Verify that Docker project execution is successful when Docker flag and string
     # commandline arguments are supplied (`tty` and `name`, respectively)
-    invoke_cli_runner(cli.run, [TEST_DOCKER_PROJECT_DIR, "-A", "tty", "-A", "name=mycontainer"])
+    invoke_cli_runner(
+        cli.run, [TEST_DOCKER_PROJECT_DIR, "-A", "tty", "-A", "name=mycontainer"]
+    )
 
 
 @pytest.mark.large
-@pytest.mark.parametrize("experiment_name", [b"test-experiment".decode("utf-8"), "test-experiment"])
+@pytest.mark.parametrize(
+    "experiment_name", [b"test-experiment".decode("utf-8"), "test-experiment"]
+)
 def test_run_local_experiment_specification(experiment_name):
     invoke_cli_runner(
         cli.run,
@@ -72,7 +80,15 @@ def test_run_local_experiment_specification(experiment_name):
 
     invoke_cli_runner(
         cli.run,
-        [TEST_PROJECT_DIR, "-e", "greeter", "-P", "name=test", "--experiment-id", experiment_id],
+        [
+            TEST_PROJECT_DIR,
+            "-e",
+            "greeter",
+            "-P",
+            "name=test",
+            "--experiment-id",
+            experiment_id,
+        ],
     )
 
 
@@ -88,7 +104,9 @@ def clean_mlruns_dir():
 def test_run_local_conda_env():
     with open(os.path.join(TEST_PROJECT_DIR, "conda.yaml"), "r") as handle:
         conda_env_contents = handle.read()
-    expected_env_name = "mlflow-%s" % hashlib.sha1(conda_env_contents.encode("utf-8")).hexdigest()
+    expected_env_name = (
+        "mlflow-%s" % hashlib.sha1(conda_env_contents.encode("utf-8")).hexdigest()
+    )
     try:
         process.exec_cmd(cmd=["conda", "env", "remove", "--name", expected_env_name])
     except process.ShellCommandException:
@@ -99,7 +117,13 @@ def test_run_local_conda_env():
         )
     invoke_cli_runner(
         cli.run,
-        [TEST_PROJECT_DIR, "-e", "check_conda_env", "-P", "conda_env_name=%s" % expected_env_name],
+        [
+            TEST_PROJECT_DIR,
+            "-e",
+            "check_conda_env",
+            "-P",
+            "conda_env_name=%s" % expected_env_name,
+        ],
     )
 
 
@@ -187,3 +211,32 @@ def test_run_databricks_cluster_spec(tmpdir):
             env={"MLFLOW_TRACKING_URI": "databricks://profile"},
         )
         assert res.exit_code != 0
+
+
+def test_mlflow_run():
+    with mock.patch("mlflow.cli.projects") as mock_projects:
+        result = CliRunner().invoke(cli.run)
+        mock_projects.run.assert_not_called()
+        assert "Missing argument 'URI'" in result.output
+
+    with mock.patch("mlflow.cli.projects") as mock_projects:
+        CliRunner().invoke(cli.run, ["project_uri"])
+        mock_projects.run.assert_called_once()
+
+    with mock.patch("mlflow.cli.projects") as mock_projects:
+        CliRunner().invoke(cli.run, ["--experiment-id", "5", "project_uri"])
+        mock_projects.run.assert_called_once()
+
+    with mock.patch("mlflow.cli.projects") as mock_projects:
+        CliRunner().invoke(cli.run, ["--experiment-name", "random name", "project_uri"])
+        mock_projects.run.assert_called_once()
+
+    with mock.patch("mlflow.cli.projects") as mock_projects:
+        result = CliRunner().invoke(
+            cli.run, ["--experiment-id", "51", "--experiment-name", "name blah", "uri"]
+        )
+        mock_projects.run.assert_not_called()
+        assert (
+            "Specify only one of 'experiment-name' or 'experiment-id' options."
+            in result.output
+        )

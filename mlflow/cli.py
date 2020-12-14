@@ -6,14 +6,11 @@ import logging
 import click
 from click import UsageError
 
-import mlflow.azureml.cli
-import mlflow.db
 import mlflow.experiments
 import mlflow.models.cli
 import mlflow.deployments.cli
 import mlflow.projects as projects
 import mlflow.runs
-import mlflow.sagemaker.cli
 import mlflow.store.artifact.cli
 import mlflow.store.db.utils
 from mlflow import tracking
@@ -283,7 +280,9 @@ def ui(backend_store_uri, default_artifact_root, port, host):
     try:
         _run_server(backend_store_uri, default_artifact_root, host, port, None, 1)
     except ShellCommandException:
-        eprint("Running the mlflow server failed. Please see the logs above for details.")
+        eprint(
+            "Running the mlflow server failed. Please see the logs above for details."
+        )
         sys.exit(1)
 
 
@@ -336,7 +335,9 @@ def _validate_static_prefix(ctx, param, value):  # pylint: disable=unused-argume
     help="Additional command line options forwarded to gunicorn processes.",
 )
 @click.option(
-    "--waitress-opts", default=None, help="Additional command line options for waitress-serve."
+    "--waitress-opts",
+    default=None,
+    help="Additional command line options for waitress-serve.",
 )
 @click.option(
     "--expose-prometheus",
@@ -367,7 +368,9 @@ def server(
     from mlflow.server import _run_server
     from mlflow.server.handlers import initialize_backend_stores
 
-    _validate_server_args(gunicorn_opts=gunicorn_opts, workers=workers, waitress_opts=waitress_opts)
+    _validate_server_args(
+        gunicorn_opts=gunicorn_opts, workers=workers, waitress_opts=waitress_opts
+    )
 
     # Ensure that both backend_store_uri and default_artifact_uri are set correctly.
     if not backend_store_uri:
@@ -403,7 +406,9 @@ def server(
             expose_prometheus,
         )
     except ShellCommandException:
-        eprint("Running the mlflow server failed. Please see the logs above for details.")
+        eprint(
+            "Running the mlflow server failed. Please see the logs above for details."
+        )
         sys.exit(1)
 
 
@@ -454,14 +459,34 @@ def gc(backend_store_uri, run_ids):
         print("Run with ID %s has been permanently deleted." % str(run_id))
 
 
-cli.add_command(mlflow.models.cli.commands)
-cli.add_command(mlflow.deployments.cli.commands)
-cli.add_command(mlflow.sagemaker.cli.commands)
-cli.add_command(mlflow.experiments.commands)
-cli.add_command(mlflow.store.artifact.cli.commands)
-cli.add_command(mlflow.azureml.cli.commands)
-cli.add_command(mlflow.runs.commands)
-cli.add_command(mlflow.db.commands)
+def add_commands(cli):
+    cli.add_command(mlflow.store.artifact.cli.commands)
+    cli.add_command(mlflow.models.cli.commands)
+    cli.add_command(mlflow.deployments.cli.commands)
+    cli.add_command(mlflow.experiments.commands)
+    cli.add_command(mlflow.runs.commands)
+
+    try:
+        import mlflow.sagemaker.cli
+
+        cli.add_command(mlflow.sagemaker.cli.commands)
+    except (ImportError, ModuleNotFoundError) as e:
+        _logger.warning("Failed to import mlflow.sagemaker.cli with {}".format(e))
+
+    try:
+        import mlflow.azureml.cli
+
+        cli.add_command(mlflow.azureml.cli.commands)
+    except (ImportError, ModuleNotFoundError) as e:
+        _logger.warning("Failed to import mlflow.azureml.cli with {}".format(e))
+
+    try:
+        import mlflow.db
+
+        cli.add_command(mlflow.db.commands)
+    except (ImportError, ModuleNotFoundError) as e:
+        _logger.warning("Failed to import mlflow.db with {}".format(e))
+
 
 if __name__ == "__main__":
     cli()
