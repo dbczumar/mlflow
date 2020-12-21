@@ -1107,7 +1107,7 @@ def _augment_mlflow_warnings(autologging_integration):
                 message,
             )
         else:
-            original_showwarning(message, category, filename, *args, **kwargs)
+            original_showwarning(message, category, filename, lineno, *args, **kwargs)
 
     try:
         # NB: Reassigning `warnings.showwarning` is the standard / recommended approach for
