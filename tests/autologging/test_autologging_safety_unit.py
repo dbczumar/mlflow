@@ -5,6 +5,7 @@ import copy
 import inspect
 import os
 import pytest
+import warnings
 from collections import namedtuple
 from unittest import mock
 
@@ -732,6 +733,66 @@ def test_safe_patch_makes_expected_event_logging_calls_when_original_function_th
     patch_start, original_start, original_error = mock_event_logger.calls
     assert patch_start.exception is original_start.exception is None
     assert original_error.exception == exc_to_raise
+
+
+def test_safe_patch_augments_mlflow_warnings_and_preserves_others(
+    patch_destination, test_autologging_integration
+):
+    """
+    MLflow routines called by autologging patch code may issue warnings via the `warnings.warn`
+    API. In many cases, the user cannot remediate the cause of these warnings because
+    they result from the autologging patch implementation, rather than a user-facing API call.
+
+    This test case verifies that, for user clarity, such MLflow warnings are augmented with
+    context about their origin (i.e. MLflow's autologging patch implementation, rather than
+    user behavior) during autologging patch code execution.
+    """
+    mlflow_warning_kwargs = {
+        "message": "Mock MLflow warning",
+        "category": UserWarning,
+        "filename": mlflow.__file__,
+        "lineno": 7,
+    }
+    external_warning_kwargs = {
+        "message": "Mock external warning",
+        "category": UserWarning,
+        "filename": "/some/tensorflow/module.py",
+        "lineno": 14,
+    }
+
+    def patch_impl(original, *args, **kwargs):
+        warnings.warn_explicit(**mlflow_warning_kwargs)
+        warnings.warn_explicit(**external_warning_kwargs)
+
+    safe_patch(test_autologging_integration, patch_destination, "fn", patch_impl)
+
+    with pytest.warns(UserWarning) as user_warnings_from_patch, mock.patch(
+        "mlflow.utils.autologging_utils._logger.warning"
+    ) as logger_mock:
+        patch_destination.fn()
+
+    assert len(user_warnings_from_patch) == 1
+    # Verify that the warning message (which is the first argument to the UserWarning)
+    # issued via the standard warning mechanism (i.e. printing to `sys.stderr`) corresponds
+    # to the external warning
+    assert user_warnings_from_patch[0].message.args[0] == "Mock external warning"
+
+    # Verify that the warning message routed to the MLflow logger corresponds to the MLflow warning
+    assert logger_mock.call_count == 1
+    logger_warn_args = logger_mock.call_args[0]
+    message = logger_warn_args[0]
+    formatting_args = logger_warn_args[1:]
+    assert "Mock MLflow warning" in (message % formatting_args)
+
+    with pytest.warns(UserWarning) as user_warnings_outside_patch:
+        warnings.warn_explicit(**mlflow_warning_kwargs)
+        warnings.warn_explicit(**external_warning_kwargs)
+
+    # Verify that MLflow warnings and external warnings are emitted as normal outside
+    # of autologging patch execution
+    assert set([warning.message.args[0] for warning in user_warnings_outside_patch]) == set(
+        ["Mock MLflow warning", "Mock external warning"]
+    )
 
 
 @pytest.mark.usefixtures(test_mode_off.__name__)
