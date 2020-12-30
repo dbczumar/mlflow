@@ -748,7 +748,9 @@ def _setup_callbacks(lst, log_models, metrics_logger):
 
         def on_train_end(self, logs=None):  # pylint: disable=unused-argument
             if log_models:
-                try_mlflow_log(mlflow.keras.log_model, self.model, artifact_path="model")
+                try_mlflow_log(
+                    mlflow.keras.log_model, self.model, artifact_path="model", save_format="tf"
+                )
 
     class __MLflowTfKeras2Callback(Callback, metaclass=ExceptionSafeClass):
         """
@@ -789,7 +791,9 @@ def _setup_callbacks(lst, log_models, metrics_logger):
 
         def on_train_end(self, logs=None):  # pylint: disable=unused-argument
             if log_models:
-                try_mlflow_log(mlflow.keras.log_model, self.model, artifact_path="model")
+                try_mlflow_log(
+                    mlflow.keras.log_model, self.model, artifact_path="model", save_format="tf"
+                )
 
     tb = _get_tensorboard_callback(lst)
     if tb is None:
