@@ -913,6 +913,12 @@ def autolog(
 
         result = original(self, *args, **kwargs)
 
+        import os
+        for fname in os.listdir(self.model_dir):
+            if "tfevents" in fname:
+                full_tf_event_log_path = os.path.join(self.model_dir, fname)
+                mlflow.log_artifact(full_tf_event_log_path, "tensorboard_logs")
+
         return result
 
     def export_saved_model(original, self, *args, **kwargs):
