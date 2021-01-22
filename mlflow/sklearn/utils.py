@@ -725,7 +725,7 @@ def _is_plotting_supported():
     return LooseVersion(sklearn.__version__) >= LooseVersion("0.22.0")
 
 
-def _all_estimators():
+def _all_sklearn_estimators():
     try:
         from sklearn.utils import all_estimators
 
@@ -734,7 +734,56 @@ def _all_estimators():
         return _backported_all_estimators()
 
 
-def _backported_all_estimators(type_filter=None):
+def _all_xgboost_estimators():
+    """
+    Get a list of all scikit-learn-compatible estimators from XGBoost
+    (for example, `xgboost.sklearn.XGBoostRegressor`).
+
+    This is adapted from `all_estimators` in scikit-learn 0.23.2:
+    https://github.com/scikit-learn/scikit-learn/blob/0.23.2/sklearn/utils/__init__.py#L1146
+
+    :return: estimators : A list of (name, class) tuples, where ``name`` is the estimator class
+                          name as a string and ``class`` is the estimator class itself.
+    """
+    import pkgutil
+    import xgboost
+    from importlib import import_module
+    from operator import itemgetter
+    from sklearn.base import BaseEstimator
+
+    def is_abstract(c):
+        if not (hasattr(c, "__abstractmethods__")):
+            return False
+        if not len(c.__abstractmethods__):
+            return False
+        return True
+
+    all_classes = []
+    # modules_to_ignore = {"tests", "externals", "setup", "conftest"}
+    modules_to_ignore = {}
+    root = xgboost.__path__[0]  # xgboost package
+    for _, modname, _ in pkgutil.walk_packages(path=[root], prefix="xgboost."):
+        mod_parts = modname.split(".")
+        if any(part in modules_to_ignore for part in mod_parts) or "._" in modname:
+            continue
+        module = import_module(modname)
+        classes = inspect.getmembers(module, inspect.isclass)
+        classes = [(name, est_cls) for name, est_cls in classes if not name.startswith("_")]
+        all_classes.extend(classes)
+
+    all_classes = set(all_classes)
+    estimators = [
+        c for c in all_classes if (issubclass(c[1], BaseEstimator) and c[0] not in ["BaseEstimator", "XGBModelBase"])
+    ]
+    # get rid of abstract base classes
+    estimators = [c for c in estimators if not is_abstract(c[1])]
+    # drop duplicates, sort for reproducibility
+    # itemgetter is used to ensure the sort does not extend to the 2nd item of
+    # the tuple
+    return sorted(set(estimators), key=itemgetter(0))
+
+
+def _backported_all_sklearn_estimators(type_filter=None):
     """
     Backported from scikit-learn 0.23.2:
     https://github.com/scikit-learn/scikit-learn/blob/0.23.2/sklearn/utils/__init__.py#L1146
