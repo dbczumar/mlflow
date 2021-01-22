@@ -732,7 +732,8 @@ def autolog(
         _get_args_for_score,
         _log_specialized_estimator_content,
         _get_Xy,
-        _all_estimators,
+        _all_sklearn_estimators,
+        _all_xgboost_estimators,
         _truncate_dict,
         _get_arg_names,
         _get_estimator_info_tags,
@@ -932,7 +933,7 @@ def autolog(
             else:
                 return original(self, *args, **kwargs)
 
-    _, estimators_to_patch = zip(*_all_estimators())
+    _, estimators_to_patch = zip(*_all_sklearn_estimators())
     # Ensure that relevant meta estimators (e.g. GridSearchCV, Pipeline) are selected
     # for patching if they are not already included in the output of `all_estimators()`
     estimators_to_patch = set(estimators_to_patch).union(

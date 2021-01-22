@@ -731,7 +731,7 @@ def _all_sklearn_estimators():
 
         return all_estimators()
     except ImportError:
-        return _backported_all_estimators()
+        return _backported_all_sklearn_estimators()
 
 
 def _all_xgboost_estimators():
