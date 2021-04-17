@@ -32,6 +32,7 @@ from mlflow.utils.rest_utils import (
     extract_api_info_for_service,
     _REST_API_PATH_PREFIX,
 )
+from mlflow.utils.run_utils import get_artifact_root_uri_with_cache
 from mlflow.utils.uri import (
     extract_and_normalize_path,
     get_databricks_profile_uri_from_artifact_uri,
@@ -60,8 +61,6 @@ class DatabricksArtifactRepository(ArtifactRepository):
     The artifact_uri is expected to be of the form
     dbfs:/databricks/mlflow-tracking/<EXP_ID>/<RUN_ID>/
     """
-
-    _artifact_roots_cache = OrderedDict()
 
     def __init__(self, artifact_uri):
         if not is_valid_dbfs_uri(artifact_uri):
@@ -92,7 +91,7 @@ class DatabricksArtifactRepository(ArtifactRepository):
         # (the `run_relative_artifact_repo_root_path`). All operations performed on this artifact
         # repository will be performed relative to this computed location
         artifact_repo_root_path = extract_and_normalize_path(artifact_uri)
-        run_artifact_root_uri = self._get_run_artifact_root(self.run_id)
+        run_artifact_root_uri = get_artifact_root_uri_with_cache(self.run_id)
         run_artifact_root_path = extract_and_normalize_path(run_artifact_root_uri)
         run_relative_root_path = posixpath.relpath(
             path=artifact_repo_root_path, start=run_artifact_root_path
@@ -123,21 +122,6 @@ class DatabricksArtifactRepository(ArtifactRepository):
         endpoint, method = _SERVICE_AND_METHOD_TO_INFO[service][api]
         response_proto = api.Response()
         return call_endpoint(db_creds, endpoint, method, json_body, response_proto)
-
-    def _get_run_artifact_root(self, run_id):
-        cached_root = DatabricksArtifactRepository._artifact_roots_cache.get(run_id)
-        if cached_root is not None:
-            return cached_root
-        else:
-            json_body = message_to_json(GetRun(run_id=run_id))
-            run_response = self._call_endpoint(MlflowService, GetRun, json_body)
-            artifact_root = run_response.run.info.artifact_uri
-
-            # Cache the artifact root to avoid a future network call, removing the oldest
-            # entry in the cache if there are too many elements
-            if len(DatabricksArtifactRepository._artifact_roots_cache) > 1024:
-                DatabricksArtifactRepository.popitem(last=False)
-            DatabricksArtifactRepository._artifact_roots_cache[run_id] = artifact_root
 
     def _get_write_credentials(self, run_id, path=None):
         json_body = message_to_json(GetCredentialsForWrite(run_id=run_id, path=path))

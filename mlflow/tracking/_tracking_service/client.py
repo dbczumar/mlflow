@@ -20,6 +20,7 @@ from mlflow.utils.validation import (
 from mlflow.entities import Param, Metric, RunStatus, RunTag, ViewType, ExperimentTag
 from mlflow.store.artifact.artifact_repository_registry import get_artifact_repository
 from mlflow.utils.mlflow_tags import MLFLOW_USER
+from mlflow.utils.run_utils import get_artifact_root_uri_with_cache
 from mlflow.utils.string_utils import is_string_type
 from mlflow.utils.uri import add_databricks_profile_info_to_artifact_uri
 
@@ -255,9 +256,8 @@ class TrackingServiceClient(object):
         self.store.record_logged_model(run_id, mlflow_model)
 
     def _get_artifact_repo(self, run_id):
-        run = self.get_run(run_id)
         artifact_uri = add_databricks_profile_info_to_artifact_uri(
-            run.info.artifact_uri, self.tracking_uri
+            get_artifact_root_uri_with_cache(run_id), self.tracking_uri
         )
         return get_artifact_repository(artifact_uri)
 
