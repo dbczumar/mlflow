@@ -6,6 +6,7 @@ exposed in the :py:mod:`mlflow.tracking` module.
 
 import time
 import os
+from collections import namedtuple
 
 from mlflow.store.tracking import SEARCH_MAX_RESULTS_DEFAULT
 from mlflow.tracking._tracking_service import utils
@@ -22,6 +23,41 @@ from mlflow.store.artifact.artifact_repository_registry import get_artifact_repo
 from mlflow.utils.mlflow_tags import MLFLOW_USER
 from mlflow.utils.string_utils import is_string_type
 from mlflow.utils.uri import add_databricks_profile_info_to_artifact_uri
+from mlflow.utils.validation import (
+    MAX_PARAMS_TAGS_PER_BATCH,
+    MAX_METRICS_PER_BATCH,
+    MAX_ENTITIES_PER_BATCH,
+)
+
+
+_CreateRun = namedtuple('_CreateRun', ['experiment_id', 'user_id', 'start_time'])
+
+
+class _BufferedRun:
+
+    def __init__(self, run_id, create_run=None):
+        self.run_id = run_id
+        self.create_run = create_run
+        self.params = []
+        self.metrics = []
+        self.tags = []
+
+    def flush(self):
+        if self.create_run:
+            self.store.create_run(
+                experiment_id=self.create_run.experiment_id,
+                user_id=self.create_run.user_id,
+                start_time=self.start_time,
+                tags=tags[:MAX_PARAMS_TAGS_PER_BATCH],
+            )
+            tags = tags[MAX_PARAMS_TAGS_PER_BATCH:]
+
+        self.store.log_batch(
+            run_id=self.create_run.run_id,
+            metrics=self.metrics,
+            params=self.params,
+            tags=self.tags
+        )
 
 
 class TrackingServiceClient(object):
@@ -29,12 +65,24 @@ class TrackingServiceClient(object):
     Client of an MLflow Tracking Server that creates and manages experiments and runs.
     """
 
-    def __init__(self, tracking_uri):
+    def __init__(self, tracking_uri, buffered=False):
         """
         :param tracking_uri: Address of local or remote tracking server.
         """
         self.tracking_uri = tracking_uri
         self.store = utils._get_store(self.tracking_uri)
+        self.buffered = buffered
+        self.buffer = {}
+        # self.params_buffer = {}
+        # self.metrics_buffer = {}
+
+    def _log_to_buffer(self, run_id, params=None, metrics=None, tags=None, create_run=None):
+        if run_id not in self.buffer:
+            self.buffer[run_id] = _BufferedRun(run_id, create_run)
+
+        self.buffer[run_id].params += (params or [])
+        self.buffer[run_id].metrics += (metrics or [])
+        self.buffer[run_id].tags += (tags or [])
 
     def get_run(self, run_id):
         """
@@ -86,12 +134,23 @@ class TrackingServiceClient(object):
         # in a later release.
         user_id = tags.get(MLFLOW_USER, "unknown")
 
-        return self.store.create_run(
-            experiment_id=experiment_id,
-            user_id=user_id,
-            start_time=start_time or int(time.time() * 1000),
-            tags=[RunTag(key, value) for (key, value) in tags.items()],
-        )
+        if self.buffered:
+            self._log_to_buffer(
+                run_id,
+                create_run=_CreateRun(
+                    experiment_id=experiment_id,
+                    user_id=user_id,
+                    start_time=start_time or int(time.time() * 1000),
+                ),
+                tags=[RunTag(key, value) for (key, value) in tags.items()],
+            )
+        else:
+            return self.store.create_run(
+                experiment_id=experiment_id,
+                user_id=user_id,
+                start_time=start_time or int(time.time() * 1000),
+                tags=[RunTag(key, value) for (key, value) in tags.items()],
+            )
 
     def list_run_infos(
         self,
@@ -179,7 +238,11 @@ class TrackingServiceClient(object):
         step = step if step is not None else 0
         _validate_metric(key, value, timestamp, step)
         metric = Metric(key, value, timestamp, step)
-        self.store.log_metric(run_id, metric)
+
+        if self.buffered:
+            self._log_to_buffer(run_id, metrics=[metric])
+        else:
+            self.store.log_metric(run_id, metric)
 
     def log_param(self, run_id, key, value):
         """
@@ -188,6 +251,11 @@ class TrackingServiceClient(object):
         _validate_param_name(key)
         param = Param(key, str(value))
         self.store.log_param(run_id, param)
+
+        if self.buffered:
+            self._log_to_buffer(run_id, params=[param])
+        else:
+            self.store.log_metric(run_id, param)
 
     def set_experiment_tag(self, experiment_id, key, value):
         """
@@ -212,6 +280,11 @@ class TrackingServiceClient(object):
         _validate_tag_name(key)
         tag = RunTag(key, str(value))
         self.store.set_tag(run_id, tag)
+
+        if self.buffered:
+            self._log_to_buffer(run_id, tags=[tag])
+        else:
+            self.store.log_metric(run_id, tag)
 
     def delete_tag(self, run_id, key):
         """
@@ -242,7 +315,11 @@ class TrackingServiceClient(object):
             _validate_param_name(param.key)
         for tag in tags:
             _validate_tag_name(tag.key)
-        self.store.log_batch(run_id=run_id, metrics=metrics, params=params, tags=tags)
+
+        if self.buffered:
+            self._log_to_buffer(run_id, params=list(params), metrics=list(metrics), tags=list(tags))
+        else:
+            self.store.log_batch(run_id=run_id, metrics=metrics, params=params, tags=tags)
 
     def _record_logged_model(self, run_id, mlflow_model):
         from mlflow.models import Model
