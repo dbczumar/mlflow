@@ -333,7 +333,7 @@ class DatabricksArtifactRepository(ArtifactRepository):
             self.run_relative_artifact_repo_root_path, remote_file_path
         )
         read_credentials = self._get_read_credentials(self.run_id, run_relative_remote_file_path)
-        return self._download_from_cloud(read_credentials.credentials, local_path)
+        self._download_from_cloud(read_credentials.credentials, local_path)
 
     def download_artifacts(self, artifact_path, dst_path=None):
         """
@@ -397,6 +397,8 @@ class DatabricksArtifactRepository(ArtifactRepository):
 
         # Check if the artifacts points to a directory
         if self._is_directory(artifact_path):
+            print("FUTURES: " + futures)
+            print("LOCAL DIR: " + local_dir)
             local_dir, futures = download_artifact_dir(artifact_path)
             map(lambda f: f.result(), futures)
             return local_dir
