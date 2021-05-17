@@ -102,7 +102,7 @@ message GetCredentialsForRead {
 
   // The artifact paths, relative to the Run's artifact root location, for which to
   // fetch artifact read credentials
-  repeated string path = 2 [(validate_required) = true];
+  repeated string path = 2;
 
   // Token specifying the page of credentials to fetch for large requests that require pagination
   optional string page_token = 3;
@@ -126,7 +126,7 @@ message GetCredentialsForWrite {
 
   // The artifact paths, relative to the Run's artifact root location, for which to
   // fetch artifact write credentials
-  repeated string path = 2 [(validate_required) = true];
+  repeated string path = 2;
 
   // Token specifying the page of credentials to fetch for large requests that require pagination
   optional string page_token = 3;
