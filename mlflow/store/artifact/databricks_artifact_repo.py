@@ -5,6 +5,7 @@ import posixpath
 import requests
 import uuid
 import tempfile
+from collections import namedtuple
 from concurrent.futures import ThreadPoolExecutor
 
 from mlflow.azure.client import put_block, put_block_list
@@ -138,14 +139,29 @@ class DatabricksArtifactRepository(ArtifactRepository):
         run_response = self._call_endpoint(MlflowService, GetRun, json_body)
         return run_response.run.info.artifact_uri
 
-    def _get_write_credentials(self, run_id, path=None):
-        json_body = message_to_json(GetCredentialsForWrite(run_id=run_id, path=path))
-        return self._call_endpoint(
-            DatabricksMlflowArtifactsService, GetCredentialsForWrite, json_body
-        )
+    def _get_write_credentials(self, run_id, paths=None):
+        write_credentials = []
+        page_token = None
+        while True:
+            if page_token:
+                json_body = message_to_json(GetCredentialsForWrite(run_id=run_id, path=paths))
+            else:
+                json_body = message_to_json(GetCredentialsForWrite(run_id=run_id, path=paths, page_token=page_token))
 
-    def _get_read_credentials(self, run_id, path=None):
-        json_body = message_to_json(GetCredentialsForRead(run_id=run_id, path=path))
+            response = self._call_endpoint(
+                DatabricksMlflowArtifactsService, GetCredentialsForWrite, json_body
+            )
+            write_credentials += response.credentials_batch
+            page_token = response.next_page_token
+
+            if not page_token or len(response.credentials_batch) == 0:
+                break
+
+        return write_credentials
+
+
+    def _get_read_credentials(self, run_id, paths=None):
+        json_body = message_to_json(GetCredentialsForRead(run_id=run_id, path=paths))
         return self._call_endpoint(
             DatabricksMlflowArtifactsService, GetCredentialsForRead, json_body
         )
@@ -223,13 +239,13 @@ class DatabricksArtifactRepository(ArtifactRepository):
             raise MlflowException(err)
 
     def _upload_to_cloud(self, cloud_credentials, local_file, artifact_path):
-        if cloud_credentials.credentials.type == ArtifactCredentialType.AZURE_SAS_URI:
-            self._azure_upload_file(cloud_credentials.credentials, local_file, artifact_path)
-        elif cloud_credentials.credentials.type in [
+        if cloud_credentials.type == ArtifactCredentialType.AZURE_SAS_URI:
+            self._azure_upload_file(cloud_credentials, local_file, artifact_path)
+        elif cloud_credentials.type in [
             ArtifactCredentialType.AWS_PRESIGNED_URL,
             ArtifactCredentialType.GCP_SIGNED_URL,
         ]:
-            self._signed_url_upload_file(cloud_credentials.credentials, local_file)
+            self._signed_url_upload_file(cloud_credentials, local_file)
         else:
             raise MlflowException(
                 message="Cloud provider not supported.", error_code=INTERNAL_ERROR
@@ -263,21 +279,25 @@ class DatabricksArtifactRepository(ArtifactRepository):
             raise MlflowException(err)
 
     def log_artifact(self, local_file, artifact_path=None):
+        run_relative_artifact_path = self._get_run_relative_artifact_path(local_file, artifact_path)
+        write_credentials = self._get_write_credentials(self.run_id, run_relative_artifact_path)[0]
+        self._upload_to_cloud(write_credentials, local_file, run_relative_artifact_path)
+
+    def _get_run_relative_artifact_path(self, local_file, artifact_path):
         basename = os.path.basename(local_file)
         artifact_path = artifact_path or ""
         artifact_path = posixpath.join(artifact_path, basename)
         if len(artifact_path) > 0:
-            run_relative_artifact_path = posixpath.join(
+            return posixpath.join(
                 self.run_relative_artifact_repo_root_path, artifact_path
             )
         else:
-            run_relative_artifact_path = self.run_relative_artifact_repo_root_path
-        write_credentials = self._get_write_credentials(self.run_id, run_relative_artifact_path)
-        self._upload_to_cloud(write_credentials, local_file, run_relative_artifact_path)
+            return self.run_relative_artifact_repo_root_path
 
     def log_artifacts(self, local_dir, artifact_path=None):
         artifact_path = artifact_path or ""
         upload_futures = []
+        artifacts_to_upload = []
         for (dirpath, _, filenames) in os.walk(local_dir):
             artifact_subdir = artifact_path
             if dirpath != local_dir:
@@ -285,11 +305,21 @@ class DatabricksArtifactRepository(ArtifactRepository):
                 rel_path = relative_path_to_artifact_path(rel_path)
                 artifact_subdir = posixpath.join(artifact_path, rel_path)
             for name in filenames:
-                file_path = os.path.join(dirpath, name)
-                upload_future = self.thread_pool.submit(
-                    self.log_artifact, file_path, artifact_subdir
+                local_path = os.path.join(dirpath, name)
+                artifacts_to_upload.append(
+                    (local_path, self._get_run_relative_artifact_path(local_path, artifact_subdir))
                 )
-                upload_futures.append(upload_future)
+
+        all_write_credentials = self._get_write_credentials(
+            run_id=self.run_id,
+            paths=[artifact_path for _, artifact_path in artifacts_to_upload]
+        )
+
+        for (local_path, artifact_path), credentials in zip(artifacts_to_upload, all_write_credentials):
+            upload_future = self.thread_pool.submit(
+                self._upload_to_cloud, credentials, local_path, artifact_path 
+            )
+            upload_futures.append(upload_future)
 
         for upload_future in upload_futures:
             upload_future.result()

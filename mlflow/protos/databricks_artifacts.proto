@@ -23,7 +23,7 @@ service DatabricksMlflowArtifactsService {
   rpc getCredentialsForRead (GetCredentialsForRead) returns (GetCredentialsForRead.Response) {
     option (rpc) = {
       endpoints: [{
-        method: "GET",
+        method: "POST",
         path: "/mlflow/artifacts/credentials-for-read"
         since { major: 2, minor: 0 },
       }],
@@ -35,7 +35,7 @@ service DatabricksMlflowArtifactsService {
   rpc getCredentialsForWrite (GetCredentialsForWrite) returns (GetCredentialsForWrite.Response) {
     option (rpc) = {
       endpoints: [{
-        method: "GET",
+        method: "POST",
         path: "/mlflow/artifacts/credentials-for-write"
         since { major: 2, minor: 0 },
       }],
@@ -111,7 +111,6 @@ message GetCredentialsForRead {
 
     // DEPRECATED: Credentials for reading from a single specified artifact locations.
     // Older versions of the MLflow client use this field to retrieve credentials via point fetches.
-    //
     // optional ArtifactCredentialInfo credentials = 1;
 
     // Batch of credentials for reading from the specified artifact locations
@@ -138,9 +137,8 @@ message GetCredentialsForWrite {
 
   message Response {
 
-    // DEPRECATED: Credentials for reading from a single specified artifact locations.
+    // DEPRECATED: Credentials for reading from a single specified artifact location.
     // Older versions of the MLflow client use this field to retrieve credentials via point fetches.
-    //
     // optional ArtifactCredentialInfo credentials = 1;
 
     // Batch of credentials for reading from the specified artifact locations
