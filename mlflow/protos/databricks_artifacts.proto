@@ -109,8 +109,8 @@ message GetCredentialsForRead {
 
   message Response {
 
-    // DEPRECATED: Credentials for reading from a single specified artifact locations.
-    // Older versions of the MLflow client use this field to retrieve credentials via point fetches.
+    // DEPRECATED: Credentials for reading from a single specified artifact location.
+    // Older versions of the MLflow client use this field to retrieve credentials via point fetches
     // optional ArtifactCredentialInfo credentials = 1;
 
     // Batch of credentials for reading from the specified artifact locations
@@ -137,11 +137,11 @@ message GetCredentialsForWrite {
 
   message Response {
 
-    // DEPRECATED: Credentials for reading from a single specified artifact location.
-    // Older versions of the MLflow client use this field to retrieve credentials via point fetches.
+    // DEPRECATED: Credentials for writing to a single specified artifact location.
+    // Older versions of the MLflow client use this field to retrieve credentials via point fetches
     // optional ArtifactCredentialInfo credentials = 1;
 
-    // Batch of credentials for reading from the specified artifact locations
+    // Batch of credentials for writing to the specified artifact locations
     repeated ArtifactCredentialInfo credentials_batch = 2;
 
     // Token used to fetch the next page of credentials for large requests that require pagination

@@ -5145,7 +5145,7 @@ public final class DatabricksArtifacts {
 
       /**
        * <pre>
-       * Batch of credentials for reading from the specified artifact locations
+       * Batch of credentials for writing to the specified artifact locations
        * </pre>
        *
        * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
@@ -5154,7 +5154,7 @@ public final class DatabricksArtifacts {
           getCredentialsBatchList();
       /**
        * <pre>
-       * Batch of credentials for reading from the specified artifact locations
+       * Batch of credentials for writing to the specified artifact locations
        * </pre>
        *
        * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
@@ -5162,7 +5162,7 @@ public final class DatabricksArtifacts {
       com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo getCredentialsBatch(int index);
       /**
        * <pre>
-       * Batch of credentials for reading from the specified artifact locations
+       * Batch of credentials for writing to the specified artifact locations
        * </pre>
        *
        * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
@@ -5170,7 +5170,7 @@ public final class DatabricksArtifacts {
       int getCredentialsBatchCount();
       /**
        * <pre>
-       * Batch of credentials for reading from the specified artifact locations
+       * Batch of credentials for writing to the specified artifact locations
        * </pre>
        *
        * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
@@ -5179,7 +5179,7 @@ public final class DatabricksArtifacts {
           getCredentialsBatchOrBuilderList();
       /**
        * <pre>
-       * Batch of credentials for reading from the specified artifact locations
+       * Batch of credentials for writing to the specified artifact locations
        * </pre>
        *
        * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
@@ -5309,7 +5309,7 @@ public final class DatabricksArtifacts {
       private java.util.List<com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo> credentialsBatch_;
       /**
        * <pre>
-       * Batch of credentials for reading from the specified artifact locations
+       * Batch of credentials for writing to the specified artifact locations
        * </pre>
        *
        * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
@@ -5319,7 +5319,7 @@ public final class DatabricksArtifacts {
       }
       /**
        * <pre>
-       * Batch of credentials for reading from the specified artifact locations
+       * Batch of credentials for writing to the specified artifact locations
        * </pre>
        *
        * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
@@ -5330,7 +5330,7 @@ public final class DatabricksArtifacts {
       }
       /**
        * <pre>
-       * Batch of credentials for reading from the specified artifact locations
+       * Batch of credentials for writing to the specified artifact locations
        * </pre>
        *
        * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
@@ -5340,7 +5340,7 @@ public final class DatabricksArtifacts {
       }
       /**
        * <pre>
-       * Batch of credentials for reading from the specified artifact locations
+       * Batch of credentials for writing to the specified artifact locations
        * </pre>
        *
        * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
@@ -5350,7 +5350,7 @@ public final class DatabricksArtifacts {
       }
       /**
        * <pre>
-       * Batch of credentials for reading from the specified artifact locations
+       * Batch of credentials for writing to the specified artifact locations
        * </pre>
        *
        * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
@@ -5799,7 +5799,7 @@ public final class DatabricksArtifacts {
 
         /**
          * <pre>
-         * Batch of credentials for reading from the specified artifact locations
+         * Batch of credentials for writing to the specified artifact locations
          * </pre>
          *
          * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
@@ -5813,7 +5813,7 @@ public final class DatabricksArtifacts {
         }
         /**
          * <pre>
-         * Batch of credentials for reading from the specified artifact locations
+         * Batch of credentials for writing to the specified artifact locations
          * </pre>
          *
          * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
@@ -5827,7 +5827,7 @@ public final class DatabricksArtifacts {
         }
         /**
          * <pre>
-         * Batch of credentials for reading from the specified artifact locations
+         * Batch of credentials for writing to the specified artifact locations
          * </pre>
          *
          * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
@@ -5841,7 +5841,7 @@ public final class DatabricksArtifacts {
         }
         /**
          * <pre>
-         * Batch of credentials for reading from the specified artifact locations
+         * Batch of credentials for writing to the specified artifact locations
          * </pre>
          *
          * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
@@ -5862,7 +5862,7 @@ public final class DatabricksArtifacts {
         }
         /**
          * <pre>
-         * Batch of credentials for reading from the specified artifact locations
+         * Batch of credentials for writing to the specified artifact locations
          * </pre>
          *
          * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
@@ -5880,7 +5880,7 @@ public final class DatabricksArtifacts {
         }
         /**
          * <pre>
-         * Batch of credentials for reading from the specified artifact locations
+         * Batch of credentials for writing to the specified artifact locations
          * </pre>
          *
          * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
@@ -5900,7 +5900,7 @@ public final class DatabricksArtifacts {
         }
         /**
          * <pre>
-         * Batch of credentials for reading from the specified artifact locations
+         * Batch of credentials for writing to the specified artifact locations
          * </pre>
          *
          * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
@@ -5921,7 +5921,7 @@ public final class DatabricksArtifacts {
         }
         /**
          * <pre>
-         * Batch of credentials for reading from the specified artifact locations
+         * Batch of credentials for writing to the specified artifact locations
          * </pre>
          *
          * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
@@ -5939,7 +5939,7 @@ public final class DatabricksArtifacts {
         }
         /**
          * <pre>
-         * Batch of credentials for reading from the specified artifact locations
+         * Batch of credentials for writing to the specified artifact locations
          * </pre>
          *
          * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
@@ -5957,7 +5957,7 @@ public final class DatabricksArtifacts {
         }
         /**
          * <pre>
-         * Batch of credentials for reading from the specified artifact locations
+         * Batch of credentials for writing to the specified artifact locations
          * </pre>
          *
          * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
@@ -5976,7 +5976,7 @@ public final class DatabricksArtifacts {
         }
         /**
          * <pre>
-         * Batch of credentials for reading from the specified artifact locations
+         * Batch of credentials for writing to the specified artifact locations
          * </pre>
          *
          * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
@@ -5993,7 +5993,7 @@ public final class DatabricksArtifacts {
         }
         /**
          * <pre>
-         * Batch of credentials for reading from the specified artifact locations
+         * Batch of credentials for writing to the specified artifact locations
          * </pre>
          *
          * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
@@ -6010,7 +6010,7 @@ public final class DatabricksArtifacts {
         }
         /**
          * <pre>
-         * Batch of credentials for reading from the specified artifact locations
+         * Batch of credentials for writing to the specified artifact locations
          * </pre>
          *
          * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
@@ -6021,7 +6021,7 @@ public final class DatabricksArtifacts {
         }
         /**
          * <pre>
-         * Batch of credentials for reading from the specified artifact locations
+         * Batch of credentials for writing to the specified artifact locations
          * </pre>
          *
          * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
@@ -6035,7 +6035,7 @@ public final class DatabricksArtifacts {
         }
         /**
          * <pre>
-         * Batch of credentials for reading from the specified artifact locations
+         * Batch of credentials for writing to the specified artifact locations
          * </pre>
          *
          * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
@@ -6050,7 +6050,7 @@ public final class DatabricksArtifacts {
         }
         /**
          * <pre>
-         * Batch of credentials for reading from the specified artifact locations
+         * Batch of credentials for writing to the specified artifact locations
          * </pre>
          *
          * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
@@ -6061,7 +6061,7 @@ public final class DatabricksArtifacts {
         }
         /**
          * <pre>
-         * Batch of credentials for reading from the specified artifact locations
+         * Batch of credentials for writing to the specified artifact locations
          * </pre>
          *
          * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
@@ -6073,7 +6073,7 @@ public final class DatabricksArtifacts {
         }
         /**
          * <pre>
-         * Batch of credentials for reading from the specified artifact locations
+         * Batch of credentials for writing to the specified artifact locations
          * </pre>
          *
          * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
