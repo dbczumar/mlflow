@@ -4,12 +4,19 @@ import os
 import posixpath
 import requests
 import uuid
+import tempfile
+from concurrent.futures import ThreadPoolExecutor
 
 from mlflow.azure.client import put_block, put_block_list
 import mlflow.tracking
 from mlflow.entities import FileInfo
 from mlflow.exceptions import MlflowException
-from mlflow.protos.databricks_pb2 import INVALID_PARAMETER_VALUE, INTERNAL_ERROR
+from mlflow.protos.databricks_pb2 import (
+    INVALID_PARAMETER_VALUE,
+    INTERNAL_ERROR,
+    RESOURCE_DOES_NOT_EXIST,
+)
+
 from mlflow.protos.databricks_artifacts_pb2 import (
     DatabricksMlflowArtifactsService,
     GetCredentialsForWrite,
@@ -98,6 +105,11 @@ class DatabricksArtifactRepository(ArtifactRepository):
         self.run_relative_artifact_repo_root_path = (
             "" if run_artifact_root_path == artifact_repo_root_path else run_relative_root_path
         )
+        # Limit the number of threads used for artifact uploads, using at most 8 threads or
+        # 2 * the number of CPU cores available on the system (whichever is smaller)
+        num_cpus = os.cpu_count() or 4
+        num_artifact_workers = min(num_cpus * 2, 8)
+        self.thread_pool = ThreadPoolExecutor(max_workers=num_artifact_workers)
 
     @staticmethod
     def _extract_run_id(artifact_uri):
@@ -265,6 +277,7 @@ class DatabricksArtifactRepository(ArtifactRepository):
 
     def log_artifacts(self, local_dir, artifact_path=None):
         artifact_path = artifact_path or ""
+        upload_futures = []
         for (dirpath, _, filenames) in os.walk(local_dir):
             artifact_subdir = artifact_path
             if dirpath != local_dir:
@@ -273,7 +286,13 @@ class DatabricksArtifactRepository(ArtifactRepository):
                 artifact_subdir = posixpath.join(artifact_path, rel_path)
             for name in filenames:
                 file_path = os.path.join(dirpath, name)
-                self.log_artifact(file_path, artifact_subdir)
+                upload_future = self.thread_pool.submit(
+                    self.log_artifact, file_path, artifact_subdir
+                )
+                upload_futures.append(upload_future)
+
+        for upload_future in upload_futures:
+            upload_future.result()
 
     def list_artifacts(self, path=None):
         if path:
@@ -319,6 +338,89 @@ class DatabricksArtifactRepository(ArtifactRepository):
         )
         read_credentials = self._get_read_credentials(self.run_id, run_relative_remote_file_path)
         self._download_from_cloud(read_credentials.credentials, local_path)
+
+    def download_artifacts(self, artifact_path, dst_path=None):
+        """
+        Parallelized implementation of `download_artifacts` for Databricks.
+        """
+
+        def download_file(fullpath):
+            """
+            Submit a download of `fullpath` to the thread pool and return the
+            resultant Future.
+            """
+            fullpath = fullpath.rstrip("/")
+            dirpath, _ = posixpath.split(fullpath)
+            local_dir_path = os.path.join(dst_path, dirpath)
+            local_file_path = os.path.join(dst_path, fullpath)
+            if not os.path.exists(local_dir_path):
+                os.makedirs(local_dir_path)
+            return (
+                local_file_path,
+                self.thread_pool.submit(
+                    self._download_file, remote_file_path=fullpath, local_path=local_file_path
+                ),
+            )
+
+        def download_artifact_dir(dir_path):
+            """
+            Recursively list files in the directory specified by `dir_path` and submit
+            asynchronous downloads for each encountered file, returning a list of futures
+            representing each download operation.
+            """
+            download_futures = []
+            local_dir = os.path.join(dst_path, dir_path)
+            dir_content = [  # prevent infinite loop, sometimes the dir is recursively included
+                file_info
+                for file_info in self.list_artifacts(dir_path)
+                if file_info.path != "." and file_info.path != dir_path
+            ]
+            if not dir_content:  # empty dir
+                if not os.path.exists(local_dir):
+                    os.makedirs(local_dir)
+            else:
+                for file_info in dir_content:
+                    if file_info.is_dir:
+                        _, futures = download_artifact_dir(dir_path=file_info.path)
+                        download_futures += futures
+                    else:
+                        _, future = download_file(file_info.path)
+                        download_futures += [future]
+            return local_dir, download_futures
+
+        if dst_path is None:
+            dst_path = tempfile.mkdtemp()
+        dst_path = os.path.abspath(dst_path)
+
+        if not os.path.exists(dst_path):
+            raise MlflowException(
+                message=(
+                    "The destination path for downloaded artifacts does not"
+                    " exist! Destination path: {dst_path}".format(dst_path=dst_path)
+                ),
+                error_code=RESOURCE_DOES_NOT_EXIST,
+            )
+        elif not os.path.isdir(dst_path):
+            raise MlflowException(
+                message=(
+                    "The destination path for downloaded artifacts must be a directory!"
+                    " Destination path: {dst_path}".format(dst_path=dst_path)
+                ),
+                error_code=INVALID_PARAMETER_VALUE,
+            )
+
+        if self._is_directory(artifact_path):
+            local_dir, futures = download_artifact_dir(artifact_path)
+            # Join futures to ensure that all files in the directory have
+            # been downloaded prior to returning
+            for future in futures:
+                future.result()
+            return local_dir
+        else:
+            local_dir, future = download_file(artifact_path)
+            # Join future to ensure that the file has been downloaded prior to returning
+            future.result()
+            return local_dir
 
     def delete_artifacts(self, artifact_path=None):
         raise MlflowException("Not implemented yet")
