@@ -2755,7 +2755,7 @@ public final class DatabricksArtifacts {
      * fetch artifact read credentials
      * </pre>
      *
-     * <code>repeated string path = 2 [(.mlflow.validate_required) = true];</code>
+     * <code>repeated string path = 2;</code>
      */
     java.util.List<java.lang.String>
         getPathList();
@@ -2765,7 +2765,7 @@ public final class DatabricksArtifacts {
      * fetch artifact read credentials
      * </pre>
      *
-     * <code>repeated string path = 2 [(.mlflow.validate_required) = true];</code>
+     * <code>repeated string path = 2;</code>
      */
     int getPathCount();
     /**
@@ -2774,7 +2774,7 @@ public final class DatabricksArtifacts {
      * fetch artifact read credentials
      * </pre>
      *
-     * <code>repeated string path = 2 [(.mlflow.validate_required) = true];</code>
+     * <code>repeated string path = 2;</code>
      */
     java.lang.String getPath(int index);
     /**
@@ -2783,7 +2783,7 @@ public final class DatabricksArtifacts {
      * fetch artifact read credentials
      * </pre>
      *
-     * <code>repeated string path = 2 [(.mlflow.validate_required) = true];</code>
+     * <code>repeated string path = 2;</code>
      */
     com.google.protobuf.ByteString
         getPathBytes(int index);
@@ -2918,46 +2918,46 @@ public final class DatabricksArtifacts {
 
       /**
        * <pre>
-       * Credentials for reading from the specified artifact locations
+       * Batch of credentials for reading from the specified artifact locations
        * </pre>
        *
-       * <code>repeated .mlflow.ArtifactCredentialInfo credentials = 1;</code>
+       * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
        */
       java.util.List<com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo> 
-          getCredentialsList();
+          getCredentialsBatchList();
       /**
        * <pre>
-       * Credentials for reading from the specified artifact locations
+       * Batch of credentials for reading from the specified artifact locations
        * </pre>
        *
-       * <code>repeated .mlflow.ArtifactCredentialInfo credentials = 1;</code>
+       * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
        */
-      com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo getCredentials(int index);
+      com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo getCredentialsBatch(int index);
       /**
        * <pre>
-       * Credentials for reading from the specified artifact locations
+       * Batch of credentials for reading from the specified artifact locations
        * </pre>
        *
-       * <code>repeated .mlflow.ArtifactCredentialInfo credentials = 1;</code>
+       * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
        */
-      int getCredentialsCount();
+      int getCredentialsBatchCount();
       /**
        * <pre>
-       * Credentials for reading from the specified artifact locations
+       * Batch of credentials for reading from the specified artifact locations
        * </pre>
        *
-       * <code>repeated .mlflow.ArtifactCredentialInfo credentials = 1;</code>
+       * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
        */
       java.util.List<? extends com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfoOrBuilder> 
-          getCredentialsOrBuilderList();
+          getCredentialsBatchOrBuilderList();
       /**
        * <pre>
-       * Credentials for reading from the specified artifact locations
+       * Batch of credentials for reading from the specified artifact locations
        * </pre>
        *
-       * <code>repeated .mlflow.ArtifactCredentialInfo credentials = 1;</code>
+       * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
        */
-      com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfoOrBuilder getCredentialsOrBuilder(
+      com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfoOrBuilder getCredentialsBatchOrBuilder(
           int index);
 
       /**
@@ -2965,7 +2965,7 @@ public final class DatabricksArtifacts {
        * Token used to fetch the next page of credentials for large requests that require pagination
        * </pre>
        *
-       * <code>optional string next_page_token = 2;</code>
+       * <code>optional string next_page_token = 3;</code>
        */
       boolean hasNextPageToken();
       /**
@@ -2973,7 +2973,7 @@ public final class DatabricksArtifacts {
        * Token used to fetch the next page of credentials for large requests that require pagination
        * </pre>
        *
-       * <code>optional string next_page_token = 2;</code>
+       * <code>optional string next_page_token = 3;</code>
        */
       java.lang.String getNextPageToken();
       /**
@@ -2981,7 +2981,7 @@ public final class DatabricksArtifacts {
        * Token used to fetch the next page of credentials for large requests that require pagination
        * </pre>
        *
-       * <code>optional string next_page_token = 2;</code>
+       * <code>optional string next_page_token = 3;</code>
        */
       com.google.protobuf.ByteString
           getNextPageTokenBytes();
@@ -2999,7 +2999,7 @@ public final class DatabricksArtifacts {
         super(builder);
       }
       private Response() {
-        credentials_ = java.util.Collections.emptyList();
+        credentialsBatch_ = java.util.Collections.emptyList();
         nextPageToken_ = "";
       }
 
@@ -3027,16 +3027,16 @@ public final class DatabricksArtifacts {
               case 0:
                 done = true;
                 break;
-              case 10: {
+              case 18: {
                 if (!((mutable_bitField0_ & 0x00000001) == 0x00000001)) {
-                  credentials_ = new java.util.ArrayList<com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo>();
+                  credentialsBatch_ = new java.util.ArrayList<com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo>();
                   mutable_bitField0_ |= 0x00000001;
                 }
-                credentials_.add(
+                credentialsBatch_.add(
                     input.readMessage(com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo.PARSER, extensionRegistry));
                 break;
               }
-              case 18: {
+              case 26: {
                 com.google.protobuf.ByteString bs = input.readBytes();
                 bitField0_ |= 0x00000001;
                 nextPageToken_ = bs;
@@ -3058,7 +3058,7 @@ public final class DatabricksArtifacts {
               e).setUnfinishedMessage(this);
         } finally {
           if (((mutable_bitField0_ & 0x00000001) == 0x00000001)) {
-            credentials_ = java.util.Collections.unmodifiableList(credentials_);
+            credentialsBatch_ = java.util.Collections.unmodifiableList(credentialsBatch_);
           }
           this.unknownFields = unknownFields.build();
           makeExtensionsImmutable();
@@ -3078,69 +3078,69 @@ public final class DatabricksArtifacts {
       }
 
       private int bitField0_;
-      public static final int CREDENTIALS_FIELD_NUMBER = 1;
-      private java.util.List<com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo> credentials_;
+      public static final int CREDENTIALS_BATCH_FIELD_NUMBER = 2;
+      private java.util.List<com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo> credentialsBatch_;
       /**
        * <pre>
-       * Credentials for reading from the specified artifact locations
+       * Batch of credentials for reading from the specified artifact locations
        * </pre>
        *
-       * <code>repeated .mlflow.ArtifactCredentialInfo credentials = 1;</code>
+       * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
        */
-      public java.util.List<com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo> getCredentialsList() {
-        return credentials_;
+      public java.util.List<com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo> getCredentialsBatchList() {
+        return credentialsBatch_;
       }
       /**
        * <pre>
-       * Credentials for reading from the specified artifact locations
+       * Batch of credentials for reading from the specified artifact locations
        * </pre>
        *
-       * <code>repeated .mlflow.ArtifactCredentialInfo credentials = 1;</code>
+       * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
        */
       public java.util.List<? extends com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfoOrBuilder> 
-          getCredentialsOrBuilderList() {
-        return credentials_;
+          getCredentialsBatchOrBuilderList() {
+        return credentialsBatch_;
       }
       /**
        * <pre>
-       * Credentials for reading from the specified artifact locations
+       * Batch of credentials for reading from the specified artifact locations
        * </pre>
        *
-       * <code>repeated .mlflow.ArtifactCredentialInfo credentials = 1;</code>
+       * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
        */
-      public int getCredentialsCount() {
-        return credentials_.size();
+      public int getCredentialsBatchCount() {
+        return credentialsBatch_.size();
       }
       /**
        * <pre>
-       * Credentials for reading from the specified artifact locations
+       * Batch of credentials for reading from the specified artifact locations
        * </pre>
        *
-       * <code>repeated .mlflow.ArtifactCredentialInfo credentials = 1;</code>
+       * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
        */
-      public com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo getCredentials(int index) {
-        return credentials_.get(index);
+      public com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo getCredentialsBatch(int index) {
+        return credentialsBatch_.get(index);
       }
       /**
        * <pre>
-       * Credentials for reading from the specified artifact locations
+       * Batch of credentials for reading from the specified artifact locations
        * </pre>
        *
-       * <code>repeated .mlflow.ArtifactCredentialInfo credentials = 1;</code>
+       * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
        */
-      public com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfoOrBuilder getCredentialsOrBuilder(
+      public com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfoOrBuilder getCredentialsBatchOrBuilder(
           int index) {
-        return credentials_.get(index);
+        return credentialsBatch_.get(index);
       }
 
-      public static final int NEXT_PAGE_TOKEN_FIELD_NUMBER = 2;
+      public static final int NEXT_PAGE_TOKEN_FIELD_NUMBER = 3;
       private volatile java.lang.Object nextPageToken_;
       /**
        * <pre>
        * Token used to fetch the next page of credentials for large requests that require pagination
        * </pre>
        *
-       * <code>optional string next_page_token = 2;</code>
+       * <code>optional string next_page_token = 3;</code>
        */
       public boolean hasNextPageToken() {
         return ((bitField0_ & 0x00000001) == 0x00000001);
@@ -3150,7 +3150,7 @@ public final class DatabricksArtifacts {
        * Token used to fetch the next page of credentials for large requests that require pagination
        * </pre>
        *
-       * <code>optional string next_page_token = 2;</code>
+       * <code>optional string next_page_token = 3;</code>
        */
       public java.lang.String getNextPageToken() {
         java.lang.Object ref = nextPageToken_;
@@ -3171,7 +3171,7 @@ public final class DatabricksArtifacts {
        * Token used to fetch the next page of credentials for large requests that require pagination
        * </pre>
        *
-       * <code>optional string next_page_token = 2;</code>
+       * <code>optional string next_page_token = 3;</code>
        */
       public com.google.protobuf.ByteString
           getNextPageTokenBytes() {
@@ -3201,11 +3201,11 @@ public final class DatabricksArtifacts {
       @java.lang.Override
       public void writeTo(com.google.protobuf.CodedOutputStream output)
                           throws java.io.IOException {
-        for (int i = 0; i < credentials_.size(); i++) {
-          output.writeMessage(1, credentials_.get(i));
+        for (int i = 0; i < credentialsBatch_.size(); i++) {
+          output.writeMessage(2, credentialsBatch_.get(i));
         }
         if (((bitField0_ & 0x00000001) == 0x00000001)) {
-          com.google.protobuf.GeneratedMessageV3.writeString(output, 2, nextPageToken_);
+          com.google.protobuf.GeneratedMessageV3.writeString(output, 3, nextPageToken_);
         }
         unknownFields.writeTo(output);
       }
@@ -3216,12 +3216,12 @@ public final class DatabricksArtifacts {
         if (size != -1) return size;
 
         size = 0;
-        for (int i = 0; i < credentials_.size(); i++) {
+        for (int i = 0; i < credentialsBatch_.size(); i++) {
           size += com.google.protobuf.CodedOutputStream
-            .computeMessageSize(1, credentials_.get(i));
+            .computeMessageSize(2, credentialsBatch_.get(i));
         }
         if (((bitField0_ & 0x00000001) == 0x00000001)) {
-          size += com.google.protobuf.GeneratedMessageV3.computeStringSize(2, nextPageToken_);
+          size += com.google.protobuf.GeneratedMessageV3.computeStringSize(3, nextPageToken_);
         }
         size += unknownFields.getSerializedSize();
         memoizedSize = size;
@@ -3239,8 +3239,8 @@ public final class DatabricksArtifacts {
         com.databricks.api.proto.mlflow.DatabricksArtifacts.GetCredentialsForRead.Response other = (com.databricks.api.proto.mlflow.DatabricksArtifacts.GetCredentialsForRead.Response) obj;
 
         boolean result = true;
-        result = result && getCredentialsList()
-            .equals(other.getCredentialsList());
+        result = result && getCredentialsBatchList()
+            .equals(other.getCredentialsBatchList());
         result = result && (hasNextPageToken() == other.hasNextPageToken());
         if (hasNextPageToken()) {
           result = result && getNextPageToken()
@@ -3257,9 +3257,9 @@ public final class DatabricksArtifacts {
         }
         int hash = 41;
         hash = (19 * hash) + getDescriptor().hashCode();
-        if (getCredentialsCount() > 0) {
-          hash = (37 * hash) + CREDENTIALS_FIELD_NUMBER;
-          hash = (53 * hash) + getCredentialsList().hashCode();
+        if (getCredentialsBatchCount() > 0) {
+          hash = (37 * hash) + CREDENTIALS_BATCH_FIELD_NUMBER;
+          hash = (53 * hash) + getCredentialsBatchList().hashCode();
         }
         if (hasNextPageToken()) {
           hash = (37 * hash) + NEXT_PAGE_TOKEN_FIELD_NUMBER;
@@ -3393,17 +3393,17 @@ public final class DatabricksArtifacts {
         private void maybeForceBuilderInitialization() {
           if (com.google.protobuf.GeneratedMessageV3
                   .alwaysUseFieldBuilders) {
-            getCredentialsFieldBuilder();
+            getCredentialsBatchFieldBuilder();
           }
         }
         @java.lang.Override
         public Builder clear() {
           super.clear();
-          if (credentialsBuilder_ == null) {
-            credentials_ = java.util.Collections.emptyList();
+          if (credentialsBatchBuilder_ == null) {
+            credentialsBatch_ = java.util.Collections.emptyList();
             bitField0_ = (bitField0_ & ~0x00000001);
           } else {
-            credentialsBuilder_.clear();
+            credentialsBatchBuilder_.clear();
           }
           nextPageToken_ = "";
           bitField0_ = (bitField0_ & ~0x00000002);
@@ -3435,14 +3435,14 @@ public final class DatabricksArtifacts {
           com.databricks.api.proto.mlflow.DatabricksArtifacts.GetCredentialsForRead.Response result = new com.databricks.api.proto.mlflow.DatabricksArtifacts.GetCredentialsForRead.Response(this);
           int from_bitField0_ = bitField0_;
           int to_bitField0_ = 0;
-          if (credentialsBuilder_ == null) {
+          if (credentialsBatchBuilder_ == null) {
             if (((bitField0_ & 0x00000001) == 0x00000001)) {
-              credentials_ = java.util.Collections.unmodifiableList(credentials_);
+              credentialsBatch_ = java.util.Collections.unmodifiableList(credentialsBatch_);
               bitField0_ = (bitField0_ & ~0x00000001);
             }
-            result.credentials_ = credentials_;
+            result.credentialsBatch_ = credentialsBatch_;
           } else {
-            result.credentials_ = credentialsBuilder_.build();
+            result.credentialsBatch_ = credentialsBatchBuilder_.build();
           }
           if (((from_bitField0_ & 0x00000002) == 0x00000002)) {
             to_bitField0_ |= 0x00000001;
@@ -3497,29 +3497,29 @@ public final class DatabricksArtifacts {
 
         public Builder mergeFrom(com.databricks.api.proto.mlflow.DatabricksArtifacts.GetCredentialsForRead.Response other) {
           if (other == com.databricks.api.proto.mlflow.DatabricksArtifacts.GetCredentialsForRead.Response.getDefaultInstance()) return this;
-          if (credentialsBuilder_ == null) {
-            if (!other.credentials_.isEmpty()) {
-              if (credentials_.isEmpty()) {
-                credentials_ = other.credentials_;
+          if (credentialsBatchBuilder_ == null) {
+            if (!other.credentialsBatch_.isEmpty()) {
+              if (credentialsBatch_.isEmpty()) {
+                credentialsBatch_ = other.credentialsBatch_;
                 bitField0_ = (bitField0_ & ~0x00000001);
               } else {
-                ensureCredentialsIsMutable();
-                credentials_.addAll(other.credentials_);
+                ensureCredentialsBatchIsMutable();
+                credentialsBatch_.addAll(other.credentialsBatch_);
               }
               onChanged();
             }
           } else {
-            if (!other.credentials_.isEmpty()) {
-              if (credentialsBuilder_.isEmpty()) {
-                credentialsBuilder_.dispose();
-                credentialsBuilder_ = null;
-                credentials_ = other.credentials_;
+            if (!other.credentialsBatch_.isEmpty()) {
+              if (credentialsBatchBuilder_.isEmpty()) {
+                credentialsBatchBuilder_.dispose();
+                credentialsBatchBuilder_ = null;
+                credentialsBatch_ = other.credentialsBatch_;
                 bitField0_ = (bitField0_ & ~0x00000001);
-                credentialsBuilder_ = 
+                credentialsBatchBuilder_ = 
                   com.google.protobuf.GeneratedMessageV3.alwaysUseFieldBuilders ?
-                     getCredentialsFieldBuilder() : null;
+                     getCredentialsBatchFieldBuilder() : null;
               } else {
-                credentialsBuilder_.addAllMessages(other.credentials_);
+                credentialsBatchBuilder_.addAllMessages(other.credentialsBatch_);
               }
             }
           }
@@ -3558,316 +3558,316 @@ public final class DatabricksArtifacts {
         }
         private int bitField0_;
 
-        private java.util.List<com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo> credentials_ =
+        private java.util.List<com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo> credentialsBatch_ =
           java.util.Collections.emptyList();
-        private void ensureCredentialsIsMutable() {
+        private void ensureCredentialsBatchIsMutable() {
           if (!((bitField0_ & 0x00000001) == 0x00000001)) {
-            credentials_ = new java.util.ArrayList<com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo>(credentials_);
+            credentialsBatch_ = new java.util.ArrayList<com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo>(credentialsBatch_);
             bitField0_ |= 0x00000001;
            }
         }
 
         private com.google.protobuf.RepeatedFieldBuilderV3<
-            com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo, com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo.Builder, com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfoOrBuilder> credentialsBuilder_;
+            com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo, com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo.Builder, com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfoOrBuilder> credentialsBatchBuilder_;
 
         /**
          * <pre>
-         * Credentials for reading from the specified artifact locations
+         * Batch of credentials for reading from the specified artifact locations
          * </pre>
          *
-         * <code>repeated .mlflow.ArtifactCredentialInfo credentials = 1;</code>
+         * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
          */
-        public java.util.List<com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo> getCredentialsList() {
-          if (credentialsBuilder_ == null) {
-            return java.util.Collections.unmodifiableList(credentials_);
+        public java.util.List<com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo> getCredentialsBatchList() {
+          if (credentialsBatchBuilder_ == null) {
+            return java.util.Collections.unmodifiableList(credentialsBatch_);
           } else {
-            return credentialsBuilder_.getMessageList();
+            return credentialsBatchBuilder_.getMessageList();
           }
         }
         /**
          * <pre>
-         * Credentials for reading from the specified artifact locations
+         * Batch of credentials for reading from the specified artifact locations
          * </pre>
          *
-         * <code>repeated .mlflow.ArtifactCredentialInfo credentials = 1;</code>
+         * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
          */
-        public int getCredentialsCount() {
-          if (credentialsBuilder_ == null) {
-            return credentials_.size();
+        public int getCredentialsBatchCount() {
+          if (credentialsBatchBuilder_ == null) {
+            return credentialsBatch_.size();
           } else {
-            return credentialsBuilder_.getCount();
+            return credentialsBatchBuilder_.getCount();
           }
         }
         /**
          * <pre>
-         * Credentials for reading from the specified artifact locations
+         * Batch of credentials for reading from the specified artifact locations
          * </pre>
          *
-         * <code>repeated .mlflow.ArtifactCredentialInfo credentials = 1;</code>
+         * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
          */
-        public com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo getCredentials(int index) {
-          if (credentialsBuilder_ == null) {
-            return credentials_.get(index);
+        public com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo getCredentialsBatch(int index) {
+          if (credentialsBatchBuilder_ == null) {
+            return credentialsBatch_.get(index);
           } else {
-            return credentialsBuilder_.getMessage(index);
+            return credentialsBatchBuilder_.getMessage(index);
           }
         }
         /**
          * <pre>
-         * Credentials for reading from the specified artifact locations
+         * Batch of credentials for reading from the specified artifact locations
          * </pre>
          *
-         * <code>repeated .mlflow.ArtifactCredentialInfo credentials = 1;</code>
+         * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
          */
-        public Builder setCredentials(
+        public Builder setCredentialsBatch(
             int index, com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo value) {
-          if (credentialsBuilder_ == null) {
+          if (credentialsBatchBuilder_ == null) {
             if (value == null) {
               throw new NullPointerException();
             }
-            ensureCredentialsIsMutable();
-            credentials_.set(index, value);
+            ensureCredentialsBatchIsMutable();
+            credentialsBatch_.set(index, value);
             onChanged();
           } else {
-            credentialsBuilder_.setMessage(index, value);
+            credentialsBatchBuilder_.setMessage(index, value);
           }
           return this;
         }
         /**
          * <pre>
-         * Credentials for reading from the specified artifact locations
+         * Batch of credentials for reading from the specified artifact locations
          * </pre>
          *
-         * <code>repeated .mlflow.ArtifactCredentialInfo credentials = 1;</code>
+         * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
          */
-        public Builder setCredentials(
+        public Builder setCredentialsBatch(
             int index, com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo.Builder builderForValue) {
-          if (credentialsBuilder_ == null) {
-            ensureCredentialsIsMutable();
-            credentials_.set(index, builderForValue.build());
+          if (credentialsBatchBuilder_ == null) {
+            ensureCredentialsBatchIsMutable();
+            credentialsBatch_.set(index, builderForValue.build());
             onChanged();
           } else {
-            credentialsBuilder_.setMessage(index, builderForValue.build());
+            credentialsBatchBuilder_.setMessage(index, builderForValue.build());
           }
           return this;
         }
         /**
          * <pre>
-         * Credentials for reading from the specified artifact locations
+         * Batch of credentials for reading from the specified artifact locations
          * </pre>
          *
-         * <code>repeated .mlflow.ArtifactCredentialInfo credentials = 1;</code>
+         * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
          */
-        public Builder addCredentials(com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo value) {
-          if (credentialsBuilder_ == null) {
+        public Builder addCredentialsBatch(com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo value) {
+          if (credentialsBatchBuilder_ == null) {
             if (value == null) {
               throw new NullPointerException();
             }
-            ensureCredentialsIsMutable();
-            credentials_.add(value);
+            ensureCredentialsBatchIsMutable();
+            credentialsBatch_.add(value);
             onChanged();
           } else {
-            credentialsBuilder_.addMessage(value);
+            credentialsBatchBuilder_.addMessage(value);
           }
           return this;
         }
         /**
          * <pre>
-         * Credentials for reading from the specified artifact locations
+         * Batch of credentials for reading from the specified artifact locations
          * </pre>
          *
-         * <code>repeated .mlflow.ArtifactCredentialInfo credentials = 1;</code>
+         * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
          */
-        public Builder addCredentials(
+        public Builder addCredentialsBatch(
             int index, com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo value) {
-          if (credentialsBuilder_ == null) {
+          if (credentialsBatchBuilder_ == null) {
             if (value == null) {
               throw new NullPointerException();
             }
-            ensureCredentialsIsMutable();
-            credentials_.add(index, value);
+            ensureCredentialsBatchIsMutable();
+            credentialsBatch_.add(index, value);
             onChanged();
           } else {
-            credentialsBuilder_.addMessage(index, value);
+            credentialsBatchBuilder_.addMessage(index, value);
           }
           return this;
         }
         /**
          * <pre>
-         * Credentials for reading from the specified artifact locations
+         * Batch of credentials for reading from the specified artifact locations
          * </pre>
          *
-         * <code>repeated .mlflow.ArtifactCredentialInfo credentials = 1;</code>
+         * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
          */
-        public Builder addCredentials(
+        public Builder addCredentialsBatch(
             com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo.Builder builderForValue) {
-          if (credentialsBuilder_ == null) {
-            ensureCredentialsIsMutable();
-            credentials_.add(builderForValue.build());
+          if (credentialsBatchBuilder_ == null) {
+            ensureCredentialsBatchIsMutable();
+            credentialsBatch_.add(builderForValue.build());
             onChanged();
           } else {
-            credentialsBuilder_.addMessage(builderForValue.build());
+            credentialsBatchBuilder_.addMessage(builderForValue.build());
           }
           return this;
         }
         /**
          * <pre>
-         * Credentials for reading from the specified artifact locations
+         * Batch of credentials for reading from the specified artifact locations
          * </pre>
          *
-         * <code>repeated .mlflow.ArtifactCredentialInfo credentials = 1;</code>
+         * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
          */
-        public Builder addCredentials(
+        public Builder addCredentialsBatch(
             int index, com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo.Builder builderForValue) {
-          if (credentialsBuilder_ == null) {
-            ensureCredentialsIsMutable();
-            credentials_.add(index, builderForValue.build());
+          if (credentialsBatchBuilder_ == null) {
+            ensureCredentialsBatchIsMutable();
+            credentialsBatch_.add(index, builderForValue.build());
             onChanged();
           } else {
-            credentialsBuilder_.addMessage(index, builderForValue.build());
+            credentialsBatchBuilder_.addMessage(index, builderForValue.build());
           }
           return this;
         }
         /**
          * <pre>
-         * Credentials for reading from the specified artifact locations
+         * Batch of credentials for reading from the specified artifact locations
          * </pre>
          *
-         * <code>repeated .mlflow.ArtifactCredentialInfo credentials = 1;</code>
+         * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
          */
-        public Builder addAllCredentials(
+        public Builder addAllCredentialsBatch(
             java.lang.Iterable<? extends com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo> values) {
-          if (credentialsBuilder_ == null) {
-            ensureCredentialsIsMutable();
+          if (credentialsBatchBuilder_ == null) {
+            ensureCredentialsBatchIsMutable();
             com.google.protobuf.AbstractMessageLite.Builder.addAll(
-                values, credentials_);
+                values, credentialsBatch_);
             onChanged();
           } else {
-            credentialsBuilder_.addAllMessages(values);
+            credentialsBatchBuilder_.addAllMessages(values);
           }
           return this;
         }
         /**
          * <pre>
-         * Credentials for reading from the specified artifact locations
+         * Batch of credentials for reading from the specified artifact locations
          * </pre>
          *
-         * <code>repeated .mlflow.ArtifactCredentialInfo credentials = 1;</code>
+         * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
          */
-        public Builder clearCredentials() {
-          if (credentialsBuilder_ == null) {
-            credentials_ = java.util.Collections.emptyList();
+        public Builder clearCredentialsBatch() {
+          if (credentialsBatchBuilder_ == null) {
+            credentialsBatch_ = java.util.Collections.emptyList();
             bitField0_ = (bitField0_ & ~0x00000001);
             onChanged();
           } else {
-            credentialsBuilder_.clear();
+            credentialsBatchBuilder_.clear();
           }
           return this;
         }
         /**
          * <pre>
-         * Credentials for reading from the specified artifact locations
+         * Batch of credentials for reading from the specified artifact locations
          * </pre>
          *
-         * <code>repeated .mlflow.ArtifactCredentialInfo credentials = 1;</code>
+         * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
          */
-        public Builder removeCredentials(int index) {
-          if (credentialsBuilder_ == null) {
-            ensureCredentialsIsMutable();
-            credentials_.remove(index);
+        public Builder removeCredentialsBatch(int index) {
+          if (credentialsBatchBuilder_ == null) {
+            ensureCredentialsBatchIsMutable();
+            credentialsBatch_.remove(index);
             onChanged();
           } else {
-            credentialsBuilder_.remove(index);
+            credentialsBatchBuilder_.remove(index);
           }
           return this;
         }
         /**
          * <pre>
-         * Credentials for reading from the specified artifact locations
+         * Batch of credentials for reading from the specified artifact locations
          * </pre>
          *
-         * <code>repeated .mlflow.ArtifactCredentialInfo credentials = 1;</code>
+         * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
          */
-        public com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo.Builder getCredentialsBuilder(
+        public com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo.Builder getCredentialsBatchBuilder(
             int index) {
-          return getCredentialsFieldBuilder().getBuilder(index);
+          return getCredentialsBatchFieldBuilder().getBuilder(index);
         }
         /**
          * <pre>
-         * Credentials for reading from the specified artifact locations
+         * Batch of credentials for reading from the specified artifact locations
          * </pre>
          *
-         * <code>repeated .mlflow.ArtifactCredentialInfo credentials = 1;</code>
+         * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
          */
-        public com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfoOrBuilder getCredentialsOrBuilder(
+        public com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfoOrBuilder getCredentialsBatchOrBuilder(
             int index) {
-          if (credentialsBuilder_ == null) {
-            return credentials_.get(index);  } else {
-            return credentialsBuilder_.getMessageOrBuilder(index);
+          if (credentialsBatchBuilder_ == null) {
+            return credentialsBatch_.get(index);  } else {
+            return credentialsBatchBuilder_.getMessageOrBuilder(index);
           }
         }
         /**
          * <pre>
-         * Credentials for reading from the specified artifact locations
+         * Batch of credentials for reading from the specified artifact locations
          * </pre>
          *
-         * <code>repeated .mlflow.ArtifactCredentialInfo credentials = 1;</code>
+         * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
          */
         public java.util.List<? extends com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfoOrBuilder> 
-             getCredentialsOrBuilderList() {
-          if (credentialsBuilder_ != null) {
-            return credentialsBuilder_.getMessageOrBuilderList();
+             getCredentialsBatchOrBuilderList() {
+          if (credentialsBatchBuilder_ != null) {
+            return credentialsBatchBuilder_.getMessageOrBuilderList();
           } else {
-            return java.util.Collections.unmodifiableList(credentials_);
+            return java.util.Collections.unmodifiableList(credentialsBatch_);
           }
         }
         /**
          * <pre>
-         * Credentials for reading from the specified artifact locations
+         * Batch of credentials for reading from the specified artifact locations
          * </pre>
          *
-         * <code>repeated .mlflow.ArtifactCredentialInfo credentials = 1;</code>
+         * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
          */
-        public com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo.Builder addCredentialsBuilder() {
-          return getCredentialsFieldBuilder().addBuilder(
+        public com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo.Builder addCredentialsBatchBuilder() {
+          return getCredentialsBatchFieldBuilder().addBuilder(
               com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo.getDefaultInstance());
         }
         /**
          * <pre>
-         * Credentials for reading from the specified artifact locations
+         * Batch of credentials for reading from the specified artifact locations
          * </pre>
          *
-         * <code>repeated .mlflow.ArtifactCredentialInfo credentials = 1;</code>
+         * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
          */
-        public com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo.Builder addCredentialsBuilder(
+        public com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo.Builder addCredentialsBatchBuilder(
             int index) {
-          return getCredentialsFieldBuilder().addBuilder(
+          return getCredentialsBatchFieldBuilder().addBuilder(
               index, com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo.getDefaultInstance());
         }
         /**
          * <pre>
-         * Credentials for reading from the specified artifact locations
+         * Batch of credentials for reading from the specified artifact locations
          * </pre>
          *
-         * <code>repeated .mlflow.ArtifactCredentialInfo credentials = 1;</code>
+         * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
          */
         public java.util.List<com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo.Builder> 
-             getCredentialsBuilderList() {
-          return getCredentialsFieldBuilder().getBuilderList();
+             getCredentialsBatchBuilderList() {
+          return getCredentialsBatchFieldBuilder().getBuilderList();
         }
         private com.google.protobuf.RepeatedFieldBuilderV3<
             com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo, com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo.Builder, com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfoOrBuilder> 
-            getCredentialsFieldBuilder() {
-          if (credentialsBuilder_ == null) {
-            credentialsBuilder_ = new com.google.protobuf.RepeatedFieldBuilderV3<
+            getCredentialsBatchFieldBuilder() {
+          if (credentialsBatchBuilder_ == null) {
+            credentialsBatchBuilder_ = new com.google.protobuf.RepeatedFieldBuilderV3<
                 com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo, com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo.Builder, com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfoOrBuilder>(
-                    credentials_,
+                    credentialsBatch_,
                     ((bitField0_ & 0x00000001) == 0x00000001),
                     getParentForChildren(),
                     isClean());
-            credentials_ = null;
+            credentialsBatch_ = null;
           }
-          return credentialsBuilder_;
+          return credentialsBatchBuilder_;
         }
 
         private java.lang.Object nextPageToken_ = "";
@@ -3876,7 +3876,7 @@ public final class DatabricksArtifacts {
          * Token used to fetch the next page of credentials for large requests that require pagination
          * </pre>
          *
-         * <code>optional string next_page_token = 2;</code>
+         * <code>optional string next_page_token = 3;</code>
          */
         public boolean hasNextPageToken() {
           return ((bitField0_ & 0x00000002) == 0x00000002);
@@ -3886,7 +3886,7 @@ public final class DatabricksArtifacts {
          * Token used to fetch the next page of credentials for large requests that require pagination
          * </pre>
          *
-         * <code>optional string next_page_token = 2;</code>
+         * <code>optional string next_page_token = 3;</code>
          */
         public java.lang.String getNextPageToken() {
           java.lang.Object ref = nextPageToken_;
@@ -3907,7 +3907,7 @@ public final class DatabricksArtifacts {
          * Token used to fetch the next page of credentials for large requests that require pagination
          * </pre>
          *
-         * <code>optional string next_page_token = 2;</code>
+         * <code>optional string next_page_token = 3;</code>
          */
         public com.google.protobuf.ByteString
             getNextPageTokenBytes() {
@@ -3927,7 +3927,7 @@ public final class DatabricksArtifacts {
          * Token used to fetch the next page of credentials for large requests that require pagination
          * </pre>
          *
-         * <code>optional string next_page_token = 2;</code>
+         * <code>optional string next_page_token = 3;</code>
          */
         public Builder setNextPageToken(
             java.lang.String value) {
@@ -3944,7 +3944,7 @@ public final class DatabricksArtifacts {
          * Token used to fetch the next page of credentials for large requests that require pagination
          * </pre>
          *
-         * <code>optional string next_page_token = 2;</code>
+         * <code>optional string next_page_token = 3;</code>
          */
         public Builder clearNextPageToken() {
           bitField0_ = (bitField0_ & ~0x00000002);
@@ -3957,7 +3957,7 @@ public final class DatabricksArtifacts {
          * Token used to fetch the next page of credentials for large requests that require pagination
          * </pre>
          *
-         * <code>optional string next_page_token = 2;</code>
+         * <code>optional string next_page_token = 3;</code>
          */
         public Builder setNextPageTokenBytes(
             com.google.protobuf.ByteString value) {
@@ -4085,7 +4085,7 @@ public final class DatabricksArtifacts {
      * fetch artifact read credentials
      * </pre>
      *
-     * <code>repeated string path = 2 [(.mlflow.validate_required) = true];</code>
+     * <code>repeated string path = 2;</code>
      */
     public com.google.protobuf.ProtocolStringList
         getPathList() {
@@ -4097,7 +4097,7 @@ public final class DatabricksArtifacts {
      * fetch artifact read credentials
      * </pre>
      *
-     * <code>repeated string path = 2 [(.mlflow.validate_required) = true];</code>
+     * <code>repeated string path = 2;</code>
      */
     public int getPathCount() {
       return path_.size();
@@ -4108,7 +4108,7 @@ public final class DatabricksArtifacts {
      * fetch artifact read credentials
      * </pre>
      *
-     * <code>repeated string path = 2 [(.mlflow.validate_required) = true];</code>
+     * <code>repeated string path = 2;</code>
      */
     public java.lang.String getPath(int index) {
       return path_.get(index);
@@ -4119,7 +4119,7 @@ public final class DatabricksArtifacts {
      * fetch artifact read credentials
      * </pre>
      *
-     * <code>repeated string path = 2 [(.mlflow.validate_required) = true];</code>
+     * <code>repeated string path = 2;</code>
      */
     public com.google.protobuf.ByteString
         getPathBytes(int index) {
@@ -4669,7 +4669,7 @@ public final class DatabricksArtifacts {
        * fetch artifact read credentials
        * </pre>
        *
-       * <code>repeated string path = 2 [(.mlflow.validate_required) = true];</code>
+       * <code>repeated string path = 2;</code>
        */
       public com.google.protobuf.ProtocolStringList
           getPathList() {
@@ -4681,7 +4681,7 @@ public final class DatabricksArtifacts {
        * fetch artifact read credentials
        * </pre>
        *
-       * <code>repeated string path = 2 [(.mlflow.validate_required) = true];</code>
+       * <code>repeated string path = 2;</code>
        */
       public int getPathCount() {
         return path_.size();
@@ -4692,7 +4692,7 @@ public final class DatabricksArtifacts {
        * fetch artifact read credentials
        * </pre>
        *
-       * <code>repeated string path = 2 [(.mlflow.validate_required) = true];</code>
+       * <code>repeated string path = 2;</code>
        */
       public java.lang.String getPath(int index) {
         return path_.get(index);
@@ -4703,7 +4703,7 @@ public final class DatabricksArtifacts {
        * fetch artifact read credentials
        * </pre>
        *
-       * <code>repeated string path = 2 [(.mlflow.validate_required) = true];</code>
+       * <code>repeated string path = 2;</code>
        */
       public com.google.protobuf.ByteString
           getPathBytes(int index) {
@@ -4715,7 +4715,7 @@ public final class DatabricksArtifacts {
        * fetch artifact read credentials
        * </pre>
        *
-       * <code>repeated string path = 2 [(.mlflow.validate_required) = true];</code>
+       * <code>repeated string path = 2;</code>
        */
       public Builder setPath(
           int index, java.lang.String value) {
@@ -4733,7 +4733,7 @@ public final class DatabricksArtifacts {
        * fetch artifact read credentials
        * </pre>
        *
-       * <code>repeated string path = 2 [(.mlflow.validate_required) = true];</code>
+       * <code>repeated string path = 2;</code>
        */
       public Builder addPath(
           java.lang.String value) {
@@ -4751,7 +4751,7 @@ public final class DatabricksArtifacts {
        * fetch artifact read credentials
        * </pre>
        *
-       * <code>repeated string path = 2 [(.mlflow.validate_required) = true];</code>
+       * <code>repeated string path = 2;</code>
        */
       public Builder addAllPath(
           java.lang.Iterable<java.lang.String> values) {
@@ -4767,7 +4767,7 @@ public final class DatabricksArtifacts {
        * fetch artifact read credentials
        * </pre>
        *
-       * <code>repeated string path = 2 [(.mlflow.validate_required) = true];</code>
+       * <code>repeated string path = 2;</code>
        */
       public Builder clearPath() {
         path_ = com.google.protobuf.LazyStringArrayList.EMPTY;
@@ -4781,7 +4781,7 @@ public final class DatabricksArtifacts {
        * fetch artifact read credentials
        * </pre>
        *
-       * <code>repeated string path = 2 [(.mlflow.validate_required) = true];</code>
+       * <code>repeated string path = 2;</code>
        */
       public Builder addPathBytes(
           com.google.protobuf.ByteString value) {
@@ -4982,7 +4982,7 @@ public final class DatabricksArtifacts {
      * fetch artifact write credentials
      * </pre>
      *
-     * <code>repeated string path = 2 [(.mlflow.validate_required) = true];</code>
+     * <code>repeated string path = 2;</code>
      */
     java.util.List<java.lang.String>
         getPathList();
@@ -4992,7 +4992,7 @@ public final class DatabricksArtifacts {
      * fetch artifact write credentials
      * </pre>
      *
-     * <code>repeated string path = 2 [(.mlflow.validate_required) = true];</code>
+     * <code>repeated string path = 2;</code>
      */
     int getPathCount();
     /**
@@ -5001,7 +5001,7 @@ public final class DatabricksArtifacts {
      * fetch artifact write credentials
      * </pre>
      *
-     * <code>repeated string path = 2 [(.mlflow.validate_required) = true];</code>
+     * <code>repeated string path = 2;</code>
      */
     java.lang.String getPath(int index);
     /**
@@ -5010,7 +5010,7 @@ public final class DatabricksArtifacts {
      * fetch artifact write credentials
      * </pre>
      *
-     * <code>repeated string path = 2 [(.mlflow.validate_required) = true];</code>
+     * <code>repeated string path = 2;</code>
      */
     com.google.protobuf.ByteString
         getPathBytes(int index);
@@ -5145,46 +5145,46 @@ public final class DatabricksArtifacts {
 
       /**
        * <pre>
-       * Credentials for writing to the specified artifact locations
+       * Batch of credentials for reading from the specified artifact locations
        * </pre>
        *
-       * <code>repeated .mlflow.ArtifactCredentialInfo credentials = 1;</code>
+       * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
        */
       java.util.List<com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo> 
-          getCredentialsList();
+          getCredentialsBatchList();
       /**
        * <pre>
-       * Credentials for writing to the specified artifact locations
+       * Batch of credentials for reading from the specified artifact locations
        * </pre>
        *
-       * <code>repeated .mlflow.ArtifactCredentialInfo credentials = 1;</code>
+       * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
        */
-      com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo getCredentials(int index);
+      com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo getCredentialsBatch(int index);
       /**
        * <pre>
-       * Credentials for writing to the specified artifact locations
+       * Batch of credentials for reading from the specified artifact locations
        * </pre>
        *
-       * <code>repeated .mlflow.ArtifactCredentialInfo credentials = 1;</code>
+       * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
        */
-      int getCredentialsCount();
+      int getCredentialsBatchCount();
       /**
        * <pre>
-       * Credentials for writing to the specified artifact locations
+       * Batch of credentials for reading from the specified artifact locations
        * </pre>
        *
-       * <code>repeated .mlflow.ArtifactCredentialInfo credentials = 1;</code>
+       * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
        */
       java.util.List<? extends com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfoOrBuilder> 
-          getCredentialsOrBuilderList();
+          getCredentialsBatchOrBuilderList();
       /**
        * <pre>
-       * Credentials for writing to the specified artifact locations
+       * Batch of credentials for reading from the specified artifact locations
        * </pre>
        *
-       * <code>repeated .mlflow.ArtifactCredentialInfo credentials = 1;</code>
+       * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
        */
-      com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfoOrBuilder getCredentialsOrBuilder(
+      com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfoOrBuilder getCredentialsBatchOrBuilder(
           int index);
 
       /**
@@ -5192,7 +5192,7 @@ public final class DatabricksArtifacts {
        * Token used to fetch the next page of credentials for large requests that require pagination
        * </pre>
        *
-       * <code>optional string next_page_token = 2;</code>
+       * <code>optional string next_page_token = 3;</code>
        */
       boolean hasNextPageToken();
       /**
@@ -5200,7 +5200,7 @@ public final class DatabricksArtifacts {
        * Token used to fetch the next page of credentials for large requests that require pagination
        * </pre>
        *
-       * <code>optional string next_page_token = 2;</code>
+       * <code>optional string next_page_token = 3;</code>
        */
       java.lang.String getNextPageToken();
       /**
@@ -5208,7 +5208,7 @@ public final class DatabricksArtifacts {
        * Token used to fetch the next page of credentials for large requests that require pagination
        * </pre>
        *
-       * <code>optional string next_page_token = 2;</code>
+       * <code>optional string next_page_token = 3;</code>
        */
       com.google.protobuf.ByteString
           getNextPageTokenBytes();
@@ -5226,7 +5226,7 @@ public final class DatabricksArtifacts {
         super(builder);
       }
       private Response() {
-        credentials_ = java.util.Collections.emptyList();
+        credentialsBatch_ = java.util.Collections.emptyList();
         nextPageToken_ = "";
       }
 
@@ -5254,16 +5254,16 @@ public final class DatabricksArtifacts {
               case 0:
                 done = true;
                 break;
-              case 10: {
+              case 18: {
                 if (!((mutable_bitField0_ & 0x00000001) == 0x00000001)) {
-                  credentials_ = new java.util.ArrayList<com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo>();
+                  credentialsBatch_ = new java.util.ArrayList<com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo>();
                   mutable_bitField0_ |= 0x00000001;
                 }
-                credentials_.add(
+                credentialsBatch_.add(
                     input.readMessage(com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo.PARSER, extensionRegistry));
                 break;
               }
-              case 18: {
+              case 26: {
                 com.google.protobuf.ByteString bs = input.readBytes();
                 bitField0_ |= 0x00000001;
                 nextPageToken_ = bs;
@@ -5285,7 +5285,7 @@ public final class DatabricksArtifacts {
               e).setUnfinishedMessage(this);
         } finally {
           if (((mutable_bitField0_ & 0x00000001) == 0x00000001)) {
-            credentials_ = java.util.Collections.unmodifiableList(credentials_);
+            credentialsBatch_ = java.util.Collections.unmodifiableList(credentialsBatch_);
           }
           this.unknownFields = unknownFields.build();
           makeExtensionsImmutable();
@@ -5305,69 +5305,69 @@ public final class DatabricksArtifacts {
       }
 
       private int bitField0_;
-      public static final int CREDENTIALS_FIELD_NUMBER = 1;
-      private java.util.List<com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo> credentials_;
+      public static final int CREDENTIALS_BATCH_FIELD_NUMBER = 2;
+      private java.util.List<com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo> credentialsBatch_;
       /**
        * <pre>
-       * Credentials for writing to the specified artifact locations
+       * Batch of credentials for reading from the specified artifact locations
        * </pre>
        *
-       * <code>repeated .mlflow.ArtifactCredentialInfo credentials = 1;</code>
+       * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
        */
-      public java.util.List<com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo> getCredentialsList() {
-        return credentials_;
+      public java.util.List<com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo> getCredentialsBatchList() {
+        return credentialsBatch_;
       }
       /**
        * <pre>
-       * Credentials for writing to the specified artifact locations
+       * Batch of credentials for reading from the specified artifact locations
        * </pre>
        *
-       * <code>repeated .mlflow.ArtifactCredentialInfo credentials = 1;</code>
+       * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
        */
       public java.util.List<? extends com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfoOrBuilder> 
-          getCredentialsOrBuilderList() {
-        return credentials_;
+          getCredentialsBatchOrBuilderList() {
+        return credentialsBatch_;
       }
       /**
        * <pre>
-       * Credentials for writing to the specified artifact locations
+       * Batch of credentials for reading from the specified artifact locations
        * </pre>
        *
-       * <code>repeated .mlflow.ArtifactCredentialInfo credentials = 1;</code>
+       * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
        */
-      public int getCredentialsCount() {
-        return credentials_.size();
+      public int getCredentialsBatchCount() {
+        return credentialsBatch_.size();
       }
       /**
        * <pre>
-       * Credentials for writing to the specified artifact locations
+       * Batch of credentials for reading from the specified artifact locations
        * </pre>
        *
-       * <code>repeated .mlflow.ArtifactCredentialInfo credentials = 1;</code>
+       * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
        */
-      public com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo getCredentials(int index) {
-        return credentials_.get(index);
+      public com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo getCredentialsBatch(int index) {
+        return credentialsBatch_.get(index);
       }
       /**
        * <pre>
-       * Credentials for writing to the specified artifact locations
+       * Batch of credentials for reading from the specified artifact locations
        * </pre>
        *
-       * <code>repeated .mlflow.ArtifactCredentialInfo credentials = 1;</code>
+       * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
        */
-      public com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfoOrBuilder getCredentialsOrBuilder(
+      public com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfoOrBuilder getCredentialsBatchOrBuilder(
           int index) {
-        return credentials_.get(index);
+        return credentialsBatch_.get(index);
       }
 
-      public static final int NEXT_PAGE_TOKEN_FIELD_NUMBER = 2;
+      public static final int NEXT_PAGE_TOKEN_FIELD_NUMBER = 3;
       private volatile java.lang.Object nextPageToken_;
       /**
        * <pre>
        * Token used to fetch the next page of credentials for large requests that require pagination
        * </pre>
        *
-       * <code>optional string next_page_token = 2;</code>
+       * <code>optional string next_page_token = 3;</code>
        */
       public boolean hasNextPageToken() {
         return ((bitField0_ & 0x00000001) == 0x00000001);
@@ -5377,7 +5377,7 @@ public final class DatabricksArtifacts {
        * Token used to fetch the next page of credentials for large requests that require pagination
        * </pre>
        *
-       * <code>optional string next_page_token = 2;</code>
+       * <code>optional string next_page_token = 3;</code>
        */
       public java.lang.String getNextPageToken() {
         java.lang.Object ref = nextPageToken_;
@@ -5398,7 +5398,7 @@ public final class DatabricksArtifacts {
        * Token used to fetch the next page of credentials for large requests that require pagination
        * </pre>
        *
-       * <code>optional string next_page_token = 2;</code>
+       * <code>optional string next_page_token = 3;</code>
        */
       public com.google.protobuf.ByteString
           getNextPageTokenBytes() {
@@ -5428,11 +5428,11 @@ public final class DatabricksArtifacts {
       @java.lang.Override
       public void writeTo(com.google.protobuf.CodedOutputStream output)
                           throws java.io.IOException {
-        for (int i = 0; i < credentials_.size(); i++) {
-          output.writeMessage(1, credentials_.get(i));
+        for (int i = 0; i < credentialsBatch_.size(); i++) {
+          output.writeMessage(2, credentialsBatch_.get(i));
         }
         if (((bitField0_ & 0x00000001) == 0x00000001)) {
-          com.google.protobuf.GeneratedMessageV3.writeString(output, 2, nextPageToken_);
+          com.google.protobuf.GeneratedMessageV3.writeString(output, 3, nextPageToken_);
         }
         unknownFields.writeTo(output);
       }
@@ -5443,12 +5443,12 @@ public final class DatabricksArtifacts {
         if (size != -1) return size;
 
         size = 0;
-        for (int i = 0; i < credentials_.size(); i++) {
+        for (int i = 0; i < credentialsBatch_.size(); i++) {
           size += com.google.protobuf.CodedOutputStream
-            .computeMessageSize(1, credentials_.get(i));
+            .computeMessageSize(2, credentialsBatch_.get(i));
         }
         if (((bitField0_ & 0x00000001) == 0x00000001)) {
-          size += com.google.protobuf.GeneratedMessageV3.computeStringSize(2, nextPageToken_);
+          size += com.google.protobuf.GeneratedMessageV3.computeStringSize(3, nextPageToken_);
         }
         size += unknownFields.getSerializedSize();
         memoizedSize = size;
@@ -5466,8 +5466,8 @@ public final class DatabricksArtifacts {
         com.databricks.api.proto.mlflow.DatabricksArtifacts.GetCredentialsForWrite.Response other = (com.databricks.api.proto.mlflow.DatabricksArtifacts.GetCredentialsForWrite.Response) obj;
 
         boolean result = true;
-        result = result && getCredentialsList()
-            .equals(other.getCredentialsList());
+        result = result && getCredentialsBatchList()
+            .equals(other.getCredentialsBatchList());
         result = result && (hasNextPageToken() == other.hasNextPageToken());
         if (hasNextPageToken()) {
           result = result && getNextPageToken()
@@ -5484,9 +5484,9 @@ public final class DatabricksArtifacts {
         }
         int hash = 41;
         hash = (19 * hash) + getDescriptor().hashCode();
-        if (getCredentialsCount() > 0) {
-          hash = (37 * hash) + CREDENTIALS_FIELD_NUMBER;
-          hash = (53 * hash) + getCredentialsList().hashCode();
+        if (getCredentialsBatchCount() > 0) {
+          hash = (37 * hash) + CREDENTIALS_BATCH_FIELD_NUMBER;
+          hash = (53 * hash) + getCredentialsBatchList().hashCode();
         }
         if (hasNextPageToken()) {
           hash = (37 * hash) + NEXT_PAGE_TOKEN_FIELD_NUMBER;
@@ -5620,17 +5620,17 @@ public final class DatabricksArtifacts {
         private void maybeForceBuilderInitialization() {
           if (com.google.protobuf.GeneratedMessageV3
                   .alwaysUseFieldBuilders) {
-            getCredentialsFieldBuilder();
+            getCredentialsBatchFieldBuilder();
           }
         }
         @java.lang.Override
         public Builder clear() {
           super.clear();
-          if (credentialsBuilder_ == null) {
-            credentials_ = java.util.Collections.emptyList();
+          if (credentialsBatchBuilder_ == null) {
+            credentialsBatch_ = java.util.Collections.emptyList();
             bitField0_ = (bitField0_ & ~0x00000001);
           } else {
-            credentialsBuilder_.clear();
+            credentialsBatchBuilder_.clear();
           }
           nextPageToken_ = "";
           bitField0_ = (bitField0_ & ~0x00000002);
@@ -5662,14 +5662,14 @@ public final class DatabricksArtifacts {
           com.databricks.api.proto.mlflow.DatabricksArtifacts.GetCredentialsForWrite.Response result = new com.databricks.api.proto.mlflow.DatabricksArtifacts.GetCredentialsForWrite.Response(this);
           int from_bitField0_ = bitField0_;
           int to_bitField0_ = 0;
-          if (credentialsBuilder_ == null) {
+          if (credentialsBatchBuilder_ == null) {
             if (((bitField0_ & 0x00000001) == 0x00000001)) {
-              credentials_ = java.util.Collections.unmodifiableList(credentials_);
+              credentialsBatch_ = java.util.Collections.unmodifiableList(credentialsBatch_);
               bitField0_ = (bitField0_ & ~0x00000001);
             }
-            result.credentials_ = credentials_;
+            result.credentialsBatch_ = credentialsBatch_;
           } else {
-            result.credentials_ = credentialsBuilder_.build();
+            result.credentialsBatch_ = credentialsBatchBuilder_.build();
           }
           if (((from_bitField0_ & 0x00000002) == 0x00000002)) {
             to_bitField0_ |= 0x00000001;
@@ -5724,29 +5724,29 @@ public final class DatabricksArtifacts {
 
         public Builder mergeFrom(com.databricks.api.proto.mlflow.DatabricksArtifacts.GetCredentialsForWrite.Response other) {
           if (other == com.databricks.api.proto.mlflow.DatabricksArtifacts.GetCredentialsForWrite.Response.getDefaultInstance()) return this;
-          if (credentialsBuilder_ == null) {
-            if (!other.credentials_.isEmpty()) {
-              if (credentials_.isEmpty()) {
-                credentials_ = other.credentials_;
+          if (credentialsBatchBuilder_ == null) {
+            if (!other.credentialsBatch_.isEmpty()) {
+              if (credentialsBatch_.isEmpty()) {
+                credentialsBatch_ = other.credentialsBatch_;
                 bitField0_ = (bitField0_ & ~0x00000001);
               } else {
-                ensureCredentialsIsMutable();
-                credentials_.addAll(other.credentials_);
+                ensureCredentialsBatchIsMutable();
+                credentialsBatch_.addAll(other.credentialsBatch_);
               }
               onChanged();
             }
           } else {
-            if (!other.credentials_.isEmpty()) {
-              if (credentialsBuilder_.isEmpty()) {
-                credentialsBuilder_.dispose();
-                credentialsBuilder_ = null;
-                credentials_ = other.credentials_;
+            if (!other.credentialsBatch_.isEmpty()) {
+              if (credentialsBatchBuilder_.isEmpty()) {
+                credentialsBatchBuilder_.dispose();
+                credentialsBatchBuilder_ = null;
+                credentialsBatch_ = other.credentialsBatch_;
                 bitField0_ = (bitField0_ & ~0x00000001);
-                credentialsBuilder_ = 
+                credentialsBatchBuilder_ = 
                   com.google.protobuf.GeneratedMessageV3.alwaysUseFieldBuilders ?
-                     getCredentialsFieldBuilder() : null;
+                     getCredentialsBatchFieldBuilder() : null;
               } else {
-                credentialsBuilder_.addAllMessages(other.credentials_);
+                credentialsBatchBuilder_.addAllMessages(other.credentialsBatch_);
               }
             }
           }
@@ -5785,316 +5785,316 @@ public final class DatabricksArtifacts {
         }
         private int bitField0_;
 
-        private java.util.List<com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo> credentials_ =
+        private java.util.List<com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo> credentialsBatch_ =
           java.util.Collections.emptyList();
-        private void ensureCredentialsIsMutable() {
+        private void ensureCredentialsBatchIsMutable() {
           if (!((bitField0_ & 0x00000001) == 0x00000001)) {
-            credentials_ = new java.util.ArrayList<com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo>(credentials_);
+            credentialsBatch_ = new java.util.ArrayList<com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo>(credentialsBatch_);
             bitField0_ |= 0x00000001;
            }
         }
 
         private com.google.protobuf.RepeatedFieldBuilderV3<
-            com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo, com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo.Builder, com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfoOrBuilder> credentialsBuilder_;
+            com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo, com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo.Builder, com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfoOrBuilder> credentialsBatchBuilder_;
 
         /**
          * <pre>
-         * Credentials for writing to the specified artifact locations
+         * Batch of credentials for reading from the specified artifact locations
          * </pre>
          *
-         * <code>repeated .mlflow.ArtifactCredentialInfo credentials = 1;</code>
+         * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
          */
-        public java.util.List<com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo> getCredentialsList() {
-          if (credentialsBuilder_ == null) {
-            return java.util.Collections.unmodifiableList(credentials_);
+        public java.util.List<com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo> getCredentialsBatchList() {
+          if (credentialsBatchBuilder_ == null) {
+            return java.util.Collections.unmodifiableList(credentialsBatch_);
           } else {
-            return credentialsBuilder_.getMessageList();
+            return credentialsBatchBuilder_.getMessageList();
           }
         }
         /**
          * <pre>
-         * Credentials for writing to the specified artifact locations
+         * Batch of credentials for reading from the specified artifact locations
          * </pre>
          *
-         * <code>repeated .mlflow.ArtifactCredentialInfo credentials = 1;</code>
+         * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
          */
-        public int getCredentialsCount() {
-          if (credentialsBuilder_ == null) {
-            return credentials_.size();
+        public int getCredentialsBatchCount() {
+          if (credentialsBatchBuilder_ == null) {
+            return credentialsBatch_.size();
           } else {
-            return credentialsBuilder_.getCount();
+            return credentialsBatchBuilder_.getCount();
           }
         }
         /**
          * <pre>
-         * Credentials for writing to the specified artifact locations
+         * Batch of credentials for reading from the specified artifact locations
          * </pre>
          *
-         * <code>repeated .mlflow.ArtifactCredentialInfo credentials = 1;</code>
+         * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
          */
-        public com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo getCredentials(int index) {
-          if (credentialsBuilder_ == null) {
-            return credentials_.get(index);
+        public com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo getCredentialsBatch(int index) {
+          if (credentialsBatchBuilder_ == null) {
+            return credentialsBatch_.get(index);
           } else {
-            return credentialsBuilder_.getMessage(index);
+            return credentialsBatchBuilder_.getMessage(index);
           }
         }
         /**
          * <pre>
-         * Credentials for writing to the specified artifact locations
+         * Batch of credentials for reading from the specified artifact locations
          * </pre>
          *
-         * <code>repeated .mlflow.ArtifactCredentialInfo credentials = 1;</code>
+         * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
          */
-        public Builder setCredentials(
+        public Builder setCredentialsBatch(
             int index, com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo value) {
-          if (credentialsBuilder_ == null) {
+          if (credentialsBatchBuilder_ == null) {
             if (value == null) {
               throw new NullPointerException();
             }
-            ensureCredentialsIsMutable();
-            credentials_.set(index, value);
+            ensureCredentialsBatchIsMutable();
+            credentialsBatch_.set(index, value);
             onChanged();
           } else {
-            credentialsBuilder_.setMessage(index, value);
+            credentialsBatchBuilder_.setMessage(index, value);
           }
           return this;
         }
         /**
          * <pre>
-         * Credentials for writing to the specified artifact locations
+         * Batch of credentials for reading from the specified artifact locations
          * </pre>
          *
-         * <code>repeated .mlflow.ArtifactCredentialInfo credentials = 1;</code>
+         * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
          */
-        public Builder setCredentials(
+        public Builder setCredentialsBatch(
             int index, com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo.Builder builderForValue) {
-          if (credentialsBuilder_ == null) {
-            ensureCredentialsIsMutable();
-            credentials_.set(index, builderForValue.build());
+          if (credentialsBatchBuilder_ == null) {
+            ensureCredentialsBatchIsMutable();
+            credentialsBatch_.set(index, builderForValue.build());
             onChanged();
           } else {
-            credentialsBuilder_.setMessage(index, builderForValue.build());
+            credentialsBatchBuilder_.setMessage(index, builderForValue.build());
           }
           return this;
         }
         /**
          * <pre>
-         * Credentials for writing to the specified artifact locations
+         * Batch of credentials for reading from the specified artifact locations
          * </pre>
          *
-         * <code>repeated .mlflow.ArtifactCredentialInfo credentials = 1;</code>
+         * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
          */
-        public Builder addCredentials(com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo value) {
-          if (credentialsBuilder_ == null) {
+        public Builder addCredentialsBatch(com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo value) {
+          if (credentialsBatchBuilder_ == null) {
             if (value == null) {
               throw new NullPointerException();
             }
-            ensureCredentialsIsMutable();
-            credentials_.add(value);
+            ensureCredentialsBatchIsMutable();
+            credentialsBatch_.add(value);
             onChanged();
           } else {
-            credentialsBuilder_.addMessage(value);
+            credentialsBatchBuilder_.addMessage(value);
           }
           return this;
         }
         /**
          * <pre>
-         * Credentials for writing to the specified artifact locations
+         * Batch of credentials for reading from the specified artifact locations
          * </pre>
          *
-         * <code>repeated .mlflow.ArtifactCredentialInfo credentials = 1;</code>
+         * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
          */
-        public Builder addCredentials(
+        public Builder addCredentialsBatch(
             int index, com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo value) {
-          if (credentialsBuilder_ == null) {
+          if (credentialsBatchBuilder_ == null) {
             if (value == null) {
               throw new NullPointerException();
             }
-            ensureCredentialsIsMutable();
-            credentials_.add(index, value);
+            ensureCredentialsBatchIsMutable();
+            credentialsBatch_.add(index, value);
             onChanged();
           } else {
-            credentialsBuilder_.addMessage(index, value);
+            credentialsBatchBuilder_.addMessage(index, value);
           }
           return this;
         }
         /**
          * <pre>
-         * Credentials for writing to the specified artifact locations
+         * Batch of credentials for reading from the specified artifact locations
          * </pre>
          *
-         * <code>repeated .mlflow.ArtifactCredentialInfo credentials = 1;</code>
+         * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
          */
-        public Builder addCredentials(
+        public Builder addCredentialsBatch(
             com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo.Builder builderForValue) {
-          if (credentialsBuilder_ == null) {
-            ensureCredentialsIsMutable();
-            credentials_.add(builderForValue.build());
+          if (credentialsBatchBuilder_ == null) {
+            ensureCredentialsBatchIsMutable();
+            credentialsBatch_.add(builderForValue.build());
             onChanged();
           } else {
-            credentialsBuilder_.addMessage(builderForValue.build());
+            credentialsBatchBuilder_.addMessage(builderForValue.build());
           }
           return this;
         }
         /**
          * <pre>
-         * Credentials for writing to the specified artifact locations
+         * Batch of credentials for reading from the specified artifact locations
          * </pre>
          *
-         * <code>repeated .mlflow.ArtifactCredentialInfo credentials = 1;</code>
+         * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
          */
-        public Builder addCredentials(
+        public Builder addCredentialsBatch(
             int index, com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo.Builder builderForValue) {
-          if (credentialsBuilder_ == null) {
-            ensureCredentialsIsMutable();
-            credentials_.add(index, builderForValue.build());
+          if (credentialsBatchBuilder_ == null) {
+            ensureCredentialsBatchIsMutable();
+            credentialsBatch_.add(index, builderForValue.build());
             onChanged();
           } else {
-            credentialsBuilder_.addMessage(index, builderForValue.build());
+            credentialsBatchBuilder_.addMessage(index, builderForValue.build());
           }
           return this;
         }
         /**
          * <pre>
-         * Credentials for writing to the specified artifact locations
+         * Batch of credentials for reading from the specified artifact locations
          * </pre>
          *
-         * <code>repeated .mlflow.ArtifactCredentialInfo credentials = 1;</code>
+         * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
          */
-        public Builder addAllCredentials(
+        public Builder addAllCredentialsBatch(
             java.lang.Iterable<? extends com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo> values) {
-          if (credentialsBuilder_ == null) {
-            ensureCredentialsIsMutable();
+          if (credentialsBatchBuilder_ == null) {
+            ensureCredentialsBatchIsMutable();
             com.google.protobuf.AbstractMessageLite.Builder.addAll(
-                values, credentials_);
+                values, credentialsBatch_);
             onChanged();
           } else {
-            credentialsBuilder_.addAllMessages(values);
+            credentialsBatchBuilder_.addAllMessages(values);
           }
           return this;
         }
         /**
          * <pre>
-         * Credentials for writing to the specified artifact locations
+         * Batch of credentials for reading from the specified artifact locations
          * </pre>
          *
-         * <code>repeated .mlflow.ArtifactCredentialInfo credentials = 1;</code>
+         * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
          */
-        public Builder clearCredentials() {
-          if (credentialsBuilder_ == null) {
-            credentials_ = java.util.Collections.emptyList();
+        public Builder clearCredentialsBatch() {
+          if (credentialsBatchBuilder_ == null) {
+            credentialsBatch_ = java.util.Collections.emptyList();
             bitField0_ = (bitField0_ & ~0x00000001);
             onChanged();
           } else {
-            credentialsBuilder_.clear();
+            credentialsBatchBuilder_.clear();
           }
           return this;
         }
         /**
          * <pre>
-         * Credentials for writing to the specified artifact locations
+         * Batch of credentials for reading from the specified artifact locations
          * </pre>
          *
-         * <code>repeated .mlflow.ArtifactCredentialInfo credentials = 1;</code>
+         * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
          */
-        public Builder removeCredentials(int index) {
-          if (credentialsBuilder_ == null) {
-            ensureCredentialsIsMutable();
-            credentials_.remove(index);
+        public Builder removeCredentialsBatch(int index) {
+          if (credentialsBatchBuilder_ == null) {
+            ensureCredentialsBatchIsMutable();
+            credentialsBatch_.remove(index);
             onChanged();
           } else {
-            credentialsBuilder_.remove(index);
+            credentialsBatchBuilder_.remove(index);
           }
           return this;
         }
         /**
          * <pre>
-         * Credentials for writing to the specified artifact locations
+         * Batch of credentials for reading from the specified artifact locations
          * </pre>
          *
-         * <code>repeated .mlflow.ArtifactCredentialInfo credentials = 1;</code>
+         * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
          */
-        public com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo.Builder getCredentialsBuilder(
+        public com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo.Builder getCredentialsBatchBuilder(
             int index) {
-          return getCredentialsFieldBuilder().getBuilder(index);
+          return getCredentialsBatchFieldBuilder().getBuilder(index);
         }
         /**
          * <pre>
-         * Credentials for writing to the specified artifact locations
+         * Batch of credentials for reading from the specified artifact locations
          * </pre>
          *
-         * <code>repeated .mlflow.ArtifactCredentialInfo credentials = 1;</code>
+         * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
          */
-        public com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfoOrBuilder getCredentialsOrBuilder(
+        public com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfoOrBuilder getCredentialsBatchOrBuilder(
             int index) {
-          if (credentialsBuilder_ == null) {
-            return credentials_.get(index);  } else {
-            return credentialsBuilder_.getMessageOrBuilder(index);
+          if (credentialsBatchBuilder_ == null) {
+            return credentialsBatch_.get(index);  } else {
+            return credentialsBatchBuilder_.getMessageOrBuilder(index);
           }
         }
         /**
          * <pre>
-         * Credentials for writing to the specified artifact locations
+         * Batch of credentials for reading from the specified artifact locations
          * </pre>
          *
-         * <code>repeated .mlflow.ArtifactCredentialInfo credentials = 1;</code>
+         * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
          */
         public java.util.List<? extends com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfoOrBuilder> 
-             getCredentialsOrBuilderList() {
-          if (credentialsBuilder_ != null) {
-            return credentialsBuilder_.getMessageOrBuilderList();
+             getCredentialsBatchOrBuilderList() {
+          if (credentialsBatchBuilder_ != null) {
+            return credentialsBatchBuilder_.getMessageOrBuilderList();
           } else {
-            return java.util.Collections.unmodifiableList(credentials_);
+            return java.util.Collections.unmodifiableList(credentialsBatch_);
           }
         }
         /**
          * <pre>
-         * Credentials for writing to the specified artifact locations
+         * Batch of credentials for reading from the specified artifact locations
          * </pre>
          *
-         * <code>repeated .mlflow.ArtifactCredentialInfo credentials = 1;</code>
+         * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
          */
-        public com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo.Builder addCredentialsBuilder() {
-          return getCredentialsFieldBuilder().addBuilder(
+        public com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo.Builder addCredentialsBatchBuilder() {
+          return getCredentialsBatchFieldBuilder().addBuilder(
               com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo.getDefaultInstance());
         }
         /**
          * <pre>
-         * Credentials for writing to the specified artifact locations
+         * Batch of credentials for reading from the specified artifact locations
          * </pre>
          *
-         * <code>repeated .mlflow.ArtifactCredentialInfo credentials = 1;</code>
+         * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
          */
-        public com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo.Builder addCredentialsBuilder(
+        public com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo.Builder addCredentialsBatchBuilder(
             int index) {
-          return getCredentialsFieldBuilder().addBuilder(
+          return getCredentialsBatchFieldBuilder().addBuilder(
               index, com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo.getDefaultInstance());
         }
         /**
          * <pre>
-         * Credentials for writing to the specified artifact locations
+         * Batch of credentials for reading from the specified artifact locations
          * </pre>
          *
-         * <code>repeated .mlflow.ArtifactCredentialInfo credentials = 1;</code>
+         * <code>repeated .mlflow.ArtifactCredentialInfo credentials_batch = 2;</code>
          */
         public java.util.List<com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo.Builder> 
-             getCredentialsBuilderList() {
-          return getCredentialsFieldBuilder().getBuilderList();
+             getCredentialsBatchBuilderList() {
+          return getCredentialsBatchFieldBuilder().getBuilderList();
         }
         private com.google.protobuf.RepeatedFieldBuilderV3<
             com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo, com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo.Builder, com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfoOrBuilder> 
-            getCredentialsFieldBuilder() {
-          if (credentialsBuilder_ == null) {
-            credentialsBuilder_ = new com.google.protobuf.RepeatedFieldBuilderV3<
+            getCredentialsBatchFieldBuilder() {
+          if (credentialsBatchBuilder_ == null) {
+            credentialsBatchBuilder_ = new com.google.protobuf.RepeatedFieldBuilderV3<
                 com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo, com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfo.Builder, com.databricks.api.proto.mlflow.DatabricksArtifacts.ArtifactCredentialInfoOrBuilder>(
-                    credentials_,
+                    credentialsBatch_,
                     ((bitField0_ & 0x00000001) == 0x00000001),
                     getParentForChildren(),
                     isClean());
-            credentials_ = null;
+            credentialsBatch_ = null;
           }
-          return credentialsBuilder_;
+          return credentialsBatchBuilder_;
         }
 
         private java.lang.Object nextPageToken_ = "";
@@ -6103,7 +6103,7 @@ public final class DatabricksArtifacts {
          * Token used to fetch the next page of credentials for large requests that require pagination
          * </pre>
          *
-         * <code>optional string next_page_token = 2;</code>
+         * <code>optional string next_page_token = 3;</code>
          */
         public boolean hasNextPageToken() {
           return ((bitField0_ & 0x00000002) == 0x00000002);
@@ -6113,7 +6113,7 @@ public final class DatabricksArtifacts {
          * Token used to fetch the next page of credentials for large requests that require pagination
          * </pre>
          *
-         * <code>optional string next_page_token = 2;</code>
+         * <code>optional string next_page_token = 3;</code>
          */
         public java.lang.String getNextPageToken() {
           java.lang.Object ref = nextPageToken_;
@@ -6134,7 +6134,7 @@ public final class DatabricksArtifacts {
          * Token used to fetch the next page of credentials for large requests that require pagination
          * </pre>
          *
-         * <code>optional string next_page_token = 2;</code>
+         * <code>optional string next_page_token = 3;</code>
          */
         public com.google.protobuf.ByteString
             getNextPageTokenBytes() {
@@ -6154,7 +6154,7 @@ public final class DatabricksArtifacts {
          * Token used to fetch the next page of credentials for large requests that require pagination
          * </pre>
          *
-         * <code>optional string next_page_token = 2;</code>
+         * <code>optional string next_page_token = 3;</code>
          */
         public Builder setNextPageToken(
             java.lang.String value) {
@@ -6171,7 +6171,7 @@ public final class DatabricksArtifacts {
          * Token used to fetch the next page of credentials for large requests that require pagination
          * </pre>
          *
-         * <code>optional string next_page_token = 2;</code>
+         * <code>optional string next_page_token = 3;</code>
          */
         public Builder clearNextPageToken() {
           bitField0_ = (bitField0_ & ~0x00000002);
@@ -6184,7 +6184,7 @@ public final class DatabricksArtifacts {
          * Token used to fetch the next page of credentials for large requests that require pagination
          * </pre>
          *
-         * <code>optional string next_page_token = 2;</code>
+         * <code>optional string next_page_token = 3;</code>
          */
         public Builder setNextPageTokenBytes(
             com.google.protobuf.ByteString value) {
@@ -6312,7 +6312,7 @@ public final class DatabricksArtifacts {
      * fetch artifact write credentials
      * </pre>
      *
-     * <code>repeated string path = 2 [(.mlflow.validate_required) = true];</code>
+     * <code>repeated string path = 2;</code>
      */
     public com.google.protobuf.ProtocolStringList
         getPathList() {
@@ -6324,7 +6324,7 @@ public final class DatabricksArtifacts {
      * fetch artifact write credentials
      * </pre>
      *
-     * <code>repeated string path = 2 [(.mlflow.validate_required) = true];</code>
+     * <code>repeated string path = 2;</code>
      */
     public int getPathCount() {
       return path_.size();
@@ -6335,7 +6335,7 @@ public final class DatabricksArtifacts {
      * fetch artifact write credentials
      * </pre>
      *
-     * <code>repeated string path = 2 [(.mlflow.validate_required) = true];</code>
+     * <code>repeated string path = 2;</code>
      */
     public java.lang.String getPath(int index) {
       return path_.get(index);
@@ -6346,7 +6346,7 @@ public final class DatabricksArtifacts {
      * fetch artifact write credentials
      * </pre>
      *
-     * <code>repeated string path = 2 [(.mlflow.validate_required) = true];</code>
+     * <code>repeated string path = 2;</code>
      */
     public com.google.protobuf.ByteString
         getPathBytes(int index) {
@@ -6896,7 +6896,7 @@ public final class DatabricksArtifacts {
        * fetch artifact write credentials
        * </pre>
        *
-       * <code>repeated string path = 2 [(.mlflow.validate_required) = true];</code>
+       * <code>repeated string path = 2;</code>
        */
       public com.google.protobuf.ProtocolStringList
           getPathList() {
@@ -6908,7 +6908,7 @@ public final class DatabricksArtifacts {
        * fetch artifact write credentials
        * </pre>
        *
-       * <code>repeated string path = 2 [(.mlflow.validate_required) = true];</code>
+       * <code>repeated string path = 2;</code>
        */
       public int getPathCount() {
         return path_.size();
@@ -6919,7 +6919,7 @@ public final class DatabricksArtifacts {
        * fetch artifact write credentials
        * </pre>
        *
-       * <code>repeated string path = 2 [(.mlflow.validate_required) = true];</code>
+       * <code>repeated string path = 2;</code>
        */
       public java.lang.String getPath(int index) {
         return path_.get(index);
@@ -6930,7 +6930,7 @@ public final class DatabricksArtifacts {
        * fetch artifact write credentials
        * </pre>
        *
-       * <code>repeated string path = 2 [(.mlflow.validate_required) = true];</code>
+       * <code>repeated string path = 2;</code>
        */
       public com.google.protobuf.ByteString
           getPathBytes(int index) {
@@ -6942,7 +6942,7 @@ public final class DatabricksArtifacts {
        * fetch artifact write credentials
        * </pre>
        *
-       * <code>repeated string path = 2 [(.mlflow.validate_required) = true];</code>
+       * <code>repeated string path = 2;</code>
        */
       public Builder setPath(
           int index, java.lang.String value) {
@@ -6960,7 +6960,7 @@ public final class DatabricksArtifacts {
        * fetch artifact write credentials
        * </pre>
        *
-       * <code>repeated string path = 2 [(.mlflow.validate_required) = true];</code>
+       * <code>repeated string path = 2;</code>
        */
       public Builder addPath(
           java.lang.String value) {
@@ -6978,7 +6978,7 @@ public final class DatabricksArtifacts {
        * fetch artifact write credentials
        * </pre>
        *
-       * <code>repeated string path = 2 [(.mlflow.validate_required) = true];</code>
+       * <code>repeated string path = 2;</code>
        */
       public Builder addAllPath(
           java.lang.Iterable<java.lang.String> values) {
@@ -6994,7 +6994,7 @@ public final class DatabricksArtifacts {
        * fetch artifact write credentials
        * </pre>
        *
-       * <code>repeated string path = 2 [(.mlflow.validate_required) = true];</code>
+       * <code>repeated string path = 2;</code>
        */
       public Builder clearPath() {
         path_ = com.google.protobuf.LazyStringArrayList.EMPTY;
@@ -7008,7 +7008,7 @@ public final class DatabricksArtifacts {
        * fetch artifact write credentials
        * </pre>
        *
-       * <code>repeated string path = 2 [(.mlflow.validate_required) = true];</code>
+       * <code>repeated string path = 2;</code>
        */
       public Builder addPathBytes(
           com.google.protobuf.ByteString value) {
@@ -7220,17 +7220,17 @@ public final class DatabricksArtifacts {
       "nfo.HttpHeader\022,\n\004type\030\005 \001(\0162\036.mlflow.Ar" +
       "tifactCredentialType\032)\n\nHttpHeader\022\014\n\004na" +
       "me\030\001 \001(\t\022\r\n\005value\030\002 \001(\t\"\220\002\n\025GetCredentia" +
-      "lsForRead\022\024\n\006run_id\030\001 \001(\tB\004\370\206\031\001\022\022\n\004path\030" +
-      "\002 \003(\tB\004\370\206\031\001\022\022\n\npage_token\030\003 \001(\t\032X\n\010Respo" +
-      "nse\0223\n\013credentials\030\001 \003(\0132\036.mlflow.Artifa" +
-      "ctCredentialInfo\022\027\n\017next_page_token\030\002 \001(" +
+      "lsForRead\022\024\n\006run_id\030\001 \001(\tB\004\370\206\031\001\022\014\n\004path\030" +
+      "\002 \003(\t\022\022\n\npage_token\030\003 \001(\t\032^\n\010Response\0229\n" +
+      "\021credentials_batch\030\002 \003(\0132\036.mlflow.Artifa" +
+      "ctCredentialInfo\022\027\n\017next_page_token\030\003 \001(" +
       "\t:_\342?(\n&com.databricks.rpc.RPC[$this.Res" +
       "ponse]\342?1\n/com.databricks.mlflow.api.Mlf" +
       "lowTrackingMessage\"\221\002\n\026GetCredentialsFor" +
-      "Write\022\024\n\006run_id\030\001 \001(\tB\004\370\206\031\001\022\022\n\004path\030\002 \003(" +
-      "\tB\004\370\206\031\001\022\022\n\npage_token\030\003 \001(\t\032X\n\010Response\022" +
-      "3\n\013credentials\030\001 \003(\0132\036.mlflow.ArtifactCr" +
-      "edentialInfo\022\027\n\017next_page_token\030\002 \001(\t:_\342" +
+      "Write\022\024\n\006run_id\030\001 \001(\tB\004\370\206\031\001\022\014\n\004path\030\002 \003(" +
+      "\t\022\022\n\npage_token\030\003 \001(\t\032^\n\010Response\0229\n\021cre" +
+      "dentials_batch\030\002 \003(\0132\036.mlflow.ArtifactCr" +
+      "edentialInfo\022\027\n\017next_page_token\030\003 \001(\t:_\342" +
       "?(\n&com.databricks.rpc.RPC[$this.Respons" +
       "e]\342?1\n/com.databricks.mlflow.api.MlflowT" +
       "rackingMessage*V\n\026ArtifactCredentialType" +
@@ -7284,7 +7284,7 @@ public final class DatabricksArtifacts {
     internal_static_mlflow_GetCredentialsForRead_Response_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
         internal_static_mlflow_GetCredentialsForRead_Response_descriptor,
-        new java.lang.String[] { "Credentials", "NextPageToken", });
+        new java.lang.String[] { "CredentialsBatch", "NextPageToken", });
     internal_static_mlflow_GetCredentialsForWrite_descriptor =
       getDescriptor().getMessageTypes().get(2);
     internal_static_mlflow_GetCredentialsForWrite_fieldAccessorTable = new
@@ -7296,7 +7296,7 @@ public final class DatabricksArtifacts {
     internal_static_mlflow_GetCredentialsForWrite_Response_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
         internal_static_mlflow_GetCredentialsForWrite_Response_descriptor,
-        new java.lang.String[] { "Credentials", "NextPageToken", });
+        new java.lang.String[] { "CredentialsBatch", "NextPageToken", });
     com.google.protobuf.ExtensionRegistry registry =
         com.google.protobuf.ExtensionRegistry.newInstance();
     registry.add(com.databricks.api.proto.databricks.Databricks.rpc);
