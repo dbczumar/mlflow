@@ -161,10 +161,24 @@ class DatabricksArtifactRepository(ArtifactRepository):
 
 
     def _get_read_credentials(self, run_id, paths=None):
-        json_body = message_to_json(GetCredentialsForRead(run_id=run_id, path=paths))
-        return self._call_endpoint(
-            DatabricksMlflowArtifactsService, GetCredentialsForRead, json_body
-        )
+        read_credentials = []
+        page_token = None
+        while True:
+            if page_token:
+                json_body = message_to_json(GetCredentialsForRead(run_id=run_id, path=paths))
+            else:
+                json_body = message_to_json(GetCredentialsForRead(run_id=run_id, path=paths, page_token=page_token))
+
+            response = self._call_endpoint(
+                DatabricksMlflowArtifactsService, GetCredentialsForRead, json_body
+            )
+            read_credentials += response.credentials_batch
+            page_token = response.next_page_token
+
+            if not page_token or len(response.credentials_batch) == 0:
+                break
+
+        return read_credentials 
 
     def _extract_headers_from_credentials(self, headers):
         return {header.name: header.value for header in headers}
@@ -367,14 +381,14 @@ class DatabricksArtifactRepository(ArtifactRepository):
             self.run_relative_artifact_repo_root_path, remote_file_path
         )
         read_credentials = self._get_read_credentials(self.run_id, run_relative_remote_file_path)
-        self._download_from_cloud(read_credentials.credentials, local_path)
+        self._download_from_cloud(read_credentials.batch_credentials[0], local_path)
 
     def download_artifacts(self, artifact_path, dst_path=None):
         """
         Parallelized implementation of `download_artifacts` for Databricks.
         """
 
-        def download_file(fullpath):
+        def download_file(fullpath, credentials):
             """
             Submit a download of `fullpath` to the thread pool and return the
             resultant Future.
@@ -385,12 +399,14 @@ class DatabricksArtifactRepository(ArtifactRepository):
             local_file_path = os.path.join(dst_path, fullpath)
             if not os.path.exists(local_dir_path):
                 os.makedirs(local_dir_path)
-            return (
-                local_file_path,
-                self.thread_pool.submit(
-                    self._download_file, remote_file_path=fullpath, local_path=local_file_path
-                ),
-            )
+
+            return self._download_from_cloud(credentials, local_file_path) 
+            # return (
+            #     local_file_path,
+            #     self.thread_pool.submit(
+            #         self._download_file, remote_file_path=fullpath, local_path=local_file_path
+            #     ),
+            # )
 
         def download_artifact_dir(dir_path):
             """
@@ -409,14 +425,28 @@ class DatabricksArtifactRepository(ArtifactRepository):
                 if not os.path.exists(local_dir):
                     os.makedirs(local_dir)
             else:
-                for file_info in dir_content:
-                    if file_info.is_dir:
-                        _, futures = download_artifact_dir(dir_path=file_info.path)
-                        download_futures += futures
-                    else:
-                        _, future = download_file(file_info.path)
-                        download_futures += [future]
-            return local_dir, download_futures
+                files = [file_info for file_info in dir_content if not file_info.is_dir]
+                files_read_credentials = self._get_read_credentials(
+                    run_id=self.run_id,
+                    paths=[os.path.join(self.run_relative_artifact_repo_root_path, file_info.path) for file_info in files]
+                )
+                for file_info, credentials in zip(files, files_read_credentials):
+                    download_file(file_info.path, credentials)
+
+                directories = [file_info for file_info in dir_content if file_info.is_dir]
+                for directory_info in directories:
+                    download_artifact_dir(dir_path=directory_info.path)
+
+
+                # for file_info in dir_content:
+                #     if file_info.is_dir:
+                #         _, futures = download_artifact_dir(dir_path=file_info.path)
+                #         download_futures += futures
+                #     else:
+                #         _, future = download_file(file_info.path)
+                #         download_futures += [future]
+            return local_dir 
+            # return local_dir, download_futures
 
         if dst_path is None:
             dst_path = tempfile.mkdtemp()
@@ -440,17 +470,23 @@ class DatabricksArtifactRepository(ArtifactRepository):
             )
 
         if self._is_directory(artifact_path):
-            local_dir, futures = download_artifact_dir(artifact_path)
-            # Join futures to ensure that all files in the directory have
-            # been downloaded prior to returning
-            for future in futures:
-                future.result()
-            return local_dir
+            # local_dir, futures = download_artifact_dir(artifact_path)
+            # # Join futures to ensure that all files in the directory have
+            # # been downloaded prior to returning
+            # for future in futures:
+            #     future.result()
+            # return local_dir
+            return download_artifact_dir(artifact_path)
         else:
-            local_dir, future = download_file(artifact_path)
-            # Join future to ensure that the file has been downloaded prior to returning
-            future.result()
-            return local_dir
+            # local_dir, future = download_file(artifact_path)
+            # # Join future to ensure that the file has been downloaded prior to returning
+            # future.result()
+            # return local_dir
+            file_read_credentials = self._get_read_credentials(
+                run_id=self.run_id,
+                paths=[os.path.join(self.run_relative_artifact_repo_root_path, artifact_path)]
+            )[0]
+            return download_file(artifact_path, file_read_credentials)
 
     def delete_artifacts(self, artifact_path=None):
         raise MlflowException("Not implemented yet")
