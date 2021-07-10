@@ -176,9 +176,6 @@ class PythonSubscriber(object, metaclass=ExceptionSafeClass):
     more information.
     """
 
-    def __init__(self):
-        self._repl_id = _get_repl_id()
-
     def toString(self):
         # For debugging
         return "PythonSubscriber<replId=%s>" % self.replId()
@@ -214,7 +211,7 @@ class PythonSubscriber(object, metaclass=ExceptionSafeClass):
             add_table_info_to_context_provider(path, version, data_format)
 
     def replId(self):
-        return self._repl_id
+        _get_repl_id()
 
     class Java:
         implements = ["{}.MlflowAutologEventSubscriber".format(_JAVA_PACKAGE)]
