@@ -274,7 +274,8 @@ def safe_patch(destination, function_name, patch_function):
     original = getattr(destination, function_name)
 
     def safe_patch_function(*args, **kwargs):
-        # Whether or not an exception was raised from within the original / underlying function
+        # Whether or not an exception was raised from within
+        # the original / underlying function
         # during the execution of patched code
         failed_during_original = False
 
