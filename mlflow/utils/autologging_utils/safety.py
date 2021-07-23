@@ -629,3 +629,7 @@ def safe_patch_function(*args, **kwargs):
         or mlflow.utils.autologging_utils._AUTOLOGGING_GLOBALLY_DISABLED
     ):
         return original_fit(*args, **kwargs)
+
+    ...
+
+    # Construct `original`, call `patched_function`, ...
