@@ -268,8 +268,16 @@ def is_testing():
     """
     return os.environ.get(_AUTOLOGGING_TEST_MODE_ENV_VAR, "false") == "true"
 
+def safe_patch(
+    autologging_integration,
+    destination,
+    function_name,
+    patch_function,
+    manage_run=False
+)
 
-def safe_patch(destination, function_name, patch_function):
+
+def safe_patch(destination, function_name, patch_function)
 
     original = getattr(destination, function_name)
 
