@@ -274,19 +274,12 @@ def safe_patch(destination, function_name, patch_function):
     original = getattr(destination, function_name)
 
     def safe_patch_function(*args, **kwargs):
-
-        # Whether or not the original / underlying function has been called during the
-        # execution of patched code
-        original_has_been_called = False
         # Whether or not an exception was raised from within the original / underlying function
         # during the execution of patched code
         failed_during_original = False
 
         def call_original(*og_args, **og_kwargs):
             try:
-                nonlocal original_has_been_called
-                original_has_been_called = True
-
                 return original(*og_args, **og_kwargs)
             except Exception as e:
                 nonlocal failed_during_original
