@@ -269,12 +269,11 @@ def is_testing():
     return os.environ.get(_AUTOLOGGING_TEST_MODE_ENV_VAR, "false") == "true"
 
 
-def safe_patch(
-    destination, function_name, patch_function
-):
+def safe_patch(destination, function_name, patch_function):
+
+    original = gorilla.get_original_attribute(destination, function_name)
 
     def safe_patch_function(*args, **kwargs):
-        original = gorilla.get_original_attribute(destination, function_name)
 
         # Whether or not the original / underlying function has been called during the
         # execution of patched code
@@ -299,6 +298,8 @@ def safe_patch(
         except Exception as e:
             if failed_during_original:
                 raise
+
+    setattr(destination, function_name, safe_patch_function)
 
 
 
