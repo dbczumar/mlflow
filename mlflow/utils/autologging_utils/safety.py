@@ -604,3 +604,28 @@ __all__ = [
     "with_managed_run",
     "update_wrapper_extended",
 ]
+
+
+
+def safe_patch_function(*args, **kwargs):
+
+    ...
+
+    # Whether or not to exclude autologged content from user-created fluent runs
+    # (i.e. runs created manually via `mlflow.start_run()`)
+    exclusive = get_autologging_config(autologging_integration, "exclusive", False)
+    user_created_fluent_run_is_active = (
+        mlflow.active_run() and not _AutologgingSessionManager.active_session()
+    )
+    active_session_failed = (
+        _AutologgingSessionManager.active_session() is not None
+        and _AutologgingSessionManager.active_session().state == "failed"
+    )
+
+    if (
+        active_session_failed
+        or autologging_is_disabled(autologging_integration)
+        or (user_created_fluent_run_is_active and exclusive)
+        or mlflow.utils.autologging_utils._AUTOLOGGING_GLOBALLY_DISABLED
+    ):
+        return original_fit(*args, **kwargs)
