@@ -332,28 +332,10 @@ def _check_and_log_warning_for_unsupported_package_versions(integration_name):
 
 
 def autologging_integration(name):
-    """
-    **All autologging integrations should be decorated with this wrapper.**
-
-    Wraps an autologging function in order to store its configuration arguments. This enables
-    patch functions to broadly obey certain configurations (e.g., disable=True) without
-    requiring specific logic to be present in each autologging integration.
-    """
-
-    def validate_param_spec(param_spec):
-        if "disable" not in param_spec or param_spec["disable"].default is not False:
-            raise Exception(
-                "Invalid `autolog()` function for integration '{}'. `autolog()` functions"
-                " must specify a 'disable' argument with default value 'False'".format(name)
-            )
-        elif "silent" not in param_spec or param_spec["silent"].default is not False:
-            raise Exception(
-                "Invalid `autolog()` function for integration '{}'. `autolog()` functions"
-                " must specify a 'silent' argument with default value 'False'".format(name)
-            )
 
     def wrapper(_autolog):
         param_spec = inspect.signature(_autolog).parameters
+
         validate_param_spec(param_spec)
 
         AUTOLOGGING_INTEGRATIONS[name] = {}
@@ -367,46 +349,7 @@ def autologging_integration(name):
             config_to_store.update(kwargs)
             AUTOLOGGING_INTEGRATIONS[name] = config_to_store
 
-            try:
-                # Pass `autolog()` arguments to `log_autolog_called` in keyword format to enable
-                # event loggers to more easily identify important configuration parameters
-                # (e.g., `disable`) without examining positional arguments. Passing positional
-                # arguments to `log_autolog_called` is deprecated in MLflow > 1.13.1
-                AutologgingEventLogger.get_logger().log_autolog_called(name, (), config_to_store)
-            except Exception:
-                pass
-
-            # If disabling autologging using fluent api, then every active integration's autolog
-            # needs to be called with disable=True. So do not short circuit and let
-            # `mlflow.autolog()` invoke all active integrations with disable=True.
-            if name != "mlflow" and get_autologging_config(name, "disable", True):
-                revert_patches(name)
-                return
-
-            is_silent_mode = get_autologging_config(name, "silent", False)
-            # Reroute non-MLflow warnings encountered during autologging enablement to an
-            # MLflow event logger, and enforce silent mode if applicable (i.e. if the corresponding
-            # autologging integration was called with `silent=True`)
-            with set_mlflow_events_and_warnings_behavior_globally(
-                # MLflow warnings emitted during autologging setup / enablement are likely
-                # actionable and relevant to the user, so they should be emitted as normal
-                # when `silent=False`. For reference, see recommended warning and event logging
-                # behaviors from https://docs.python.org/3/howto/logging.html#when-to-use-logging
-                reroute_warnings=False,
-                disable_event_logs=is_silent_mode,
-                disable_warnings=is_silent_mode,
-            ), set_non_mlflow_warnings_behavior_for_current_thread(
-                # non-MLflow warnings emitted during autologging setup / enablement are not
-                # actionable for the user, as they are a byproduct of the autologging
-                # implementation. Accordingly, they should be rerouted to `logger.warning()`.
-                # For reference, see recommended warning and event logging
-                # behaviors from https://docs.python.org/3/howto/logging.html#when-to-use-logging
-                reroute_warnings=True,
-                disable_warnings=is_silent_mode,
-            ):
-                _check_and_log_warning_for_unsupported_package_versions(name)
-
-                return _autolog(*args, **kwargs)
+            return _autolog(*args, **kwargs)
 
         wrapped_autolog = update_wrapper_extended(autolog, _autolog)
         # Set the autologging integration name as a function attribute on the wrapped autologging
@@ -414,10 +357,6 @@ def autologging_integration(name):
         # during the execution of import hooks for `mlflow.autolog()`.
         wrapped_autolog.integration_name = name
 
-        if name in FLAVOR_TO_MODULE_NAME_AND_VERSION_INFO_KEY:
-            wrapped_autolog.__doc__ = (
-                gen_autologging_package_version_requirements_doc(name) + wrapped_autolog.__doc__
-            )
         return wrapped_autolog
 
     return wrapper
