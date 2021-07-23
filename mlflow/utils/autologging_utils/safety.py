@@ -274,12 +274,12 @@ def safe_patch(
     function_name,
     patch_function,
     manage_run=False
-)
+):
 
 
-def safe_patch(destination, function_name, patch_function)
+def safe_patch(destination, function_name, patch_function):
 
-    original = getattr(destination, function_name)
+    original_fit = getattr(destination, function_name)
 
     def safe_patch_function(*args, **kwargs):
         # Whether or not an exception was raised from within
@@ -287,16 +287,16 @@ def safe_patch(destination, function_name, patch_function)
         # during the execution of patched code
         failed_during_original = False
 
-        def call_original(*og_args, **og_kwargs):
+        def original(*og_args, **og_kwargs):
             try:
-                return original(*og_args, **og_kwargs)
+                return original_fit(*og_args, **og_kwargs)
             except Exception as e:
                 nonlocal failed_during_original
                 failed_during_original = True
                 raise
 
         try:
-            patch_function(call_original, *args, **kwargs)
+            patch_function(original, *args, **kwargs)
         except Exception as e:
             if failed_during_original:
                 raise
