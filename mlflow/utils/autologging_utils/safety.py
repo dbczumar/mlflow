@@ -271,7 +271,7 @@ def is_testing():
 
 def safe_patch(destination, function_name, patch_function):
 
-    original = gorilla.get_original_attribute(destination, function_name)
+    original = getattr(destination, function_name)
 
     def safe_patch_function(*args, **kwargs):
 
