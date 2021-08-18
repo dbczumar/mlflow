@@ -120,27 +120,26 @@ export const getParentRunIdsToFetch = (runs) => {
 // this function takes a response of runs and returns them along with their missing parents
 export const fetchMissingParents = (searchRunsResponse) =>
   searchRunsResponse.runs && searchRunsResponse.runs.length
-    ? Promise.all(
+    ? Promise.allSettled(
         getParentRunIdsToFetch(searchRunsResponse.runs).map((runId) =>
           wrapDeferred(MlflowService.getRun, { run_id: runId }),
         ),
-      )
-        .then((parentRuns) => {
-          parentRuns.forEach((parentRun) => searchRunsResponse.runs.push(parentRun.run));
-          return searchRunsResponse;
-        })
-        .catch((e) => {
-          if (e.getErrorCode() === ErrorCodes.RESOURCE_DOES_NOT_EXIST) {
-            // ES-83004: If a run is deleted and then purged, but its children
-            // runs are not, the user will see a 'RESOURCE_DOES_NOT_EXIST' error
-            // every time we attempt to fetch those children's root run, since
-            // the old run ID is still hanging around in the children's tags.
-            // Since the user never explicitly requested those missing runs,
-            // this error is intrusive and unhelpful.
-            e.renderHttpError = undefined;
+      ).then((getParentRunResults) => {
+        getParentRunResults.forEach((getParentRunResult) => {
+          if (getParentRunResult.status === 'fulfilled') {
+            searchRunsResponse.runs.push(getParentRunResult.value.run);
+          } else if (
+            getParentRunResult.reason.getErrorCode() !== ErrorCodes.RESOURCE_DOES_NOT_EXIST
+          ) {
+            // NB: The parent run may have been deleted, in which case attempting to fetch the
+            // run fails with the `RESOURCE_DOES_NOT_EXIST` error code. Because this is expected
+            // behavior, we swallow such exceptions. We re-raise all other exceptions encountered
+            // when fetching parent runs because they are unexpected
+            throw getParentRunResult.reason;
           }
-          throw e;
-        })
+        });
+        return searchRunsResponse;
+      })
     : searchRunsResponse;
 
 export const searchRunsPayload = ({
