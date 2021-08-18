@@ -120,24 +120,23 @@ export const getParentRunIdsToFetch = (runs) => {
 // this function takes a response of runs and returns them along with their missing parents
 export const fetchMissingParents = (searchRunsResponse) =>
   searchRunsResponse.runs && searchRunsResponse.runs.length
-    ? Promise.allSettled(
+    ? Promise.all(
         getParentRunIdsToFetch(searchRunsResponse.runs).map((runId) =>
-          wrapDeferred(MlflowService.getRun, { run_id: runId }),
+          wrapDeferred(MlflowService.getRun, { run_id: runId })
+            .then((value) => {
+              searchRunsResponse.runs.push(value.run);
+            })
+            .catch((error) => {
+              if (error.getErrorCode() !== ErrorCodes.RESOURCE_DOES_NOT_EXIST) {
+                // NB: The parent run may have been deleted, in which case attempting to fetch the
+                // run fails with the `RESOURCE_DOES_NOT_EXIST` error code. Because this is
+                // expected behavior, we swallow such exceptions. We re-raise all other exceptions
+                // encountered when fetching parent runs because they are unexpected
+                throw error;
+              }
+            }),
         ),
-      ).then((getParentRunResults) => {
-        getParentRunResults.forEach((getParentRunResult) => {
-          if (getParentRunResult.status === 'fulfilled') {
-            searchRunsResponse.runs.push(getParentRunResult.value.run);
-          } else if (
-            getParentRunResult.reason.getErrorCode() !== ErrorCodes.RESOURCE_DOES_NOT_EXIST
-          ) {
-            // NB: The parent run may have been deleted, in which case attempting to fetch the
-            // run fails with the `RESOURCE_DOES_NOT_EXIST` error code. Because this is expected
-            // behavior, we swallow such exceptions. We re-raise all other exceptions encountered
-            // when fetching parent runs because they are unexpected
-            throw getParentRunResult.reason;
-          }
-        });
+      ).then((_) => {
         return searchRunsResponse;
       })
     : searchRunsResponse;

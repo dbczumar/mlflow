@@ -73,6 +73,19 @@ describe('fetchMissingParents', () => {
       expect(runs).toEqual({ runs: [a, b, aParent, bParent] });
     });
   });
+
+  it('should handle deleted parent runs', () => {
+    jest
+      .spyOn(MlflowService, 'getRun')
+      .mockImplementation(({ data, success }) =>
+        success({ run: { info: { run_id: data.run_id } } }),
+      );
+
+    const res = { runs: [a, b, aParent, bParent] };
+    return fetchMissingParents(res).then((runs) => {
+      expect(runs).toEqual({ runs: [a, b, aParent, bParent] });
+    });
+  });
 });
 
 describe('getParentRunIdsToFetch', () => {
