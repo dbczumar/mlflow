@@ -31,7 +31,7 @@ const b = {
 const aParent = { info: { run_id: 'aParent' } };
 const bParent = { info: { run_id: 'bParent' } };
 
-beforeAll(() => {
+beforeEach(() => {
   jest
     .spyOn(MlflowService, 'searchRuns')
     .mockImplementation(({ success }) => success({ runs: [a, b, aParent] }));
@@ -41,7 +41,7 @@ beforeAll(() => {
     .mockImplementation(({ data, success }) => success({ run: { info: { run_id: data.run_id } } }));
 });
 
-afterAll(() => {
+afterEach(() => {
   MlflowService.searchRuns.mockRestore();
   MlflowService.getRun.mockRestore();
 });
@@ -75,16 +75,41 @@ describe('fetchMissingParents', () => {
   });
 
   it('should handle deleted parent runs', () => {
-    jest
-      .spyOn(MlflowService, 'getRun')
-      .mockImplementation(({ data, success }) =>
-        success({ run: { info: { run_id: data.run_id } } }),
-      );
+    const mockParentRunDeletedError = {
+      getErrorCode() {
+        return 'RESOURCE_DOES_NOT_EXIST';
+      },
+    };
 
-    const res = { runs: [a, b, aParent, bParent] };
-    return fetchMissingParents(res).then((runs) => {
-      expect(runs).toEqual({ runs: [a, b, aParent, bParent] });
+    jest.spyOn(MlflowService, 'getRun').mockImplementation(({ data, success }) => {
+      if (data.run_id === 'aParent') {
+        success({ run: { info: { run_id: data.run_id } } });
+      } else {
+        throw mockParentRunDeletedError;
+      }
     });
+
+    const res = { runs: [a, b] };
+    return fetchMissingParents(res).then((runs) => {
+      expect(runs).toEqual({ runs: [a, b, aParent] });
+    });
+  });
+
+  it('should throw for unexpected exceptions encountered during run resolution', async () => {
+    const mockUnexpectedGetRunError = {
+      getErrorCode() {
+        // return 'RESOURCE_DOES_NOT_EXIST';
+        return 'INTERNAL_ERROR';
+      },
+    };
+
+    jest.spyOn(MlflowService, 'getRun').mockImplementation(() => {
+      throw mockUnexpectedGetRunError;
+    });
+
+    const res = { runs: [a, b] };
+    await expect(fetchMissingParents(res)).rejects.toEqual(mockUnexpectedGetRunError);
+    // expect(async () => await fetchMissingParents(res)).toThrow(mockUnexpectedGetRunError);
   });
 });
 
