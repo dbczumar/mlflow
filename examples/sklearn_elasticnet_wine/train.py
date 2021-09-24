@@ -29,6 +29,13 @@ def eval_metrics(actual, pred):
 
 
 if __name__ == "__main__":
+
+    mlflow.set_experiment("foobaz")
+
+    with mlflow.start_run(nested=True):
+        print("RUN ID: " + mlflow.active_run().info.run_id)
+        mlflow.log_param("A", "B")
+
     warnings.filterwarnings("ignore")
     np.random.seed(40)
 
