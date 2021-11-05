@@ -13,6 +13,7 @@ import abc
 
 from mlflow.utils.annotations import experimental
 from mlflow.exceptions import MlflowException
+from mlflow.pyfunc import PyFuncInput, PyFuncOutput
 
 
 def run_local(target, name, model_uri, flavor=None, config=None):  # pylint: disable=W0613
@@ -171,7 +172,7 @@ class BaseDeploymentClient(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def predict(self, deployment_name, df):
+    def predict(self, deployment_name: str, df: PyFuncInput) -> PyFuncOutput:
         """
         Compute predictions on the pandas DataFrame ``df`` using the specified deployment.
         Note that the input/output types of this method matches that of `mlflow pyfunc predict`
@@ -179,8 +180,9 @@ class BaseDeploymentClient(abc.ABC):
         pandas Series, or numpy array as output).
 
         :param deployment_name: Name of deployment to predict against
-        :param df: Pandas DataFrame to use for inference
-        :return: A pandas DataFrame, pandas Series, or numpy array
+        :param df: Inference input as one of pandas.DataFrame, numpy.ndarray, or
+                   Dict[str, numpy.ndarray].
+        :return: Inference output as one of pandas.DataFrame, pandas.Series, numpy.ndarray or list.
         """
         pass
 
