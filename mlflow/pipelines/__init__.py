@@ -156,4 +156,7 @@ def _get_databricks_repo_root_path(repo_notebook_id):
     repo_notebook_git_info = json.loads(repo_notebook_git_info_response.text)
     relative_path = repo_notebook_git_info["relative_path"]
     absolute_path = repo_notebook_git_info["absolute_path"]
-    return absolute_path[:-1 * len(relative_path)]
+    # Remove the relative path of the current notebook from the absolute path to obtain the repo
+    # root path. Then, prepend `/Workspace` because repos are mounted to the `/Workspaces`
+    # directory on the cluster filesystem
+    return "/Workspace" + absolute_path[:-1 * len(relative_path)]
