@@ -5,13 +5,7 @@ import pytest
 from click.testing import CliRunner
 
 import mlflow.pipelines
-from mlflow.pipelines import (
-    ingest as ingest_cli,
-    split as split_cli,
-    transform as transform_cli,
-    train as train_cli,
-    evaluate as evaluate_cli,
-)
+import mlflow.pipelines.cli as pipelines_cli
 
 PIPELINE_EXAMPLE_PATH_FROM_MLFLOW_ROOT = "examples/pipelines/example_pipeline"
 
@@ -57,4 +51,12 @@ def test_pipelines_api_flow_completes_successfully():
 
 @pytest.mark.usefixtures("enter_pipeline_example_directory", "clean_up_pipeline")
 def test_pipelines_cli_flow_completes_successfully():
-    CliRunner().invoke(ingest_cli)
+    CliRunner().invoke(pipelines_cli.clean)
+    CliRunner().invoke(pipelines_cli.evaluate)
+
+    CliRunner().invoke(pipelines_cli.clean)
+    CliRunner().invoke(pipelines_cli.ingest)
+    CliRunner().invoke(pipelines_cli.split)
+    CliRunner().invoke(pipelines_cli.transform)
+    CliRunner().invoke(pipelines_cli.train)
+    CliRunner().invoke(pipelines_cli.evaluate)
