@@ -1,3 +1,0 @@
-[submodule "examples/pipelines/mlflow-pipelines-example-private"]
-	path = examples/pipelines/example_pipeline
-	url = https://github.com/databricks/mlflow-pipelines-example-private
