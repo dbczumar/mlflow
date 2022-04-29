@@ -372,6 +372,7 @@ jobs:
           pip install -r requirements/small-requirements.txt
           pip install --no-dependencies tests/resources/mlflow-test-plugin
           pip install -e .[extras]
+          pip install pytest-timeout
       - name: Run tests
         run: |
           export MLFLOW_HOME=$(pwd)

@@ -84,9 +84,18 @@ def _exec_cmd(
     if not synchronous:
         return process
 
+    #REMOVE LATER
+    import logging
+    _logger = logging.getLogger(__name__)
+    buf = [] 
     if stream_stdout:
         for output_char in iter(lambda: process.stdout.read(1), ""):
             sys.stdout.write(output_char)
+            #REMOVE LATER
+            buf.append(output_char)
+            if len(buf) >= 100:
+                _logger.info("".join(buf))
+                buf = []
 
     stdout, stderr = process.communicate()
     returncode = process.poll()

@@ -22,6 +22,7 @@ def clean_up_pipeline():
 
 
 @pytest.mark.usefixtures("enter_pipeline_example_directory", "clean_up_pipeline")
+@pytest.mark.timeout(90)
 def test_pipelines_api_flow_completes_successfully():
     mlflow.pipelines.clean()
     mlflow.pipelines.evaluate()
@@ -35,6 +36,7 @@ def test_pipelines_api_flow_completes_successfully():
 
 
 @pytest.mark.usefixtures("enter_pipeline_example_directory", "clean_up_pipeline")
+@pytest.mark.timeout(90)
 def test_pipelines_cli_flow_completes_successfully():
     CliRunner().invoke(pipelines_cli.clean)
     CliRunner().invoke(pipelines_cli.evaluate)
@@ -49,6 +51,7 @@ def test_pipelines_cli_flow_completes_successfully():
 
 @pytest.mark.usefixtures("enter_pipeline_example_directory", "clean_up_pipeline")
 @pytest.mark.parametrize("custom_execution_directory", [None, "custom"])
+@pytest.mark.timeout(90)
 def test_pipelines_execution_directory_is_managed_as_expected(custom_execution_directory, tmp_path):
     if custom_execution_directory is not None:
         custom_execution_directory = tmp_path / custom_execution_directory

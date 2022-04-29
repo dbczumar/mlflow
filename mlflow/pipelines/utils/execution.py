@@ -11,6 +11,10 @@ _STEPS_SUBDIRECTORY_NAME = "steps"
 _STEP_OUTPUTS_SUBDIRECTORY_NAME = "outputs"
 _STEP_CONF_YAML_NAME = "conf.yaml"
 
+#REMOVE LATER
+import logging
+_logger = logging.getLogger(__name__)
+
 
 def run_pipeline_step(
     pipeline_root_path: str, pipeline_name: str, pipeline_steps: List[str], target_step: str
@@ -190,6 +194,7 @@ def _create_makefile(pipeline_root_path, execution_directory_path) -> None:
     makefile_contents = _MAKEFILE_FORMAT_STRING.format(
         path=_MakefilePathFormat(os.path.abspath(pipeline_root_path)),
     )
+    _logger.info(makefile_contents)
     with open(makefile_path, "w") as f:
         f.write(makefile_contents)
 

@@ -13,6 +13,7 @@ from tests.pipelines.helper_functions import (
 from tests.pipelines.helper_functions import chdir
 
 
+@pytest.mark.timeout(90)
 def test_get_pipeline_root_path_returns_correctly_when_inside_pipeline_directory(
     enter_pipeline_example_directory,
 ):
@@ -22,11 +23,13 @@ def test_get_pipeline_root_path_returns_correctly_when_inside_pipeline_directory
     assert get_pipeline_root_path() == str(enter_pipeline_example_directory)
 
 
+@pytest.mark.timeout(90)
 def test_get_pipeline_root_path_throws_outside_pipeline_directory(tmp_path):
     with pytest.raises(MlflowException, match="Failed to find pipeline.yaml"), chdir(tmp_path):
         get_pipeline_root_path()
 
 
+@pytest.mark.timeout(90)
 def test_get_pipeline_name_returns_correctly_for_valid_pipeline_directory(
     enter_pipeline_example_directory, tmp_path
 ):
@@ -38,6 +41,7 @@ def test_get_pipeline_name_returns_correctly_for_valid_pipeline_directory(
         assert get_pipeline_name(pipeline_root_path=pipeline_root_path) == "sklearn_regression"
 
 
+@pytest.mark.timeout(90)
 def test_get_pipeline_name_throws_for_invalid_pipeline_directory(tmp_path):
     with pytest.raises(MlflowException, match="Failed to find pipeline.yaml"), chdir(tmp_path):
         get_pipeline_name()

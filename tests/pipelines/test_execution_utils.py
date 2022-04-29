@@ -7,6 +7,7 @@ import pytest
 from mlflow.pipelines.utils.execution import _get_or_create_execution_directory
 
 
+@pytest.mark.timeout(90)
 def test_get_or_create_execution_directory_is_idempotent(tmp_path):
     def assert_expected_execution_directory_contents_exist(execution_dir_path):
         assert (execution_dir_path / "Makefile").exists()

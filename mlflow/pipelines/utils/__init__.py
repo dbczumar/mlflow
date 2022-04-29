@@ -9,6 +9,11 @@ from mlflow.utils.file_utils import read_yaml
 _PIPELINE_CONFIG_FILE_NAME = "pipeline.yaml"
 
 
+#REMOVE LATER
+import logging
+_logger = logging.getLogger(__name__)
+
+
 def get_pipeline_name(pipeline_root_path: str = None) -> str:
     """
     Obtains the name of the specified pipeline or of the pipeline corresponding to the current
@@ -43,7 +48,7 @@ def get_pipeline_root_path() -> str:
 
     DEBUGGING_REMOVE_LATER_CURR_ITER = 0
     while True and DEBUGGING_REMOVE_LATER_CURR_ITER < 50:
-        print("CURR DIR", str(curr_dir_path))
+        _logger.info("CURR DIR", str(curr_dir_path))
         pipeline_yaml_path_to_check = curr_dir_path / _PIPELINE_CONFIG_FILE_NAME
         if pipeline_yaml_path_to_check.exists():
             return str(curr_dir_path.resolve())
