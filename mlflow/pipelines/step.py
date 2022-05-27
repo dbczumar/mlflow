@@ -42,7 +42,7 @@ class BaseStep(metaclass=abc.ABCMeta):
                                  outputs should be stored.
         :return: Results from executing the corresponding step.
         """
-        self._initialize_databricks_pyspark_connection_if_applicable()
+        self._initialize_databricks_spark_connection_and_hooks_if_applicable()
         self._run(output_directory)
         return self.inspect(output_directory)
 
@@ -146,10 +146,11 @@ class BaseStep(metaclass=abc.ABCMeta):
         """
         return {}
 
-    def _initialize_databricks_pyspark_connection_if_applicable(self) -> None:
+    def _initialize_databricks_spark_connection_and_hooks_if_applicable(self) -> None:
         """
-        Initializes a connection to the Databricks PySpark Gateway if MLflow Pipelines is running
-        in the Databricks Runtime.
+        Initializes a connection to the Databricks Spark Gateway and sets up associated hooks
+        (e.g. MLflow Run creation notification hooks) if MLflow Pipelines is running in the
+        Databricks Runtime.
         """
         if is_in_databricks_runtime():
             try:
@@ -157,11 +158,21 @@ class BaseStep(metaclass=abc.ABCMeta):
                     initialize_spark_connection,
                     is_pinn_mode_enabled,
                 )
-
-                initialize_spark_connection(is_pinn_mode_enabled())
+                spark_handles, entry_point = initialize_spark_connection(is_pinn_mode_enabled())
             except Exception as e:
                 _logger.warning(
                     "Encountered unexpected failure while initializing Spark connection. Spark"
                     " operations may not succeed. Exception: %s",
                     e,
                 )
+            else:
+                try:
+                    from dbruntime.MlflowCreateRunHook import get_mlflow_create_run_hook
+
+                    get_mlflow_create_run_hook(spark_handles['sc'], entry_point)
+                except Exception as e:
+                    _logger.warning(
+                        "Encountered unexpected failure while setting up Databricks MLflow Run"
+                        " creation hooks. Exception: %s",
+                        e,
+                    )
