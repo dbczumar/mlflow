@@ -158,6 +158,7 @@ class BaseStep(metaclass=abc.ABCMeta):
                     initialize_spark_connection,
                     is_pinn_mode_enabled,
                 )
+
                 spark_handles, entry_point = initialize_spark_connection(is_pinn_mode_enabled())
             except Exception as e:
                 _logger.warning(
@@ -169,7 +170,7 @@ class BaseStep(metaclass=abc.ABCMeta):
                 try:
                     from dbruntime.MlflowCreateRunHook import get_mlflow_create_run_hook
 
-                    get_mlflow_create_run_hook(spark_handles['sc'], entry_point)
+                    get_mlflow_create_run_hook(spark_handles["sc"], entry_point)
                 except Exception as e:
                     _logger.warning(
                         "Encountered unexpected failure while setting up Databricks MLflow Run"
