@@ -37,6 +37,8 @@
           transformUserCode([steps/transform.py]) --> transformMLPStep
           transformMLPStep --> transformedParquet[(transformed_training_data, <br/> transformed_validation_data)]
           transformedParquet --> trainMLPStep[["<font>train</font>"]]
+          transformMLPStep --> transformer{{transformer}}
+          transformer --> trainMLPStep 
 
           trainUserCode([steps/train.py]) --> trainMLPStep
           trainMLPStep --> run{{run}}
@@ -45,6 +47,11 @@
           model --> evaluateMLPStep[["<font>evaluate</font>"]]
           evaluateUserCode([steps/evaluate.py]) --> evaluateMLPStep
           splitData2 --> evaluateMLPStep
+
+          evaluateMLPStep --> model_validation_status{{model_validation_status}} 
+          model_validation_status --> registerMLPStep[["<font>register</font>"]]
+
+          registerMLPStep --> registered_model_info{{registered_model_info}}
 
           click ingestMLPStep noOp "  # Dataset locations on the local filesystem are supported, as well as any remote
   # locations resolvable by MLflow, such as those listed in
@@ -66,11 +73,11 @@
           click pipeline renderMoreInformation "{{pipeline_yaml}}"
           click dataParquet noOp "data ingested from source"
           click data noOp "data ingested from source"
-          click splitData1 noOp "Outputs splits for training and validation"
-          click splitData2 noOp "Output split for evaluating the model"
-          click transformedParquet noOp "Transformed output of training and validation needed for training"
-          click run noOp "Output run which is tracked in MLFlow"
-          click model noOp "Output model form training"
+          click splitData1 noOp "Raw training and validation data that will be transformed prior to model training"
+          click splitData2 noOp "Test data for model evaluation"
+          click transformedParquet noOp "Transformed training and validation datasets used during training"
+          click run noOp "MLflow Run containing the trained model with associated paramaters and performance metrics"
+          click model noOp "Trained model in MLflow Model format"
 
       </div>
       <div id="editor"></div>

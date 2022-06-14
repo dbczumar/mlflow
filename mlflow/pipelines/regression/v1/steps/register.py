@@ -36,7 +36,7 @@ class RegisterStep(BaseStep):
                 "Missing 'model_name' config in register step config.",
                 error_code=INVALID_PARAMETER_VALUE,
             )
-        self.register_model_name = self.step_config.get("model_name")
+        self.register_model_name = self.step_config["model_name"]
         self.allow_non_validated_model = self.step_config.get("allow_non_validated_model", False)
 
     def _run(self, output_directory):
@@ -84,10 +84,10 @@ class RegisterStep(BaseStep):
         # Build card
 
         final_markdown = []
-        if self.model_url is not None:
-            final_markdown.append(f"**Model URL:** `{self.model_url}`")
         if self.model_uri is not None:
-            final_markdown.append(f"**Model URI:** `{self.model_uri}`")
+            final_markdown.append(f"**Model Source URI:** `{self.model_uri}`")
+        if self.version is not None:
+            final_markdown.append(f"**Model Name:** `{self.register_model_name}`")
         if self.version is not None:
             final_markdown.append(f"**Model Version:** `{self.version}`")
         if self.alerts is not None:
