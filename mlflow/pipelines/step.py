@@ -2,17 +2,19 @@ import abc
 import json
 import logging
 import os
+import sys
 import time
 import traceback
 import yaml
+import importlib
 
 from enum import Enum
+from typing import TypeVar, Dict, Any
 from mlflow.pipelines.cards import BaseCard, CARD_PICKLE_NAME, FailureCard, CARD_HTML_NAME
 from mlflow.pipelines.utils import get_hashed_pipeline_root, get_pipeline_name, display_html
 from mlflow.tracking import MlflowClient
 from mlflow.utils.databricks_utils import is_in_databricks_runtime
-from typing import TypeVar, Dict, Any
-
+from mlflow.exceptions import MlflowException, BAD_REQUEST
 
 _logger = logging.getLogger(__name__)
 
@@ -130,6 +132,10 @@ class BaseStep(metaclass=abc.ABCMeta):
         """
         card_path = os.path.join(output_directory, CARD_PICKLE_NAME)
         if not os.path.exists(card_path):
+            _logger.info(
+                "Unable to locate runtime info for step '%s'. Re-run the step before inspect.",
+                self.name,
+            )
             return None
 
         card = BaseCard.load(card_path)
@@ -281,3 +287,26 @@ class BaseStep(metaclass=abc.ABCMeta):
         )
         if os.path.exists(local_card_path):
             MlflowClient().log_artifact(run_id, local_card_path, artifact_path=step_name)
+
+    def _get_custom_metrics(self):
+        return (self.step_config.get("metrics") or {}).get("custom")
+
+    def _get_custom_metric_greater_is_better(self):
+        custom_metrics = self._get_custom_metrics()
+        return (
+            {cm["name"]: cm["greater_is_better"] for cm in custom_metrics} if custom_metrics else {}
+        )
+
+    def _load_custom_metric_functions(self):
+        custom_metrics = self._get_custom_metrics()
+        if not custom_metrics:
+            return None
+        try:
+            sys.path.append(self.pipeline_root)
+            custom_metrics_mod = importlib.import_module("steps.custom_metrics")
+            return [getattr(custom_metrics_mod, cm["function"]) for cm in custom_metrics]
+        except Exception as e:
+            raise MlflowException(
+                message="Failed to load custom metric functions",
+                error_code=BAD_REQUEST,
+            ) from e

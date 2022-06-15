@@ -5,6 +5,7 @@ import sys
 import time
 
 import cloudpickle
+from packaging.version import Version
 
 from mlflow.exceptions import MlflowException, INVALID_PARAMETER_VALUE
 from mlflow.pipelines.cards import BaseCard
@@ -13,6 +14,33 @@ from mlflow.pipelines.utils.execution import get_step_output_path
 from mlflow.pipelines.utils.tracking import get_pipeline_tracking_config
 
 _logger = logging.getLogger(__name__)
+
+
+def _generate_feature_names(num_features):
+    max_length = len(str(num_features))
+    return ["f_" + str(i).zfill(max_length) for i in range(num_features)]
+
+
+def _get_output_feature_names(transformer, num_features, input_features):
+    import sklearn
+
+    # `get_feature_names_out` was introduced in scikit-learn 1.0.0.
+    if Version(sklearn.__version__) < Version("1.0.0"):
+        return _generate_feature_names(num_features)
+
+    try:
+        # `get_feature_names_out` fails if `transformer` contains a transformer that doesn't
+        # implement `get_feature_names_out`. For example, `FunctionTransformer` only implements
+        # `get_feature_names_out` when it's instantiated with `feature_names_out`.
+        # In scikit-learn >= 1.1.0, all transformers implement `get_feature_names_out`.
+        # In scikit-learn == 1.0.*, some transformers implement `get_feature_names_out`.
+        return transformer.get_feature_names_out(input_features)
+    except Exception as e:
+        _logger.warning(
+            f"Failed to get output feature names with `get_feature_names_out`: {e}. "
+            "Falling back to using auto-generated feature names."
+        )
+        return _generate_feature_names(num_features)
 
 
 class TransformStep(BaseStep):
@@ -56,10 +84,8 @@ class TransformStep(BaseStep):
             labels = dataset[self.target_col]
             transformed_feature_array = transformer.transform(features)
             num_features = transformed_feature_array.shape[1]
-            # TODO: get the correct feature names from the transformer
-            df = pd.DataFrame(
-                transformed_feature_array, columns=[f"f_{i:03}" for i in range(num_features)]
-            )
+            columns = _get_output_feature_names(transformer, num_features, features.columns)
+            df = pd.DataFrame(transformed_feature_array, columns=columns)
             df[self.target_col] = labels.values
             return df
 
@@ -113,7 +139,13 @@ class TransformStep(BaseStep):
         transformer_repr = estimator_html_repr(transformer)
         card.add_tab("Transformer", "{{TRANSFORMER}}").add_html("TRANSFORMER", transformer_repr)
 
-        # Tab 4: transformer output schema
+        # Tab 4: transformer input schema
+        card.add_tab("Input Schema", "{{INPUT_SCHEMA}}").add_html(
+            "INPUT_SCHEMA",
+            BaseCard.render_table({"Name": n, "Type": t} for n, t in train_df.dtypes.items()),
+        )
+
+        # Tab 5: transformer output schema
         try:
             card.add_tab("Output Schema", "{{OUTPUT_SCHEMA}}").add_html(
                 "OUTPUT_SCHEMA",
@@ -126,18 +158,14 @@ class TransformStep(BaseStep):
                 "OUTPUT_SCHEMA", f"Failed to extract transformer schema. Error: {e}"
             )
 
-        # Tab 5: run summary
+        # Tab 6: run summary
         (
             card.add_tab(
                 "Run Summary",
                 """
-                {{ RAW_FEATURES_IN_TRANSFORMER }}
                 {{ EXE_DURATION }}
                 {{ LAST_UPDATE_TIME }}
                 """,
-            ).add_markdown(
-                "RAW_FEATURES_IN_TRANSFORMER",
-                f"**Feature set before transformation:** `{train_df.columns}`",
             )
         )
 

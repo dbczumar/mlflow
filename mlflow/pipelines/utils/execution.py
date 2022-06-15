@@ -399,7 +399,7 @@ train_objects = steps/train/outputs/model.pkl steps/train/outputs/run_id
 
 train: $(train_objects)
 
-steps/%/outputs/model.pkl steps/%/outputs/run_id: {path:prp/steps/train.py} steps/transform/outputs/transformed_training_data.parquet steps/transform/outputs/transformed_validation_data.parquet steps/split/outputs/train.parquet steps/split/outputs/validation.parquet steps/transform/outputs/transformer.pkl steps/train/conf.yaml
+steps/%/outputs/model.pkl steps/%/outputs/run_id: {path:prp/steps/train.py} {path:prp/steps/custom_metrics.py} steps/transform/outputs/transformed_training_data.parquet steps/transform/outputs/transformed_validation_data.parquet steps/split/outputs/train.parquet steps/split/outputs/validation.parquet steps/transform/outputs/transformer.pkl steps/train/conf.yaml
 	cd {path:prp/} && \
         python -c "from mlflow.pipelines.regression.v1.steps.train import TrainStep; TrainStep.from_step_config_path(step_config_path='{path:exe/steps/train/conf.yaml}', pipeline_root='{path:prp/}').run(output_directory='{path:exe/steps/train/outputs}')"
 
@@ -407,7 +407,7 @@ evaluate_objects = steps/evaluate/outputs/metrics.json steps/evaluate/outputs/ar
 
 evaluate: $(evaluate_objects)
 
-steps/%/outputs/metrics.json steps/%/outputs/artifacts steps/%/outputs/model_validation_status: steps/train/outputs/model.pkl steps/split/outputs/test.parquet steps/train/outputs/run_id steps/evaluate/conf.yaml
+steps/%/outputs/metrics.json steps/%/outputs/artifacts steps/%/outputs/model_validation_status: {path:prp/steps/custom_metrics.py} steps/train/outputs/model.pkl steps/split/outputs/test.parquet steps/train/outputs/run_id steps/evaluate/conf.yaml steps/transform/outputs/transformer.pkl
 	cd {path:prp/} && \
         python -c "from mlflow.pipelines.regression.v1.steps.evaluate import EvaluateStep; EvaluateStep.from_step_config_path(step_config_path='{path:exe/steps/evaluate/conf.yaml}', pipeline_root='{path:prp/}').run(output_directory='{path:exe/steps/evaluate/outputs}')"
 

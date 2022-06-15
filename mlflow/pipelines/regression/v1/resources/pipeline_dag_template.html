@@ -2,7 +2,10 @@
 <html lang="en">
   <body>
     <style>
-      .mermaidTooltip{
+      @keyframes spin {
+        to { transform: translate(calc(-50%), calc(50vh - 50%)) rotate(360deg); }
+      }
+      .mermaidTooltip {
         display: none;
       }
       .wrapper {
@@ -11,9 +14,26 @@
       .mermaid {
         width: 60%;
       }
+      .pane-loading {
+        font-size: 0;
+        color: transparent;
+      }
+      .pane-loading::after {
+        content: "";
+        position: absolute;
+        inset: 0 50%;
+        width: 32px;
+        height: 32px;
+        transform: translate(calc(-50%), calc(50vh - 50%));
+        border: 0.25rem solid #9370DB;
+        border-bottom: 0.25rem solid rgba(0,0,0,0);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
       #editor {
         font-size: 13px;
         width: 40%;
+        position: relative;
       }
       font {
         font-size: 24px;
@@ -22,36 +42,40 @@
     </style>
 
     <div class="wrapper">
-      <div class="mermaid">
+      <div class="mermaid pane-loading">
           flowchart TB
-          pipeline(pipeline.yaml)
+          pipeline([pipeline.yaml])
 
           ingestUserCode([steps/ingest.py]) --> ingestMLPStep[["<font>ingest</font>"]]
           ingestMLPStep --> dataParquet[(ingested_data)]
 
           data[(ingested_data)] --> splitStep[["<font>split</font>"]]
+          splitUserCode([steps/split.py]) --> splitStep
           splitStep --> splitData1[(training_data, <br> validation_data)]
           splitStep --> splitData2[(test_data)]
           splitData1 --> transformMLPStep[["<font>transform</font>"]]
 
           transformUserCode([steps/transform.py]) --> transformMLPStep
           transformMLPStep --> transformedParquet[(transformed_training_data, <br/> transformed_validation_data)]
-          transformedParquet --> trainMLPStep[["<font>train</font>"]]
           transformMLPStep --> transformer{{transformer}}
-          transformer --> trainMLPStep 
+          transformedParquet --> trainMLPStep[["<font>train</font>"]]
 
           trainUserCode([steps/train.py]) --> trainMLPStep
+          customMetricsUserCode([steps/custom_metrics.py]) --> trainMLPStep
+          transformer --> trainMLPStep
           trainMLPStep --> run{{run}}
           trainMLPStep --> model{{model}}
 
           model --> evaluateMLPStep[["<font>evaluate</font>"]]
-          evaluateUserCode([steps/evaluate.py]) --> evaluateMLPStep
+          transformer --> evaluateMLPStep
           splitData2 --> evaluateMLPStep
+          customMetricsUserCode --> evaluateMLPStep
+          evaluateMLPStep --> model_validation_status{{model_validation_status}}
+          run --> registerMLPStep[["<font>register</font>"]]
+          run --> evaluateMLPStep
 
-          evaluateMLPStep --> model_validation_status{{model_validation_status}} 
-          model_validation_status --> registerMLPStep[["<font>register</font>"]]
-
-          registerMLPStep --> registered_model_info{{registered_model_info}}
+          model_validation_status --> registerMLPStep
+          registerMLPStep --> registered_model{{registered_model}}
 
           click ingestMLPStep noOp "  # Dataset locations on the local filesystem are supported, as well as any remote
   # locations resolvable by MLflow, such as those listed in
@@ -68,16 +92,21 @@
           click trainMLPStep noOp "# Please override the steps/train.py for customization"
           click trainUserCode noOp "def train() -> model"
           click evaluateMLPStep noOp "# Please override the steps/evaluate.py for customization"
-          click evaluateUserCode noOp "def custom_metric_fns() -> List[Callable]"
+          click registerMLPStep noOp "# register step"
+          click customMetricsUserCode noOp "def custom_metric_fns() -> List[Callable]"
+          click splitUserCode noOp "def process_splits(train_df: DataFrame, validation_df: DataFrame, test_df: DataFrame) -> (DataFrame, DataFrame, DataFrame)"
 
           click pipeline renderMoreInformation "{{pipeline_yaml}}"
           click dataParquet noOp "data ingested from source"
           click data noOp "data ingested from source"
-          click splitData1 noOp "Raw training and validation data that will be transformed prior to model training"
-          click splitData2 noOp "Test data for model evaluation"
-          click transformedParquet noOp "Transformed training and validation datasets used during training"
-          click run noOp "MLflow Run containing the trained model with associated paramaters and performance metrics"
-          click model noOp "Trained model in MLflow Model format"
+          click splitData1 noOp "Outputs splits for training and validation"
+          click splitData2 noOp "Output split for evaluating the model"
+          click transformedParquet noOp "Transformed output of training and validation needed for training"
+          click run noOp "Output run which is tracked in MLFlow"
+          click model noOp "Output model form training"
+          click transformer noOp "Output transformer from transform step"
+          click model_validation_status noOp "Output model validation status from evaluate step"
+          click registered_model noOp "Output registered model from register step"
 
       </div>
       <div id="editor"></div>
@@ -104,6 +133,7 @@
                 htmlLabels:true,
             }
           };
+          document.querySelector('.mermaid.pane-loading').classList.remove('pane-loading');
           mermaid.initialize(config);
           mermaid.init();
           const nodes = document.querySelectorAll(".node");
@@ -142,17 +172,25 @@
         rect.style.color = "#fff";
         rect.style.strokeDasharray = "5 5";
 
-        require(["ace/ace", "python", "monokai"],
+        document.querySelector("#editor").classList.add('pane-loading');
+        const hideSpinner = () => document.querySelector("#editor").classList.remove('pane-loading');
+
+        require(["ace/ace"],
           function (ace) {
-            if (!window.editor) {
-              const editor = ace.edit("editor");
-              editor.setTheme("ace/theme/monokai");
-              editor.session.setMode("ace/mode/python");
-              editor.setReadOnly(true);
-              window.editor = editor;
-            }
-            window.editor.setValue(title)
-          }
+            require(["python", "monokai"],
+              function () {
+                hideSpinner();
+                if (!window.editor) {
+                  const editor = ace.edit("editor");
+                  editor.setTheme("ace/theme/monokai");
+                  editor.session.setMode("ace/mode/python");
+                  editor.setReadOnly(true);
+                  window.editor = editor;
+                }
+                window.editor.setValue(title)
+              }, hideSpinner
+            );
+          }, hideSpinner
         );
       }
     </script>

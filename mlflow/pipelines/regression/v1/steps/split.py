@@ -91,12 +91,12 @@ class SplitStep(BaseStep):
         self.execution_duration = None
         self.num_dropped_rows = None
 
-        if "target_col" not in self.step_config:
+        self.target_col = self.step_config.get("target_col")
+        if self.target_col is None:
             raise MlflowException(
                 "Missing target_col config in pipeline config.",
                 error_code=INVALID_PARAMETER_VALUE,
             )
-        self.target_col = self.step_config.get("target_col")
 
         split_ratios = self.step_config.get("split_ratios", [0.75, 0.125, 0.125])
         if not (
@@ -211,13 +211,8 @@ class SplitStep(BaseStep):
 
     @classmethod
     def from_pipeline_config(cls, pipeline_config, pipeline_root):
-        try:
-            step_config = pipeline_config["steps"]["split"]
-            step_config["target_col"] = pipeline_config.get("target_col")
-        except KeyError:
-            raise MlflowException(
-                "Config for split step is not found.", error_code=INVALID_PARAMETER_VALUE
-            )
+        step_config = pipeline_config.get("steps", {}).get("split", {})
+        step_config["target_col"] = pipeline_config.get("target_col")
         return cls(step_config, pipeline_root)
 
     @property

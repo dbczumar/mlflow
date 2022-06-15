@@ -1,6 +1,4 @@
 import logging
-import importlib.util
-import sys
 import operator
 import os
 import time
@@ -10,7 +8,7 @@ from typing import Dict, Any
 from collections import namedtuple
 
 import mlflow
-from mlflow.protos.databricks_pb2 import INVALID_PARAMETER_VALUE, BAD_REQUEST
+from mlflow.protos.databricks_pb2 import INVALID_PARAMETER_VALUE
 from mlflow.pipelines.step import BaseStep
 from mlflow.pipelines.utils.execution import get_step_output_path
 from mlflow.pipelines.utils.tracking import (
@@ -50,29 +48,6 @@ class EvaluateStep(BaseStep):
         self.run_end_time = None
         self.execution_duration = None
         self.model_validation_status = "UNKNOWN"
-
-    def _get_custom_metrics(self):
-        return (self.step_config.get("metrics") or {}).get("custom")
-
-    def _get_custom_metric_greater_is_better(self):
-        custom_metrics = self._get_custom_metrics()
-        return (
-            {cm["name"]: cm["greater_is_better"] for cm in custom_metrics} if custom_metrics else {}
-        )
-
-    def _load_custom_metric_functions(self):
-        custom_metrics = self._get_custom_metrics()
-        if not custom_metrics:
-            return None
-        try:
-            sys.path.append(self.pipeline_root)
-            custom_metrics_mod = importlib.import_module("steps.custom_metrics")
-            return [getattr(custom_metrics_mod, cm["function"]) for cm in custom_metrics]
-        except Exception as e:
-            raise MlflowException(
-                message="Failed to load custom metric functions",
-                error_code=BAD_REQUEST,
-            ) from e
 
     def _validate_validation_criteria(self):
         """
@@ -219,18 +194,22 @@ class EvaluateStep(BaseStep):
         summary_tab.add_markdown("METRICS", metric_table_html)
 
         if criteria_summary is not None:
-            criteria_summary_df = pd.DataFrame(criteria_summary)
 
-            def criteria_table_row_format(row):
-                color = "background-color: {}".format(
-                    "lightgreen" if row.validated else "lightpink"
+            def get_icon(validated):
+                return (
+                    # check mark button emoji
+                    "\u2705"
+                    if validated
+                    # cross mark emoji
+                    else "\u274c"
                 )
-                return (color,) * len(row)
+
+            criteria_summary_df = pd.DataFrame(criteria_summary).assign(
+                validated=lambda df: df["validated"].map(get_icon)
+            )
 
             criteria_html = BaseCard.render_table(
-                criteria_summary_df.style.apply(criteria_table_row_format, axis=1).format(
-                    {"value": "{:.6g}", "threshold": "{:.6g}"}
-                )
+                criteria_summary_df.style.format({"value": "{:.6g}", "threshold": "{:.6g}"})
             )
             summary_tab.add_html(
                 "METRIC_VALIDATION_RESULTS",

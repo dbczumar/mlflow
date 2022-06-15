@@ -84,12 +84,6 @@ CORE_REQUIREMENTS = SKINNY_REQUIREMENTS + [
     # Required to run the MLflow server against SQL-backed storage
     "sqlalchemy",
     "waitress; platform_system == 'Windows'",
-    # Required for MLflow Pipelines
-    # TODO: Move these to extras later
-    "pandas-profiling",
-    "pyarrow",
-    "jinja2",
-    "Markdown",
 ]
 
 _is_mlflow_skinny = bool(os.environ.get(_MLFLOW_SKINNY_ENV_VAR))
@@ -153,6 +147,14 @@ setup(
             # Required to serve models through MLServer
             "mlserver>=0.5.3",
             "mlserver-mlflow>=0.5.3",
+        ],
+        "pipeline": [
+            "scikit-learn>=1.0.*",
+            "pyarrow>=7.0.*",
+            "shap>=0.40.*",
+            "pandas-profiling>=3.1.*",
+            "ipython>=7.0.*",
+            "markdown>=3.3.*",
         ],
         "sqlserver": ["mlflow-dbstore"],
         "aliyun-oss": ["aliyunstoreplugin"],

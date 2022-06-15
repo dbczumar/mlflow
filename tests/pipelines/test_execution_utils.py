@@ -96,11 +96,11 @@ def test_pipeline(
 
 @pytest.fixture(autouse=True)
 def clean_test_pipeline(enter_test_pipeline_directory):  # pylint: disable=unused-argument
-    Pipeline().clean()
+    Pipeline(profile="local").clean()
     try:
         yield
     finally:
-        Pipeline().clean()
+        Pipeline(profile="local").clean()
 
 
 def test_get_or_create_execution_directory_is_idempotent(tmp_path):

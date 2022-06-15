@@ -112,8 +112,10 @@ class TrainStep(BaseStep):
                 model_type="regressor",
                 evaluators="default",
                 dataset_name="validation",
-                # TODO: add custom metrics
-                custom_metrics=[],
+                custom_metrics=self._load_custom_metric_functions(),
+                evaluator_config={
+                    "log_model_explainability": False,
+                },
             )
             eval_result.save(output_directory)
 
@@ -201,7 +203,13 @@ class TrainStep(BaseStep):
         )
         # Tab 4: Run summary.
         (
-            card.add_tab(f"Run Summary ({self.name.capitalize()})", "{{RUN_ID}}" + "{{MODEL_URI}}")
+            card.add_tab(
+                "Run Summary",
+                "{{ RUN_ID }} "
+                + "{{ MODEL_URI }}"
+                + "{{ EXE_DURATION }}"
+                + "{{ LAST_UPDATE_TIME }}",
+            )
             .add_markdown("RUN_ID", f"**MLflow Run ID:** `{run_id}`")
             .add_markdown("MODEL_URI", f"**MLflow Model URI:** `{model_uri}`")
         )
@@ -212,6 +220,7 @@ class TrainStep(BaseStep):
     def from_pipeline_config(cls, pipeline_config, pipeline_root):
         try:
             step_config = pipeline_config["steps"]["train"]
+            step_config["metrics"] = pipeline_config.get("metrics")
             step_config.update(
                 get_pipeline_tracking_config(
                     pipeline_root_path=pipeline_root,

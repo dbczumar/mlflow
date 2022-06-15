@@ -45,7 +45,7 @@ def test_create_pipeline_fails_with_invalid_profile():
 
 @pytest.mark.usefixtures("enter_pipeline_example_directory")
 def test_create_pipeline_and_clean_works():
-    p = Pipeline()
+    p = Pipeline(profile="local")
     p.clean()
 
 
@@ -71,7 +71,7 @@ def test_pipelines_execution_directory_is_managed_as_expected(
 
     # Run the full pipeline and verify that outputs for each step were written to the expected
     # execution directory locations
-    p = Pipeline()
+    p = Pipeline(profile="local")
     p.run()
     assert (expected_execution_directory_location / "Makefile").exists()
     assert (expected_execution_directory_location / "steps").exists()
@@ -169,7 +169,7 @@ def test_pipelines_run_throws_exception_and_produces_failure_card_when_step_fail
 
 @pytest.mark.usefixtures("enter_pipeline_example_directory")
 def test_test_step_logs_step_cards_as_artifacts():
-    pipeline = Pipeline()
+    pipeline = Pipeline(profile="local")
     pipeline.run("ingest")
     pipeline.run("split")
     pipeline.run("transform")
@@ -195,7 +195,7 @@ def test_test_step_logs_step_cards_as_artifacts():
 
 @pytest.mark.usefixtures("enter_pipeline_example_directory")
 def test_pipeline_get_artifacts():
-    pipeline = Pipeline()
+    pipeline = Pipeline(profile="local")
     pipeline.clean()
 
     pipeline.run("ingest")

@@ -1,8 +1,10 @@
 import os
+import pytest
 
 import numpy as np
 import pandas as pd
 
+from mlflow.exceptions import MlflowException
 from mlflow.pipelines.utils.execution import _MLFLOW_PIPELINES_EXECUTION_DIRECTORY_ENV_VAR
 from mlflow.pipelines.regression.v1.steps.split import _get_split_df, _make_elem_hashable, SplitStep
 from unittest import mock
@@ -76,3 +78,23 @@ def test_get_split_df():
         assert train_df.v.tolist() == [10, 30, 50]
         assert val_df.v.tolist() == [40, 60]
         assert test_df.v.tolist() == [20]
+
+
+def test_from_pipeline_config_fails_without_target_col(tmp_path):
+    with mock.patch.dict(
+        os.environ, {_MLFLOW_PIPELINES_EXECUTION_DIRECTORY_ENV_VAR: str(tmp_path)}
+    ), mock.patch("mlflow.pipelines.step.get_pipeline_name", return_value="fake_name"), mock.patch(
+        "mlflow.pipelines.step.get_hashed_pipeline_root", return_value="hashed_fake_name"
+    ), pytest.raises(
+        MlflowException, match="Missing target_col config"
+    ):
+        _ = SplitStep.from_pipeline_config({}, "fake_root")
+
+
+def test_from_pipeline_config_works_with_target_col(tmp_path):
+    with mock.patch.dict(
+        os.environ, {_MLFLOW_PIPELINES_EXECUTION_DIRECTORY_ENV_VAR: str(tmp_path)}
+    ), mock.patch("mlflow.pipelines.step.get_pipeline_name", return_value="fake_name"), mock.patch(
+        "mlflow.pipelines.step.get_hashed_pipeline_root", return_value="hashed_fake_name"
+    ):
+        assert SplitStep.from_pipeline_config({"target_col": "fake_col"}, "fake_root") is not None

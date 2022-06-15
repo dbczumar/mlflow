@@ -364,7 +364,8 @@ jobs:
           INSTALL_LARGE_PYTHON_DEPS: false
         run: |
           source ./dev/install-common-deps.sh
-          pip install -r mlflow/pipelines/requirements.txt
+          pip install -e .[pipeline]
+          pip install pyspark
       - name: Run tests
         run: |
           export MLFLOW_HOME=$(pwd)
@@ -395,10 +396,10 @@ jobs:
       - name: Install python dependencies
         run: |
           pip install -r requirements/small-requirements.txt
-          pip install -r mlflow/pipelines/requirements.txt
           pip install --no-dependencies tests/resources/mlflow-test-plugin
           pip install -e .[extras]
-          pip install -r mlflow/pipelines/requirements.txt
+          pip install -e .[pipeline]
+          pip install pyspark
       - name: Download Hadoop winutils for Spark
         run: |
           git clone https://github.com/cdarlint/winutils

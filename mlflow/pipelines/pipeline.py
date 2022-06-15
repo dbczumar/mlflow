@@ -8,7 +8,6 @@ from mlflow.pipelines.utils import (
     get_hashed_pipeline_root,
     get_pipeline_name,
     get_pipeline_root_path,
-    get_default_profile,
     display_html,
 )
 from mlflow.pipelines.utils.execution import (
@@ -25,7 +24,7 @@ _logger = logging.getLogger(__name__)
 
 
 class Pipeline:
-    def __new__(cls, profile: str = get_default_profile()):
+    def __new__(cls, profile: str = None):
         """
         A factory class to create an instance of MLflow Pipeline based on the template
         defined in pipeline.yaml under the pipeline root.
@@ -64,7 +63,10 @@ class Pipeline:
                 ) from None
 
         pipeline_name = get_pipeline_name(pipeline_root_path)
-        _logger.info(f"Creating MLflow Pipeline '{pipeline_name}' with profile: '{profile}'")
+        if profile:
+            _logger.info(f"Creating MLflow Pipeline '{pipeline_name}' with profile: '{profile}'")
+        else:
+            _logger.info(f"Creating MLflow Pipeline '{pipeline_name}' without profile override.")
         return pipeline_class_module(pipeline_root_path, profile)
 
 
