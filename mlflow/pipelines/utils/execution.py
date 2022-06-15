@@ -1,3 +1,4 @@
+import hashlib
 import os
 import pathlib
 import shutil
@@ -16,7 +17,6 @@ _STEP_CONF_YAML_NAME = "conf.yaml"
 
 def run_pipeline_step(
     pipeline_root_path: str,
-    pipeline_name: str,
     pipeline_steps: List[BaseStep],
     target_step: BaseStep,
 ) -> BaseStep:
@@ -25,7 +25,6 @@ def run_pipeline_step(
 
     :param pipeline_root_path: The absolute path of the pipeline root directory on the local
                                filesystem.
-    :param pipeline_name: The name of the pipeline.
     :param pipeline_steps: A list of all the steps contained in the specified pipeline. Pipeline
                            steps must be provided in the order that they are intended to be
                            executed.
@@ -35,9 +34,7 @@ def run_pipeline_step(
              unsuccessful, this corresponds to the step that failed.
     """
     target_step_index = pipeline_steps.index(target_step)
-    execution_dir_path = _get_or_create_execution_directory(
-        pipeline_root_path, pipeline_name, pipeline_steps
-    )
+    execution_dir_path = _get_or_create_execution_directory(pipeline_root_path, pipeline_steps)
 
     def get_execution_state(step):
         return step.get_execution_state(
@@ -51,7 +48,7 @@ def run_pipeline_step(
     # dependencies. If any of these steps previously failed, clear its execution
     # state to ensure that the step is run again during the upcoming execution
     clean_execution_state(
-        pipeline_name=pipeline_name,
+        pipeline_root_path=pipeline_root_path,
         pipeline_steps=[
             step
             for step in pipeline_steps[: target_step_index + 1]
@@ -91,7 +88,7 @@ def run_pipeline_step(
     # If any of these steps was last executed before the target step or another step upstream of the
     # target step, this indicates that downstream steps are out of date and need to be cleared
     clean_execution_state(
-        pipeline_name=pipeline_name,
+        pipeline_root_path=pipeline_root_path,
         pipeline_steps=[
             step
             for step in pipeline_steps[pipeline_steps.index(last_executed_step) :]
@@ -103,16 +100,17 @@ def run_pipeline_step(
     return last_executed_step
 
 
-def clean_execution_state(pipeline_name: str, pipeline_steps: List[BaseStep]) -> None:
+def clean_execution_state(pipeline_root_path: str, pipeline_steps: List[BaseStep]) -> None:
     """
     Removes all execution state for the specified pipeline steps from the associated execution
     directory on the local filesystem. This method does *not* remove other execution results, such
     as content logged to MLflow Tracking.
 
-    :param pipeline_name: The name of the pipeline.
+    :param pipeline_root_path: The absolute path of the pipeline root directory on the local
+                               filesystem.
     :param pipeline_steps: The pipeline steps for which to remove execution state.
     """
-    execution_dir_path = get_or_create_base_execution_directory(pipeline_name=pipeline_name)
+    execution_dir_path = get_or_create_base_execution_directory(pipeline_root_path=pipeline_root_path)
     for step in pipeline_steps:
         step_outputs_path = _get_step_output_directory_path(
             execution_directory_path=execution_dir_path,
@@ -123,19 +121,20 @@ def clean_execution_state(pipeline_name: str, pipeline_steps: List[BaseStep]) ->
         os.makedirs(step_outputs_path)
 
 
-def get_step_output_path(pipeline_name: str, step_name: str, relative_path: str) -> str:
+def get_step_output_path(pipeline_root_path: str, step_name: str, relative_path: str) -> str:
     """
     Obtains the absolute path of the specified step output on the local filesystem. Does
     not check the existence of the output.
 
-    :param pipeline_name: The name of the pipeline.
+    :param pipeline_root_path: The absolute path of the pipeline root directory on the local
+                               filesystem.
     :param step_name: The name of the pipeline step containing the specified output.
     :param relative_path: The relative path of the output within the output directory
                           of the specified pipeline step.
     :return The absolute path of the step output on the local filesystem, which may or may
             not exist.
     """
-    execution_dir_path = get_or_create_base_execution_directory(pipeline_name=pipeline_name)
+    execution_dir_path = get_or_create_base_execution_directory(pipeline_root_path=pipeline_root_path)
     step_outputs_path = _get_step_output_directory_path(
         execution_directory_path=execution_dir_path,
         step_name=step_name,
@@ -143,9 +142,7 @@ def get_step_output_path(pipeline_name: str, step_name: str, relative_path: str)
     return os.path.abspath(os.path.join(step_outputs_path, relative_path))
 
 
-def _get_or_create_execution_directory(
-    pipeline_root_path: str, pipeline_name: str, pipeline_steps: List[BaseStep]
-) -> str:
+def _get_or_create_execution_directory(pipeline_root_path: str, pipeline_steps: List[BaseStep]) -> str:
     """
     Obtains the path of the execution directory on the local filesystem corresponding to the
     specified pipeline, creating the execution directory and its required contents if they do
@@ -153,12 +150,11 @@ def _get_or_create_execution_directory(
 
     :param pipeline_root_path: The absolute path of the pipeline root directory on the local
                                filesystem.
-    :param pipeline_name: The name of the pipeline.
     :param pipeline_steps: A list of all the steps contained in the specified pipeline.
     :return: The absolute path of the execution directory on the local filesystem for the specified
              pipeline.
     """
-    execution_dir_path = get_or_create_base_execution_directory(pipeline_name)
+    execution_dir_path = get_or_create_base_execution_directory(pipeline_root_path=pipeline_root_path)
 
     _create_makefile(pipeline_root_path, execution_dir_path)
     for step in pipeline_steps:
@@ -203,17 +199,21 @@ def _write_updated_step_confs(
             )
 
 
-def get_or_create_base_execution_directory(pipeline_name: str) -> str:
+def get_or_create_base_execution_directory(pipeline_root_path: str) -> str:
     """
     Obtains the path of the execution directory on the local filesystem corresponding to the
     specified pipeline. The directory is created if it does not exist.
 
-    :param pipeline_name: The name of the pipeline for which to obtain the associated execution
-                          directory path.
+    :param pipeline_root_path: The absolute path of the pipeline root directory on the local
+                               filesystem.
+    :return: The path of the execution directory on the local filesystem corresponding to the
+             specified pipeline.
     """
+    hashed_pipeline_root = hashlib.sha256(os.path.abspath(pipeline_root_path).encode("utf-8")).hexdigest()
+
     execution_dir_path = os.path.abspath(
         os.environ.get(_MLFLOW_PIPELINES_EXECUTION_DIRECTORY_ENV_VAR)
-        or os.path.join(os.path.expanduser("~"), ".mlflow", "pipelines", pipeline_name)
+        or os.path.join(os.path.expanduser("~"), ".mlflow", "pipelines", hashed_pipeline_root)
     )
     os.makedirs(execution_dir_path, exist_ok=True)
     return execution_dir_path

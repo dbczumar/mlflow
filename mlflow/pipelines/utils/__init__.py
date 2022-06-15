@@ -1,7 +1,6 @@
 import logging
 import os
 import pathlib
-import hashlib
 from typing import Dict, Any
 
 from mlflow.exceptions import MlflowException, INVALID_PARAMETER_VALUE
@@ -16,24 +15,6 @@ _PIPELINE_PROFILE_DIR = "profiles"
 _PIPELINE_PROFILE_ENV_VAR = "MLFLOW_PIPELINES_PROFILE"
 
 _logger = logging.getLogger(__name__)
-
-
-def get_hashed_pipeline_root(pipeline_root_path: str = None) -> str:
-    """
-    Obtains the hashed string of pipeline root of the specified pipeline or
-    of the pipeline corresponding to the current working directory.
-
-    :param pipeline_root_path: The absolute path of the pipeline root directory on the local
-                               filesystem. If unspecified, the pipeline root directory is
-                               resolved from the current working directory.
-    :raises MlflowException: If the specified ``pipeline_root_path`` is not a pipeline root
-                             directory or if ``pipeline_root_path`` is ``None`` and the current
-                             working directory does not correspond to a pipeline.
-    :return: The hashed of the specified pipeline.
-    """
-    pipeline_root_path = pipeline_root_path or get_pipeline_root_path()
-    _verify_is_pipeline_root_directory(pipeline_root_path=pipeline_root_path)
-    return hashlib.sha256(os.path.abspath(pipeline_root_path).encode("utf-8")).hexdigest()
 
 
 def get_pipeline_name(pipeline_root_path: str = None) -> str:
