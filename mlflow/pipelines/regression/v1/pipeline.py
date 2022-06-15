@@ -16,7 +16,7 @@ from mlflow.pipelines.regression.v1.steps.split import (
 from mlflow.pipelines.regression.v1.steps.transform import TransformStep
 from mlflow.pipelines.regression.v1.steps.train import TrainStep
 from mlflow.pipelines.regression.v1.steps.evaluate import EvaluateStep
-from mlflow.pipelines.regression.v1.steps.register import RegisterStep
+from mlflow.pipelines.regression.v1.steps.register import RegisterStep, RegisteredModelVersionInfo
 from mlflow.pipelines.step import BaseStep
 from typing import List
 from mlflow.pipelines.utils import get_pipeline_root_path
@@ -88,7 +88,7 @@ class RegressionPipeline(_BasePipeline):
 
          - `run`: returns an MLflow run object.
         """
-        ingest_step, split_step, transform_step, train_step, _, _ = self._steps
+        ingest_step, split_step, transform_step, train_step, _, register_step = self._steps
 
         ingest_output_dir = get_step_output_path(self._hashed_pipeline_root, ingest_step.name, "")
         split_output_dir = get_step_output_path(self._hashed_pipeline_root, split_step.name, "")
@@ -187,6 +187,17 @@ class RegressionPipeline(_BasePipeline):
                     return MlflowClient().get_run(run_id)
             else:
                 log_artifact_not_found_warning("mlflow run", train_step.name)
+                return None
+
+        elif artifact == "registered_model_version":
+            register_output_dir = get_step_output_path(self._hashed_pipeline_root, register_step.name, "")
+            registered_model_info_path = os.path.join(register_output_dir, "registered_model")
+            if os.path.exists(registered_model_info_path):
+                registered_model_info = RegisteredModelVersionInfo.from_json(path=registered_model_info_path)
+                with _use_tracking_uri(train_step_tracking_uri, pipeline_root_path):
+                    return MlflowClient().get_model_version(name=registered_model_info.name, version=registered_model_info.version)
+            else:
+                log_artifact_not_found_warning("registered_model", register_step.name)
                 return None
 
         else:

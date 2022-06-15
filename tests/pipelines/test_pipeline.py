@@ -16,6 +16,7 @@ from mlflow.tracking.client import MlflowClient
 from mlflow.tracking.context.registry import resolve_tags
 from mlflow.utils.file_utils import path_to_local_file_uri
 from mlflow.entities import Run
+from mlflow.entities.model_registry import ModelVersion
 
 # pylint: disable=unused-import
 from tests.pipelines.helper_functions import (
@@ -202,6 +203,7 @@ def test_pipeline_get_artifacts():
     pipeline.run("split")
     pipeline.run("transform")
     pipeline.run("train")
+    pipeline.run("register")
 
     assert isinstance(pipeline.get_artifact("ingested_data"), pd.DataFrame)
     assert isinstance(pipeline.get_artifact("training_data"), pd.DataFrame)
@@ -212,6 +214,7 @@ def test_pipeline_get_artifacts():
     assert hasattr(pipeline.get_artifact("transformer"), "transform")
     assert isinstance(pipeline.get_artifact("model"), mlflow.pyfunc.PyFuncModel)
     assert isinstance(pipeline.get_artifact("run"), Run)
+    assert isinstance(pipeline.get_artifact("registered_model_version"), ModelVersion)
 
     with pytest.raises(MlflowException, match="The artifact abcde is not supported."):
         pipeline.get_artifact("abcde")

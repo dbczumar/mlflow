@@ -1,4 +1,6 @@
+import json
 import logging
+import os
 import time
 from typing import Dict, Any
 
@@ -70,6 +72,11 @@ class RegisterStep(BaseStep):
                 await_registration_for=DEFAULT_AWAIT_MAX_SLEEP_SECONDS,
             )
             self.version = self.model_details.version
+            registered_model_info = RegisteredModelVersionInfo(
+                name=self.register_model_name,
+                version=self.version
+            )
+            registered_model_info.to_json(path=os.path.join(output_directory, "registered_model")) 
         else:
             self.alerts = (
                 "Model registration skipped.  Please check the validation "
@@ -121,3 +128,30 @@ class RegisterStep(BaseStep):
     @property
     def environment(self):
         return get_databricks_env_vars(tracking_uri=self.tracking_config.tracking_uri)
+
+
+class RegisteredModelVersionInfo:
+    _KEY_REGISTERED_MODEL_NAME = "registered_model_name"
+    _KEY_REGISTERED_MODEL_VERSION = "registered_model_version"
+
+    def __init__(self, name: str, version: int):
+        self.name = name
+        self.version = version
+
+    def to_json(self, path):
+        registered_model_info_dict = {
+            RegisteredModelVersionInfo._KEY_REGISTERED_MODEL_NAME: self.name,
+            RegisteredModelVersionInfo._KEY_REGISTERED_MODEL_VERSION: self.version,
+        }
+        with open(path, "w") as f:
+            json.dump(registered_model_info_dict, f)
+
+    @classmethod
+    def from_json(cls, path):
+        with open(path, "r") as f:
+            registered_model_info_dict = json.load(f)
+
+        return cls(
+            name=registered_model_info_dict[RegisteredModelVersionInfo._KEY_REGISTERED_MODEL_NAME],
+            version=registered_model_info_dict[RegisteredModelVersionInfo._KEY_REGISTERED_MODEL_VERSION],
+        )

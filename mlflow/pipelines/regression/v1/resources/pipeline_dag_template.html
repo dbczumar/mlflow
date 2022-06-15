@@ -75,7 +75,7 @@
           run --> evaluateMLPStep
 
           model_validation_status --> registerMLPStep
-          registerMLPStep --> registered_model{{registered_model}}
+          registerMLPStep --> registered_model_version{{registered_model_version}}
 
           click ingestMLPStep noOp "  # Dataset locations on the local filesystem are supported, as well as any remote
   # locations resolvable by MLflow, such as those listed in
