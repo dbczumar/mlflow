@@ -190,12 +190,18 @@ class RegressionPipeline(_BasePipeline):
                 return None
 
         elif artifact == "registered_model_version":
-            register_output_dir = get_step_output_path(self._hashed_pipeline_root, register_step.name, "")
+            register_output_dir = get_step_output_path(
+                self._hashed_pipeline_root, register_step.name, ""
+            )
             registered_model_info_path = os.path.join(register_output_dir, "registered_model")
             if os.path.exists(registered_model_info_path):
-                registered_model_info = RegisteredModelVersionInfo.from_json(path=registered_model_info_path)
+                registered_model_info = RegisteredModelVersionInfo.from_json(
+                    path=registered_model_info_path
+                )
                 with _use_tracking_uri(train_step_tracking_uri, pipeline_root_path):
-                    return MlflowClient().get_model_version(name=registered_model_info.name, version=registered_model_info.version)
+                    return MlflowClient().get_model_version(
+                        name=registered_model_info.name, version=registered_model_info.version
+                    )
             else:
                 log_artifact_not_found_warning("registered_model", register_step.name)
                 return None

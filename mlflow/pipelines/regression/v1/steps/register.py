@@ -73,10 +73,9 @@ class RegisterStep(BaseStep):
             )
             self.version = self.model_details.version
             registered_model_info = RegisteredModelVersionInfo(
-                name=self.register_model_name,
-                version=self.version
+                name=self.register_model_name, version=self.version
             )
-            registered_model_info.to_json(path=os.path.join(output_directory, "registered_model")) 
+            registered_model_info.to_json(path=os.path.join(output_directory, "registered_model"))
         else:
             self.alerts = (
                 "Model registration skipped.  Please check the validation "
@@ -153,5 +152,7 @@ class RegisteredModelVersionInfo:
 
         return cls(
             name=registered_model_info_dict[RegisteredModelVersionInfo._KEY_REGISTERED_MODEL_NAME],
-            version=registered_model_info_dict[RegisteredModelVersionInfo._KEY_REGISTERED_MODEL_VERSION],
+            version=registered_model_info_dict[
+                RegisteredModelVersionInfo._KEY_REGISTERED_MODEL_VERSION
+            ],
         )
