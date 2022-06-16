@@ -183,11 +183,30 @@
                 if (!window.editor) {
                   const editor = ace.edit("editor");
                   editor.setTheme("ace/theme/monokai");
-                  editor.session.setMode("ace/mode/python");
+                  editor.session.setMode("ace/mode/text");
+                  // Wrap text lines for readability
+                  editor.session.setUseWrapMode(true);
+                  // Remove unnecessary indentation on wrapped lines
+                  editor.setOption("indentedSoftWrap", false);
                   editor.setReadOnly(true);
+                  // Disable active line highlighting
+                  editor.setHighlightActiveLine(false);
+                  // Hide the cursor, the presence of which creates the misconception
+                  // that the text is editable
+                  editor.renderer.$cursorLayer.element.style.display = "none"
+                  // Hide the editor gutter, since the window isn't really an editor and instead
+                  // is intended for displaying text
+                  editor.renderer.setShowGutter(false);
+                  // Disable the line length ruler
+                  editor.setShowPrintMargin(false);
+
                   window.editor = editor;
                 }
+                // Set the editor value and the editor session value to the text associated with
+                // the pipeline node; setting the session is important in order to avoid
+                // obtrusive highlighting
                 window.editor.setValue(title)
+                window.editor.session.setValue(title)
               }, hideSpinner
             );
           }, hideSpinner

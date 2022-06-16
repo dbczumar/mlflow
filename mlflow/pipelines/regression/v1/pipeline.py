@@ -3,6 +3,7 @@ import logging
 
 import pandas as pd
 
+import mlflow.pipelines.regression.v1.dag_help_strings as dag_help_strings 
 import mlflow.pyfunc
 from mlflow.tracking.client import MlflowClient
 from mlflow.pipelines.pipeline import _BasePipeline
@@ -35,15 +36,11 @@ class RegressionPipeline(_BasePipeline):
         return self._PIPELINE_STEPS
 
     def _get_pipeline_dag_file(self) -> str:
-        # This is just a POC to show how the help strings would be dynamic.
-        # TODO: replace below code to read the help strings instead.
-        pipeline_yaml = "initial config for the pipeline"
-
         import jinja2
 
         j2_env = jinja2.Environment(loader=jinja2.FileSystemLoader(os.path.dirname(__file__)))
         pipeline_dag_template = j2_env.get_template("resources/pipeline_dag_template.html").render(
-            {"pipeline_yaml": pipeline_yaml}
+            {"pipeline_yaml": f"{dag_help_strings.PIPELINE_YAML}"}
         )
 
         pipeline_dag_file = os.path.join(
