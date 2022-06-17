@@ -41,11 +41,26 @@ class RegressionPipeline(_BasePipeline):
         j2_env = jinja2.Environment(loader=jinja2.FileSystemLoader(os.path.dirname(__file__)))
         pipeline_dag_template = j2_env.get_template("resources/pipeline_dag_template.html").render(
             {
-              "pipeline_yaml": f"{dag_help_strings.PIPELINE_YAML}",
-              "ingest_user_code": f"{dag_help_strings.INGEST_USER_CODE}",
-              "split_user_code": f"{dag_help_strings.SPLIT_USER_CODE}",
-              "transform_user_code": f"{dag_help_strings.TRANSFORM_USER_CODE}",
-              "train_user_code": f"{dag_help_strings.TRAIN_USER_CODE}",
+                "pipeline_yaml": {
+                    "help_string_type": "yaml",
+                    "help_string": dag_help_strings.PIPELINE_YAML,
+                },
+                "ingest_user_code": {
+                    "help_string": dag_help_strings.INGEST_USER_CODE,
+                    "help_string_type": "python",
+                },
+                "split_user_code": {
+                    "help_string": dag_help_strings.SPLIT_USER_CODE,
+                    "help_string_type": "python",
+                },
+                "transform_user_code": {
+                    "help_string": dag_help_strings.TRANSFORM_USER_CODE,
+                    "help_string_type": "python",
+                },
+                "train_user_code": {
+                    "help_string": dag_help_strings.TRAIN_USER_CODE,
+                    "help_string_type": "python",
+                },
             }
         )
 
