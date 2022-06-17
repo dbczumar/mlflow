@@ -41,7 +41,12 @@ metrics:
 """)
 
 INGEST_USER_CODE = format_help_string("""\"\"\"\nsteps/ingest.py defines customizable logic for parsing arbitrary dataset formats (i.e. formats that are not natively parsed by MLflow Pipelines) via the `load_file_as_dataframe` function. Note that the Parquet, Delta, and Spark SQL dataset formats are natively parsed by MLflow Pipelines, and you do not need to define custom logic for parsing them. An example `load_file_as_dataframe` implementation is displayed below (note that a different function name or module can be specified via the 'custom_loader_method' attribute of the 'data' section in pipeline.yaml).\n\"\"\"\n
-def load_file_as_dataframe(file_path, file_format):
+import pandas
+
+def load_file_as_dataframe(
+    file_path: str,
+    file_format: str,
+) -> pandas.DataFrame:
     \"\"\"
     Load content from the specified dataset file as a Pandas DataFrame.
 
@@ -53,17 +58,19 @@ def load_file_as_dataframe(file_path, file_format):
     \"\"\"
 
     if file_format == "csv":
-        import pandas
-
         return pandas.read_csv(file_path, index_col=0)
     else:
         raise NotImplementedError
 """)
 
 SPLIT_USER_CODE = format_help_string("""\"\"\"\nsteps/split.py defines customizable logic for preprocessing the training, validation, and test datasets prior to model creation via the `process_splits` function, an example of which is displayed below (note that a different function name or module can be specified via the 'post_split_method' attribute of the 'split' step definition in pipeline.yaml).\n\"\"\"\n
+import pandas
+
 def process_splits(
-    train_df: DataFrame, validation_df: DataFrame, test_df: DataFrame
-) -> (DataFrame, DataFrame, DataFrame):
+    train_df: pandas.DataFrame,
+    validation_df: pandas.DataFrame,
+    test_df: pandas.DataFrame,
+) -> (pandas.DataFrame, pandas.DataFrame, pandas.DataFrame):
     \"\"\"
     Perform additional processing on the split datasets.
 
@@ -75,10 +82,11 @@ def process_splits(
 
     return train_df.dropna(), validation_df.dropna(), test_df.dropna()
 """)
+
 TRANSFORM_USER_CODE = format_help_string("""\"\"\"\nsteps/transform.py defines customizable logic for transforming input data during model inference. Transformations are specified via the via the `transformer_fn` function, an example of which is displayed below (note that a different function name or module can be specified via the 'transform_method' attribute of the 'transform' step definition in pipeline.yaml).\n\"\"\"\n
 def transformer_fn():
     \"\"\"
-    Returns an *unfit* transformer with ``fit()`` and ``transform()`` methods. The transformer's input and output signatures should be compatible with scikit-learn transformers.
+    Returns an *unfit* transformer that defines ``fit()`` and ``transform()`` methods. The transformer's input and output signatures should be compatible with scikit-learn transformers.
     \"\"\"
     from sklearn.compose import ColumnTransformer
     from sklearn.pipeline import Pipeline
@@ -107,4 +115,32 @@ def estimator_fn():
     from sklearn.linear_model import SGDRegressor
 
     return SGDRegressor()
+""")
+
+CUSTOM_METRICS_USER_CODE = format_help_string("""\"\"\"\nsteps/custom_metrics.py defines customizable logic for specifying custom metrics to compute during model training and evaluation. Custom metric functions defined in custom_metrics.py are referenced by the 'function' attributes of entries in the 'custom' subsection of the 'metrics' section in pipeline.yaml. An example custom_metrics.py file is displayed below.\n\"\"\"\n
+import pandas
+from sklearn.metrics import mean_squared_error
+
+def weighted_mean_squared_error(
+    eval_df: pandas.DataFrame,
+    builtin_metrics: Dict[str, int],
+) -> Dict[str, int]:
+    \"\"\"
+    Computes the weighted mean squared error (MSE) metric.
+
+    :param eval_df: A Pandas DataFrame containing the following columns:
+
+                    - ``"prediction"``: Predictions produced by submitting input data to the model.
+                    - ``"target"``: Ground truth values corresponding to the input data.
+
+    :param builtin_metrics: A dictionary containing the built-in metrics that are calculated automatically during model evaluation. The keys are the names of the metrics and the values are the scalar values of the metrics. For more information, see https://mlflow.org/docs/latest/python_api/mlflow.html#mlflow.evaluate.
+    :return: A single-entry dictionary containing the MSE metric. The key is the metric names and the value is the scalar metric value. Note that custom metric functions can return dictionaries with multiple metric entries as well.
+    \"\"\"
+    return {
+        "weighted_mean_squared_error": mean_squared_error(
+            eval_df["prediction"],
+            eval_df["target"],
+            sample_weight=1 / eval_df["prediction"].values,
+        )
+    }
 """)

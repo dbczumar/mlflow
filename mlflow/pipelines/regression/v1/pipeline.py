@@ -61,6 +61,10 @@ class RegressionPipeline(_BasePipeline):
                     "help_string": dag_help_strings.TRAIN_USER_CODE,
                     "help_string_type": "python",
                 },
+                "custom_metrics_user_code": {
+                    "help_string": dag_help_strings.CUSTOM_METRICS_USER_CODE,
+                    "help_string_type": "python",
+                },
             }
         )
 

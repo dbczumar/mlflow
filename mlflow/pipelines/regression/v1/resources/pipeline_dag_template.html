@@ -93,7 +93,7 @@
           click trainUserCode renderMoreInformation "{{train_user_code}}"
           click evaluateMLPStep noOp "# Please override the steps/evaluate.py for customization"
           click registerMLPStep noOp "# register step"
-          click customMetricsUserCode noOp "def custom_metric_fns() -> List[Callable]"
+          click customMetricsUserCode renderMoreInformation "{{custom_metrics_user_code}}"
           click splitUserCode renderMoreInformation "{{split_user_code}}"
 
           click pipeline renderMoreInformation "{{pipeline_yaml}}"
