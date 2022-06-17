@@ -83,20 +83,20 @@
   location: ./datasets/autos.parquet
   # The `spark_sql` and `delta` formats are also natively supported for use with Spark
   format: parquet"
-          click ingestUserCode noOp "def load_file_as_dataframe(&#013; file_path: str, &#013; file_format: str&#013;) -> Pandas.parquet"
+          click ingestUserCode renderMoreInformation "{{ingest_user_code}}" python 
           click splitStep noOp "  # Should be an array where each value corresponds to [train, validation, test] dataset split.
   # Each value should be between 0.0 and 1.0 which represent the respective proportion of the dataset to include.
   split_ratio: [0.75, 0.125, 0.125]"
           click transformMLPStep noOp "# Please override the steps/transform.py for customization"
-          click transformUserCode noOp "def transform() -> transformer"
+          click transformUserCode renderMoreInformation python "{{transform_user_code}}"
           click trainMLPStep noOp "# Please override the steps/train.py for customization"
-          click trainUserCode noOp "def train() -> model"
+          click trainUserCode renderMoreInformation python "{{train_user_code}}" 
           click evaluateMLPStep noOp "# Please override the steps/evaluate.py for customization"
           click registerMLPStep noOp "# register step"
           click customMetricsUserCode noOp "def custom_metric_fns() -> List[Callable]"
-          click splitUserCode noOp "def process_splits(train_df: DataFrame, validation_df: DataFrame, test_df: DataFrame) -> (DataFrame, DataFrame, DataFrame)"
+          click splitUserCode renderMoreInformation python "{{split_user_code}}"
 
-          click pipeline renderMoreInformation "{{pipeline_yaml}}"
+          click pipeline renderMoreInformation "{{pipeline_yaml}}" yaml
           click dataParquet noOp "data ingested from source"
           click data noOp "data ingested from source"
           click splitData1 noOp "Outputs splits for training and validation"
@@ -150,7 +150,7 @@
       );
 
       var noOp = function() {}
-      var renderMoreInformation = function(nodeId) {
+      var renderMoreInformation = function(nodeInfoFileType, nodeId) {
         const allNodes = document.querySelector('.nodes').querySelectorAll('[id^="flowchart-"]');
         [...allNodes].forEach(nodes => {
           const rect = nodes.firstChild
@@ -183,7 +183,7 @@
                 if (!window.editor) {
                   const editor = ace.edit("editor");
                   editor.setTheme("ace/theme/monokai");
-                  editor.session.setMode("ace/mode/text");
+                  editor.session.setMode("ace/mode/${nodeInfoFileType}");
                   // Wrap text lines for readability
                   editor.session.setUseWrapMode(true);
                   // Remove unnecessary indentation on wrapped lines
@@ -199,7 +199,6 @@
                   editor.renderer.setShowGutter(false);
                   // Disable the line length ruler
                   editor.setShowPrintMargin(false);
-
                   window.editor = editor;
                 }
                 // Set the editor value and the editor session value to the text associated with
