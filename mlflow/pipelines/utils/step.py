@@ -55,19 +55,15 @@ def display_html(html_data: str = None, html_file_path: str = None) -> None:
             error_code=INVALID_PARAMETER_VALUE,
         )
 
+    if is_in_databricks_runtime():
+        # Patch IPython display with Databricks display
+        import IPython.core.display as icd
+
+        icd.display = display  # pylint: disable=undefinedvariable
     if is_running_in_ipython_environment():
         from IPython.display import display as ip_display, HTML
 
-        if is_in_databricks_runtime():
-            # Patch IPython display with Databricks display before showing the HTML.
-            import IPython.core.display as icd
-
-            orig_display = icd.display
-            icd.display = display  # pylint: disable=undefined-variable
-            ip_display(HTML(data=html_data, filename=html_file_path))
-            icd.display = orig_display
-        else:
-            ip_display(HTML(data=html_data, filename=html_file_path))
+        ip_display(HTML(data=html_data, filename=html_file_path))
     else:
         import shutil
         import subprocess
