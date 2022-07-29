@@ -3,6 +3,7 @@ import logging
 import os
 import sys
 import shutil
+import tempfile
 
 import uuid
 
@@ -415,7 +416,11 @@ class FileStore(AbstractStore):
                 "Cannot rename experiment in non-active lifecycle stage."
                 " Current stage: %s" % experiment.lifecycle_stage
             )
-        write_yaml(meta_dir, FileStore.META_DATA_FILE_NAME, dict(experiment), overwrite=True)
+        FileStore._overwrite_yaml(
+            root=meta_dir,
+            file_name=FileStore.META_DATA_FILE_NAME,
+            data=dict(experiment),
+        )
 
     def delete_run(self, run_id):
         run_info = self._get_run_info(run_id)
@@ -876,7 +881,11 @@ class FileStore(AbstractStore):
     def _overwrite_run_info(self, run_info):
         run_dir = self._get_run_dir(run_info.experiment_id, run_info.run_id)
         run_info_dict = _make_persisted_run_info_dict(run_info)
-        write_yaml(run_dir, FileStore.META_DATA_FILE_NAME, run_info_dict, overwrite=True)
+        FileStore._overwrite_yaml(
+            root=run_dir,
+            file_name=FileStore.META_DATA_FILE_NAME,
+            data=run_info_dict,
+        )
 
     def log_batch(self, run_id, metrics, params, tags):
         _validate_run_id(run_id)
@@ -921,3 +930,23 @@ class FileStore(AbstractStore):
             self._set_run_tag(run_info, tag)
         except Exception as e:
             raise MlflowException(e, INTERNAL_ERROR)
+
+    @staticmethod
+    def _overwrite_yaml(root, file_name, data):
+        tmp_file_path = None
+        try:
+            _, tmp_file_path = tempfile.mkstemp(suffix="file.yaml")
+            write_yaml(
+                root=get_parent_dir(tmp_file_path),
+                file_name=os.path.basename(tmp_file_path),
+                data=data,
+                overwrite=True,
+                sort_keys=True,
+            )
+            shutil.copyfile(
+                tmp_file_path,
+                os.path.join(root, file_name),
+            )
+        finally:
+            if tmp_file_path is not None and os.path.exists(tmp_file_path):
+                os.remove(tmp_file_path)
