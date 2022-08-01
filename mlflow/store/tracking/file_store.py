@@ -950,3 +950,7 @@ class FileStore(AbstractStore):
         finally:
             if tmp_file_path is not None and os.path.exists(tmp_file_path):
                 os.remove(tmp_file_path)
+
+    @staticmethod
+    def _read_yaml(root, file_name):
+        pass
