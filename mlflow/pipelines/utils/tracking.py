@@ -6,7 +6,7 @@ import shutil
 from typing import Dict, Any, TypeVar
 
 import mlflow
-from mlflow.exceptions import MlflowException
+from mlflow.exceptions import MlflowException, RestException
 from mlflow.pipelines.utils import get_pipeline_name
 from mlflow.protos.databricks_pb2 import INVALID_PARAMETER_VALUE
 from mlflow.tracking.client import MlflowClient
@@ -26,7 +26,6 @@ from mlflow.utils.mlflow_tags import (
 )
 
 _logger = logging.getLogger(__name__)
-
 
 TrackingConfigType = TypeVar("TrackingConfig")
 
@@ -193,10 +192,20 @@ def apply_pipeline_tracking_config(tracking_config: TrackingConfig):
                 "Experiment with name '%s' does not exist. Creating a new experiment.",
                 tracking_config.experiment_name,
             )
-            client.create_experiment(
-                name=tracking_config.experiment_name,
-                artifact_location=tracking_config.artifact_location,
-            )
+            try:
+                client.create_experiment(
+                    name=tracking_config.experiment_name,
+                    artifact_location=tracking_config.artifact_location,
+                )
+            except RestException:
+                # Inform user they should create an experiment and specify it in the pipeline
+                # config if an experiment with the pipeline name can't be created.
+                raise MlflowException(
+                    f"Could not create an MLflow Experiment with "
+                    f"name {tracking_config.experiment_name}. Please create an "
+                    f"MLflow Experiment for this pipeline and specify its name in the"
+                    f'"name" field of the "experiment" section in your profile configuration.'
+                )
 
     fluent_set_experiment(
         experiment_id=tracking_config.experiment_id, experiment_name=tracking_config.experiment_name
@@ -232,7 +241,10 @@ def get_run_tags_env_vars(pipeline_root_path: str) -> Dict[str, str]:
 
 
 def log_code_snapshot(
-    pipeline_root: str, run_id: str, artifact_path: str = "pipeline_snapshot"
+    pipeline_root: str,
+    run_id: str,
+    artifact_path: str = "pipeline_snapshot",
+    pipeline_config: Dict[str, Any] = None,
 ) -> None:
     """
     Logs a pipeline code snapshot as mlflow artifacts.
@@ -240,6 +252,7 @@ def log_code_snapshot(
     :param pipeline_root_path: String file path to the directory where the pipeline is defined.
     :param run_id: Run ID to which the code snapshot is logged.
     :param artifact_path: Directory within the run's artifact director (default: "snapshots").
+    :param pipeline_config: Dict containing the full pipeline configuration at runtime.
     """
     with tempfile.TemporaryDirectory() as tmpdir:
         tmpdir = pathlib.Path(tmpdir)
@@ -256,4 +269,11 @@ def log_code_snapshot(
                 tmp_path = tmpdir.joinpath(file_path.relative_to(pipeline_root))
                 tmp_path.parent.mkdir(exist_ok=True, parents=True)
                 shutil.copyfile(file_path, tmp_path)
+        if pipeline_config is not None:
+            import yaml
+
+            tmp_path = tmpdir.joinpath("runtime/pipeline.yaml")
+            tmp_path.parent.mkdir(exist_ok=True, parents=True)
+            with open(tmp_path, mode="w", encoding="utf-8") as config_file:
+                yaml.dump(pipeline_config, config_file)
         MlflowClient().log_artifacts(run_id, str(tmpdir), artifact_path=artifact_path)
