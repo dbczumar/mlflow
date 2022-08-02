@@ -961,15 +961,16 @@ class FileStore(AbstractStore):
 
         :param root: Directory name.
         :param file_name: File name. Expects to have '.yaml' extension.
-        :param retries: The number of times to retry for unexpected empty content. 
+        :param retries: The number of times to retry for unexpected empty content.
         :return: Data in yaml file as dictionary
         """
+
         def _read_helper(root, file_name, attempts_remaining=2):
             result = read_yaml(root, file_name)
             if result is not None or attempts_remaining == 0:
                 return result
             else:
-                time.sleep(.1 * (3 - attempts_remaining))
+                time.sleep(0.1 * (3 - attempts_remaining))
                 return _read_helper(root, file_name, attempts_remaining - 1)
 
-        return _read_helper(root, file_name, attempts_remaining=retries) 
+        return _read_helper(root, file_name, attempts_remaining=retries)
