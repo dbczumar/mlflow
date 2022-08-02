@@ -934,6 +934,16 @@ class FileStore(AbstractStore):
 
     @staticmethod
     def _overwrite_yaml(root, file_name, data):
+        """
+        Safely overwrites a preexisting yaml file, ensuring that file contents are not deleted or
+        corrupted if the write fails. This is achieved by writing contents to a temporary file
+        and moving the temporary file to replace the preexisting file, rather than opening the
+        preexisting file for a direct write.
+
+        :param root: Directory name.
+        :param file_name: File name. Expects to have '.yaml' extension.
+        :param data: The data to write, represented as a dictionary.
+        """
         tmp_file_path = None
         try:
             _, tmp_file_path = tempfile.mkstemp(suffix="file.yaml")
@@ -944,7 +954,7 @@ class FileStore(AbstractStore):
                 overwrite=True,
                 sort_keys=True,
             )
-            shutil.copyfile(
+            shutil.move(
                 tmp_file_path,
                 os.path.join(root, file_name),
             )
