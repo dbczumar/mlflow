@@ -3,6 +3,7 @@ import logging
 import os
 import sys
 import shutil
+import time
 import tempfile
 
 import uuid
@@ -339,7 +340,7 @@ class FileStore(AbstractStore):
                 "Could not find experiment with ID %s" % experiment_id,
                 databricks_pb2.RESOURCE_DOES_NOT_EXIST,
             )
-        meta = read_yaml(experiment_dir, FileStore.META_DATA_FILE_NAME)
+        meta = FileStore._read_yaml(experiment_dir, FileStore.META_DATA_FILE_NAME)
         if experiment_dir.startswith(self.trash_folder):
             meta["lifecycle_stage"] = LifecycleStage.DELETED
         else:
@@ -562,7 +563,7 @@ class FileStore(AbstractStore):
         return run_info
 
     def _get_run_info_from_dir(self, run_dir):
-        meta = read_yaml(run_dir, FileStore.META_DATA_FILE_NAME)
+        meta = FileStore._read_yaml(run_dir, FileStore.META_DATA_FILE_NAME)
         run_info = _read_persisted_run_info_dict(meta)
         return run_info
 
@@ -952,5 +953,23 @@ class FileStore(AbstractStore):
                 os.remove(tmp_file_path)
 
     @staticmethod
-    def _read_yaml(root, file_name):
-        pass
+    def _read_yaml(root, file_name, retries=2):
+        """
+        Read data from yaml file and return as dictionary, retrying up to
+        a specified number of times if the file contents are unexpectedly
+        empty due to a concurrent write.
+
+        :param root: Directory name.
+        :param file_name: File name. Expects to have '.yaml' extension.
+        :param retries: The number of times to retry for unexpected empty content. 
+        :return: Data in yaml file as dictionary
+        """
+        def _read_helper(root, file_name, attempts_remaining=2):
+            result = read_yaml(root, file_name)
+            if result is not None or attempts_remaining == 0:
+                return result
+            else:
+                time.sleep(.1 * (3 - attempts_remaining))
+                return _read_helper(root, file_name, attempts_remaining - 1)
+
+        return _read_helper(root, file_name, attempts_remaining=retries) 
