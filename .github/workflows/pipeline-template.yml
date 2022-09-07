@@ -3,16 +3,29 @@ name: Pipeline template tests
 on:
   workflow_dispatch:
     inputs:
-      repository:
+      mlflow_repository:
         description: >
-          [Optional] Repository name with owner. For example, mlflow/mlp-regression-template.
+          [Optional] MLflow repository name with owner. For example, mlflow/mlflow.
+        required: true
+        default: "mlflow/mlflow"
+      pipeline_repository:
+        description: >
+          [Optional] MLflow Pipelines template repository name with owner. For example,
+           mlflow/mlp-regression-template.
         required: true
         default: "mlflow/mlp-regression-template"
-      ref:
+      mlflow_ref:
         description: >
-          [Optional] The branch, tag or SHA to checkout. When checking out the repository that
-           triggered a workflow, this defaults to the reference or SHA for that event. Otherwise,
-           uses the default branch.
+          [Optional] The MLflow branch, tag or SHA to checkout. When checking out the repository
+           that triggered a workflow, this defaults to the reference or SHA for that event.
+           Otherwise, uses the default branch.
+        required: false
+        default: ""
+      pipelines_ref:
+        description: >
+          [Optional] The MLflow Pipelines template repository branch, tag or SHA to checkout. When
+           checking out the repository that triggered a workflow, this defaults to the reference or
+           SHA for that event. Otherwise, uses the default branch.
         required: false
         default: ""
 
@@ -36,11 +49,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
+      with:
+        path: ${{ github.event.inputs.mlflow_ref }}
+        repository: ${{ github.event.inputs.mlflow_ref }}
+        ref: ${{ github.event.inputs.mlflow }}
     - uses: actions/checkout@v3
       with:
-        path: ${{ github.event.inputs.repository }}
-        repository: ${{ github.event.inputs.repository }}
-        ref: ${{ github.event.inputs.ref }}
+        path: ${{ github.event.inputs.pipeline_repository }}
+        repository: ${{ github.event.inputs.pipeline_repository }}
+        ref: ${{ github.event.inputs.pipeline_ref }}
     - uses: ./.github/actions/setup-python
     - uses: ./.github/actions/cache-pip
     - name: Add problem matchers
@@ -49,7 +66,7 @@ jobs:
         echo "::add-matcher::.github/workflows/matchers/black.json"
     - name: Install dependencies
       run: |
-        pip install -r ${{ github.event.inputs.repository }}/requirements/lint-requirements.txt
+        pip install -r ${{ github.event.inputs.pipeline_repository }}/requirements/lint-requirements.txt
     - name: Run lint checks
       run: |
         cd ${{ github.event.inputs.repository }} && ../../dev/lint.sh
@@ -57,17 +74,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+        with:
+          path: ${{ github.event.inputs.mlflow_ref }}
+          repository: ${{ github.event.inputs.mlflow_ref }}
+          ref: ${{ github.event.inputs.mlflow }}
       - uses: actions/checkout@v3
         with:
-          path: ${{ github.event.inputs.repository }}
-          repository: ${{ github.event.inputs.repository }}
-          ref: ${{ github.event.inputs.ref }}
+          path: ${{ github.event.inputs.pipeline_repository }}
+          repository: ${{ github.event.inputs.pipeline_repository }}
+          ref: ${{ github.event.inputs.pipeline_ref }}
       - uses: ./.github/actions/setup-python
       - name: Install dependencies
         run: |
           pip install -e .[pipelines]
-          pip install -r ${{ github.event.inputs.repository }}/requirements.txt
-          pip install -r ${{ github.event.inputs.repository }}/requirements/test-requirements.txt
+          pip install -r ${{ github.event.inputs.pipeline_repository }}/requirements.txt
+          pip install -r ${{ github.event.inputs.pipeline_repository }}/requirements/test-requirements.txt
           # This dependency is needed pytest.ini uses pytest-cov
           pip install pytest-cov
       - name: Run tests
@@ -77,6 +98,15 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v3
+        with:
+          path: ${{ github.event.inputs.mlflow_ref }}
+          repository: ${{ github.event.inputs.mlflow_ref }}
+          ref: ${{ github.event.inputs.mlflow }}
+      - uses: actions/checkout@v3
+        with:
+          path: ${{ github.event.inputs.pipeline_repository }}
+          repository: ${{ github.event.inputs.pipeline_repository }}
+          ref: ${{ github.event.inputs.pipeline_ref }}
       - uses: actions/checkout@v3
         with:
           path: ${{ github.event.inputs.repository }}
@@ -86,8 +116,8 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -e .[pipelines]
-          pip install -r ${{ github.event.inputs.repository }}/requirements.txt
-          pip install -r ${{ github.event.inputs.repository }}/requirements/test-requirements.txt
+          pip install -r ${{ github.event.inputs.pipeline_repository }}/requirements.txt
+          pip install -r ${{ github.event.inputs.pipeline_repository }}/requirements/test-requirements.txt
           # This dependency is needed pytest.ini uses pytest-cov
           pip install pytest-cov
       - name: Run tests
