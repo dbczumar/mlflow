@@ -217,3 +217,42 @@ __all__ = [
     "MlflowClient",
     "MlflowException",
 ] + _model_flavors_supported
+
+try:
+    from IPython import get_ipython
+    from pathlib import Path
+
+    from IPython.core.magic import register_cell_magic
+
+
+    @register_cell_magic
+    def mlp_code(file_path, cell):
+        import os
+        from mlflow.pipelines.decorators import _set_mlp_code_path
+        from mlflow.pipelines.utils import get_pipeline_root_path
+
+        if os.path.isabs(file_path):
+            raise MlflowException("Code must be written within the pipeline repository")
+
+        _set_mlp_code_path(file_path)
+
+        pipeline_root_path = get_pipeline_root_path()
+        file_path = os.path.join(pipeline_root_path, file_path) 
+
+        get_ipython().run_cell(cell).raise_error()
+        
+        # Check to see if there's any difference in file content with OG train.py
+        # before overwriting so that Make doesn't have problems...
+
+        _set_mlp_code_path(None)
+        
+        if os.path.exists(file_path):
+          with open(file_path, "r") as f:
+            content = f.read()
+            if content == cell:
+              return
+      
+        with open(file_path, "w") as f:
+            f.write(cell)
+except Exception:
+    pass

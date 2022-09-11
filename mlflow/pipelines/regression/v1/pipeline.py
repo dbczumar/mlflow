@@ -105,7 +105,7 @@ The pipeline steps are defined as follows:
 .. |steps/transform.py| replace:: `steps/transform.py <https://github.com/mlflow/mlp-regression-template/blob/main/steps/transform.py>`__
 .. |steps/custom_metrics.py| replace:: `steps/custom_metrics.py <https://github.com/mlflow/mlp-regression-template/blob/main/steps/custom_metrics.py>`__
 """
-
+import copy
 import os
 import logging
 
@@ -126,12 +126,13 @@ from mlflow.pipelines.steps.predict import PredictStep, _SCORED_OUTPUT_FILE_NAME
 from mlflow.pipelines.steps.register import RegisterStep, RegisteredModelVersionInfo
 from mlflow.pipelines.step import BaseStep
 from typing import List, Any, Optional
-from mlflow.pipelines.utils import get_pipeline_root_path
+from mlflow.pipelines.utils import get_pipeline_root_path, get_pipeline_config
 from mlflow.pipelines.utils.execution import get_or_create_base_execution_directory
 from mlflow.pipelines.utils.execution import get_step_output_path
 from mlflow.exceptions import MlflowException, INVALID_PARAMETER_VALUE
 from mlflow.tracking._tracking_service.utils import _use_tracking_uri
 from mlflow.utils.annotations import experimental
+from mlflow.utils.file_utils import write_yaml
 
 _logger = logging.getLogger(__name__)
 
@@ -370,6 +371,115 @@ class RegressionPipeline(_BasePipeline):
             regression_pipeline.run()
         """
         return super().run(step=step)
+
+
+    def ingest(self, location=None, format="parquet", sql=None, custom_loader_method=None):
+        config = get_pipeline_config(self._pipeline_root_path, self._profile)
+        data_config = {}
+        data_config["location"] = location 
+        data_config["sql"] = sql 
+
+        if custom_loader_method is not None:
+            if not hasattr(custom_loader_method, "mlp_fn_name"):
+                raise MlflowException(
+                    f"Unrecognized method for MLP step: '{custom_loader_method.__name__}'."
+                    " Please ensure that the method is defined within a notebook cell that"
+                    " applies the %%mlp_code magic"
+                )
+
+            data_config["custom_loader_method"] =  getattr(custom_loader_method, "mlp_fn_name")
+        
+        if sql is None:
+          data_config["format"] = format 
+
+        data_config = {
+          key: value
+          for key, value in data_config.items()
+          if value is not None
+        }
+
+        config["data"] = data_config
+
+        write_yaml(self._pipeline_root_path, "pipeline.yaml", config, overwrite=True) 
+
+        self.run("ingest")
+
+        return self.get_artifact("ingested_data")
+
+    def split(self, split_ratios, post_split_method=None):
+        config = get_pipeline_config(self._pipeline_root_path, self._profile)
+        split_config = {}
+        split_config["split_ratios"] = split_ratios
+        if post_split_method is not None:
+            split_config["post_split_method"] = post_split_method 
+
+        config["steps"]["split"] = split_config
+
+        write_yaml(self._pipeline_root_path, "pipeline.yaml", config, overwrite=True) 
+
+        self.run("split")
+
+        return self.get_artifact("training_data"), self.get_artifact("validation_data"), self.get_artifact("test_data") 
+
+
+    def transform(self, transformer_method):
+        config = get_pipeline_config(self._pipeline_root_path, self._profile)
+
+        if not hasattr(transformer_method, "mlp_fn_name"):
+            raise MlflowException(
+                f"Unrecognized method for MLP step: '{transformer_method.__name__}'."
+                " Please ensure that the method is defined within a notebook cell that"
+                " applies the %%mlp_code magic"
+            )
+
+        config["steps"]["transform"]["transformer_method"] = getattr(transformer_method, "mlp_fn_name")
+
+        write_yaml(self._pipeline_root_path, "pipeline.yaml", config, overwrite=True) 
+
+        self.run("transform")
+
+        return (
+            self.get_artifact("transformed_training_data"),
+            self.get_artifact("transformed_validation_data"),
+            self.get_artifact("transformer"),
+        )
+
+    def train(self, estimator_method):
+        config = get_pipeline_config(self._pipeline_root_path, self._profile)
+
+        if not hasattr(estimator_method, "mlp_fn_name"):
+            raise MlflowException(
+                f"Unrecognized method for MLP step: '{estimator_method.__name__}'."
+                " Please ensure that the method is defined within a notebook cell that"
+                " applies the %%mlp_code magic"
+            )
+
+        config["steps"]["train"]["estimator_method"] = getattr(estimator_method, "mlp_fn_name")
+
+        write_yaml(self._pipeline_root_path, "pipeline.yaml", config, overwrite=True) 
+
+        self.run("train")
+
+        return self.get_artifact("model")
+
+    def evaluate(self, validation_criteria):
+        config = get_pipeline_config(self._pipeline_root_path, self._profile)
+        config["steps"]["evaluate"]["validation_criteria"] = validation_criteria
+
+        write_yaml(self._pipeline_root_path, "pipeline.yaml", config, overwrite=True) 
+
+        self.run("evaluate")
+
+    def register(self, model_name, allow_non_validated_model=False):
+        config = get_pipeline_config(self._pipeline_root_path, self._profile)
+        config["steps"]["register"]["allow_non_validated_model"] = allow_non_validated_model 
+        config["steps"]["register"]["model_name"] = model_name 
+
+        write_yaml(self._pipeline_root_path, "pipeline.yaml", config, overwrite=True) 
+
+        self.run("register")
+
+        return self.get_artifact("registered_model_version")
 
     @experimental
     def get_artifact(self, artifact_name: str) -> Optional[Any]:
