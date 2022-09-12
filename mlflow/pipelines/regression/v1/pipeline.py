@@ -374,10 +374,10 @@ class RegressionPipeline(_BasePipeline):
 
 
     def ingest(self, location=None, format="parquet", sql=None, custom_loader_method=None, use_cached=False):
-        data_config = {}
-        data_config["location"] = location
-        data_config["sql"] = sql
-        data_config["use_cached"] = use_cached
+        ingest_config = {}
+        ingest_config["location"] = location
+        ingest_config["sql"] = sql
+        ingest_config["use_cached"] = use_cached
 
         if custom_loader_method is not None:
             if not hasattr(custom_loader_method, "mlp_fn_name"):
@@ -387,41 +387,42 @@ class RegressionPipeline(_BasePipeline):
                     " applies the %%mlp_code IPython magic"
                 )
 
-            data_config["custom_loader_method"] =  getattr(custom_loader_method, "mlp_fn_name")
+            ingest_config["custom_loader_method"] =  getattr(custom_loader_method, "mlp_fn_name")
 
         if sql is None:
-          data_config["format"] = format
+          ingest_config["format"] = format
 
-        data_config = {
+        ingest_config = {
           key: value
-          for key, value in data_config.items()
+          for key, value in ingest_config.items()
           if value is not None
         }
 
         config = get_pipeline_config(self._pipeline_root_path)
-        config["data"] = data_config
-        write_yaml(self._pipeline_root_path, "pipeline.yaml", config, overwrite=True) 
+        config["steps"]["ingest"] = ingest_config
+        write_yaml(self._pipeline_root_path, "pipeline.yaml", config, overwrite=True, sort_keys=False)
 
         self.run("ingest")
 
         return self.get_artifact("ingested_data")
 
-    def split(self, split_ratios, post_split_method=None):
+    def split(self, split_ratios, target_col, post_split_method=None):
         split_step_config = {}
         split_step_config["split_ratios"] = split_ratios
+        split_step_config["target_col"] = target_col
         if post_split_method is not None:
-            split_step_config["post_split_method"] = post_split_method 
+            split_step_config["post_split_method"] = post_split_method
 
         config = get_pipeline_config(self._pipeline_root_path)
         config["steps"]["split"] = split_step_config
-        write_yaml(self._pipeline_root_path, "pipeline.yaml", config, overwrite=True) 
+        write_yaml(self._pipeline_root_path, "pipeline.yaml", config, overwrite=True, sort_keys=False)
 
         self.run("split")
 
         return self.get_artifact("training_data"), self.get_artifact("validation_data"), self.get_artifact("test_data") 
 
 
-    def transform(self, transformer_method):
+    def transform(self, transformer_method, target_col):
         if not hasattr(transformer_method, "mlp_fn_name"):
             raise MlflowException(
                 f"Unrecognized method for MLP step: '{transformer_method.__name__}'."
@@ -431,11 +432,12 @@ class RegressionPipeline(_BasePipeline):
 
         transform_step_config = {
             "transformer_method": getattr(transformer_method, "mlp_fn_name"),
+            "target_col": target_col,
         }
 
         config = get_pipeline_config(self._pipeline_root_path)
         config["steps"]["transform"] = transform_step_config 
-        write_yaml(self._pipeline_root_path, "pipeline.yaml", config, overwrite=True) 
+        write_yaml(self._pipeline_root_path, "pipeline.yaml", config, overwrite=True, sort_keys=False) 
 
         self.run("transform")
 
@@ -445,9 +447,7 @@ class RegressionPipeline(_BasePipeline):
             self.get_artifact("transformer"),
         )
 
-    def train(self, estimator_method, metrics=None):
-        train_config = {}
-
+    def train(self, estimator_method, target_col, metrics=None):
         if not hasattr(estimator_method, "mlp_fn_name"):
             raise MlflowException(
                 f"Unrecognized method for MLP step: '{estimator_method.__name__}'."
@@ -455,7 +455,10 @@ class RegressionPipeline(_BasePipeline):
                 " applies the %%mlp_code IPython magic."
             )
 
-        train_config["estimator_method"] = getattr(estimator_method, "mlp_fn_name")
+        train_step_config = {
+          "estimator_method": getattr(estimator_method, "mlp_fn_name"),
+          "target_col": target_col,
+        }
 
         metrics = copy.deepcopy(metrics)
         for metric_info in (metrics or []).get("custom", []):
@@ -474,18 +477,20 @@ class RegressionPipeline(_BasePipeline):
 
             metric_info["function"] = getattr(metric_function, "mlp_fn_name")
 
-        train_config["metrics"] = metrics 
-        
+        train_step_config["metrics"] = metrics
+
         config = get_pipeline_config(self._pipeline_root_path)
-        config["steps"]["train"] = train_config 
-        write_yaml(self._pipeline_root_path, "pipeline.yaml", config, overwrite=True) 
+        config["steps"]["train"] = train_step_config
+        write_yaml(self._pipeline_root_path, "pipeline.yaml", config, overwrite=True, sort_keys=False)
 
         self.run("train")
 
         return self.get_artifact("model")
 
-    def evaluate(self, metrics=None, validation_criteria=None):
-        evaluate_step_config = {}
+    def evaluate(self, target_col, metrics=None, validation_criteria=None):
+        evaluate_step_config = {
+            "target_col": target_col,
+        }
 
         metrics = copy.deepcopy(metrics)
         for metric_info in (metrics or []).get("custom", []):
@@ -508,10 +513,10 @@ class RegressionPipeline(_BasePipeline):
             evaluate_step_config["metrics"] = metrics
         if validation_criteria is not None:
             evaluate_step_config["validation_criteria"] = validation_criteria
-            
+
         config = get_pipeline_config(self._pipeline_root_path)
-        config["steps"]["evaluate"] = evaluate_step_config 
-        write_yaml(self._pipeline_root_path, "pipeline.yaml", config, overwrite=True)
+        config["steps"]["evaluate"] = evaluate_step_config
+        write_yaml(self._pipeline_root_path, "pipeline.yaml", config, overwrite=True, sort_keys=False)
 
         self.run("evaluate")
 
@@ -523,7 +528,7 @@ class RegressionPipeline(_BasePipeline):
 
         config = get_pipeline_config(self._pipeline_root_path)
         config["steps"]["register"] = register_step_config 
-        write_yaml(self._pipeline_root_path, "pipeline.yaml", config, overwrite=True) 
+        write_yaml(self._pipeline_root_path, "pipeline.yaml", config, overwrite=True, sort_keys=False) 
 
         self.run("register")
 

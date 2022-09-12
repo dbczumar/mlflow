@@ -65,7 +65,7 @@ NUM_RUNS_PER_PAGE_PANDAS = 10000
 _logger = logging.getLogger(__name__)
 
 
-def set_experiment(experiment_name: str = None, experiment_id: str = None) -> Experiment:
+def set_experiment(experiment_name: str = None, experiment_id: str = None, artifact_location=None) -> Experiment:
     """
     Set the given experiment as the active experiment. The experiment must either be specified by
     name via `experiment_name` or by ID via `experiment_id`. The experiment name and ID cannot
@@ -120,7 +120,7 @@ def set_experiment(experiment_name: str = None, experiment_id: str = None) -> Ex
             # NB: If two simultaneous threads or processes attempt to set the same experiment
             # simultaneously, a race condition may be encountered here wherein experiment creation
             # fails
-            experiment_id = client.create_experiment(experiment_name)
+            experiment_id = client.create_experiment(experiment_name, artifact_location=artifact_location)
             experiment = client.get_experiment(experiment_id)
     else:
         experiment = client.get_experiment(experiment_id)

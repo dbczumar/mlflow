@@ -162,16 +162,14 @@ class BaseIngestStep(BaseStep, metaclass=abc.ABCMeta):
 
     @classmethod
     def from_pipeline_config(cls, pipeline_config: Dict[str, Any], pipeline_root: str):
-        if "data" not in pipeline_config:
+        if "ingest" not in pipeline_config.get("steps", {}):
             raise MlflowException(
-                message="The `data` section of pipeline.yaml must be specified",
+                message="pipeline.yaml is missing the `ingest` step definition",
                 error_code=INVALID_PARAMETER_VALUE,
             )
-        data_config = pipeline_config["data"]
-        ingest_config = pipeline_config.get("steps", {}).get("ingest", {})
 
         return cls(
-            step_config={**data_config, **ingest_config},
+            step_config=pipeline_config.get("steps", {})["ingest"],
             pipeline_root=pipeline_root,
         )
 
@@ -182,21 +180,6 @@ class IngestStep(BaseIngestStep):
     def __init__(self, step_config: Dict[str, Any], pipeline_root: str):
         super().__init__(step_config, pipeline_root)
         self.dataset_output_name = IngestStep._DATASET_OUTPUT_NAME
-
-    @classmethod
-    def from_pipeline_config(cls, pipeline_config: Dict[str, Any], pipeline_root: str):
-        if "data" not in pipeline_config:
-            raise MlflowException(
-                message="The `data` section of pipeline.yaml must be specified",
-                error_code=INVALID_PARAMETER_VALUE,
-            )
-        data_config = pipeline_config["data"]
-        ingest_config = pipeline_config.get("steps", {}).get("ingest", {})
-
-        return cls(
-            step_config={**data_config, **ingest_config},
-            pipeline_root=pipeline_root,
-        )
 
     @property
     def name(self) -> str:
@@ -212,16 +195,14 @@ class IngestScoringStep(BaseIngestStep):
 
     @classmethod
     def from_pipeline_config(cls, pipeline_config: Dict[str, Any], pipeline_root: str):
-        if "data_scoring" not in pipeline_config:
+        if "ingest_scoring" not in pipeline_config.get("steps", {}):
             raise MlflowException(
-                message="The `data_scoring` section of pipeline.yaml must be specified",
+                message="pipeline.yaml is missing the `ingest_scoring` step definition",
                 error_code=INVALID_PARAMETER_VALUE,
             )
-        data_scoring_config = pipeline_config["data_scoring"]
-        ingest_config = pipeline_config.get("steps", {}).get("ingest", {})
 
         return cls(
-            step_config={**data_scoring_config, **ingest_config},
+            step_config=pipeline_config.get("steps", {})["ingest_scoring"],
             pipeline_root=pipeline_root,
         )
 

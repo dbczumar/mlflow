@@ -215,7 +215,6 @@ class SplitStep(BaseStep):
     @classmethod
     def from_pipeline_config(cls, pipeline_config, pipeline_root):
         step_config = pipeline_config.get("steps", {}).get("split", {})
-        step_config["target_col"] = pipeline_config.get("target_col")
         return cls(step_config, pipeline_root)
 
     @property

@@ -467,7 +467,6 @@ class TrainStep(BaseStep):
             raise MlflowException(
                 "Config for train step is not found.", error_code=INVALID_PARAMETER_VALUE
             )
-        step_config["target_col"] = pipeline_config.get("target_col")
         return cls(step_config, pipeline_root, pipeline_config=pipeline_config)
 
     @property

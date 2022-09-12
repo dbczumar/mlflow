@@ -1,6 +1,7 @@
 import abc
 import logging
 
+import mlflow
 from mlflow.exceptions import MlflowException
 from mlflow.pipelines.step import BaseStep, StepStatus
 from mlflow.pipelines.utils import (
@@ -15,8 +16,12 @@ from mlflow.pipelines.utils.execution import (
 )
 from mlflow.pipelines.utils.step import display_html
 from mlflow.protos.databricks_pb2 import INVALID_PARAMETER_VALUE, INTERNAL_ERROR, BAD_REQUEST
+from mlflow.tracking.client import MlflowClient
+from mlflow.tracking.default_experiment import DEFAULT_EXPERIMENT_ID
+from mlflow.tracking.fluent import _get_experiment_id
 from mlflow.utils.annotations import experimental
 from mlflow.utils.class_utils import _get_class_from_string
+from mlflow.utils.file_utils import write_yaml
 from typing import List
 
 _logger = logging.getLogger(__name__)
@@ -60,6 +65,24 @@ class _BasePipeline:
                      executed.
         :return: None
         """
+        config = get_pipeline_config(self._pipeline_root_path)
+        
+        experiment_id = _get_experiment_id()
+        if experiment_id != DEFAULT_EXPERIMENT_ID:
+            # experiment_id == 0 indicates that the default experiment was found,
+            # which most likely means that the user has not configured an experiment
+            # or tracking URI in the environment from which they're running the
+            # pipeline
+            experiment = MlflowClient().get_experiment(experiment_id)
+            config["experiment"] = {
+                "name": experiment.name, 
+                "artifact_location": experiment.artifact_location, 
+                "tracking_uri": mlflow.get_tracking_uri(), 
+            }
+            config["model_registry"] = {
+                "uri": mlflow.get_registry_uri(),
+            }
+            write_yaml(self._pipeline_root_path, "pipeline.yaml", config, overwrite=True, sort_keys=False)
 
         # TODO Record performance here.
         # Always resolve the steps to load latest step modules before execution.
