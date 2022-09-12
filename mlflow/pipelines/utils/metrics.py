@@ -77,11 +77,17 @@ def _load_custom_metric_functions(
 
     try:
         sys.path.append(pipeline_root)
-        custom_metrics_mod = importlib.import_module("steps.custom_metrics")
-        return [
-            getattr(custom_metrics_mod, custom_metric_function_name)
-            for custom_metric_function_name in custom_metric_function_names
-        ]
+
+        custom_metric_functions = []
+        for custom_metric_function_fq_name in custom_metric_function_names:
+            custom_metric_mod_name = ".".join(custom_metric_function_fq_name.split(".")[:-1])
+            custom_metric_function_name = custom_metric_function_fq_name.split(".")[-1]
+
+            custom_metric_mod = importlib.import_module(custom_metric_mod_name)
+            custom_metric_function = getattr(custom_metric_mod, custom_metric_function_name)
+            custom_metric_functions.append(custom_metric_function)
+
+        return custom_metric_functions
     except Exception as e:
         raise MlflowException(
             message="Failed to load custom metric functions",

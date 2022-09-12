@@ -10,8 +10,6 @@ from mlflow.utils.databricks_utils import is_in_databricks_runtime
 from mlflow.utils.file_utils import read_yaml, render_and_merge_yaml
 
 _PIPELINE_CONFIG_FILE_NAME = "pipeline.yaml"
-_PIPELINE_PROFILE_DIR = "profiles"
-_PIPELINE_PROFILE_ENV_VAR = "MLFLOW_PIPELINES_PROFILE"
 
 _logger = logging.getLogger(__name__)
 
@@ -34,15 +32,13 @@ def get_pipeline_name(pipeline_root_path: str = None) -> str:
     return os.path.basename(pipeline_root_path)
 
 
-def get_pipeline_config(pipeline_root_path: str = None, profile: str = None) -> Dict[str, Any]:
+def get_pipeline_config(pipeline_root_path: str = None) -> Dict[str, Any]:
     """
     Obtains a dictionary representation of the configuration for the specified pipeline.
 
     :param pipeline_root_path: The absolute path of the pipeline root directory on the local
                                filesystem. If unspecified, the pipeline root directory is
                                resolved from the current working directory, and an
-    :param profile: The name of the profile under the `profiles` directory to use,
-                    e.g. "dev" to use configs from "profiles/dev.yaml"
     :raises MlflowException: If the specified ``pipeline_root_path`` is not a pipeline root
                              directory or if ``pipeline_root_path`` is ``None`` and the current
                              working directory does not correspond to a pipeline.
@@ -51,32 +47,13 @@ def get_pipeline_config(pipeline_root_path: str = None, profile: str = None) -> 
     pipeline_root_path = pipeline_root_path or get_pipeline_root_path()
     _verify_is_pipeline_root_directory(pipeline_root_path=pipeline_root_path)
     try:
-        if profile:
-            # Jinja expects template names in posixpath format relative to environment root,
-            # so use posixpath to construct the relative path here.
-            profile_relpath = posixpath.join(_PIPELINE_PROFILE_DIR, f"{profile}.yaml")
-            profile_file_path = os.path.join(
-                pipeline_root_path, _PIPELINE_PROFILE_DIR, f"{profile}.yaml"
-            )
-            if not os.path.exists(profile_file_path):
-                raise MlflowException(
-                    "Did not find the YAML configuration file for the specified profile"
-                    f" '{profile}' at expected path '{profile_file_path}'.",
-                    error_code=INVALID_PARAMETER_VALUE,
-                )
-            return render_and_merge_yaml(
-                pipeline_root_path, _PIPELINE_CONFIG_FILE_NAME, profile_relpath
-            )
-        else:
-            return read_yaml(pipeline_root_path, _PIPELINE_CONFIG_FILE_NAME)
+        return read_yaml(pipeline_root_path, _PIPELINE_CONFIG_FILE_NAME)
     except MlflowException:
         raise
     except Exception as e:
         raise MlflowException(
             "Failed to read pipeline configuration. Please verify that the `pipeline.yaml`"
-            " configuration file and the YAML configuration file for the selected profile are"
-            " syntactically correct and that the specified profile provides all required values"
-            " for template substitutions defined in `pipeline.yaml`.",
+            " configuration file is syntactically correct." 
             error_code=INVALID_PARAMETER_VALUE,
         ) from e
 
@@ -107,16 +84,6 @@ def get_pipeline_root_path() -> str:
             # we have reached the root directory without finding
             # the desired pipeline.yaml file
             raise MlflowException(f"Failed to find {_PIPELINE_CONFIG_FILE_NAME}!")
-
-
-def get_default_profile() -> str:
-    """
-    Returns the default profile name under which a pipeline is executed. The default
-    profile may change depending on runtime environment.
-
-    :return: The default profile name string.
-    """
-    return "databricks" if is_in_databricks_runtime() else "local"
 
 
 def _verify_is_pipeline_root_directory(pipeline_root_path: str) -> str:

@@ -29,22 +29,17 @@ class _BasePipeline:
     """
 
     @experimental
-    def __init__(self, pipeline_root_path: str, profile: str) -> None:
+    def __init__(self, pipeline_root_path: str) -> None:
         """
         Pipeline base class.
 
         :param pipeline_root_path: String path to the directory under which the pipeline template
-                                   such as pipeline.yaml, profiles/{profile}.yaml and
-                                   steps/{step_name}.py are defined.
-        :param profile: String specifying the profile name, with which
-                        {pipeline_root_path}/profiles/{profile}.yaml is read and merged with
-                        pipeline.yaml to generate the configuration to run the pipeline.
+                                   such as pipeline.yaml and steps/{step_name}.py are defined.
         """
         self._pipeline_root_path = pipeline_root_path
-        self._profile = profile
         self._name = get_pipeline_name(pipeline_root_path)
         self._steps = self._resolve_pipeline_steps()
-        self._template = get_pipeline_config(self._pipeline_root_path, self._profile).get(
+        self._template = get_pipeline_config(self._pipeline_root_path).get(
             # TODO: Think about renaming this to something else
             "template"
         )
@@ -54,14 +49,6 @@ class _BasePipeline:
     def name(self) -> str:
         """Returns the name of the pipeline."""
         return self._name
-
-    @experimental
-    @property
-    def profile(self) -> str:
-        """
-        Returns the profile under which the pipeline and its steps will execute.
-        """
-        return self._profile
 
     @experimental
     def run(self, step: str = None) -> None:
@@ -172,8 +159,7 @@ class _BasePipeline:
         """
         Constructs and returns all pipeline step objects from the pipeline configuration.
         """
-        pipeline_config = get_pipeline_config(self._pipeline_root_path, self._profile)
-        pipeline_config["profile"] = self.profile
+        pipeline_config = get_pipeline_config(self._pipeline_root_path)
         return [
             s.from_pipeline_config(pipeline_config, self._pipeline_root_path)
             for s in self._get_step_classes()
@@ -221,22 +207,18 @@ class Pipeline:
         from mlflow.pipelines import Pipeline
 
         os.chdir("~/mlp-regression-template")
-        regression_pipeline = Pipeline(profile="local")
+        regression_pipeline = Pipeline()
         regression_pipeline.run(step="train")
     """
 
     @experimental
-    def __new__(cls, profile: str) -> RegressionPipeline:
+    def __new__(cls) -> RegressionPipeline:
         """
         Creates an instance of an MLflow Pipeline for a particular ML problem or MLOps task based
         on the current working directory and supplied configuration. The current working directory
         must be the root directory of an MLflow Pipeline repository or a subdirectory of an
         MLflow Pipeline repository.
 
-        :param profile: The name of the profile to use for configuring the problem-specific or
-                        task-specific pipeline. Profiles customize the configuration of
-                        one or more pipeline steps, and pipeline executions with different profiles
-                        often produce different results.
         :return: A pipeline for a particular ML problem or MLOps task. For example, an instance of
                  :py:class:`RegressionPipeline
                  <mlflow.pipelines.regression.v1.pipeline.RegressionPipeline>`
@@ -249,15 +231,9 @@ class Pipeline:
             from mlflow.pipelines import Pipeline
 
             os.chdir("~/mlp-regression-template")
-            regression_pipeline = Pipeline(profile="local")
+            regression_pipeline = Pipeline()
             regression_pipeline.run(step="train")
         """
-        if not profile:
-            raise MlflowException(
-                "A profile name must be provided to construct a valid Pipeline object.",
-                error_code=INVALID_PARAMETER_VALUE,
-            ) from None
-
         pipeline_root_path = get_pipeline_root_path()
         if " " in pipeline_root_path:
             raise MlflowException(
@@ -268,9 +244,7 @@ class Pipeline:
                 error_code=INVALID_PARAMETER_VALUE,
             ) from None
 
-        pipeline_config = get_pipeline_config(
-            pipeline_root_path=pipeline_root_path, profile=profile
-        )
+        pipeline_config = get_pipeline_config(pipeline_root_path=pipeline_root_path)
         template = pipeline_config.get("template")
         if template is None:
             raise MlflowException(
@@ -297,5 +271,5 @@ class Pipeline:
                 ) from None
 
         pipeline_name = get_pipeline_name(pipeline_root_path)
-        _logger.info(f"Creating MLflow Pipeline '{pipeline_name}' with profile: '{profile}'")
-        return pipeline_class_module(pipeline_root_path, profile)
+        _logger.info(f"Creating MLflow Pipeline '{pipeline_name}'")
+        return pipeline_class_module(pipeline_root_path)

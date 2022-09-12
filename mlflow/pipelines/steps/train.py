@@ -455,7 +455,6 @@ class TrainStep(BaseStep):
     def from_pipeline_config(cls, pipeline_config, pipeline_root):
         try:
             step_config = pipeline_config["steps"]["train"]
-            step_config["metrics"] = pipeline_config.get("metrics")
             step_config["template_name"] = pipeline_config.get("template")
             step_config["profile"] = pipeline_config.get("profile")
             step_config.update(

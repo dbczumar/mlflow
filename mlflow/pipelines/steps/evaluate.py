@@ -329,7 +329,6 @@ class EvaluateStep(BaseStep):
             raise MlflowException(
                 "Config for evaluate step is not found.", error_code=INVALID_PARAMETER_VALUE
             )
-        step_config["metrics"] = pipeline_config.get("metrics")
         step_config["target_col"] = pipeline_config.get("target_col")
         step_config.update(
             get_pipeline_tracking_config(

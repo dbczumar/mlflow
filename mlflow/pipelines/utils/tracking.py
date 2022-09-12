@@ -204,7 +204,7 @@ def apply_pipeline_tracking_config(tracking_config: TrackingConfig):
                     f"Could not create an MLflow Experiment with "
                     f"name {tracking_config.experiment_name}. Please create an "
                     f"MLflow Experiment for this pipeline and specify its name in the"
-                    f'"name" field of the "experiment" section in your profile configuration.'
+                    f'"name" field of the "experiment" section in your pipeline configuration.'
                 )
 
     fluent_set_experiment(
@@ -262,7 +262,6 @@ def log_code_snapshot(
             #       instead of a raw pipeline.yaml.
             pipeline_root.joinpath("pipeline.yaml"),
             pipeline_root.joinpath("requirements.txt"),
-            *pipeline_root.glob("profiles/*.yaml"),
             *pipeline_root.glob("steps/*.py"),
         ):
             if file_path.exists():

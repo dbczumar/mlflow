@@ -13,7 +13,7 @@ def format_help_string(help_string):
 
 
 PIPELINE_YAML = format_help_string(
-    """# pipeline.yaml is the main configuration file for the pipeline. It defines attributes for each step of the regression pipeline, such as the dataset to use (defined in the 'data' section of the 'ingest' step definition) and the metrics to compute during model training & evaluation (defined in the 'metrics' section, which is used by the 'train' and 'evaluate' steps). pipeline.yaml files also support value overrides from profiles (located in the 'profiles' subdirectory of the pipeline) using Jinja2 templating syntax. An example pipeline.yaml file is displayed below.\n
+    """# pipeline.yaml is the main configuration file for the pipeline. It defines attributes for each step of the regression pipeline, such as the dataset to use (defined in the 'data' section of the 'ingest' step definition) and the metrics to compute during model training & evaluation (defined in the 'metrics' section, which is used by the 'train' and 'evaluate' steps). An example pipeline.yaml file is displayed below.\n
 template: "regression/v1"
 # Specifies the dataset to use for model development
 data:
