@@ -53,7 +53,7 @@ def get_pipeline_config(pipeline_root_path: str = None) -> Dict[str, Any]:
     except Exception as e:
         raise MlflowException(
             "Failed to read pipeline configuration. Please verify that the `pipeline.yaml`"
-            " configuration file is syntactically correct." 
+            " configuration file is syntactically correct.",
             error_code=INVALID_PARAMETER_VALUE,
         ) from e
 

@@ -373,10 +373,11 @@ class RegressionPipeline(_BasePipeline):
         return super().run(step=step)
 
 
-    def ingest(self, location=None, format="parquet", sql=None, custom_loader_method=None):
+    def ingest(self, location=None, format="parquet", sql=None, custom_loader_method=None, use_cached=False):
         data_config = {}
-        data_config["location"] = location 
-        data_config["sql"] = sql 
+        data_config["location"] = location
+        data_config["sql"] = sql
+        data_config["use_cached"] = use_cached
 
         if custom_loader_method is not None:
             if not hasattr(custom_loader_method, "mlp_fn_name"):
@@ -387,9 +388,9 @@ class RegressionPipeline(_BasePipeline):
                 )
 
             data_config["custom_loader_method"] =  getattr(custom_loader_method, "mlp_fn_name")
-        
+
         if sql is None:
-          data_config["format"] = format 
+          data_config["format"] = format
 
         data_config = {
           key: value
