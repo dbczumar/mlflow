@@ -49,8 +49,6 @@ class BaseIngestStep(BaseStep, metaclass=abc.ABCMeta):
                 error_code=INVALID_PARAMETER_VALUE,
             )
 
-        self.use_cached = step_config.get("use_cached", False)
-
         for dataset_class in BaseIngestStep._SUPPORTED_DATASETS:
             if dataset_class.handles_format(dataset_format):
                 self.dataset = dataset_class.from_config(
@@ -68,13 +66,6 @@ class BaseIngestStep(BaseStep, metaclass=abc.ABCMeta):
         import pandas as pd
 
         dataset_dst_path = os.path.abspath(os.path.join(output_directory, self.dataset_output_name))
-
-        found_cached_dataset = False
-        if os.path.exists(dataset_dst_path) and self.use_cached:
-            found_cached_dataset = True
-            _logger.info("Found cached data in parquet format at '%s'", dataset_dst_path)
-            return
-
         self.dataset.resolve_to_parquet(
             dst_path=dataset_dst_path,
         )
@@ -82,15 +73,13 @@ class BaseIngestStep(BaseStep, metaclass=abc.ABCMeta):
 
         ingested_df = read_parquet_as_pandas_df(data_parquet_path=dataset_dst_path)
         ingested_dataset_profile = None
-
-        dataset_profile_path = os.path.join(
-            output_directory, BaseIngestStep._DATASET_PROFILE_OUTPUT_NAME
-        )
-
-        if not self.skip_data_profiling and not (found_cached_dataset and os.path.exists(dataset_profile_path)):
+        if not self.skip_data_profiling:
             _logger.info("Profiling ingested dataset")
             ingested_dataset_profile = get_pandas_data_profile(
                 ingested_df, "Profile of Ingested Dataset"
+            )
+            dataset_profile_path = os.path.join(
+                output_directory, BaseIngestStep._DATASET_PROFILE_OUTPUT_NAME
             )
             ingested_dataset_profile.to_file(output_file=dataset_profile_path)
             _logger.info(f"Wrote dataset profile to '{dataset_profile_path}'")
