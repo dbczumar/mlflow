@@ -76,10 +76,15 @@ def run_pipeline_step(
     }
     for step in pipeline_steps:
         make_env.update(step.environment)
+
+    rule_name = target_step.name
+    if target_step.name == "ingest" and target_step.step_config.get("use_cached", False):
+        rule_name = "steps/ingest/outputs/dataset.parquet"
+
     # Use Make to run the target step and all of its dependencies
     _run_make(
         execution_directory_path=execution_dir_path,
-        rule_name=target_step.name,
+        rule_name=rule_name,
         extra_env=make_env,
     )
 
