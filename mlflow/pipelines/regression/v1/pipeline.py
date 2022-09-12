@@ -298,6 +298,35 @@ class RegressionPipeline(_BasePipeline):
 
         return pipeline_dag_file
 
+    # def configure(self, target_col=None, metrics=None):
+    #     config = get_pipeline_config(self._pipeline_root_path)
+    #
+    #     if metrics is not None:
+    #         metrics = copy.deepcopy(metrics)
+    #         for metric_info in (metrics or []).get("custom", []):
+    #             metric_function = metric_info.get("function")
+    #             if metric_function is None:
+    #                 raise MlflowException(
+    #                     "All custom metrics definitions must include a 'function' key"
+    #                 )
+    #
+    #             if not hasattr(metric_function, "mlp_fn_name"):
+    #                 raise MlflowException(
+    #                     f"Unrecognized method for MLP custom metric: '{metric_function.__name__}'."
+    #                     " Please ensure that the method is defined within a notebook cell that"
+    #                     " applies the %%mlp_code IPython magic."
+    #                 )
+    #
+    #             metric_info["function"] = getattr(metric_function, "mlp_fn_name")
+    #
+    #         config["metrics"] = metrics
+    #
+    #     if target_col is not None:
+    #         config["target_col"] = target_col
+    #
+    #     write_yaml(self._pipeline_root_path, "pipeline.yaml", config, overwrite=True, sort_keys=False)
+
+
     def run(self, step: str = None) -> None:
         """
         Runs the full pipeline or a particular pipeline step, producing outputs and displaying a
@@ -380,14 +409,17 @@ class RegressionPipeline(_BasePipeline):
         ingest_config["use_cached"] = use_cached
 
         if custom_loader_method is not None:
-            if not hasattr(custom_loader_method, "mlp_fn_name"):
-                raise MlflowException(
-                    f"Unrecognized method for MLP step: '{custom_loader_method.__name__}'."
-                    " Please ensure that the method is defined within a notebook cell that"
-                    " applies the %%mlp_code IPython magic"
-                )
+            if callable(custom_loader_method):
+                if not hasattr(custom_loader_method, "mlp_fn_name"):
+                    raise MlflowException(
+                        f"Unrecognized method for MLP step: '{custom_loader_method.__name__}'."
+                        " Please ensure that the method is defined within a notebook cell that"
+                        " applies the %%mlp_code IPython magic"
+                    )
 
-            ingest_config["custom_loader_method"] =  getattr(custom_loader_method, "mlp_fn_name")
+                custom_loader_method = getattr(custom_loader_method, "mlp_fn_name")
+
+            ingest_config["custom_loader_method"] = custom_loader_method
 
         if sql is None:
           ingest_config["format"] = format
@@ -407,10 +439,22 @@ class RegressionPipeline(_BasePipeline):
         return self.get_artifact("ingested_data")
 
     def split(self, split_ratios, target_col, post_split_method=None):
-        split_step_config = {}
-        split_step_config["split_ratios"] = split_ratios
-        split_step_config["target_col"] = target_col
+        split_step_config = {
+            "split_ratios": split_ratios,
+            "target_col": target_col,
+        }
+
         if post_split_method is not None:
+            if callable(post_split_method):
+                if not hasattr(post_split_method, "mlp_fn_name"):
+                    raise MlflowException(
+                        f"Unrecognized method for MLP step: '{post_split_method.__name__}'."
+                        " Please ensure that the method is defined within a notebook cell that"
+                        " applies the %%mlp_code IPython magic"
+                    )
+
+                post_split_method = getattr(post_split_method, "mlp_fn_name")
+
             split_step_config["post_split_method"] = post_split_method
 
         config = get_pipeline_config(self._pipeline_root_path)
@@ -419,44 +463,49 @@ class RegressionPipeline(_BasePipeline):
 
         self.run("split")
 
-        return self.get_artifact("training_data"), self.get_artifact("validation_data"), self.get_artifact("test_data") 
+        return self.get_artifact("training_data"), self.get_artifact("validation_data"), self.get_artifact("test_data")
 
 
     def transform(self, transformer_method, target_col):
-        if not hasattr(transformer_method, "mlp_fn_name"):
-            raise MlflowException(
-                f"Unrecognized method for MLP step: '{transformer_method.__name__}'."
-                " Please ensure that the method is defined within a notebook cell that"
-                " applies the %%mlp_code IPython magic"
-            )
+        if callable(transformer_method):
+            if not hasattr(transformer_method, "mlp_fn_name"):
+                raise MlflowException(
+                    f"Unrecognized method for MLP step: '{transformer_method.__name__}'."
+                    " Please ensure that the method is defined within a notebook cell that"
+                    " applies the %%mlp_code IPython magic"
+                )
+
+            transformer_method = getattr(transformer_method, "mlp_fn_name")
 
         transform_step_config = {
-            "transformer_method": getattr(transformer_method, "mlp_fn_name"),
+            "transformer_method": transformer_method,
             "target_col": target_col,
         }
 
         config = get_pipeline_config(self._pipeline_root_path)
-        config["steps"]["transform"] = transform_step_config 
-        write_yaml(self._pipeline_root_path, "pipeline.yaml", config, overwrite=True, sort_keys=False) 
+        config["steps"]["transform"] = transform_step_config
+        write_yaml(self._pipeline_root_path, "pipeline.yaml", config, overwrite=True, sort_keys=False)
 
         self.run("transform")
 
         return (
             self.get_artifact("transformed_training_data"),
             self.get_artifact("transformed_validation_data"),
-            self.get_artifact("transformer"),
         )
 
     def train(self, estimator_method, target_col, metrics=None):
-        if not hasattr(estimator_method, "mlp_fn_name"):
-            raise MlflowException(
-                f"Unrecognized method for MLP step: '{estimator_method.__name__}'."
-                " Please ensure that the method is defined within a notebook cell that"
-                " applies the %%mlp_code IPython magic."
-            )
+        if callable(estimator_method):
+            if not hasattr(estimator_method, "mlp_fn_name"):
+                raise MlflowException(
+                    f"Unrecognized method for MLP step: '{estimator_method.__name__}'."
+                    " Please ensure that the method is defined within a notebook cell that"
+                    " applies the %%mlp_code IPython magic."
+                )
+
+            estimator_method = getattr(estimator_method, "mlp_fn_name")
 
         train_step_config = {
-          "estimator_method": getattr(estimator_method, "mlp_fn_name"),
+          "estimator_method": estimator_method,
           "target_col": target_col,
         }
 

@@ -29,6 +29,59 @@ For more information, see the :ref:`MLflow Pipelines Overview <pipelines>`.
 
 # pylint: enable=line-too-long
 
+from IPython import get_ipython
+from IPython.core.magic import register_cell_magic
+from pathlib import Path
+
 from mlflow.pipelines.pipeline import Pipeline
 
 __all__ = ["Pipeline"]
+
+
+def mlp_code(file_path, cell):
+    import os
+    from mlflow.exceptions import MlflowException
+    from mlflow.pipelines.decorators import _set_mlp_code_path
+    from mlflow.pipelines.utils import get_pipeline_root_path
+
+    if os.path.isabs(file_path):
+        raise MlflowException("Code must be written within the pipeline repository")
+
+    _set_mlp_code_path(file_path)
+
+    pipeline_root_path = get_pipeline_root_path()
+    file_path = os.path.join(pipeline_root_path, file_path) 
+
+    get_ipython().run_cell(cell).raise_error()
+    
+    # Check to see if there's any difference in file content with OG train.py
+    # before overwriting so that Make doesn't have problems...
+
+    _set_mlp_code_path(None)
+    
+    if os.path.exists(file_path):
+      with open(file_path, "r") as f:
+        content = f.read()
+        if content == cell:
+          return
+  
+    with open(file_path, "w") as f:
+        f.write(cell)
+
+
+def load_ipython_extension(ipython):
+    """This function is called when the extension is
+    loaded. It accepts an IPython InteractiveShell
+    instance. We can register the magic with the
+    `register_magic_function` method of the shell
+    instance."""
+    ipython.register_magic_function(mlp_code, 'cell')
+
+
+# class Conf:
+#
+#     def __init__(name):
+#
+#
+# def conf(name):
+
