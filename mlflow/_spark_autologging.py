@@ -47,9 +47,14 @@ def _get_table_info_string(path, version, data_format):
 
 
 def _merge_tag_lines(existing_tag, new_table_info):
+    import mlflow.fluent
+
+    if new_table_info.replace("dbfs:", "") in mlflow.fluent._datasets or new_table_info in mlflow._fluent.datasets:
+        return None
+
     if existing_tag is None:
         return new_table_info
-    if new_table_info in existing_tag:
+    if new_table_info.replace("dbfs:", "") in existing_tag or new_table_info in existing_tag:
         return existing_tag
     return "\n".join([existing_tag, new_table_info])
 
@@ -95,8 +100,9 @@ def _set_run_tag(run_id, path, version, data_format):
     existing_run = client.get_run(run_id)
     existing_tag = existing_run.data.tags.get(_SPARK_TABLE_INFO_TAG_NAME)
     new_table_info = _merge_tag_lines(existing_tag, table_info_string)
-    new_tag_value = _generate_datasource_tag_value(new_table_info)
-    client.set_tag(run_id, _SPARK_TABLE_INFO_TAG_NAME, new_tag_value)
+    if new_table_info is not None:
+        new_tag_value = _generate_datasource_tag_value(new_table_info)
+        client.set_tag(run_id, _SPARK_TABLE_INFO_TAG_NAME, new_tag_value)
 
 
 def _listen_for_spark_activity(spark_context):
