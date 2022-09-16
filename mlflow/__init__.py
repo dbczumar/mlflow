@@ -158,6 +158,7 @@ from mlflow.tracking.fluent import (
     delete_run,
     autolog,
     last_active_run,
+    use_dataset,
 )
 from mlflow.tracking._model_registry.fluent import register_model
 from mlflow.tracking import (
@@ -216,4 +217,5 @@ __all__ = [
     "last_active_run",
     "MlflowClient",
     "MlflowException",
+    "use_dataset",
 ] + _model_flavors_supported
