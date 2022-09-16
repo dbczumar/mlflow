@@ -2000,9 +2000,13 @@ def use_dataset(dataset_uri, dataset_type, download=False):
 
         spark = _get_active_spark_session()
         if spark is not None and DeltaTable.isDeltaTable(spark, dataset_uri):
-            dataset_format = "delta"
             delta_table = DeltaTable.forPath(spark, dataset_uri)
             version = delta_table.history().head().asDict()["version"]
+            dataset_format = "delta"
+        else:
+            delta_table = DeltaTable.forName(spark, dataset_uri)
+            version = delta_table.history().head().asDict()["version"]
+            dataset_format = "delta"
     except Exception:
         pass
 
