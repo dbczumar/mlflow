@@ -322,11 +322,11 @@ def start_run(
                 )
             tags[MLFLOW_RUN_NOTE] = description
 
-            if _datasets:
-                tags["sparkDatasourceInfo"] = "\n".join([
-                    dataset_info.to_run_datasource_tag_component()
-                    for dataset_info in _datasets.values()
-                ])
+        if _datasets:
+            tags["sparkDatasourceInfo"] = "\n".join([
+                dataset_info.to_run_datasource_tag_component()
+                for dataset_info in _datasets.values()
+            ])
 
         if tags:
             client.log_batch(
