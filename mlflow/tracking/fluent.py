@@ -266,6 +266,14 @@ def start_run(
                                      run_id params.child tags.mlflow.runName
         0  7d175204675e40328e46d9a6a5a7ee6a          yes           CHILD_RUN
     """
+    tags = tags or {}
+    if _datasets:
+        tags["sparkDatasourceInfo"] = "\n".join([
+            dataset_info.to_run_datasource_tag_component()
+            for dataset_info in _datasets.values()
+        ])
+
+
     global _active_run_stack
     _validate_experiment_id_type(experiment_id)
     # back compat for int experiment_id
@@ -321,12 +329,6 @@ def start_run(
                     error_code=INVALID_PARAMETER_VALUE,
                 )
             tags[MLFLOW_RUN_NOTE] = description
-
-        if _datasets:
-            tags["sparkDatasourceInfo"] = "\n".join([
-                dataset_info.to_run_datasource_tag_component()
-                for dataset_info in _datasets.values()
-            ])
 
         if tags:
             client.log_batch(
