@@ -12,6 +12,7 @@ from copy import deepcopy
 from packaging.version import Version
 from typing import Any, Dict, List, Optional, Union, TYPE_CHECKING
 
+import mlflow.artifacts
 from mlflow.entities import Experiment, Run, RunInfo, RunStatus, Param, RunTag, Metric, ViewType
 from mlflow.entities.lifecycle_stage import LifecycleStage
 from mlflow.exceptions import MlflowException
@@ -56,6 +57,7 @@ _EXPERIMENT_ID_ENV_VAR = "MLFLOW_EXPERIMENT_ID"
 _EXPERIMENT_NAME_ENV_VAR = "MLFLOW_EXPERIMENT_NAME"
 _RUN_ID_ENV_VAR = "MLFLOW_RUN_ID"
 _active_run_stack = []
+_datasets = {}
 _active_experiment_id = None
 _last_active_run_id = None
 
@@ -319,6 +321,12 @@ def start_run(
                     error_code=INVALID_PARAMETER_VALUE,
                 )
             tags[MLFLOW_RUN_NOTE] = description
+
+            if _datasets:
+                tags["sparkDatasourceInfo"] = "\n".join([
+                    dataset_info.to_run_datasource_tag_component()
+                    for dataset_info in _datasets.values()
+                ])
 
         if tags:
             client.log_batch(
@@ -1940,3 +1948,79 @@ def autolog(
             raise
         else:
             _logger.warning("Exception raised while enabling autologging for spark: %s", str(e))
+
+
+from collections import namedtuple
+
+class _DatasetInfo:
+
+    def __init__(self, uri, dataset_type, dataset_format, version):
+        self._uri = uri
+        self._dataset_type = dataset_type
+        self._dataset_format = dataset_format
+        self._version = version 
+
+    def to_run_datasource_tag_component(self):
+        return (
+            f"path={self._uri}," + 
+            (
+                f"version={self._version},"
+                if self._version is not None
+                else ""
+            ) +
+            f"format={self._dataset_format}," +
+            f"type={self._dataset_type}"
+        )
+
+
+def use_dataset(dataset_uri, dataset_type, download=False):
+    """
+    :param dataset_uri: URI referring to the dataset
+    :param dataset_type: The type of ML dataset - "training", "validation", or "test"
+    """
+    from mlflow.utils._spark_utils import _get_active_spark_session
+  
+    if dataset_type not in ["training", "test", "validation"]:
+      raise MlflowException(
+        'Dataset type must be one of ["training", "test", "validation"]',
+        INVALID_PARAMETER_VALUE,
+    )
+    
+    if download == True:
+      result = mlflow.artifacts.download_artifact(dataset_uri)
+    else:
+      result = dataset_uri
+
+    dataset_format = "parquet" 
+    version = None
+    try:
+        from delta.tables import DeltaTable
+
+        spark = _get_active_spark_session()
+        if spark is not None and DeltaTable.isDeltaTable(spark, dataset_uri):
+            dataset_format = "delta"
+            delta_table = DeltaTable.forPath(spark, dataset_uri)
+            version = delta_table.history().head().asDict()["version"]
+    except Exception:
+        pass
+
+    dataset_info = _DatasetInfo(
+        uri=dataset_uri,
+        dataset_type=dataset_type,
+        dataset_format=dataset_format,
+        version=version,
+    )
+
+    if mlflow.active_run() is not None:
+        run_tags = MlflowClient().get_run(mlflow.active_run().info.run_id).data.tags
+        datasource_info_tag = run_tags.get("sparkDatasourceInfo", "")
+        if len(datasource_info_tag) > 0:
+            datasource_info_tag += "\n"
+
+        datasource_info_tag += dataset_info.to_run_datasource_tag_component()
+
+        mlflow.set_tag("sparkDatasourceInfo", datasource_info_tag)
+    else:
+        _datasets[dataset_uri] = dataset_info
+
+    return result
