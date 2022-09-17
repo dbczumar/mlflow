@@ -824,6 +824,8 @@ def _load_pyfunc(path):
             # a SparkSession on the workers
             .config("spark.executor.allowSparkContext", "true")
             .config("spark.eventLog.enabled", "false")
+            .config("spark.databricks.pyspark.instrumentation.usageLogging.enabled", "false")
+            .config("spark.databricks.pyspark.instrumentation.enabled", "false")
             # .config("spark.extraListeners", "com.databricks.backend.daemon.driver.DBCEventLoggingListener")
             .config("spark.databricks.eventLog.listenerClassName", "com.databricks.backend.daemon.driver.DBCEventLoggingListener")
             .config("spark.databricks.eventLog.enabled", "false")
