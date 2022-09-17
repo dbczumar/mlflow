@@ -824,7 +824,7 @@ def _load_pyfunc(path):
             # a SparkSession on the workers
             .config("spark.executor.allowSparkContext", "true")
             .config("spark.eventLog.enabled", "false")
-            .config("spark.extraListeners", "com.databricks.backend.daemon.driver.DBCEventLoggingListener")
+            # .config("spark.extraListeners", "com.databricks.backend.daemon.driver.DBCEventLoggingListener")
             .config("spark.databricks.eventLog.listenerClassName", "com.databricks.backend.daemon.driver.DBCEventLoggingListener")
             .config("spark.databricks.eventLog.enabled", "false")
             # Binding "spark.driver.bindAddress" to 127.0.0.1 helps avoiding some local hostname
