@@ -512,10 +512,11 @@ class DatabricksArtifactRepository(ArtifactRepository):
                 )
                 artifact_size = None if output_file.is_dir else output_file.file_size
                 infos.append(FileInfo(file_rel_path, output_file.is_dir, artifact_size))
-            print(artifact_list)
             if len(artifact_list) == 0 or not response.next_page_token:
                 break
             page_token = response.next_page_token
+            print(artifact_list)
+            print(page_token)
         return infos
 
     def _download_file(self, remote_file_path, local_path):
