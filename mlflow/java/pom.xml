@@ -110,13 +110,13 @@
       </dependency>
       <dependency>
         <groupId>ml.combust.mleap</groupId>
-        <artifactId>mleap-spark_2.11</artifactId>
-        <version>0.10.3</version>
+        <artifactId>mleap-spark_2.12</artifactId>
+        <version>0.21.0</version>
       </dependency>
       <dependency>
         <groupId>ml.combust.mleap</groupId>
-        <artifactId>mleap-runtime_2.11</artifactId>
-        <version>0.10.3</version>
+        <artifactId>mleap-runtime_2.12</artifactId>
+        <version>0.21.0</version>
       </dependency>
       <dependency>
         <groupId>org.apache.maven.plugins</groupId>
