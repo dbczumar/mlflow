@@ -496,6 +496,8 @@ class DatabricksArtifactRepository(ArtifactRepository):
                 ListArtifacts(run_id=self.run_id, path=run_relative_path, page_token=page_token)
             )
             response = self._call_endpoint(MlflowService, ListArtifacts, json_body)
+            print("TOKEN", response.next_page_token)
+            print("LIST LEN", len(response.files))
             artifact_list = response.files
             # If `path` is a file, ListArtifacts returns a single list element with the
             # same name as `path`. The list_artifacts API expects us to return an empty list in this
