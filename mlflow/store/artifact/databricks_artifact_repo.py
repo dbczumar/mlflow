@@ -521,11 +521,11 @@ class DatabricksArtifactRepository(ArtifactRepository):
     def _upload_parts(self, local_file, create_mpu_resp):
         futures = {}
         print("RESP", create_mpu_resp.upload_credential_infos)
+        results = {}
         for index, cred_info in enumerate(create_mpu_resp.upload_credential_infos):
             part_number = index + 1
             start_byte = index * _MULTIPART_UPLOAD_CHUNK_SIZE
-            future = self.chunk_upload_thread_pool.submit(
-                self._upload_part_retry,
+            result = self._upload_part_retry(
                 cred_info=cred_info,
                 upload_id=create_mpu_resp.upload_id,
                 part_number=part_number,
@@ -533,13 +533,23 @@ class DatabricksArtifactRepository(ArtifactRepository):
                 start_byte=start_byte,
                 size=_MULTIPART_UPLOAD_CHUNK_SIZE,
             )
-            futures[future] = part_number
+            results[part_number] = result
+            # future = self.chunk_upload_thread_pool.submit(
+            #     self._upload_part_retry,
+            #     cred_info=cred_info,
+            #     upload_id=create_mpu_resp.upload_id,
+            #     part_number=part_number,
+            #     local_file=local_file,
+            #     start_byte=start_byte,
+            #     size=_MULTIPART_UPLOAD_CHUNK_SIZE,
+            # )
+            # futures[future] = part_number
 
-        results, errors = _complete_futures(futures)
-        if errors:
-            raise MlflowException(
-                f"Failed to upload at least one part of {local_file}. Errors: {errors}"
-            )
+        # results, errors = _complete_futures(futures)
+        # if errors:
+        #     raise MlflowException(
+        #         f"Failed to upload at least one part of {local_file}. Errors: {errors}"
+        #     )
 
         return [
             PartEtag(part_number=part_number, etag=results[part_number])
