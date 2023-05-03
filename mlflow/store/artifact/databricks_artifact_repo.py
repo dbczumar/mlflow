@@ -520,10 +520,10 @@ class DatabricksArtifactRepository(ArtifactRepository):
 
     def _upload_parts(self, local_file, create_mpu_resp):
         futures = {}
+        print("RESP", create_mpu_resp.upload_credential_infos)
         for index, cred_info in enumerate(create_mpu_resp.upload_credential_infos):
             part_number = index + 1
             start_byte = index * _MULTIPART_UPLOAD_CHUNK_SIZE
-            print("UPLOAD ID", create_mpu_resp.upload_id)
             future = self.chunk_upload_thread_pool.submit(
                 self._upload_part_retry,
                 cred_info=cred_info,
