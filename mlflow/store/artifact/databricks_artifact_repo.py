@@ -496,7 +496,7 @@ class DatabricksArtifactRepository(ArtifactRepository):
         print("HEADERS", headers)
         print("DATA LEN", len(data))
         print("URI", cred_info.signed_uri)
-        1/0
+        # 1 / 0
         with rest_utils.cloud_storage_http_request(
             "put",
             cred_info.signed_uri,
@@ -525,6 +525,7 @@ class DatabricksArtifactRepository(ArtifactRepository):
     def _upload_parts(self, local_file, create_mpu_resp):
         futures = {}
         print("RESP", create_mpu_resp.upload_credential_infos)
+        return
         results = {}
         for index, cred_info in enumerate(create_mpu_resp.upload_credential_infos):
             part_number = index + 1
@@ -587,12 +588,12 @@ class DatabricksArtifactRepository(ArtifactRepository):
         create_mpu_resp = self._create_multipart_upload(self.run_id, artifact_path, num_parts)
         try:
             part_etags = self._upload_parts(local_file, create_mpu_resp)
-            self._complete_multipart_upload(
-                self.run_id,
-                artifact_path,
-                create_mpu_resp.upload_id,
-                part_etags,
-            )
+            # self._complete_multipart_upload(
+            #     self.run_id,
+            #     artifact_path,
+            #     create_mpu_resp.upload_id,
+            #     part_etags,
+            # )
         except Exception as e:
             _logger.warning(
                 "Encountered an unexpected error during multipart upload: %s, aborting", e
