@@ -496,6 +496,7 @@ class DatabricksArtifactRepository(ArtifactRepository):
         print("HEADERS", headers)
         print("DATA LEN", len(data))
         print("URI", cred_info.signed_uri)
+        1/0
         with rest_utils.cloud_storage_http_request(
             "put",
             cred_info.signed_uri,
