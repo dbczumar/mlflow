@@ -493,6 +493,9 @@ class DatabricksArtifactRepository(ArtifactRepository):
 
     def _upload_part(self, cred_info, data):
         headers = self._extract_headers_from_credentials(cred_info.headers)
+        print("HEADERS", headers)
+        print("DATA LEN", len(data))
+        print("URI", cred_info.signed_uri)
         with rest_utils.cloud_storage_http_request(
             "put",
             cred_info.signed_uri,
