@@ -786,6 +786,7 @@ class DatabricksArtifactRepository(ArtifactRepository):
                 cloud_credential_info=read_credentials[0], dst_local_file_path=local_path
             )
         else:
+            print("DOWNLOADING FILE IN PARALLEL: " + str(file_info) + "||||" + str(file_size))
             self._parallelized_download_from_cloud(
                 read_credentials[0], file_size, local_path, remote_file_path
             )
