@@ -41,15 +41,16 @@ def download_chunk(index, chunk_size, headers, download_path, http_uri):
     range_end = range_start + chunk_size - 1
     ranged_headers = {"Range": f"bytes={range_start}-{range_end}", **headers}
     with cloud_storage_http_request(
-        "get", http_uri, stream=True, headers=ranged_headers
+        "get", http_uri, stream=False, headers=ranged_headers
     ) as response:
         # File will have been created upstream. Use r+b to ensure chunks
         # don't overwrite the entire file.
         augmented_raise_for_status(response)
         with open(download_path, "r+b") as f:
             f.seek(range_start)
-            for content in response.iter_content(chunk_size=1_000_000):
-                f.write(content)
+            f.write(response.content)
+            # for content in response.iter_content(chunk_size=1_000_000):
+            #     f.write(content)
 
 
 @lru_cache(maxsize=64)
