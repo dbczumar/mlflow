@@ -3,8 +3,8 @@ from typing import List, Optional
 
 from pydantic import Field
 
-from ..base_models import RequestModel, ResponseModel
-from ..config import RouteType
+from mlflow.gateway.base_models import RequestModel, ResponseModel
+from mlflow.gateway.config import RouteType
 
 
 class RequestMessage(RequestModel):
@@ -14,9 +14,9 @@ class RequestMessage(RequestModel):
 
 class BaseRequestPayload(RequestModel):
     temperature: float = Field(0.0, ge=0, le=1)
+    candidate_count: int = Field(1, ge=1, le=5)
     stop: Optional[List[str]] = Field(None, min_items=1)
-    max_tokens: Optional[int] = Field(None, ge=0)
-    candidate_count: Optional[int] = Field(None, ge=1, le=5)
+    max_tokens: Optional[int] = Field(None, ge=1)
 
 
 class RequestPayload(BaseRequestPayload):
@@ -49,8 +49,8 @@ class ResponseMessage(ResponseModel):
     content: str
 
 
-class CandidateMetadata(ResponseModel):
-    finish_reason: Optional[FinishReason]
+class CandidateMetadata(ResponseModel, extra="allow"):
+    finish_reason: Optional[FinishReason] = None
 
 
 class Candidate(ResponseModel):
@@ -59,9 +59,9 @@ class Candidate(ResponseModel):
 
 
 class Metadata(ResponseModel):
-    input_tokens: Optional[int]
-    output_tokens: Optional[int]
-    total_tokens: Optional[int]
+    input_tokens: Optional[int] = None
+    output_tokens: Optional[int] = None
+    total_tokens: Optional[int] = None
     model: str
     route_type: RouteType
 

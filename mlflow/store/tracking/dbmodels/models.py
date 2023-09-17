@@ -1,36 +1,37 @@
-from sqlalchemy.orm import relationship, backref
 import sqlalchemy as sa
 from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    CheckConstraint,
     Column,
+    ForeignKey,
+    Index,
+    Integer,
+    PrimaryKeyConstraint,
     String,
     UnicodeText,
-    ForeignKey,
-    Integer,
-    CheckConstraint,
-    BigInteger,
-    PrimaryKeyConstraint,
-    Boolean,
-    Index,
 )
+from sqlalchemy.orm import backref, relationship
+
 from mlflow.entities import (
+    Dataset,
     Experiment,
-    RunTag,
+    ExperimentTag,
+    InputTag,
     Metric,
     Param,
+    Run,
     RunData,
     RunInfo,
-    SourceType,
     RunStatus,
-    Run,
+    RunTag,
+    SourceType,
     ViewType,
-    ExperimentTag,
-    Dataset,
-    InputTag,
 )
 from mlflow.entities.lifecycle_stage import LifecycleStage
 from mlflow.store.db.base_sql_model import Base
 from mlflow.utils.mlflow_tags import _get_run_name_from_tags
-from mlflow.utils.time_utils import get_current_time_millis
+from mlflow.utils.time import get_current_time_millis
 
 SourceTypes = [
     SourceType.to_string(SourceType.NOTEBOOK),
@@ -413,9 +414,7 @@ class SqlLatestMetric(Base):
     """
 
     def __repr__(self):
-        return "<SqlLatestMetric({}, {}, {}, {})>".format(
-            self.key, self.value, self.timestamp, self.step
-        )
+        return f"<SqlLatestMetric({self.key}, {self.value}, {self.timestamp}, {self.step})>"
 
     def to_mlflow_entity(self):
         """

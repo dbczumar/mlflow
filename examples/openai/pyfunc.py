@@ -1,5 +1,5 @@
-import os
 import logging
+import os
 
 os.environ["OPENAI_API_KEY"] = "653512062c2945ff8476482bb851b2a4"  
 os.environ["OPENAI_API_BASE"] = "https://corey-azureopenai.openai.azure.com"  
@@ -7,9 +7,9 @@ os.environ["OPENAI_API_VERSION"] = "2023-05-15"
 os.environ["OPENAI_API_TYPE"] = "azure"
 
 import openai
-import mlflow
 import pandas as pd
-import logging
+
+import mlflow
 
 print(openai.api_base, openai.api_key, openai.api_version, openai.api_type)
 
