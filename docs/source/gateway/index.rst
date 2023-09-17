@@ -30,14 +30,14 @@ By storing API keys in one secure location, organizations can significantly enha
 security posture by minimizing the exposure of sensitive API keys throughout the system. It also
 helps to prevent exposing these keys within code or requiring end-users to manage keys safely.
 
-The gateway is designed to be flexible and adaptable, capable of easily defining and managing routes
+The gateway is designed to be flexible and adaptable, capable of easily defining and managing routes and rate limits
 using a straightforward REST API. This enables the easy incorporation
 of new LLM providers or provider LLM types into the system without necessitating changes to
 applications that interface with the gateway. This level of adaptability makes the Databricks AI Gateway
 Service an invaluable tool in environments that require agility and quick response to changes.
 
 This simplification and centralization of language model interactions, coupled with the added
-layer of security for API key management, make the Databricks AI Gateway service an ideal choice for
+layer of security for API key management, rate limiting for cost control, make the Databricks AI Gateway service an ideal choice for
 organizations that use LLMs on a regular basis.
 
 .. _gateway-quickstart:
@@ -151,8 +151,30 @@ Now that you have set the Gateway URI in your Python environment, you can create
         }
     )
 
+Step 4: Set rate limits on AI Gateway routes
+--------------------------------------------------
 
-Step 4: Send Requests Using the Fluent API
+After you created AI Gateway routes, you can set rate limits on AI Gateway routes for cost control, ensuring production availability and fair sharing.  For example:
+
+.. code-block:: python
+
+    from mlflow.gateway import set_limits
+
+    # Set a per user limit (5 calls per minute) for the route created
+    set_limits(
+        route="completions",
+        limits=[
+            {
+                "key": "user",
+                "calls": "5",
+                "renewal_period": "minute"
+            }
+        ]
+    )
+
+For more details, see :ref:`rate_limits` sections.
+
+Step 5: Send Requests Using the Fluent API
 ------------------------------------------
 
 The next step is to query the Routes using the :ref:`gateway_fluent_api`.
@@ -279,15 +301,15 @@ The returned response will have the following structure (the actual content and 
         }
     }
 
-Step 5: Send Requests Using the Client API
+Step 6: Send Requests Using the Client API
 ------------------------------------------
 See the :ref:`gateway_client_api` section for further information.
 
-Step 6: Send Requests to Routes via REST API
+Step 7: Send Requests to Routes via REST API
 --------------------------------------------
 See the :ref:`REST examples <gateway_rest_api>` section for further information.
 
-Step 7: Compare Provider Models
+Step 8: Compare Provider Models
 -------------------------------
 Here's an example of adding and querying a new model from a different provider - in this case
 Anthropic - to determine which model is better for a given use case. We assume that the
@@ -349,7 +371,7 @@ Finally, if you no longer need a route, you can delete it using the
 :py:func:`mlflow.gateway.delete_route` API. For more information, see the
 :ref:`gateway_fluent_api` and :ref:`gateway_client_api` sections.
 
-Step 8: Use AI Gateway routes for model development
+Step 9: Use AI Gateway routes for model development
 ---------------------------------------------------
 
 Now that you have created several AI Gateway routes, you can create MLflow Models that query these
@@ -703,6 +725,59 @@ The following example demonstrates how to create a route with a Databricks Model
 
 For more information about creating routes with Databricks Model Serving endpoints, see :ref:`config_databricks_model_serving`.
 
+.. _rate_limits:
+
+Rate Limits on AI Gateway Routes
+================================
+
+The parameters for define a rate limit are:
+
++-------------------------------+----------------+----------+---------------+-------------------------------------------------------+
+| Limit Parameter               | Type           | Required | Default       | Description                                           |
++===============================+================+==========+===============+=======================================================+
+| **key**                       | string         | No       | route         | The limit key defines whether the rate limit is per   |
+|                               |                |          |               | databricks user or per route (across all users).      |
+|                               |                |          |               | Allowed options are: user, route.                     |
++-------------------------------+----------------+----------+---------------+-------------------------------------------------------+
+| **calls**                     | integer        | Yes      | N/A           | The maximum total number of calls allowed during the  |
+|                               |                |          |               | time interval specified in renewal_period.            |
+|                               |                |          |               | Must be non-negative integer.                         |
++-------------------------------+----------------+----------+---------------+-------------------------------------------------------+
+| **renewal_period**            | string         | Yes      | N/A           | The length in seconds of the sliding window during    |
+|                               |                |          |               | which the number of allowed requests should not exceed|
+|                               |                |          |               | the value specified in calls. Allowed option: minute. |
++-------------------------------+----------------+----------+---------------+-------------------------------------------------------+
+
+The following example demonstrates how to set a per user limit and per route limit on an existing route and how to get existing limits of a route:
+
+.. code-block:: python
+    
+    from mlflow.gateway import set_limits, get_limits
+
+    set_limits(
+        route="my-route",
+        limits=[
+            // You can define multiple limits on a route
+            {
+                // 5 calls per user per minute
+                "key": "user",
+                "calls": 5,
+                "renewal_period": "minute"
+            },
+            {
+                // 50 calls per minute for all users
+                "calls": 50,
+                "renewal_period": "minute"
+            }
+        ]
+    )
+
+    get_limits(
+        route="my-route"
+    )
+
+For more details on how to set limits and get limits via APIs, please see :ref:`gateway_fluent_api`, :ref:`gateway_client_api` and :ref:`gateway_rest_api`.
+
 .. _gateway_query:
 
 Querying the AI Gateway
@@ -979,6 +1054,40 @@ To use the ``MlflowGatewayClient`` API, see the below examples for the available
        )
        print(response)
 
+4. Set rate limits on a route:
+   
+   The :meth:`query() <mlflow.gateway.client.MlflowGatewayClient.set_limits>` method set rate limits on a route.
+   The data structure you send in the query is an array of limits, see :ref:`rate_limits`.
+
+   .. code-block:: python
+
+       response = gateway_client.set_limits(
+           route = "my-route",
+           limits = [
+            {
+                "key": "user",
+                "calls": 5,
+                "renewal_period": "minute"
+            },
+            {
+                "calls": 50,
+                "renewal_period": "minute"
+            }
+           ]
+       )
+       print(response)
+
+5. Get rate limits of a route:
+   
+   The :meth:`query() <mlflow.gateway.client.MlflowGatewayClient.get_limits>` method returns all rate limits of a route.
+   The data structure returned in the query is an array of limits, see :ref:`rate_limits`.
+
+   .. code-block:: python
+
+       response = gateway_client.get_limits(
+           route = "my-route",
+       )
+       print(response)
 
 Further route types will be added in the future.
 
@@ -1220,6 +1329,29 @@ Here are some examples for how you might use curl to interact with the Gateway:
            -d '{"text": ["I'd like to return my shipment of beanie babies, please", "Can I please speak to a human now?"]}' \
            http://your.workspace.databricks.com/gateway/<your_embeddings_route>/invocations
 
+4. Set rate limits on a route: ``POST /api/2.0/gateway/limits``
+
+   This endpoint allows you to set rate limits on an AI Gateway Route.
+
+    .. code-block:: bash
+
+         curl \
+           -X POST \
+           -H "Content-Type: application/json" \
+           -H "Authorization: Bearer <your_databricks_access_token>" \
+           -d '{"route": "my-route", "limits": [{"key": "user", "calls": 5, "renewal_period": "minute"}]}' \
+           http://your.workspace.databricks.com/api/2.0/gateway/limits
+
+5. Get rate limits of a route: ``GET /api/2.0/gateway/limits/{route}``
+
+   This endpoint allows you to get rate limits of an AI Gateway Route.
+
+    .. code-block:: bash
+
+         curl \
+           -X GET \
+           -H "Authorization: Bearer <your_databricks_access_token>" \
+         http://your.workspace.databricks.com/api/2.0/gateway/limits/<your_route>
 
 Using MosaicML-hosted open source models with the AI Gateway
 =================================================================================
