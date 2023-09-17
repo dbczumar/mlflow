@@ -998,6 +998,45 @@ For the ``fluent`` API, here are some examples:
        )
        print(response)
 
+3. Set rate limtis on a route:
+
+   The :func:`set_limits() <mlflow.gateway.set_limits>` function set rate limits on a route.
+   The data structure you send in the query is an array of limits, see :ref:`rate_limits`.
+
+   .. code-block:: python
+
+       from mlflow.gateway import set_limits
+
+       response = set_limits(
+           route = "my-route",
+           limits = [
+            {
+                "key": "user",
+                "calls": 5,
+                "renewal_period": "minute"
+            },
+            {
+                "calls": 50,
+                "renewal_period": "minute"
+            }
+           ]
+       )
+       print(response)
+
+4. Get rate limtis of a route:
+
+   The :func:`get_limits() <mlflow.gateway.get_limits>` function set rate limits on a route.
+   The data structure returned is an array of limits, see :ref:`rate_limits`.
+
+   .. code-block:: python
+
+       from mlflow.gateway import get_limits
+
+       response = get_limits(
+           route = "my-route"
+       )
+       print(response)
+
 .. _gateway_client_api:
 
 Client API
@@ -1056,8 +1095,8 @@ To use the ``MlflowGatewayClient`` API, see the below examples for the available
 
 4. Set rate limits on a route:
    
-   The :meth:`query() <mlflow.gateway.client.MlflowGatewayClient.set_limits>` method set rate limits on a route.
-   The data structure you send in the query is an array of limits, see :ref:`rate_limits`.
+   The :meth:`set_limits() <mlflow.gateway.client.MlflowGatewayClient.set_limits>` method set rate limits on a route.
+   The data structure you send is an array of limits, see :ref:`rate_limits`.
 
    .. code-block:: python
 
@@ -1079,8 +1118,8 @@ To use the ``MlflowGatewayClient`` API, see the below examples for the available
 
 5. Get rate limits of a route:
    
-   The :meth:`query() <mlflow.gateway.client.MlflowGatewayClient.get_limits>` method returns all rate limits of a route.
-   The data structure returned in the query is an array of limits, see :ref:`rate_limits`.
+   The :meth:`get_limits() <mlflow.gateway.client.MlflowGatewayClient.get_limits>` method returns all rate limits of a route.
+   The data structure returned is an array of limits, see :ref:`rate_limits`.
 
    .. code-block:: python
 
