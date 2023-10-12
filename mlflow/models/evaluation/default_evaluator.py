@@ -1431,6 +1431,7 @@ class DefaultEvaluator(ModelEvaluator):
                 **{self.dataset.targets_name or "target": self.y, "outputs": self.y_pred}
             )
         else:
+            print("FEATURES DATA", self.dataset.features_data)
             data = self.dataset.features_data.assign(outputs=self.y_pred)
 
         columns = {}
