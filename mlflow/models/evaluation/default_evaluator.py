@@ -1432,7 +1432,7 @@ class DefaultEvaluator(ModelEvaluator):
             )
         else:
             print("FEATURES DATA", self.dataset.features_data.to_dict())
-            print("Y PRED", self.y_pred)
+            print("Y PRED", self.y_pred.to_dict())
             data = self.dataset.features_data.assign(outputs=self.y_pred)
 
         columns = {}
