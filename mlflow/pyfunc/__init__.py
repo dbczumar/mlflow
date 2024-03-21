@@ -1603,10 +1603,12 @@ def spark_udf(
             "when either non-Databricks environment is in use or NFS is unavailable.",
         )
 
+    model_tmp_dir = _create_model_downloading_tmp_dir(should_use_nfs)
     local_model_path = _download_artifact_from_uri(
         artifact_uri=model_uri,
-        output_path=_create_model_downloading_tmp_dir(should_use_nfs),
+        output_path=model_tmp_dir,
     )
+    assert os.path.exists(model_tmp_dir), f"{model_tmp_dir} does not exist on driver!"
     assert os.path.exists(local_model_path), f"{local_model_path} does not exist on driver!"
 
     if env_manager == _EnvManager.LOCAL:
@@ -1913,7 +1915,8 @@ Compound types:
                     loaded_model, _ = SparkModelCache.get_or_load(archive_path)
                 else:
                     import os
-                    assert os.path.exists(get_nfs_cache_root_dir(), "NFS root dir does not exist on worker!")
+                    assert os.path.exists(get_nfs_cache_root_dir()), "NFS root dir does not exist on worker!"
+                    assert os.path.exists(model_tmp_dir), f"{model_tmp_dir} does not exist on driver!"
                     assert os.path.exists(local_model_path), f"{local_model_path} does not exist on worker!"
                     loaded_model = mlflow.pyfunc.load_model(local_model_path)
 
