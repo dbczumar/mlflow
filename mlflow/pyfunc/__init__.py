@@ -1608,6 +1608,7 @@ def spark_udf(
         artifact_uri=model_uri,
         output_path=model_tmp_dir,
     )
+    assert os.path.exists(nfs_root_dir), f"NFS root dir {nfs_root_dir} does not exist on driver!"
     assert os.path.exists(model_tmp_dir), f"{model_tmp_dir} does not exist on driver!"
     assert os.path.exists(local_model_path), f"{local_model_path} does not exist on driver!"
 
@@ -1790,6 +1791,11 @@ Compound types:
     def udf(
         iterator: Iterator[Tuple[Union[pandas.Series, pandas.DataFrame], ...]],
     ) -> Iterator[result_type_hint]:
+
+        assert os.path.exists(nfs_root_dir), f"NFS root dir {nfs_root_dir} does not exist on worker AT UDF START!"
+        assert os.path.exists(model_tmp_dir), f"{model_tmp_dir} does not exist on driver AT UDF START!"
+        assert os.path.exists(local_model_path), f"{local_model_path} does not exist on worker AT UDF START!"
+
         # importing here to prevent circular import
         from mlflow.pyfunc.scoring_server.client import (
             ScoringServerClient,
@@ -1915,7 +1921,7 @@ Compound types:
                     loaded_model, _ = SparkModelCache.get_or_load(archive_path)
                 else:
                     import os
-                    assert os.path.exists(nfs_root_dir), "NFS root dir does not exist on worker!"
+                    assert os.path.exists(nfs_root_dir), f"NFS root dir {nfs_root_dir} does not exist on worker!"
                     assert os.path.exists(model_tmp_dir), f"{model_tmp_dir} does not exist on driver!"
                     assert os.path.exists(local_model_path), f"{local_model_path} does not exist on worker!"
                     loaded_model = mlflow.pyfunc.load_model(local_model_path)
