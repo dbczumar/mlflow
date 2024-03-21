@@ -1607,6 +1607,7 @@ def spark_udf(
         artifact_uri=model_uri,
         output_path=_create_model_downloading_tmp_dir(should_use_nfs),
     )
+    assert os.path.exists(local_model_path), f"{local_model_path} does not exist on driver!"
 
     if env_manager == _EnvManager.LOCAL:
         # Assume spark executor python environment is the same with spark driver side.
@@ -1911,6 +1912,8 @@ Compound types:
                 elif should_use_spark_to_broadcast_file:
                     loaded_model, _ = SparkModelCache.get_or_load(archive_path)
                 else:
+                    import os
+                    assert os.path.exists(local_model_path), f"{local_model_path} does not exist on worker!"
                     loaded_model = mlflow.pyfunc.load_model(local_model_path)
 
                 def batch_predict_fn(pdf, params=None):
