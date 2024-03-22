@@ -1791,6 +1791,7 @@ Compound types:
     def udf(
         iterator: Iterator[Tuple[Union[pandas.Series, pandas.DataFrame], ...]],
     ) -> Iterator[result_type_hint]:
+        import os
 
         assert os.path.exists(nfs_root_dir), f"NFS root dir {nfs_root_dir} does not exist on worker AT UDF START!"
         assert os.path.exists(model_tmp_dir), f"{model_tmp_dir} does not exist on driver AT UDF START!"
