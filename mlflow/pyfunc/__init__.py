@@ -1612,7 +1612,7 @@ def spark_udf(
     )
 
     import os
-    os.chmod(tmp_model_dir, 0o777)
+    os.chmod(model_tmp_dir, 0o777)
     os.chmod(local_model_path, 0o777)
 
     assert os.path.exists(nfs_root_dir), f"NFS root dir {nfs_root_dir} does not exist on driver!"
