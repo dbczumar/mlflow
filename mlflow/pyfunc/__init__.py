@@ -1121,6 +1121,8 @@ def _warn_potentially_incompatible_py_version_if_necessary(model_py_version=None
 
 
 def _create_model_downloading_tmp_dir(should_use_nfs):
+    import os
+
     root_tmp_dir = get_or_create_nfs_tmp_dir() if should_use_nfs else get_or_create_tmp_dir()
 
     root_model_cache_dir = os.path.join(root_tmp_dir, "models")
@@ -1608,6 +1610,11 @@ def spark_udf(
         artifact_uri=model_uri,
         output_path=model_tmp_dir,
     )
+
+    import os
+    os.chmod(tmp_model_dir, 0o777)
+    os.chmod(local_model_path, 0o777)
+
     assert os.path.exists(nfs_root_dir), f"NFS root dir {nfs_root_dir} does not exist on driver!"
     assert os.path.exists(model_tmp_dir), f"{model_tmp_dir} does not exist on driver!"
     assert os.path.exists(local_model_path), f"{local_model_path} does not exist on driver!"
