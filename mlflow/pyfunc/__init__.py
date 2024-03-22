@@ -1803,7 +1803,12 @@ Compound types:
         import os
 
         assert os.path.exists(nfs_root_dir), f"NFS root dir {nfs_root_dir} does not exist on worker AT UDF START!"
-        assert os.path.exists(model_tmp_dir), f"{model_tmp_dir} does not exist on driver AT UDF START!"
+
+        import glob
+
+        nfs_dir_contents = [filename for filename in glob.iglob(nfs_root_dir + '**/**', recursive=True)]
+
+        assert os.path.exists(model_tmp_dir), f"{model_tmp_dir} does not exist on driver AT UDF START! Contents: {nfs_dir_contents}"
         assert os.path.exists(local_model_path), f"{local_model_path} does not exist on worker AT UDF START!"
 
         # importing here to prevent circular import
