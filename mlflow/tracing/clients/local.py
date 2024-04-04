@@ -1,8 +1,9 @@
 import threading
 from collections import deque
-from trace import Trace
 from typing import List, Optional
 
+import mlflow
+from mlflow.entities import Trace
 from mlflow.environment_variables import MLFLOW_TRACING_CLIENT_BUFFER_SIZE
 from mlflow.tracing.clients.base import TraceClient
 
@@ -62,9 +63,24 @@ class InMemoryTraceClient(TraceClient):
             pass
 
     def log_trace(self, trace: Trace):
+        from mlflow.tracking.fluent import _get_experiment_id
+
         with self._lock:
             self.queue.append(trace)
         self._display_trace(trace)
+
+        trace_info = mlflow.MlflowClient().create_trace(
+            experiment_id=_get_experiment_id(),
+            timestamp_ms=trace.trace_info.timestamp_ms,
+            execution_time_ms=trace.trace_info.execution_time_ms,
+            status=trace.trace_info.status,
+            request_metadata=trace.trace_info.request_metadata,
+            tags=trace.trace_info.tags,
+        )
+        mlflow.MlflowClient()._tracking_client._upload_trace_data(
+            request_id=trace_info.request_id,
+            trace_data=trace.trace_data,
+        )
 
     def get_traces(self, n: Optional[int] = 10) -> List[Trace]:
         """
