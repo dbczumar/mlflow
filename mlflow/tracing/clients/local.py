@@ -78,7 +78,7 @@ class InMemoryTraceClient(TraceClient):
             tags=trace.trace_info.tags,
         )
         mlflow.MlflowClient()._tracking_client._upload_trace_data(
-            request_id=trace_info.request_id,
+            trace_info=trace_info,
             trace_data=trace.trace_data,
         )
 
