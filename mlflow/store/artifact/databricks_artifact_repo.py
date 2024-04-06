@@ -23,7 +23,7 @@ from mlflow.environment_variables import (
     MLFLOW_MULTIPART_DOWNLOAD_CHUNK_SIZE,
     MLFLOW_MULTIPART_UPLOAD_CHUNK_SIZE,
 )
-from mlflow.exceptions import MlflowException
+from mlflow.exceptions import MlflowException, MlflowTraceDataCorrupted, MlflowTraceDataNotFound
 from mlflow.protos.databricks_artifacts_pb2 import (
     ArtifactCredentialType,
     CompleteMultipartUpload,
@@ -236,28 +236,36 @@ class DatabricksArtifactRepository(CloudArtifactRepository):
         signed_uri = cred.credential_info.signed_uri
         headers = self._extract_headers_from_credentials(cred.credential_info.headers)
         with cloud_storage_http_request("get", signed_uri, headers=headers) as resp:
-            augmented_raise_for_status(resp)
+            try:
+                augmented_raise_for_status(resp)
+            except requests.HTTPError as e:
+                if e.response.status_code == 404:
+                    raise MlflowTraceDataNotFound(request_id=self.run_id) from e
+                raise
+
             try:
                 return json.loads(resp.content)
             except json.JSONDecodeError as e:
-                raise MlflowException.invalid_parameter_value(
-                    f"Failed to parse trace data:\n{resp.content.decode()}"
-                ) from e
+                raise MlflowTraceDataCorrupted(request_id=self.run_id) from e
 
     def upload_trace_data(self, trace_data: Dict[str, Any]) -> None:
-        cred = self._call_endpoint(
-            DatabricksMlflowArtifactsService,
-            GetCredentialsForTraceDataUpload,
-            path_params={"request_id": self.run_id},
-        )
+        def get_upload_credentials():
+            return self._call_endpoint(
+                DatabricksMlflowArtifactsService,
+                GetCredentialsForTraceDataUpload,
+                path_params={"request_id": self.run_id},
+            ).credential_info
+
+        credential_info = get_upload_credentials()
+
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_file = Path(temp_dir, "traces.json")
             with temp_file.open("w") as f:
                 json.dump(trace_data, f)
 
-            if cred.credential_info.type == ArtifactCredentialType.AZURE_ADLS_GEN2_SAS_URI:
-                signed_uri = cred.credential_info.signed_uri
-                headers = self._extract_headers_from_credentials(cred.credential_info.headers)
+            if credential_info.type == ArtifactCredentialType.AZURE_ADLS_GEN2_SAS_URI:
+                signed_uri = credential_info.signed_uri
+                headers = self._extract_headers_from_credentials(credential_info.headers)
                 size = temp_file.stat().st_size
                 put_adls_file_creation(sas_url=signed_uri, headers=headers)
                 patch_adls_file_upload(
@@ -269,12 +277,15 @@ class DatabricksArtifactRepository(CloudArtifactRepository):
                     headers=headers,
                     is_single=True,
                 )
+
+            elif credential_info.type == ArtifactCredentialType.AZURE_SAS_URI:
+                self._azure_upload_file(credentials=credential_info, local_file=temp_file, refresh_credentials=get_upload_credentials)
             elif (
-                cred.credential_info.type == ArtifactCredentialType.AZURE_SAS_URI
-                or cred.credential_info.type == ArtifactCredentialType.AWS_PRESIGNED_URL
-                or cred.credential_info.type == ArtifactCredentialType.GCP_SIGNED_URL
+                credential_info.type == ArtifactCredentialType.AZURE_SAS_URI
+                or credential_info.type == ArtifactCredentialType.AWS_PRESIGNED_URL
+                or credential_info.type == ArtifactCredentialType.GCP_SIGNED_URL
             ):
-                self._signed_url_upload_file(cred.credential_info, temp_file)
+                self._signed_url_upload_file(credential_info, temp_file)
 
     def _get_read_credential_infos(self, remote_file_paths):
         """
@@ -303,7 +314,7 @@ class DatabricksArtifactRepository(CloudArtifactRepository):
         return {header.name: header.value for header in headers}
 
     def _azure_upload_chunk(
-        self, credentials, headers, local_file, artifact_file_path, start_byte, size
+        self, credentials, headers, local_file, refresh_credentials, start_byte, size
     ):
         # Base64-encode a UUID, producing a UTF8-encoded bytestring. Then, decode
         # the bytestring for compliance with Azure Blob Storage API requests
@@ -317,13 +328,13 @@ class DatabricksArtifactRepository(CloudArtifactRepository):
                     "Failed to authorize request, possibly due to credential expiration."
                     " Refreshing credentials and trying again..."
                 )
-                credential_info = self._get_write_credential_infos([artifact_file_path])[0]
+                credential_info = refresh_credentials()
                 put_block(credential_info.signed_uri, block_id, chunk, headers=headers)
             else:
                 raise e
         return block_id
 
-    def _azure_upload_file(self, credentials, local_file, artifact_file_path):
+    def _azure_upload_file(self, credentials, local_file, refresh_credentials):
         """
         Uploads a file to a given Azure storage location.
         The function uses a file chunking generator with 100 MB being the size limit for each chunk.
@@ -345,7 +356,7 @@ class DatabricksArtifactRepository(CloudArtifactRepository):
                     credentials=credentials,
                     headers=headers,
                     local_file=local_file,
-                    artifact_file_path=artifact_file_path,
+                    refresh_credentials=refresh_credentials,
                     start_byte=start_byte,
                     size=MLFLOW_MULTIPART_UPLOAD_CHUNK_SIZE.get(),
                 )
@@ -361,13 +372,18 @@ class DatabricksArtifactRepository(CloudArtifactRepository):
 
             try:
                 put_block_list(credentials.signed_uri, uploading_block_list, headers=headers)
+                response = requests.Response()
+                response.status_code = 403
+                response.reason = "Forbidden"
+                raise requests.HTTPError(response=response)
             except requests.HTTPError as e:
                 if e.response.status_code in [401, 403]:
                     _logger.info(
                         "Failed to authorize request, possibly due to credential expiration."
                         " Refreshing credentials and trying again..."
                     )
-                    credential_info = self._get_write_credential_infos([artifact_file_path])[0]
+                    credential_info = refresh_credentials()
+                    headers = self._extract_headers_from_credentials(credential_info.headers)
                     put_block_list(
                         credential_info.signed_uri, uploading_block_list, headers=headers
                     )
@@ -465,7 +481,7 @@ class DatabricksArtifactRepository(CloudArtifactRepository):
         except Exception as err:
             raise MlflowException(err)
 
-    def _upload_to_cloud(self, cloud_credential_info, src_file_path, artifact_file_path):
+    def _upload_to_cloud(self, cloud_credential_info, src_file_path, artifact_file_path, refresh_credentials):
         """
         Upload a local file to the cloud. Note that in this artifact repository, files are uploaded
         to run-relative artifact file paths in the artifact repository.
@@ -475,10 +491,11 @@ class DatabricksArtifactRepository(CloudArtifactRepository):
             src_file_path: Local source file path for the upload.
             artifact_file_path: Path in the artifact repository, relative to the run root path,
                 where the artifact will be logged.
+            refresh_credentials: Function to refresh the credentials if they have expired.
 
         """
         if cloud_credential_info.type == ArtifactCredentialType.AZURE_SAS_URI:
-            self._azure_upload_file(cloud_credential_info, src_file_path, artifact_file_path)
+            self._azure_upload_file(credentials=cloud_credential_info, local_file=src_file_path, refresh_credentials=refresh_credentials)
         elif cloud_credential_info.type == ArtifactCredentialType.AZURE_ADLS_GEN2_SAS_URI:
             self._azure_adls_gen2_upload_file(
                 cloud_credential_info, src_file_path, artifact_file_path
@@ -650,11 +667,14 @@ class DatabricksArtifactRepository(CloudArtifactRepository):
     def log_artifact(self, local_file, artifact_path=None):
         src_file_name = os.path.basename(local_file)
         artifact_file_path = posixpath.join(artifact_path or "", src_file_name)
-        write_credential_info = self._get_write_credential_infos([artifact_file_path])[0]
+        def get_write_credentials():
+            return self._get_write_credential_infos([artifact_file_path])[0]
+        write_credential_info = get_write_credentials() 
         self._upload_to_cloud(
             cloud_credential_info=write_credential_info,
             src_file_path=local_file,
             artifact_file_path=artifact_file_path,
+            refresh_credentials=write_credential_info,
         )
 
     def list_artifacts(self, path=None):

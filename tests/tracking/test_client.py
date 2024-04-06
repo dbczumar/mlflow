@@ -64,7 +64,13 @@ def mock_store():
 
 @pytest.fixture
 def mock_artifact_repo():
+<<<<<<< HEAD
     with mock.patch("mlflow.tracking._tracking_service.client.get_artifact_repository") as mock_get_repo:
+=======
+    with mock.patch(
+        "mlflow.tracking._tracking_service.client.get_artifact_repository"
+    ) as mock_get_repo:
+>>>>>>> harupy/handle-download-trace-data-error
         yield mock_get_repo.return_value
 
 
@@ -145,10 +151,10 @@ def test_client_create_run_with_name(mock_store, mock_time):
     )
 
 
-def test_client_create_trace(mock_store, mock_time):
+def test_client_create_trace_info(mock_store, mock_time):
     experiment_id = mock.Mock()
 
-    MlflowClient().create_trace(
+    MlflowClient()._create_trace_info(
         experiment_id,
         123,
         456,
@@ -157,7 +163,7 @@ def test_client_create_trace(mock_store, mock_time):
         tags={},
     )
 
-    mock_store.create_trace.assert_called_once_with(
+    mock_store.create_trace_info.assert_called_once_with(
         experiment_id=experiment_id,
         timestamp_ms=123,
         execution_time_ms=456,
@@ -201,8 +207,34 @@ def test_client_search_traces(mock_store, mock_artifact_repo):
     ]
     mock_store.search_traces.return_value = (mock_traces, None)
 
+<<<<<<< HEAD
     MlflowClient().search_traces(experiment_ids=["1", "2", "3"])
 
+=======
+def test_client_search_traces(mock_store, mock_artifact_repo):
+    mock_traces = [
+        TraceInfo(
+            request_id="1234567",
+            experiment_id="1",
+            timestamp_ms=123,
+            execution_time_ms=456,
+            status=TraceStatus.OK,
+            tags={"mlflow.artifactLocation": "dbfs:/path/to/artifacts/1"},
+        ),
+        TraceInfo(
+            request_id="8910",
+            experiment_id="2",
+            timestamp_ms=456,
+            execution_time_ms=789,
+            status=TraceStatus.OK,
+            tags={"mlflow.artifactLocation": "dbfs:/path/to/artifacts/2"},
+        ),
+    ]
+    mock_store.search_traces.return_value = (mock_traces, None)
+
+    MlflowClient().search_traces(experiment_ids=["1", "2", "3"])
+
+>>>>>>> harupy/handle-download-trace-data-error
     mock_store.search_traces.assert_called_once_with(
         experiment_ids=["1", "2", "3"],
         filter_string=None,

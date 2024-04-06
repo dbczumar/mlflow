@@ -69,7 +69,7 @@ class InMemoryTraceClient(TraceClient):
             self.queue.append(trace)
         self._display_trace(trace)
 
-        trace_info = mlflow.MlflowClient().create_trace(
+        trace_info = mlflow.MlflowClient()._create_trace_info(
             experiment_id=_get_experiment_id(),
             timestamp_ms=trace.trace_info.timestamp_ms,
             execution_time_ms=trace.trace_info.execution_time_ms,
