@@ -279,7 +279,11 @@ class DatabricksArtifactRepository(CloudArtifactRepository):
                 )
 
             elif credential_info.type == ArtifactCredentialType.AZURE_SAS_URI:
-                self._azure_upload_file(credentials=credential_info, local_file=temp_file, refresh_credentials=get_upload_credentials)
+                self._azure_upload_file(
+                    credentials=credential_info,
+                    local_file=temp_file,
+                    refresh_credentials=get_upload_credentials,
+                )
             elif (
                 credential_info.type == ArtifactCredentialType.AZURE_SAS_URI
                 or credential_info.type == ArtifactCredentialType.AWS_PRESIGNED_URL
@@ -372,10 +376,10 @@ class DatabricksArtifactRepository(CloudArtifactRepository):
 
             try:
                 put_block_list(credentials.signed_uri, uploading_block_list, headers=headers)
-                response = requests.Response()
-                response.status_code = 403
-                response.reason = "Forbidden"
-                raise requests.HTTPError(response=response)
+                # response = requests.Response()
+                # response.status_code = 403
+                # response.reason = "Forbidden"
+                # raise requests.HTTPError(response=response)
             except requests.HTTPError as e:
                 if e.response.status_code in [401, 403]:
                     _logger.info(
@@ -481,7 +485,9 @@ class DatabricksArtifactRepository(CloudArtifactRepository):
         except Exception as err:
             raise MlflowException(err)
 
-    def _upload_to_cloud(self, cloud_credential_info, src_file_path, artifact_file_path, refresh_credentials):
+    def _upload_to_cloud(
+        self, cloud_credential_info, src_file_path, artifact_file_path, refresh_credentials
+    ):
         """
         Upload a local file to the cloud. Note that in this artifact repository, files are uploaded
         to run-relative artifact file paths in the artifact repository.
@@ -495,7 +501,11 @@ class DatabricksArtifactRepository(CloudArtifactRepository):
 
         """
         if cloud_credential_info.type == ArtifactCredentialType.AZURE_SAS_URI:
-            self._azure_upload_file(credentials=cloud_credential_info, local_file=src_file_path, refresh_credentials=refresh_credentials)
+            self._azure_upload_file(
+                credentials=cloud_credential_info,
+                local_file=src_file_path,
+                refresh_credentials=refresh_credentials,
+            )
         elif cloud_credential_info.type == ArtifactCredentialType.AZURE_ADLS_GEN2_SAS_URI:
             self._azure_adls_gen2_upload_file(
                 cloud_credential_info, src_file_path, artifact_file_path
@@ -667,14 +677,16 @@ class DatabricksArtifactRepository(CloudArtifactRepository):
     def log_artifact(self, local_file, artifact_path=None):
         src_file_name = os.path.basename(local_file)
         artifact_file_path = posixpath.join(artifact_path or "", src_file_name)
+
         def get_write_credentials():
             return self._get_write_credential_infos([artifact_file_path])[0]
-        write_credential_info = get_write_credentials() 
+
+        write_credential_info = get_write_credentials()
         self._upload_to_cloud(
             cloud_credential_info=write_credential_info,
             src_file_path=local_file,
             artifact_file_path=artifact_file_path,
-            refresh_credentials=write_credential_info,
+            refresh_credentials=get_write_credentials,
         )
 
     def list_artifacts(self, path=None):

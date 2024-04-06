@@ -127,11 +127,18 @@ class CloudArtifactRepository(ArtifactRepository):
                 for staged_upload, write_credential_info in zip(
                     staged_upload_chunk, write_credential_infos
                 ):
+
+                    def refresh_credentials():
+                        return self._get_write_credential_infos(
+                            remote_file_paths=[staged_upload.artifact_file_path]
+                        )[0]
+
                     upload_future = self.thread_pool.submit(
                         self._upload_to_cloud,
                         cloud_credential_info=write_credential_info,
                         src_file_path=staged_upload.src_file_path,
                         artifact_file_path=staged_upload.artifact_file_path,
+                        refresh_credentials=refresh_credentials,
                     )
                     inflight_uploads[staged_upload.src_file_path] = upload_future
 
@@ -174,7 +181,9 @@ class CloudArtifactRepository(ArtifactRepository):
         pass
 
     @abstractmethod
-    def _upload_to_cloud(self, cloud_credential_info, src_file_path, artifact_file_path):
+    def _upload_to_cloud(
+        self, cloud_credential_info, src_file_path, artifact_file_path, refresh_credentials
+    ):
         """
         Upload a single file to the cloud.
 
@@ -182,6 +191,7 @@ class CloudArtifactRepository(ArtifactRepository):
             cloud_credential_info: ArtifactCredentialInfo object with presigned URL for the file.
             src_file_path: Local source file path for the upload.
             artifact_file_path: Path in the artifact repository where the artifact will be logged.
+            refresh_credentials: Function to refresh the credentials if they have expired.
 
         """
         pass

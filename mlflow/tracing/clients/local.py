@@ -69,6 +69,16 @@ class InMemoryTraceClient(TraceClient):
             self.queue.append(trace)
         self._display_trace(trace)
 
+        def is_not_blank(s: str) -> bool:
+            return s and (not s.isspace())
+
+        trace.trace_info.tags = [tag for tag in trace.trace_info.tags if is_not_blank(tag.key) and is_not_blank(tag.value)]
+        trace.trace_info.request_metadata = {
+            key: value
+            for key, value in trace.trace_info.request_metadata.items()
+            if is_not_blank(key) and is_not_blank(value)
+        }
+
         trace_info = mlflow.MlflowClient()._create_trace_info(
             experiment_id=_get_experiment_id(),
             timestamp_ms=trace.trace_info.timestamp_ms,
