@@ -19,6 +19,7 @@ from mlflow.azure.client import (
     put_block_list,
 )
 from mlflow.entities import FileInfo
+from mlflow.entities.trace import _TraceJSONEncoder 
 from mlflow.environment_variables import (
     MLFLOW_MULTIPART_DOWNLOAD_CHUNK_SIZE,
     MLFLOW_MULTIPART_UPLOAD_CHUNK_SIZE,
@@ -261,7 +262,7 @@ class DatabricksArtifactRepository(CloudArtifactRepository):
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_file = Path(temp_dir, "traces.json")
             with temp_file.open("w") as f:
-                json.dump(trace_data, f)
+                json.dump(trace_data, f, cls=_TraceJSONEncoder)
 
             if credential_info.type == ArtifactCredentialType.AZURE_ADLS_GEN2_SAS_URI:
                 signed_uri = credential_info.signed_uri
