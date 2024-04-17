@@ -257,11 +257,13 @@ class DatabricksArtifactRepository(CloudArtifactRepository):
         return res.credential_info
 
     def upload_trace_data(self, trace_data: Dict[str, Any]) -> None:
+        from mlflow.entities.trace import _TraceJSONEncoder
+
         cred = self._get_upload_trace_data_cred_info()
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_file = Path(temp_dir, "traces.json")
             with temp_file.open("w") as f:
-                json.dump(trace_data, f)
+                json.dump(trace_data, f, cls=_TraceJSONEncoder)
 
             if cred.type == ArtifactCredentialType.AZURE_ADLS_GEN2_SAS_URI:
                 self._azure_adls_gen2_upload_file(
