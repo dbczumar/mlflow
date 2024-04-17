@@ -1,5 +1,3 @@
-import json
-
 import pytest
 
 import mlflow
@@ -31,70 +29,71 @@ def test_json_deserialization(mock_trace_client):
     with pytest.raises(Exception, match="Error!"):
         model.predict(2, 5)
 
-    trace = mlflow.get_traces()[0]
-    trace_data_dict = trace.data.to_dict()
+    trace_data = mlflow.get_traces()[0].data
+    trace_data_dict = trace_data.to_dict()
 
     # Compare events separately as it includes exception stacktrace which is hard to hardcode
     span_to_events = {span["name"]: span.pop("events") for span in trace_data_dict["spans"]}
 
     assert trace_data_dict == {
-        "request": '{"x": 2, "y": 5}',
+        "request": {"x": 2, "y": 5},
         "response": None,
         "spans": [
             {
                 "name": "predict",
                 "context": {
-                    "trace_id": trace.data.spans[0].context.trace_id,
-                    "span_id": trace.data.spans[0].context.span_id,
+                    "request_id": trace_data.spans[0].context.request_id,
+                    "span_id": trace_data.spans[0].context.span_id,
                 },
-                "parent_id": None,
-                "start_time": trace.data.spans[0].start_time,
-                "end_time": trace.data.spans[0].end_time,
-                "status_code": "ERROR",
-                "status_message": "Exception: Error!",
-                "attributes": {
-                    "mlflow.traceRequestId": json.dumps(trace.info.request_id),
-                    "mlflow.spanType": '"UNKNOWN"',
-                    "mlflow.spanFunctionName": '"predict"',
-                    "mlflow.spanInputs": '{"x": 2, "y": 5}',
+                "span_type": "UNKNOWN",
+                "parent_span_id": None,
+                "start_time": trace_data.spans[0].start_time,
+                "end_time": trace_data.spans[0].end_time,
+                "status": {
+                    "status_code": "ERROR",
+                    "description": "Exception: Error!",
                 },
+                "inputs": {"x": 2, "y": 5},
+                "outputs": None,
+                "attributes": {"function_name": "predict"},
                 # "events": ...,
             },
             {
                 "name": "with_ok_event",
                 "context": {
-                    "trace_id": trace.data.spans[1].context.trace_id,
-                    "span_id": trace.data.spans[1].context.span_id,
+                    "request_id": trace_data.spans[1].context.request_id,
+                    "span_id": trace_data.spans[1].context.span_id,
                 },
-                "parent_id": trace.data.spans[0].context.span_id,
-                "start_time": trace.data.spans[1].start_time,
-                "end_time": trace.data.spans[1].end_time,
-                "status_code": "OK",
-                "status_message": "",
-                "attributes": {
-                    "mlflow.traceRequestId": json.dumps(trace.info.request_id),
-                    "mlflow.spanType": '"UNKNOWN"',
+                "span_type": "UNKNOWN",
+                "parent_span_id": trace_data.spans[0].context.span_id,
+                "start_time": trace_data.spans[1].start_time,
+                "end_time": trace_data.spans[1].end_time,
+                "status": {
+                    "status_code": "OK",
+                    "description": "",
                 },
+                "inputs": None,
+                "outputs": None,
+                "attributes": {},
                 # "events": ...,
             },
             {
                 "name": "always_fail_name",
                 "context": {
-                    "trace_id": trace.data.spans[2].context.trace_id,
-                    "span_id": trace.data.spans[2].context.span_id,
+                    "request_id": trace_data.spans[2].context.request_id,
+                    "span_id": trace_data.spans[2].context.span_id,
                 },
-                "parent_id": trace.data.spans[0].context.span_id,
-                "start_time": trace.data.spans[2].start_time,
-                "end_time": trace.data.spans[2].end_time,
-                "status_code": "ERROR",
-                "status_message": "Exception: Error!",
-                "attributes": {
-                    "delta": "1",
-                    "mlflow.traceRequestId": json.dumps(trace.info.request_id),
-                    "mlflow.spanType": '"LLM"',
-                    "mlflow.spanFunctionName": '"always_fail"',
-                    "mlflow.spanInputs": "{}",
+                "span_type": "LLM",
+                "parent_span_id": trace_data.spans[0].context.span_id,
+                "start_time": trace_data.spans[2].start_time,
+                "end_time": trace_data.spans[2].end_time,
+                "status": {
+                    "status_code": "ERROR",
+                    "description": "Exception: Error!",
                 },
+                "inputs": {},
+                "outputs": None,
+                "attributes": {"delta": 1, "function_name": "always_fail"},
                 # "events": ...,
             },
         ],

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import contextlib
 import functools
-import json
 import logging
 from typing import Any, Callable, Dict, List, Optional
 
@@ -13,9 +12,8 @@ from mlflow.store.tracking import SEARCH_TRACES_DEFAULT_MAX_RESULTS
 from mlflow.tracing.display import get_display_handler
 from mlflow.tracing.provider import get_tracer
 from mlflow.tracing.trace_manager import InMemoryTraceManager
-from mlflow.tracing.types.constant import SpanAttributeKey
 from mlflow.tracing.types.wrapper import MlflowSpanWrapper, NoOpMlflowSpanWrapper
-from mlflow.tracing.utils import capture_function_input_args, format_span_id
+from mlflow.tracing.utils import capture_function_input_args
 from mlflow.utils import get_results_from_paginated_fn
 
 _logger = logging.getLogger(__name__)
@@ -89,7 +87,7 @@ def trace(
             span_name = name or fn.__name__
 
             with start_span(name=span_name, span_type=span_type, attributes=attributes) as span:
-                span.set_attribute(SpanAttributeKey.FUNCTION_NAME, fn.__name__)
+                span.set_attribute("function_name", fn.__name__)
                 span.set_inputs(capture_function_input_args(fn, args, kwargs))
                 result = fn(*args, **kwargs)
                 span.set_outputs(result)
@@ -174,11 +172,10 @@ def start_span(
     try:
         if span is not None:
             trace_manager = InMemoryTraceManager.get_instance()
-            request_id = trace_manager.get_or_create_request_id(span.context.trace_id)
             # Setting end_on_exit = False to suppress the default span
             # export and instead invoke MlflowSpanWrapper.end()
             with trace_api.use_span(span, end_on_exit=False):
-                mlflow_span = MlflowSpanWrapper(span, request_id=request_id, span_type=span_type)
+                mlflow_span = MlflowSpanWrapper(span, span_type=span_type)
                 mlflow_span.set_attributes(attributes or {})
                 trace_manager.add_or_update_span(mlflow_span)
                 yield mlflow_span
@@ -263,10 +260,9 @@ def get_current_active_span():
         The current active span if exists, otherwise None.
     """
     otel_span = trace_api.get_current_span()
-    # NonRecordingSpan is returned if a tracer is not instantiated.
-    if otel_span is None or isinstance(otel_span, trace_api.NonRecordingSpan):
+    if otel_span is None:
         return None
 
+    span = MlflowSpanWrapper(otel_span)
     trace_manager = InMemoryTraceManager.get_instance()
-    request_id = json.loads(otel_span.attributes.get(SpanAttributeKey.REQUEST_ID))
-    return trace_manager.get_span_from_id(request_id, format_span_id(otel_span.context.span_id))
+    return trace_manager.get_span_from_id(span.request_id, span.span_id)

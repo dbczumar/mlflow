@@ -526,7 +526,7 @@ class MlflowClient:
 
                 # Create a child span
                 child_span = client.start_span(
-                    "child_span", request_id=request_id, parent_id=root_span.span_id
+                    "child_span", request_id=request_id, parent_span_id=root_span.span_id
                 )
                 # Do something...
                 client.end_span(request_id=request_id, span_id=child_span.span_id)
@@ -616,7 +616,7 @@ class MlflowClient:
         self,
         name: str,
         request_id: str,
-        parent_id: str,
+        parent_span_id: str,
         span_type: str = SpanType.UNKNOWN,
         inputs: Optional[Dict[str, Any]] = None,
         attributes: Optional[Dict[str, Any]] = None,
@@ -665,7 +665,7 @@ class MlflowClient:
                     child_span = client.start_span(
                         name="child_span",
                         request_id=parent_span.request_id,
-                        parent_id=parent_span.span_id,
+                        parent_span_id=parent_span.span_id,
                     )
 
                     # Do something...
@@ -688,7 +688,7 @@ class MlflowClient:
                 trace_id` in OpenTelemetry.
             span_type: The type of the span. Can be either a string or a
                 :py:class:`SpanType <mlflow.entities.SpanType>` enum value.
-            parent_id: The ID of the parent span. The parent span can be a span created by
+            parent_span_id: The ID of the parent span. The parent span can be a span created by
                 both fluent APIs like `with mlflow.start_span()`, and imperative APIs like this.
             inputs: Inputs to set on the span.
             attributes: A dictionary of attributes to set on the span.
@@ -712,7 +712,7 @@ class MlflowClient:
                 child_span = client.start_span(
                     "child_span",
                     request_id=span.request_id,
-                    parent_id=span.id,
+                    parent_span_id=span.id,
                     inputs={"x": 2},
                 )
 
@@ -727,9 +727,9 @@ class MlflowClient:
 
                 client.end_trace(request_id)
         """
-        if not parent_id:
+        if not parent_span_id:
             raise MlflowException(
-                "start_span() must be called with an explicit parent_id."
+                "start_span() must be called with an explicit parent_span_id."
                 "If you haven't started any span yet, use MLflowClient().start_trace() "
                 "to start a new trace and root span.",
                 error_code=INVALID_PARAMETER_VALUE,
@@ -739,7 +739,7 @@ class MlflowClient:
         span = trace_manager.start_detached_span(
             name=name,
             request_id=request_id,
-            parent_id=parent_id,
+            parent_span_id=parent_span_id,
             span_type=span_type,
         )
 
