@@ -81,15 +81,20 @@ class InMemoryTraceClientWithTracking(InMemoryTraceClient):
 
     def log_trace(self, trace: Trace):
         super().log_trace(trace)
-        started_trace = self.client._tracking_client._start_trace(
+        print("EXP ID", trace.info.experiment_id)
+        started_trace = self._client._tracking_client.start_trace(
             experiment_id=trace.info.experiment_id,
             timestamp_ms=trace.info.timestamp_ms,
             request_metadata=trace.info.request_metadata,
             tags=trace.info.tags,
         )
-        self._client._upload_trace_data(started_trace, trace.data)
-        self.client._tracking_client._end_trace(
-            request_id=trace.info.request_id,
+        print("REQUEST ID", started_trace.request_id)
+        self._client._tracking_client._upload_trace_data(started_trace, trace.data)
+        self._client._tracking_client.end_trace(
+            request_id=started_trace.request_id,
             timestamp_ms=trace.info.timestamp_ms + trace.info.execution_time_ms,
             status=trace.info.status,
+            request_metadata={},
+            tags={},
         )
+        print("FETCHED TRACE", self._client.get_trace(started_trace.request_id))
