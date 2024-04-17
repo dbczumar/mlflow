@@ -9,7 +9,6 @@ from typing import Any, Callable, Dict, List, Optional
 from opentelemetry import trace as trace_api
 
 from mlflow import MlflowClient
-from mlflow.entities import SpanType, Trace
 from mlflow.store.tracking import SEARCH_TRACES_DEFAULT_MAX_RESULTS
 from mlflow.tracing.display import get_display_handler
 from mlflow.tracing.provider import get_tracer
@@ -25,7 +24,7 @@ _logger = logging.getLogger(__name__)
 def trace(
     func: Optional[Callable] = None,
     name: Optional[str] = None,
-    span_type: str = SpanType.UNKNOWN,
+    span_type: str = "UNKNOWN",
     attributes: Optional[Dict[str, Any]] = None,
 ) -> Callable:
     """
@@ -104,7 +103,7 @@ def trace(
 @contextlib.contextmanager
 def start_span(
     name: str = "span",
-    span_type: Optional[str] = SpanType.UNKNOWN,
+    span_type: Optional[str] = "UNKNOWN",
     attributes: Optional[Dict[str, Any]] = None,
 ):
     """
@@ -191,7 +190,7 @@ def start_span(
         mlflow_span.end()
 
 
-def get_traces(n: int = 1) -> List[Trace]:
+def get_traces(n: int = 1):
     """
     Get the last n traces.
 
