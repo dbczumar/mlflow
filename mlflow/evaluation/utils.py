@@ -250,6 +250,7 @@ def _get_assessments_dataframe_schema() -> Dict[str, Any]:
         "metadata": "object",
         "error_code": "object",
         "error_message": "object",
+        "sentiment": "object",
     }
 
 

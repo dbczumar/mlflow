@@ -14,7 +14,8 @@ class AssessmentSource(_MlflowObject):
         """Construct a new mlflow.entities.AssessmentSource instance.
 
         Args:
-            source_type: The type of the assessment source (AssessmentSourceType).
+            source_type: The type of the assessment source (AssessmentSourceType). Either
+                "AI_JUDGE" or "HUMAN".
             source_id: An identifier for the source, e.g. Databricks user ID or LLM judge ID.
             metadata: Additional metadata about the source, e.g. human-readable name, inlined LLM
                 judge parameters, etc.

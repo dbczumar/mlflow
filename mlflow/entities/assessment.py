@@ -24,6 +24,7 @@ class Assessment(_MlflowObject):
         metadata: Optional[Dict[str, Any]] = None,
         error_code: Optional[str] = None,
         error_message: Optional[str] = None,
+        sentiment: Optional[str] = None,
     ):
         """Construct a new mlflow.entities.Assessment instance.
 
@@ -41,6 +42,8 @@ class Assessment(_MlflowObject):
             error_code: An error code representing any issues encountered during the assessment.
             error_message: A descriptive error message representing any issues encountered during
                 the assessment.
+            sentiment: The sentiment of the assessment (AssessmentSentiment), if applicable.
+                Either POSITIVE or NEGATIVE.
         """
         self._evaluation_id = evaluation_id
         self._name = name
@@ -53,6 +56,7 @@ class Assessment(_MlflowObject):
         self._metadata = metadata or {}
         self._error_code = error_code
         self._error_message = error_message
+        self._sentiment = AssessmentSentiment._parse(sentiment) if sentiment else None
 
         if (self._boolean_value, self._string_value, self._numeric_value, self._error_code).count(
             None
@@ -118,6 +122,11 @@ class Assessment(_MlflowObject):
         """Get the error message."""
         return self._error_message
 
+    @property
+    def sentiment(self) -> Optional[str]:
+        """Get the sentiment of the assessment."""
+        return self._sentiment
+
     def __eq__(self, __o):
         if isinstance(__o, self.__class__):
             return self.to_dictionary() == __o.to_dictionary()
@@ -150,6 +159,7 @@ class Assessment(_MlflowObject):
             "metadata": self.metadata,
             "error_code": self.error_code,
             "error_message": self.error_message,
+            "sentiment": self.sentiment,
         }
 
     @classmethod
@@ -175,6 +185,7 @@ class Assessment(_MlflowObject):
         metadata = assessment_dict.get("metadata")
         error_code = assessment_dict.get("error_code")
         error_message = assessment_dict.get("error_message")
+        sentiment = assessment_dict.get("sentiment")
         return cls(
             evaluation_id=evaluation_id,
             name=name,
@@ -187,4 +198,34 @@ class Assessment(_MlflowObject):
             metadata=metadata,
             error_code=error_code,
             error_message=error_message,
+            sentiment=sentiment,
         )
+
+
+class AssessmentSentiment:
+    POSITIVE = "POSITIVE"
+    NEGATIVE = "NEGATIVE"
+    _SENTIMENTS = [POSITIVE, NEGATIVE]
+
+    def __init__(self, sentiment: str):
+        self._sentiment = AssessmentSentiment._parse(sentiment)
+
+    @staticmethod
+    def _parse(sentiment: str) -> str:
+        sentiment = sentiment.upper()
+        if sentiment not in AssessmentSentiment._SENTIMENTS:
+            raise MlflowException(
+                message=(
+                    f"Invalid assessment sentiment: {sentiment}. "
+                    f"Valid sentiments: {AssessmentSentiment._SENTIMENTS}"
+                ),
+                error_code=INVALID_PARAMETER_VALUE,
+            )
+        return sentiment
+
+    def __str__(self):
+        return self._sentiment
+
+    @staticmethod
+    def standardize(sentiment: str) -> str:
+        return str(AssessmentSentiment(sentiment))
