@@ -504,6 +504,8 @@ class DatabricksArtifactRepository(CloudArtifactRepository):
         try:
             headers = self._extract_headers_from_credentials(credentials.headers)
             signed_write_uri = credentials.signed_uri
+            print("SIGNED URI", signed_write_uri)
+            print("HEADERS", headers)
             # Putting an empty file in a request by reading file bytes gives 501 error.
             if os.stat(local_file).st_size == 0:
                 with cloud_storage_http_request(
