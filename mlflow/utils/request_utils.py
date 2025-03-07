@@ -266,7 +266,10 @@ def cloud_storage_http_request(
         requests.Response object.
     """
     print("URL", url)
-    print("KWARGS", kwargs)
+    print("KWARGS", {
+        key: value[:100] if isinstance(value, str) or isinstance(value, bytes) else value
+        for key, value in kwargs.items()
+    })
     if method.lower() not in ("put", "get", "patch", "delete"):
         raise ValueError("Illegal http method: " + method)
     return _get_http_response_with_retries(

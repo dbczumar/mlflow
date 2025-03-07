@@ -39,17 +39,17 @@ import mlflow.mismatch
 with contextlib.suppress(Exception):
     mlflow.mismatch._check_version_mismatch()
 
-from mlflow import (
-    artifacts,  # noqa: F401
-    client,  # noqa: F401
-    config,  # noqa: F401
-    data,  # noqa: F401
-    exceptions,  # noqa: F401
-    models,  # noqa: F401
-    projects,  # noqa: F401
-    tracing,  # noqa: F401
-    tracking,  # noqa: F401
-)
+# from mlflow import (
+#     artifacts,  # noqa: F401
+#     client,  # noqa: F401
+#     config,  # noqa: F401
+#     data,  # noqa: F401
+#     exceptions,  # noqa: F401
+#     models,  # noqa: F401
+#     projects,  # noqa: F401
+#     tracing,  # noqa: F401
+#     tracking,  # noqa: F401
+# )
 from mlflow.environment_variables import MLFLOW_CONFIGURE_LOGGING
 from mlflow.utils.lazy_load import LazyLoader
 from mlflow.utils.logging_utils import _configure_mlflow_loggers
@@ -105,20 +105,20 @@ xgboost = LazyLoader("mlflow.xgboost", globals(), "mlflow.xgboost")
 if MLFLOW_CONFIGURE_LOGGING.get() is True:
     _configure_mlflow_loggers(root_module_name=__name__)
 
-from mlflow.client import MlflowClient
+# from mlflow.client import MlflowClient
 
 # For backward compatibility, we expose the following functions and classes at the top level in
 # addition to `mlflow.config`.
 from mlflow.config import (
-    disable_system_metrics_logging,
-    enable_system_metrics_logging,
-    get_registry_uri,
-    get_tracking_uri,
-    is_tracking_uri_set,
-    set_registry_uri,
-    set_system_metrics_node_id,
-    set_system_metrics_samples_before_logging,
-    set_system_metrics_sampling_interval,
+    # disable_system_metrics_logging,
+    # enable_system_metrics_logging,
+    # get_registry_uri,
+    # get_tracking_uri,
+    # is_tracking_uri_set,
+    # set_registry_uri,
+    # set_system_metrics_node_id,
+    # set_system_metrics_samples_before_logging,
+    # set_system_metrics_sampling_interval,
     set_tracking_uri,
 )
 from mlflow.exceptions import MlflowException
