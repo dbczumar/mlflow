@@ -10,7 +10,6 @@ from pprint import pformat
 from typing import Any, Callable, Literal, NamedTuple, Optional, Union
 from urllib.parse import urlparse
 
-import yaml
 from packaging.requirements import InvalidRequirement, Requirement
 
 import mlflow
@@ -713,6 +712,8 @@ class Model:
 
     def to_yaml(self, stream=None) -> str:
         """Write the model as yaml string."""
+        import yaml
+
         return yaml.safe_dump(self.to_dict(), stream=stream, default_flow_style=False)
 
     def __str__(self):
@@ -751,6 +752,8 @@ class Model:
             # Load the Model object from a remote model directory
             model2 = Model.load("s3://mybucket/path/to/my/model")
         """
+        import yaml
+
         # Check if the path is a local directory and not remote
         path_scheme = urlparse(str(path)).scheme
         if (not path_scheme or path_scheme == "file") and not os.path.exists(path):

@@ -17,8 +17,6 @@ import uuid
 import warnings
 from typing import TYPE_CHECKING, Any, Optional, Sequence, Union
 
-import yaml
-
 import mlflow
 from mlflow.entities import (
     DatasetInput,
@@ -2119,6 +2117,8 @@ class MlflowClient:
             mlflow.log_dict(run_id, dictionary, "data.txt")
 
         """
+        import yaml
+
         extension = os.path.splitext(artifact_file)[1]
 
         with self._log_artifact_helper(run_id, artifact_file) as tmp_path:

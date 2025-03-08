@@ -80,6 +80,7 @@ class MlflowSpanExporter(SpanExporter):
 
     def _log_trace(self, trace: Trace):
         """Log the trace to MLflow backend."""
+        self._client._upload_trace_data(trace.info, trace.data)
         upload_trace_data_task = Task(
             handler=self._client._upload_trace_data,
             args=(trace.info, trace.data),

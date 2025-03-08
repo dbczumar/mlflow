@@ -27,16 +27,8 @@ from typing import Optional, Union
 from urllib.parse import unquote
 from urllib.request import pathname2url
 
-import yaml
-
 from mlflow.protos.databricks_pb2 import INVALID_PARAMETER_VALUE
 
-try:
-    from yaml import CSafeDumper as YamlSafeDumper
-    from yaml import CSafeLoader as YamlSafeLoader
-except ImportError:
-    from yaml import SafeDumper as YamlSafeDumper
-    from yaml import SafeLoader as YamlSafeLoader
 
 from mlflow.entities import FileInfo
 from mlflow.environment_variables import (
@@ -233,6 +225,15 @@ def write_yaml(root, file_name, data, overwrite=False, sort_keys=True, ensure_ya
         sort_keys: Whether to sort the keys when writing the yaml file.
         ensure_yaml_extension: If True, will automatically add .yaml extension if not given.
     """
+    import yaml
+
+    try:
+        from yaml import CSafeDumper as YamlSafeDumper
+        from yaml import CSafeLoader as YamlSafeLoader
+    except ImportError:
+        from yaml import SafeDumper as YamlSafeDumper
+        from yaml import SafeLoader as YamlSafeLoader
+
     if not exists(root):
         raise MissingConfigException(f"Parent directory '{root}' does not exist.")
 
@@ -300,6 +301,15 @@ def read_yaml(root, file_name):
     Returns:
         Data in yaml file as dictionary.
     """
+    import yaml
+
+    try:
+        from yaml import CSafeDumper as YamlSafeDumper
+        from yaml import CSafeLoader as YamlSafeLoader
+    except ImportError:
+        from yaml import SafeDumper as YamlSafeDumper
+        from yaml import SafeLoader as YamlSafeLoader
+
     if not exists(root):
         raise MissingConfigException(
             f"Cannot read '{file_name}'. Parent dir '{root}' does not exist."
@@ -310,17 +320,6 @@ def read_yaml(root, file_name):
         raise MissingConfigException(f"Yaml file '{file_path}' does not exist.")
     with codecs.open(file_path, mode="r", encoding=ENCODING) as yaml_file:
         return yaml.load(yaml_file, Loader=YamlSafeLoader)
-
-
-class UniqueKeyLoader(YamlSafeLoader):
-    def construct_mapping(self, node, deep=False):
-        mapping = set()
-        for key_node, _ in node.value:
-            key = self.construct_object(key_node, deep=deep)
-            if key in mapping:
-                raise ValueError(f"Duplicate '{key}' key found in YAML.")
-            mapping.add(key)
-        return super().construct_mapping(node, deep)
 
 
 def render_and_merge_yaml(root, template_name, context_name):
@@ -335,8 +334,27 @@ def render_and_merge_yaml(root, template_name, context_name):
     Returns:
         Data in yaml file as dictionary.
     """
+    import yaml
+
     from jinja2 import FileSystemLoader, StrictUndefined
     from jinja2.sandbox import SandboxedEnvironment
+
+    try:
+        from yaml import CSafeDumper as YamlSafeDumper
+        from yaml import CSafeLoader as YamlSafeLoader
+    except ImportError:
+        from yaml import SafeDumper as YamlSafeDumper
+        from yaml import SafeLoader as YamlSafeLoader
+
+    class UniqueKeyLoader(YamlSafeLoader):
+        def construct_mapping(self, node, deep=False):
+            mapping = set()
+            for key_node, _ in node.value:
+                key = self.construct_object(key_node, deep=deep)
+                if key in mapping:
+                    raise ValueError(f"Duplicate '{key}' key found in YAML.")
+                mapping.add(key)
+            return super().construct_mapping(node, deep)
 
     template_path = os.path.join(root, template_name)
     context_path = os.path.join(root, context_name)
