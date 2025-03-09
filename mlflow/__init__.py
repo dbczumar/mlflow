@@ -131,7 +131,7 @@ from mlflow.tracing.fluent import (
     add_trace,
     get_current_active_span,
     get_last_active_trace,
-    get_trace,
+    # get_trace,
     log_trace,
     # search_traces,
     start_span,
