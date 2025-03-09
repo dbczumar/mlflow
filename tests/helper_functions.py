@@ -17,18 +17,10 @@ from unittest import mock
 
 import pytest
 import requests
-import yaml
 
 import mlflow
 from mlflow.tracking._model_registry import DEFAULT_AWAIT_MAX_SLEEP_SECONDS
 from mlflow.tracking.artifact_utils import _download_artifact_from_uri
-from mlflow.utils.environment import (
-    _CONDA_ENV_FILE_NAME,
-    _CONSTRAINTS_FILE_NAME,
-    _REQUIREMENTS_FILE_NAME,
-    _generate_mlflow_version_pinning,
-    _get_pip_deps,
-)
 from mlflow.utils.file_utils import read_yaml, write_yaml
 from mlflow.utils.os import is_windows
 
@@ -408,6 +400,8 @@ def create_mock_response(status_code, text):
 
 
 def _read_yaml(path):
+    import yaml
+
     with open(path) as f:
         return yaml.safe_load(f)
 
@@ -435,6 +429,8 @@ def _compare_logged_code_paths(code_path, model_path, flavor_name):
 
 
 def _compare_conda_env_requirements(env_path, req_path):
+    from mlflow.utils.environment import _get_pip_deps
+
     assert os.path.exists(req_path)
     custom_env_parsed = _read_yaml(env_path)
     requirements = _read_lines(req_path)
@@ -470,6 +466,13 @@ def _assert_pip_requirements(model_uri, requirements, constraints=None, strict=F
     If `strict` is True, evaluate `set(requirements) == set(loaded_requirements)`.
     Otherwise, evaluate `set(requirements) <= set(loaded_requirements)`.
     """
+    from mlflow.utils.environment import (
+        _CONDA_ENV_FILE_NAME,
+        _CONSTRAINTS_FILE_NAME,
+        _REQUIREMENTS_FILE_NAME,
+        _get_pip_deps,
+    )
+
     local_path = _download_artifact_from_uri(model_uri)
     txt_reqs = _read_lines(os.path.join(local_path, _REQUIREMENTS_FILE_NAME))
     conda_reqs = _get_pip_deps(_read_yaml(os.path.join(local_path, _CONDA_ENV_FILE_NAME)))
@@ -600,6 +603,8 @@ def assert_array_almost_equal(actual_array, desired_array, rtol=1e-6):
 
 
 def _mlflow_major_version_string():
+    from mlflow.utils.environment import _generate_mlflow_version_pinning
+
     return _generate_mlflow_version_pinning()
 
 

@@ -5,7 +5,6 @@ import pytest
 
 from mlflow.entities.span import LiveSpan
 from mlflow.entities.trace_status import TraceStatus
-from mlflow.pyfunc.context import Context, set_prediction_context
 from mlflow.tracing.constant import SpanAttributeKey
 from mlflow.tracing.processor.inference_table import (
     _HEADER_REQUEST_ID_KEY,
@@ -21,6 +20,8 @@ _REQUEST_ID = f"tr-{_TRACE_ID}"
 
 @pytest.mark.parametrize("context_type", ["mlflow", "flask"])
 def test_on_start(context_type):
+    from mlflow.pyfunc.context import Context, set_prediction_context
+
     # Root span should create a new trace on start
     span = create_mock_otel_span(
         trace_id=_TRACE_ID, span_id=1, parent_id=None, start_time=5_000_000
