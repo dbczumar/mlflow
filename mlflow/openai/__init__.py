@@ -47,7 +47,7 @@ import mlflow
 from mlflow import pyfunc
 from mlflow.environment_variables import MLFLOW_OPENAI_SECRET_SCOPE
 from mlflow.exceptions import MlflowException
-# TODO
+# TODO (TRACE REFACTOR)
 from mlflow.models import Model 
 # from mlflow.models import Model, ModelInputExample, ModelSignature
 from mlflow.models.model import MLMODEL_FILE_NAME
@@ -245,11 +245,11 @@ def save_model(
     conda_env=None,
     code_paths=None,
     mlflow_model=None,
-    # TODO
-    signature=None,
-    input_example=None,
+    # TODO (TRACE REFACTOR)
     # signature: ModelSignature = None,
     # input_example: ModelInputExample = None,
+    signature=None,
+    input_example=None,
     pip_requirements=None,
     extra_pip_requirements=None,
     metadata=None,
@@ -455,11 +455,11 @@ def log_model(
     conda_env=None,
     code_paths=None,
     registered_model_name=None,
-    # TODO
-    signature=None,
-    input_example=None,
+    # TODO (TRACE REFACTOR)
     # signature: ModelSignature = None,
     # input_example: ModelInputExample = None,
+    signature=None,
+    input_example=None,
     await_registration_for=DEFAULT_AWAIT_MAX_SLEEP_SECONDS,
     pip_requirements=None,
     extra_pip_requirements=None,

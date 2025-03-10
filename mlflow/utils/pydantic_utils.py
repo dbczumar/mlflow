@@ -4,6 +4,7 @@ import pydantic
 from packaging.version import Version
 from pydantic import BaseModel
 
+# TODO (TRACE REFACTOR)
 IS_PYDANTIC_V2_OR_NEWER = False
 # IS_PYDANTIC_V2_OR_NEWER = Version(pydantic.VERSION).major >= 2
 

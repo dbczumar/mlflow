@@ -3,7 +3,7 @@ The :py:mod:`mlflow.types` module defines data types and utilities to be used by
 components to describe interface independent of other frameworks or languages.
 """
 
-# TODO
+# TODO (TRACE REFACTOR)
 # import mlflow.types.llm  # noqa: F401
 # from mlflow.types.schema import ColSpec, DataType, ParamSchema, ParamSpec, Schema, TensorSpec
 #
