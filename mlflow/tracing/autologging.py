@@ -1,13 +1,13 @@
 from typing import Optional
 
-from mlflow.tracking.fluent import autolog as _autolog
-
 
 def autolog(
     disable: bool = False,
     silent: bool = False,
     exclude_flavors: Optional[list[str]] = None,
 ) -> None:
+    from mlflow.tracking.fluent import autolog as _autolog
+
     return _autolog(
         log_traces=True,
         disable=disable,
