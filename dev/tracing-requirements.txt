@@ -1,0 +1,8 @@
+cachetools<6,>=5.0.0
+gitpython<4,>=3.1.9
+opentelemetry-api<3,>=1.9.0
+opentelemetry-sdk<3,>=1.9.0
+protobuf<6,>=3.12.0
+requests<3,>=2.17.3
+# Databricks SDK is only required for [databricks] extra
+databricks-sdk<1,>=0.20.0
