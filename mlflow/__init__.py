@@ -145,7 +145,7 @@ from mlflow.tracing.fluent import (
 # )
 from mlflow.tracking.fluent import (
     # ActiveRun,
-    # active_run,
+    active_run,
 
     # TODO: MIGHT NEED THIS!
     autolog,

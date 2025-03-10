@@ -41,17 +41,16 @@ from functools import partial
 from string import Formatter
 from typing import Any, Optional
 
-import yaml
 from packaging.version import Version
 
 import mlflow
 from mlflow import pyfunc
 from mlflow.environment_variables import MLFLOW_OPENAI_SECRET_SCOPE
 from mlflow.exceptions import MlflowException
-from mlflow.models import Model, ModelInputExample, ModelSignature
+# TODO
+from mlflow.models import Model 
+# from mlflow.models import Model, ModelInputExample, ModelSignature
 from mlflow.models.model import MLMODEL_FILE_NAME
-from mlflow.models.signature import _infer_signature_from_input_example
-from mlflow.models.utils import _save_example
 from mlflow.openai._openai_autolog import (
     patched_agent_get_chat_completion,
     patched_call,
@@ -60,7 +59,6 @@ from mlflow.openai._openai_autolog import (
 from mlflow.protos.databricks_pb2 import INVALID_PARAMETER_VALUE
 from mlflow.tracking._model_registry import DEFAULT_AWAIT_MAX_SLEEP_SECONDS
 from mlflow.tracking.artifact_utils import _download_artifact_from_uri
-from mlflow.types import ColSpec, Schema, TensorSpec
 from mlflow.utils.annotations import experimental
 from mlflow.utils.autologging_utils import autologging_integration, safe_patch
 from mlflow.utils.databricks_utils import (
@@ -211,6 +209,8 @@ def _get_openai_package_version():
 
 
 def _log_secrets_yaml(local_model_dir, scope):
+    import yaml
+
     with open(os.path.join(local_model_dir, "openai.yaml"), "w") as f:
         yaml.safe_dump({e.value: f"{scope}:{e.secret_key}" for e in _OpenAIEnvVar}, f)
 
@@ -221,6 +221,8 @@ def _parse_format_fields(s) -> set[str]:
 
 
 def _get_input_schema(task, content):
+    from mlflow.types import ColSpec, Schema
+
     if content:
         formatter = _ContentFormatter(task, content)
         variables = formatter.variables
@@ -243,8 +245,11 @@ def save_model(
     conda_env=None,
     code_paths=None,
     mlflow_model=None,
-    signature: ModelSignature = None,
-    input_example: ModelInputExample = None,
+    # TODO
+    signature=None,
+    input_example=None,
+    # signature: ModelSignature = None,
+    # input_example: ModelInputExample = None,
     pip_requirements=None,
     extra_pip_requirements=None,
     metadata=None,
@@ -316,7 +321,13 @@ def save_model(
     if Version(_get_openai_package_version()).major < 1:
         raise MlflowException("Only openai>=1.0 is supported.")
 
+    import yaml
+
     import numpy as np
+    
+    from mlflow.models.signature import _infer_signature_from_input_example
+    from mlflow.models.utils import _save_example
+    from mlflow.types import TensorSpec
 
     _validate_env_arguments(conda_env, pip_requirements, extra_pip_requirements)
     path = os.path.abspath(path)
@@ -444,8 +455,11 @@ def log_model(
     conda_env=None,
     code_paths=None,
     registered_model_name=None,
-    signature: ModelSignature = None,
-    input_example: ModelInputExample = None,
+    # TODO
+    signature=None,
+    input_example=None,
+    # signature: ModelSignature = None,
+    # input_example: ModelInputExample = None,
     await_registration_for=DEFAULT_AWAIT_MAX_SLEEP_SECONDS,
     pip_requirements=None,
     extra_pip_requirements=None,
@@ -563,6 +577,8 @@ def log_model(
 
 
 def _load_model(path):
+    import yaml
+
     with open(path) as f:
         return yaml.safe_load(f)
 

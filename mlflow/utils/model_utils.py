@@ -7,8 +7,6 @@ import sys
 from pathlib import Path
 from typing import Any
 
-import yaml
-
 from mlflow.exceptions import MlflowException
 from mlflow.models import Model
 from mlflow.models.model import MLMODEL_FILE_NAME
@@ -385,6 +383,8 @@ def _get_overridden_pyfunc_model_config(
 
 
 def _validate_and_get_model_config_from_file(model_config):
+    import yaml
+
     model_config = os.path.abspath(model_config)
     if os.path.exists(model_config):
         with open(model_config) as file:
