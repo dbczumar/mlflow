@@ -148,7 +148,7 @@ from mlflow.tracking.fluent import (
     # active_run,
 
     # TODO: MIGHT NEED THIS!
-    # autolog,
+    autolog,
 
     # TODO: MIGHT NEED THIS!
     # create_experiment,
