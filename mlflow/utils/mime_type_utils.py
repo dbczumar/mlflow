@@ -6,10 +6,8 @@ from mimetypes import guess_type
 # TODO: Create a module to define constants to avoid circular imports
 #  and move MLMODEL_FILE_NAME and MLPROJECT_FILE_NAME in the module.
 def get_text_extensions():
-    from mlflow.models.model import MLMODEL_FILE_NAME
-    from mlflow.projects._project_spec import MLPROJECT_FILE_NAME
 
-    return [
+    text_extensions = [
         "txt",
         "log",
         "err",
@@ -33,9 +31,21 @@ def get_text_extensions():
         "tsv",
         "md",
         "rst",
-        MLMODEL_FILE_NAME,
-        MLPROJECT_FILE_NAME,
     ]
+    try:
+        from mlflow.models.model import MLMODEL_FILE_NAME
+
+        text_extensions.append(MLMODEL_FILE_NAME)
+    except ImportError:
+        pass
+    try:
+        from mlflow.projects._project_spec import MLPROJECT_FILE_NAME
+
+        text_extensions.append(MLPROJECT_FILE_NAME)
+    except ImportError:
+        pass
+
+    return text_extensions
 
 
 def _guess_mime_type(file_path):

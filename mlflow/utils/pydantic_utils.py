@@ -4,7 +4,9 @@ import pydantic
 from packaging.version import Version
 from pydantic import BaseModel
 
-IS_PYDANTIC_V2_OR_NEWER = Version(pydantic.VERSION).major >= 2
+# TODO (TRACE REFACTOR)
+IS_PYDANTIC_V2_OR_NEWER = False
+# IS_PYDANTIC_V2_OR_NEWER = Version(pydantic.VERSION).major >= 2
 
 
 def model_dump_compat(pydantic_model: BaseModel, **kwargs: Any) -> dict[str, Any]:

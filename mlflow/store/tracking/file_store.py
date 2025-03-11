@@ -87,11 +87,6 @@ from mlflow.utils.mlflow_tags import (
     _get_run_name_from_tags,
 )
 from mlflow.utils.name_utils import _generate_random_name, _generate_unique_integer_id
-from mlflow.utils.search_utils import (
-    SearchExperimentsUtils,
-    SearchTraceUtils,
-    SearchUtils,
-)
 from mlflow.utils.string_utils import is_string_type
 from mlflow.utils.time import get_current_time_millis
 from mlflow.utils.uri import (
@@ -318,6 +313,8 @@ class FileStore(AbstractStore):
         order_by=None,
         page_token=None,
     ):
+        from mlflow.utils.search_utils import SearchExperimentsUtils, SearchUtils
+
         if not isinstance(max_results, int) or max_results < 1:
             raise MlflowException(
                 f"Invalid value {max_results} for parameter 'max_results' supplied. It must be "
@@ -995,6 +992,8 @@ class FileStore(AbstractStore):
         order_by,
         page_token,
     ):
+        from mlflow.utils.search_utils import SearchUtils
+
         if max_results > SEARCH_MAX_RESULTS_THRESHOLD:
             raise MlflowException(
                 "Invalid value for request parameter max_results. It must be at "
@@ -1903,6 +1902,8 @@ class FileStore(AbstractStore):
             some store implementations may not support pagination and thus the returned token would
             not be meaningful in such cases.
         """
+        from mlflow.utils.search_utils import SearchTraceUtils
+
         if max_results > SEARCH_MAX_RESULTS_THRESHOLD:
             raise MlflowException(
                 "Invalid value for request parameter max_results. It must be at "

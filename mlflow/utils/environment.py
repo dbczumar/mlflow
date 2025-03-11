@@ -10,7 +10,6 @@ import tempfile
 from copy import deepcopy
 from typing import Optional
 
-import yaml
 from packaging.requirements import InvalidRequirement, Requirement
 from packaging.version import Version
 
@@ -118,6 +117,8 @@ class _PythonEnv:
         return cls(**dct)
 
     def to_yaml(self, path):
+        import yaml
+
         with open(path, "w") as f:
             # Exclude None and empty lists
             data = {k: v for k, v in self.to_dict().items() if v}
@@ -125,11 +126,15 @@ class _PythonEnv:
 
     @classmethod
     def from_yaml(cls, path):
+        import yaml
+
         with open(path) as f:
             return cls.from_dict(yaml.safe_load(f))
 
     @staticmethod
     def get_dependencies_from_conda_yaml(path):
+        import yaml
+
         with open(path) as f:
             conda_env = yaml.safe_load(f)
 
@@ -230,6 +235,8 @@ def _mlflow_conda_env(  # noqa: D417
         Conda environment.
 
     """
+    import yaml
+
     additional_pip_deps = additional_pip_deps or []
     mlflow_deps = (
         [f"mlflow=={VERSION}"]
@@ -712,6 +719,8 @@ def _process_conda_env(conda_env):
     Processes `conda_env` passed to `mlflow.*.save_model` or `mlflow.*.log_model`, and returns
     a tuple of (conda_env, pip_requirements, pip_constraints).
     """
+    import yaml
+
     if isinstance(conda_env, str):
         with open(conda_env) as f:
             conda_env = yaml.safe_load(f)
@@ -767,6 +776,8 @@ def _get_pip_install_mlflow():
 def _get_requirements_from_file(
     file_path: pathlib.Path,
 ) -> list[Requirement]:
+    import yaml
+
     data = file_path.read_text()
     if file_path.name == _CONDA_ENV_FILE_NAME:
         conda_env = yaml.safe_load(data)
@@ -780,6 +791,8 @@ def _write_requirements_to_file(
     file_path: pathlib.Path,
     new_reqs: list[str],
 ) -> None:
+    import yaml
+
     if file_path.name == _CONDA_ENV_FILE_NAME:
         conda_env = yaml.safe_load(file_path.read_text())
         conda_env = _overwrite_pip_deps(conda_env, new_reqs)

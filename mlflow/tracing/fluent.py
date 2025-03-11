@@ -11,7 +11,6 @@ from typing import TYPE_CHECKING, Any, Callable, Generator, Optional, Union
 from cachetools import TTLCache
 from opentelemetry import trace as trace_api
 
-from mlflow import MlflowClient
 from mlflow.entities import NoOpSpan, SpanType, Trace
 from mlflow.entities.span import LiveSpan, create_mlflow_span
 from mlflow.entities.span_event import SpanEvent
@@ -46,6 +45,7 @@ from mlflow.tracing.utils import (
     start_client_span_or_trace,
 )
 from mlflow.tracing.utils.search import extract_span_inputs_outputs, traces_to_df
+from mlflow.tracking.client import MlflowClient
 from mlflow.tracking.fluent import _get_experiment_id
 from mlflow.utils import get_results_from_paginated_fn
 from mlflow.utils.annotations import experimental

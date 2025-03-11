@@ -1,8 +1,6 @@
 import os
 from typing import Any, Optional, Union
 
-import yaml
-
 from mlflow.exceptions import MlflowException
 from mlflow.protos.databricks_pb2 import INVALID_PARAMETER_VALUE
 
@@ -121,6 +119,8 @@ class ModelConfig:
             dict or None: The content of the YAML file as a dictionary, or None if the
             config path is not set.
         """
+        import yaml
+
         if isinstance(self.config, dict):
             return self.config
 

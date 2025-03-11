@@ -1,4 +1,14 @@
 import pytest
+
+pytest.importorskip(
+    "opentelemetry.exporter",
+    reason=(
+        "These tests require opentelemetry-exporter-otlp-proto-http and "
+        "opentelemetry-exporter-otlp-proto-grpc. Run this suite separately from "
+        "other tracing core tests with these dependencies installed."
+    ),
+)
+
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter as GrpcExporter
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter as HttpExporter
 

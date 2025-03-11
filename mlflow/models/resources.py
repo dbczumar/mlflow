@@ -3,8 +3,6 @@ from abc import ABC, abstractmethod
 from enum import Enum
 from typing import Any, Optional
 
-import yaml
-
 DEFAULT_API_VERSION = "1"
 
 

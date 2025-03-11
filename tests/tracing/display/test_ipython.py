@@ -1,8 +1,16 @@
+import pytest
+
+pytest.importorskip(
+    "IPython",
+    reason=(
+        "These tests require IPython. Run this suite separately from tracing core tests "
+        "in an environment with IPython installed."
+    ),
+)
+
 import json
 from collections import defaultdict
 from unittest.mock import Mock
-
-import pytest
 
 import mlflow
 from mlflow.tracing.display import (

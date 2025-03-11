@@ -54,7 +54,6 @@ from mlflow.utils.file_utils import (
     write_to,
     write_yaml,
 )
-from mlflow.utils.search_utils import SearchModelUtils, SearchModelVersionUtils, SearchUtils
 from mlflow.utils.string_utils import is_string_type
 from mlflow.utils.time import get_current_time_millis
 from mlflow.utils.validation import (
@@ -364,6 +363,8 @@ class FileStore(AbstractStore):
             that satisfy the search expressions. The pagination token for the next page can be
             obtained via the ``token`` attribute of the object.
         """
+        from mlflow.utils.search_utils import SearchModelUtils, SearchUtils
+
         if not isinstance(max_results, int) or max_results < 1:
             raise MlflowException(
                 "Invalid value for max_results. It must be a positive integer,"
@@ -892,6 +893,8 @@ class FileStore(AbstractStore):
             page can be obtained via the ``token`` attribute of the object.
 
         """
+        from mlflow.utils.search_utils import SearchModelVersionUtils, SearchUtils
+
         if not isinstance(max_results, int) or max_results < 1:
             raise MlflowException(
                 "Invalid value for max_results. It must be a positive integer,"

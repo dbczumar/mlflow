@@ -9,12 +9,10 @@ from functools import partial
 from json import JSONEncoder
 from typing import Any, Optional
 
-import pydantic
 from google.protobuf.descriptor import FieldDescriptor
 from google.protobuf.json_format import MessageToJson, ParseDict
 
 from mlflow.exceptions import MlflowException
-from mlflow.utils import IS_PYDANTIC_V2_OR_NEWER
 
 _PROTOBUF_INT64_FIELDS = [
     FieldDescriptor.TYPE_INT64,
@@ -169,6 +167,9 @@ class NumpyEncoder(JSONEncoder):
     def try_convert(self, o):
         import numpy as np
         import pandas as pd
+        # MAY HAVE TO TRY CATCH!!!
+        import pydantic
+        from mlflow.utils import IS_PYDANTIC_V2_OR_NEWER
 
         def encode_binary(x):
             return base64.encodebytes(x).decode("ascii")

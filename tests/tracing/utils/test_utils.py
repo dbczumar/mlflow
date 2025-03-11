@@ -1,5 +1,4 @@
 import pytest
-from pydantic import ValidationError
 
 import mlflow
 from mlflow.entities import LiveSpan
@@ -135,6 +134,11 @@ def test_set_span_chat_messages_append():
 
 
 def test_set_chat_messages_validation():
+    ValidationError = (
+        pytest.importorskip("pydantic", reason="pydantic is required for chat message")\
+            .ValidationError
+    )
+
     messages = [{"invalid_field": "user", "content": "hello"}]
 
     @mlflow.trace(span_type=SpanType.CHAT_MODEL)
@@ -148,6 +152,11 @@ def test_set_chat_messages_validation():
 
 
 def test_set_chat_tools_validation():
+    ValidationError = (
+        pytest.importorskip("pydantic", reason="pydantic is required for chat message")\
+            .ValidationError
+    )
+
     tools = [
         {
             "type": "unsupported_function",
