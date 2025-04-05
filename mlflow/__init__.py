@@ -202,6 +202,7 @@ from mlflow.tracking._model_registry.fluent import (
     search_model_versions,
     search_registered_models,
     set_prompt_alias,
+    prompt,
 )
 from mlflow.tracking.fluent import (
     ActiveRun,

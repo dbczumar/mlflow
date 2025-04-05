@@ -1,4 +1,5 @@
 from typing import Any, Optional
+from functools import wraps
 
 from mlflow.entities.model_registry import ModelVersion, Prompt, RegisteredModel
 from mlflow.exceptions import MlflowException
@@ -464,6 +465,22 @@ def load_prompt(name_or_uri: str, version: Optional[int] = None) -> Prompt:
         client.log_prompt(run.info.run_id, f"prompts:/{prompt.name}/{prompt.version}")
 
     return prompt
+
+
+def prompt(name: str, default: Optional[str] = None) -> Prompt:
+    import mlflow
+    mlflow.set_tracking_uri("mlruns")
+    mlflow.set_registry_uri("mlruns")
+    try:
+        return load_prompt(name)
+    except Exception as e:
+        if default is not None:
+            return register_prompt(
+                name=name,
+                template=default,
+            )
+        else:
+            raise e
 
 
 @experimental
