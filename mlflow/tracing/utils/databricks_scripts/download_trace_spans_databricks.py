@@ -2,8 +2,8 @@ import json
 import logging
 import os
 import sys
+from concurrent.futures import ThreadPoolExecutor
 from functools import partial
-from multiprocessing import Pool
 
 import requests
 from requests.adapters import HTTPAdapter
@@ -71,8 +71,10 @@ if __name__ == "__main__":
         databricks_auth_headers=databricks_auth_headers,
     )
 
-    with Pool(processes=min(64, os.cpu_count() * 4)) as pool:
-        trace_ids_and_data = pool.map(download_trace_partial, trace_ids)
+    max_workers = min(64, os.cpu_count() * 4)
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = [executor.submit(download_trace_partial, trace_id) for trace_id in trace_ids]
+        trace_ids_and_data = [future.result() for future in futures]
 
     trace_ids_and_data = {
         td["trace_id"]: td["trace_data"] for td in trace_ids_and_data if td is not None
