@@ -87,26 +87,30 @@ export default function Home(): JSX.Element {
               color="blue"
               buttons={[
                 {
-                  text: "Self Hosting",
+                  text: "Open Source",
                   link: "/ml"
+                },
+                {
+                  text: "MLflow on Databricks",
+                  link: "https://docs.databricks.com/aws/en/mlflow/"
                 }
               ]}
             />
 
             <PathSelector
               title="GenAI Apps & Agents"
-              description="Explore tools for LLM tracing, prompt management, foundation model deployment, 
+              description="Explore tools for GenAI tracing, prompt management, foundation model deployment, 
               and evaluation frameworks. Learn how to track, evaluate, and optimize your generative 
               AI applications and agent workflows with MLflow."
               color="red"
               buttons={[
                 {
-                  text: "Managed MLflow",
-                  link: "https://docs.databricks.com/en/machine-learning/"
+                  text: "Open Source",
+                  link: "/genai"
                 },
                 {
-                  text: "Self Hosting",
-                  link: "/genai"
+                  text: "MLflow on Databricks",
+                  link: "https://docs.databricks.com/aws/en/mlflow3/genai/"
                 }
               ]}
             />
