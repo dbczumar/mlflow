@@ -39,7 +39,7 @@ def _generate_git_model_name(path: str) -> Optional[str]:
         path: Path to the git repository
 
     Format:
-        {repo_name}/{branch}/{commit_short}[-dirty]
+        {repo_name}:{branch}-{commit_short}[-dirty]
     """
     branch = get_git_branch(path)
     commit = get_git_commit(path)
@@ -63,7 +63,7 @@ def _generate_git_model_name(path: str) -> Optional[str]:
     # Include commit and dirty state
     is_dirty = _get_git_dirty_state(path)
     dirty_suffix = "-dirty" if is_dirty else ""
-    return f"{repo_name}/{branch}/{commit_short}{dirty_suffix}"
+    return f"{repo_name}:{branch}-{commit_short}{dirty_suffix}"
 
 
 @experimental(version="3.0.0")
@@ -94,7 +94,7 @@ def autolog(
             collected during inference. Default to ``True``.
         enable_git_versioning: If ``True``, automatically set the active model based on the
             current git repository state. If ``False``, no git-based model naming is applied.
-            Default to ``False``.
+            Model names use the format: {repo}:{branch}-{commit}[-dirty]. Default to ``False``.
     """
     if not disable and enable_git_versioning:
         # Generate model name based on git information
@@ -113,33 +113,3 @@ def autolog(
                     "Could not generate git-based model name "
                     "(not a git repository or missing git info)"
                 )
-
-    _autolog(
-        disable=disable,
-        exclusive=exclusive,
-        disable_for_unsupported_versions=disable_for_unsupported_versions,
-        silent=silent,
-        log_traces=log_traces,
-    )
-
-
-def _autolog(
-    disable=False,
-    exclusive=False,
-    disable_for_unsupported_versions=False,
-    silent=False,
-    log_traces=True,
-):
-    """
-    Internal autolog implementation. This is a placeholder for future GenAI-specific
-    autologging functionality.
-    """
-    import mlflow
-
-    mlflow.autolog(
-        disable=disable,
-        exclusive=exclusive,
-        disable_for_unsupported_versions=disable_for_unsupported_versions,
-        silent=silent,
-        log_traces=log_traces,
-    )
