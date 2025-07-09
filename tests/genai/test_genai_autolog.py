@@ -153,3 +153,121 @@ class TestGenAIAutolog:
 
             # Should produce the same model name (and reuse existing model)
             assert first_name == second_name
+
+    def test_mlflowignore_functionality(self, git_repo):
+        """Test that .mlflowignore patterns are respected when computing hashes."""
+        test_file = git_repo["test_file"]
+        tmpdir = git_repo["tmpdir"]
+
+        # Create additional files to track
+        log_file = os.path.join(tmpdir, "app.log")
+        temp_dir = os.path.join(tmpdir, "temp")
+        os.makedirs(temp_dir)
+        temp_file = os.path.join(temp_dir, "cache.tmp")
+        pycache_dir = os.path.join(tmpdir, "src", "__pycache__")
+        os.makedirs(pycache_dir)
+        pycache_file = os.path.join(pycache_dir, "module.pyc")
+
+        with open(log_file, "w") as f:
+            f.write("log content")
+        with open(temp_file, "w") as f:
+            f.write("temp content")
+        with open(pycache_file, "w") as f:
+            f.write("cache content")
+
+        # Add all files to git
+        repo = git_repo["repo"]
+        repo.index.add([log_file, temp_file, pycache_file])
+        repo.index.commit("Add files to ignore")
+
+        # Get initial model name (all files included)
+        with mlflow.start_run():
+            mlflow.genai.autolog(enable_git_versioning=True, silent=True)
+            initial_model_id = mlflow.get_active_model_id()
+            initial_model = mlflow.get_logged_model(initial_model_id)
+            initial_name = initial_model.name
+
+        # Create .mlflowignore file
+        mlflowignore_path = os.path.join(tmpdir, ".mlflowignore")
+        with open(mlflowignore_path, "w") as f:
+            f.write("*.log\n")
+            f.write("temp/\n")
+            f.write("**/__pycache__/**\n")
+            f.write("# Comment line\n")
+            f.write("\n")  # Empty line
+
+        # Get model name after adding .mlflowignore (should be different)
+        with mlflow.start_run():
+            mlflow.genai.autolog(enable_git_versioning=True, silent=True)
+            ignored_model_id = mlflow.get_active_model_id()
+            ignored_model = mlflow.get_logged_model(ignored_model_id)
+            ignored_name = ignored_model.name
+
+        # Model names should be different (ignored files don't affect hash)
+        assert initial_name != ignored_name
+
+        # Modify an ignored file - should not change model name
+        with open(log_file, "w") as f:
+            f.write("modified log content")
+
+        with mlflow.start_run():
+            mlflow.genai.autolog(enable_git_versioning=True, silent=True)
+            after_ignored_change_model_id = mlflow.get_active_model_id()
+            after_ignored_change_model = mlflow.get_logged_model(after_ignored_change_model_id)
+            after_ignored_change_name = after_ignored_change_model.name
+
+        # Should be same as ignored_name (ignored file changes don't matter)
+        assert ignored_name == after_ignored_change_name
+
+        # Modify a non-ignored file - should change model name
+        with open(test_file, "w") as f:
+            f.write("# Final modified content\ndef hello():\n    return 'final'\n")
+
+        with mlflow.start_run():
+            mlflow.genai.autolog(enable_git_versioning=True, silent=True)
+            final_model_id = mlflow.get_active_model_id()
+            final_model = mlflow.get_logged_model(final_model_id)
+            final_name = final_model.name
+
+        # Should be different from previous names
+        assert final_name != ignored_name
+        assert final_name != after_ignored_change_name
+
+    def test_mlflowignore_patterns(self, git_repo):
+        """Test specific .mlflowignore pattern matching."""
+        tmpdir = git_repo["tmpdir"]
+
+        # Import the internal functions for testing
+        from mlflow.genai.autolog import _load_mlflowignore_patterns, _should_ignore_file
+
+        # Create .mlflowignore with various patterns
+        mlflowignore_path = os.path.join(tmpdir, ".mlflowignore")
+        with open(mlflowignore_path, "w") as f:
+            f.write("*.log\n")
+            f.write("build/\n")
+            f.write("**/__pycache__/**\n")
+            f.write("*.tmp\n")
+
+        patterns = _load_mlflowignore_patterns(tmpdir)
+        assert "*.log" in patterns
+        assert "build/" in patterns
+        assert "**/__pycache__/**" in patterns
+        assert "*.tmp" in patterns
+
+        # Test pattern matching
+        test_cases = [
+            ("app.log", True),  # matches *.log
+            ("debug.log", True),  # matches *.log
+            ("build/output.bin", True),  # matches build/
+            ("build/subdir/file.txt", True),  # matches build/
+            ("src/__pycache__/module.pyc", True),  # matches **/__pycache__/**
+            ("deep/src/__pycache__/other.pyc", True),  # matches **/__pycache__/**
+            ("cache.tmp", True),  # matches *.tmp
+            ("normal.py", False),  # doesn't match any pattern
+            ("logs/app.txt", False),  # doesn't match *.log
+        ]
+
+        for file_path, should_ignore in test_cases:
+            full_path = os.path.join(tmpdir, file_path)
+            result = _should_ignore_file(full_path, patterns, tmpdir)
+            assert result == should_ignore, f"Pattern matching failed for {file_path}"

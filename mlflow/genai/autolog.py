@@ -1,6 +1,8 @@
+import fnmatch
 import hashlib
 import logging
 import os
+from pathlib import Path
 from typing import Optional
 
 from mlflow.tracking.fluent import _set_active_model
@@ -13,9 +15,79 @@ _logger = logging.getLogger(__name__)
 FLAVOR_NAME = "genai"
 
 
+def _load_mlflowignore_patterns(repo_path: str) -> list[str]:
+    """
+    Load ignore patterns from .mlflowignore file in the repository root.
+    Returns a list of patterns, similar to .gitignore format.
+    """
+    mlflowignore_path = os.path.join(repo_path, ".mlflowignore")
+    patterns = []
+
+    if os.path.exists(mlflowignore_path):
+        try:
+            with open(mlflowignore_path, encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    # Skip empty lines and comments
+                    if line and not line.startswith("#"):
+                        patterns.append(line)
+        except (OSError, IOError) as e:
+            _logger.debug(f"Could not read .mlflowignore file: {e}")
+
+    return patterns
+
+
+def _should_ignore_file(file_path: str, ignore_patterns: list[str], repo_path: str) -> bool:
+    """
+    Check if a file should be ignored based on .mlflowignore patterns.
+    Supports gitignore-style patterns including:
+    - Glob patterns (*.log, *.tmp)
+    - Directory patterns (build/, temp/)
+    - Recursive patterns (**/__pycache__/*)
+    """
+    if not ignore_patterns:
+        return False
+
+    # Convert to relative path from repo root
+    try:
+        rel_path = os.path.relpath(file_path, repo_path)
+        # Normalize path separators
+        rel_path = rel_path.replace(os.sep, "/")
+    except ValueError:
+        # File is outside repo, don't ignore
+        return False
+
+    for pattern in ignore_patterns:
+        # Handle directory patterns (ending with /)
+        if pattern.endswith("/"):
+            dir_pattern = pattern[:-1]
+            # Check if file is in this directory
+            if rel_path.startswith(dir_pattern + "/") or rel_path == dir_pattern:
+                return True
+
+        # Handle glob patterns
+        elif fnmatch.fnmatch(rel_path, pattern):
+            return True
+
+        # Handle ** patterns (recursive)
+        elif "**" in pattern:
+            # Use pathlib for ** pattern matching
+            if Path(rel_path).match(pattern):
+                return True
+
+    return False
+
+
 def _get_tracked_files_hash(path: str) -> Optional[str]:
     """
-    Generate a hash of all tracked file contents in the repository.
+    Generate a hash of all tracked file contents in the repository, excluding files
+    that match patterns in .mlflowignore (if present).
+
+    .mlflowignore supports gitignore-style patterns:
+    - *.log (glob patterns)
+    - temp/ (directory patterns)
+    - **/__pycache__/** (recursive patterns)
+
     Returns None if not in a git repository or if there are no tracked files.
     """
     try:
@@ -30,14 +102,24 @@ def _get_tracked_files_hash(path: str) -> Optional[str]:
 
     try:
         repo = Repo(path, search_parent_directories=True)
+        repo_path = repo.working_dir
+
+        # Load .mlflowignore patterns
+        ignore_patterns = _load_mlflowignore_patterns(repo_path)
 
         # Get all tracked files in the repository
         tracked_files = []
         for item in repo.index.entries:
             file_path = item[0]
-            full_path = os.path.join(repo.working_dir, file_path)
-            if os.path.exists(full_path):
-                tracked_files.append(file_path)
+            full_path = os.path.join(repo_path, file_path)
+
+            # Skip if file doesn't exist or should be ignored
+            if not os.path.exists(full_path):
+                continue
+            if _should_ignore_file(full_path, ignore_patterns, repo_path):
+                continue
+
+            tracked_files.append(file_path)
 
         if not tracked_files:
             return None
@@ -48,7 +130,7 @@ def _get_tracked_files_hash(path: str) -> Optional[str]:
         # Create hash of all tracked file contents
         hasher = hashlib.sha256()
         for file_path in tracked_files:
-            full_path = os.path.join(repo.working_dir, file_path)
+            full_path = os.path.join(repo_path, file_path)
             try:
                 with open(full_path, "rb") as f:
                     # Include file path and content in hash
