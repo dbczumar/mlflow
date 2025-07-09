@@ -145,14 +145,44 @@ def _get_tracked_files_hash(path: str) -> Optional[str]:
         return None
 
 
-def _generate_git_model_name(path: str) -> Optional[str]:
+def _get_git_dirty_state(path: str) -> bool:
     """
-    Generate a model name based on git repository information and tracked file contents.
-    Format: {repo_name}-{branch}-{commit_short}-{content_hash}
+    Check if the git repository at the specified path has uncommitted changes.
+    Returns True if the working directory is dirty, False otherwise.
+    """
+    try:
+        from git import Repo
+    except ImportError as e:
+        _logger.warning(
+            "Failed to import Git (the Git executable is probably not on your PATH),"
+            " so Git dirty state is not available. Error: %s",
+            e,
+        )
+        return False
+
+    try:
+        repo = Repo(path, search_parent_directories=True)
+        return repo.is_dirty()
+    except Exception:
+        return False
+
+
+def _generate_git_model_name(path: str, versioning_strategy: str = "content") -> Optional[str]:
+    """
+    Generate a model name based on git repository information.
+
+    Args:
+        path: Path to the git repository
+        versioning_strategy: Strategy for model versioning:
+            - "content": Include file content hash (default)
+            - "commit": Only include commit and dirty state
+
+    Format:
+        - content: {repo_name}-{branch}-{commit_short}-{content_hash}
+        - commit: {repo_name}-{branch}-{commit_short}[-dirty]
     """
     branch = get_git_branch(path)
     commit = get_git_commit(path)
-    content_hash = _get_tracked_files_hash(path)
 
     if not branch or not commit:
         return None
@@ -170,11 +200,20 @@ def _generate_git_model_name(path: str) -> Optional[str]:
     # Use short commit hash (first 7 characters)
     commit_short = commit[:7]
 
-    # Include content hash to track file changes
-    if content_hash:
-        return f"{repo_name}-{branch}-{commit_short}-{content_hash}"
+    if versioning_strategy == "content":
+        # Include content hash to track file changes
+        content_hash = _get_tracked_files_hash(path)
+        if content_hash:
+            return f"{repo_name}-{branch}-{commit_short}-{content_hash}"
+        else:
+            return f"{repo_name}-{branch}-{commit_short}"
+    elif versioning_strategy == "commit":
+        # Only include commit and dirty state
+        is_dirty = _get_git_dirty_state(path)
+        dirty_suffix = "-dirty" if is_dirty else ""
+        return f"{repo_name}-{branch}-{commit_short}{dirty_suffix}"
     else:
-        return f"{repo_name}-{branch}-{commit_short}"
+        raise ValueError(f"Unknown versioning strategy: {versioning_strategy}")
 
 
 @experimental(version="3.0.0")
@@ -185,6 +224,7 @@ def autolog(
     silent=False,
     log_traces=True,
     enable_git_versioning=False,
+    git_versioning_strategy="content",
 ):
     """
     Enables (or disables) and configures autologging for GenAI operations to MLflow.
@@ -204,13 +244,25 @@ def autolog(
         log_traces: If ``True``, traces are logged for GenAI operations. If ``False``, no traces are
             collected during inference. Default to ``True``.
         enable_git_versioning: If ``True``, automatically set the active model based on the
-            current git repository state (repo, branch, commit, and tracked file contents hash).
-            A new model name is generated every time tracked file contents change. If ``False``,
-            no git-based model naming is applied. Default to ``False``.
+            current git repository state. If ``False``, no git-based model naming is applied.
+            Default to ``False``.
+        git_versioning_strategy: Strategy for git-based model versioning. Options:
+            - "content": Generate new model names for every tracked file content change
+              (format: {repo}-{branch}-{commit}-{content_hash})
+            - "commit": Generate new model names only for commit/branch changes and dirty state
+              (format: {repo}-{branch}-{commit}[-dirty])
+            Default to "content".
     """
     if not disable and enable_git_versioning:
+        # Validate versioning strategy
+        if git_versioning_strategy not in ("content", "commit"):
+            raise ValueError(
+                f"Invalid git_versioning_strategy: {git_versioning_strategy}. "
+                "Must be 'content' or 'commit'."
+            )
+
         # Generate model name based on git information
-        git_model_name = _generate_git_model_name(os.getcwd())
+        git_model_name = _generate_git_model_name(os.getcwd(), git_versioning_strategy)
         if git_model_name:
             try:
                 _set_active_model(name=git_model_name, set_by_user=False)
