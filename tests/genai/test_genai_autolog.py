@@ -85,9 +85,11 @@ class TestGenAIAutolog:
         assert not first_name.endswith("-dirty")
         assert second_name.endswith("-dirty")
 
-        # Both should contain git info
+        # Both should contain git info in slash-separated format
         assert "main" in first_name
         assert "main" in second_name
+        assert "/" in first_name
+        assert "/" in second_name
 
     def test_traces_linked_to_git_model(self, git_repo):
         """Test that active model is set correctly for trace linking."""
@@ -101,6 +103,7 @@ class TestGenAIAutolog:
 
             model = mlflow.get_logged_model(active_model_id)
             assert "main" in model.name  # Contains branch name
+            assert "/" in model.name  # Slash-separated format
 
             # Create a simple traced function to verify linking would work
             @mlflow.trace
@@ -186,5 +189,7 @@ class TestGenAIAutolog:
         assert initial_name != committed_name
         assert not committed_name.endswith("-dirty")  # Clean state after commit
 
-        # Should have 3 parts: repo-branch-commit
-        assert len(committed_name.split("-")) == 3
+        # Should have 3 parts: repo/branch/commit
+        assert "/" in committed_name
+        parts = committed_name.split("/")
+        assert len(parts) == 3
