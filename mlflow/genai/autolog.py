@@ -131,7 +131,7 @@ def autolog(
         git_model_name = _generate_git_model_name(os.getcwd())
         if git_model_name:
             try:
-                _set_active_model(name=git_model_name)
+                _set_active_model(name=git_model_name, set_by_user=False)
                 if not silent:
                     _logger.info(f"Set active model to '{git_model_name}' based on git state")
             except Exception as e:
