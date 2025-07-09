@@ -39,7 +39,7 @@ def _generate_git_model_name(path: str) -> Optional[str]:
         path: Path to the git repository
 
     Format:
-        {repo_name}-{branch}-{commit_short}[-dirty]
+        {repo_name}/{branch}/{commit_short}[-dirty]
     """
     branch = get_git_branch(path)
     commit = get_git_commit(path)
@@ -63,7 +63,7 @@ def _generate_git_model_name(path: str) -> Optional[str]:
     # Include commit and dirty state
     is_dirty = _get_git_dirty_state(path)
     dirty_suffix = "-dirty" if is_dirty else ""
-    return f"{repo_name}-{branch}-{commit_short}{dirty_suffix}"
+    return f"{repo_name}/{branch}/{commit_short}{dirty_suffix}"
 
 
 @experimental(version="3.0.0")
