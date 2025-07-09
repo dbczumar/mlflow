@@ -51,7 +51,9 @@ class TestGenAIAutolog:
             # Model name should contain git info
             model = mlflow.get_logged_model(model_id)
             assert "main" in model.name  # branch name
-            assert len(model.name.split("-")) >= 3  # repo-branch-commit format
+            assert "/" in model.name  # slash-separated format
+            parts = model.name.split("/")
+            assert len(parts) == 3  # repo/branch/commit format
 
     def test_autolog_model_name_changes_with_dirty_state(self, git_repo):
         """Test that model name changes when git working directory becomes dirty."""
