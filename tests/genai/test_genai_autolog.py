@@ -51,9 +51,9 @@ class TestGenAIAutolog:
             # Model name should contain git info
             model = mlflow.get_logged_model(model_id)
             assert "main" in model.name  # branch name
-            assert ":" in model.name  # colon-separated format
-            parts = model.name.split(":")
-            assert len(parts) == 2  # repo:branch-commit format
+            assert "#" in model.name  # hash-separated format
+            parts = model.name.split("#")
+            assert len(parts) == 2  # repo#branch-commit format
 
     def test_autolog_model_name_changes_with_dirty_state(self, git_repo):
         """Test that model name changes when git working directory becomes dirty."""
@@ -85,11 +85,11 @@ class TestGenAIAutolog:
         assert not first_name.endswith("-dirty")
         assert second_name.endswith("-dirty")
 
-        # Both should contain git info in colon-separated format
+        # Both should contain git info in hash-separated format
         assert "main" in first_name
         assert "main" in second_name
-        assert ":" in first_name
-        assert ":" in second_name
+        assert "#" in first_name
+        assert "#" in second_name
 
     def test_traces_linked_to_git_model(self, git_repo):
         """Test that active model is set correctly for trace linking."""
@@ -103,7 +103,7 @@ class TestGenAIAutolog:
 
             model = mlflow.get_logged_model(active_model_id)
             assert "main" in model.name  # Contains branch name
-            assert ":" in model.name  # Colon-separated format
+            assert "#" in model.name  # Hash-separated format
 
             # Create a simple traced function to verify linking would work
             @mlflow.trace
@@ -189,7 +189,110 @@ class TestGenAIAutolog:
         assert initial_name != committed_name
         assert not committed_name.endswith("-dirty")  # Clean state after commit
 
-        # Should have 2 parts: repo:branch-commit
-        assert ":" in committed_name
-        parts = committed_name.split(":")
+        # Should have 2 parts: repo#branch-commit
+        assert "#" in committed_name
+        parts = committed_name.split("#")
         assert len(parts) == 2
+
+    def test_mlflowignore_affects_dirty_state(self, git_repo):
+        """Test that .mlflowignore patterns are respected when determining dirty state."""
+        test_file = git_repo["test_file"]
+        tmpdir = git_repo["tmpdir"]
+        repo = git_repo["repo"]
+
+        # Initial state (clean)
+        with mlflow.start_run():
+            mlflow.genai.autolog(enable_git_versioning=True, silent=True)
+            initial_model_id = mlflow.get_active_model_id()
+            initial_model = mlflow.get_logged_model(initial_model_id)
+            initial_name = initial_model.name
+
+        # Create a log file that should be ignored
+        log_file = os.path.join(tmpdir, "app.log")
+        with open(log_file, "w") as f:
+            f.write("log content")
+
+        # Create .mlflowignore file
+        mlflowignore_path = os.path.join(tmpdir, ".mlflowignore")
+        with open(mlflowignore_path, "w") as f:
+            f.write("*.log\n")
+
+        # Commit .mlflowignore file so it doesn't affect dirty state
+        repo.index.add([mlflowignore_path])
+        repo.index.commit("Add .mlflowignore")
+
+        # Modify ignored file - should NOT make repo dirty
+        with open(log_file, "w") as f:
+            f.write("modified log content")
+
+        with mlflow.start_run():
+            mlflow.genai.autolog(enable_git_versioning=True, silent=True)
+            after_ignored_model_id = mlflow.get_active_model_id()
+            after_ignored_model = mlflow.get_logged_model(after_ignored_model_id)
+            after_ignored_name = after_ignored_model.name
+
+        # Should not be dirty (ignored file changes don't make repo dirty)
+        assert not after_ignored_name.endswith("-dirty")
+        # The commit hash may be different due to .mlflowignore commit, but should not be dirty
+        assert "#main-" in after_ignored_name
+
+        # Modify non-ignored file - should make repo dirty
+        with open(test_file, "w") as f:
+            f.write("# Modified content\ndef hello():\n    return 'modified'\n")
+
+        with mlflow.start_run():
+            mlflow.genai.autolog(enable_git_versioning=True, silent=True)
+            dirty_model_id = mlflow.get_active_model_id()
+            dirty_model = mlflow.get_logged_model(dirty_model_id)
+            dirty_name = dirty_model.name
+
+        # Should be different from initial (non-ignored file changes make repo dirty)
+        assert dirty_name != initial_name
+        assert dirty_name.endswith("-dirty")
+
+    def test_mlflowignore_edge_cases(self, git_repo):
+        """Test edge cases with .mlflowignore patterns."""
+        tmpdir = git_repo["tmpdir"]
+
+        # Create .mlflowignore with multiple patterns
+        mlflowignore_path = os.path.join(tmpdir, ".mlflowignore")
+        with open(mlflowignore_path, "w") as f:
+            f.write("*.log\n")
+            f.write("temp/\n")
+            f.write("**/__pycache__/**\n")
+            f.write("# This is a comment\n")
+            f.write("\n")  # Empty line
+
+        # Test initial state
+        with mlflow.start_run():
+            mlflow.genai.autolog(enable_git_versioning=True, silent=True)
+            initial_model_id = mlflow.get_active_model_id()
+            initial_model = mlflow.get_logged_model(initial_model_id)
+            initial_name = initial_model.name
+
+        # Create various ignored files
+        log_file = os.path.join(tmpdir, "debug.log")
+        temp_dir = os.path.join(tmpdir, "temp")
+        os.makedirs(temp_dir)
+        temp_file = os.path.join(temp_dir, "cache.tmp")
+        pycache_dir = os.path.join(tmpdir, "src", "__pycache__")
+        os.makedirs(pycache_dir)
+        pycache_file = os.path.join(pycache_dir, "module.pyc")
+
+        # Create all ignored files
+        with open(log_file, "w") as f:
+            f.write("debug log")
+        with open(temp_file, "w") as f:
+            f.write("temp file")
+        with open(pycache_file, "w") as f:
+            f.write("cache file")
+
+        # Should still be clean (all files ignored)
+        with mlflow.start_run():
+            mlflow.genai.autolog(enable_git_versioning=True, silent=True)
+            after_ignored_model_id = mlflow.get_active_model_id()
+            after_ignored_model = mlflow.get_logged_model(after_ignored_model_id)
+            after_ignored_name = after_ignored_model.name
+
+        assert initial_name == after_ignored_name
+        assert not after_ignored_name.endswith("-dirty")
