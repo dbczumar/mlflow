@@ -53,38 +53,39 @@ class TestGenAIAutolog:
             assert "main" in model.name  # branch name
             assert len(model.name.split("-")) >= 3  # repo-branch-commit format
 
-    def test_autolog_model_name_changes_with_file_content(self, git_repo):
-        """Test that model name changes when tracked file content changes."""
+    def test_autolog_model_name_changes_with_dirty_state(self, git_repo):
+        """Test that model name changes when git working directory becomes dirty."""
         test_file = git_repo["test_file"]
 
-        # First autolog call
+        # First autolog call (clean state)
         with mlflow.start_run():
             mlflow.genai.autolog(enable_git_versioning=True, silent=True)
             first_model_id = mlflow.get_active_model_id()
             first_model = mlflow.get_logged_model(first_model_id)
             first_name = first_model.name
 
-        # Modify file content
+        # Modify file content (makes repo dirty)
         with open(test_file, "w") as f:
             f.write("# Modified content\ndef hello():\n    return 'modified world'\n")
 
-        # Second autolog call
+        # Second autolog call (dirty state)
         with mlflow.start_run():
             mlflow.genai.autolog(enable_git_versioning=True, silent=True)
             second_model_id = mlflow.get_active_model_id()
             second_model = mlflow.get_logged_model(second_model_id)
             second_name = second_model.name
 
-        # Model names should be different
+        # Model names should be different due to dirty state
         assert first_name != second_name
         assert first_model_id != second_model_id
 
-        # Both should contain git info but different hashes
+        # First should be clean, second should be dirty
+        assert not first_name.endswith("-dirty")
+        assert second_name.endswith("-dirty")
+
+        # Both should contain git info
         assert "main" in first_name
         assert "main" in second_name
-        first_hash = first_name.split("-")[-1]
-        second_hash = second_name.split("-")[-1]
-        assert first_hash != second_hash
 
     def test_traces_linked_to_git_model(self, git_repo):
         """Test that active model is set correctly for trace linking."""
@@ -154,288 +155,34 @@ class TestGenAIAutolog:
             # Should produce the same model name (and reuse existing model)
             assert first_name == second_name
 
-    def test_mlflowignore_functionality(self, git_repo):
-        """Test that .mlflowignore patterns are respected when computing hashes."""
-        test_file = git_repo["test_file"]
-        tmpdir = git_repo["tmpdir"]
-
-        # Create additional files to track
-        log_file = os.path.join(tmpdir, "app.log")
-        temp_dir = os.path.join(tmpdir, "temp")
-        os.makedirs(temp_dir)
-        temp_file = os.path.join(temp_dir, "cache.tmp")
-        pycache_dir = os.path.join(tmpdir, "src", "__pycache__")
-        os.makedirs(pycache_dir)
-        pycache_file = os.path.join(pycache_dir, "module.pyc")
-
-        with open(log_file, "w") as f:
-            f.write("log content")
-        with open(temp_file, "w") as f:
-            f.write("temp content")
-        with open(pycache_file, "w") as f:
-            f.write("cache content")
-
-        # Add all files to git
-        repo = git_repo["repo"]
-        repo.index.add([log_file, temp_file, pycache_file])
-        repo.index.commit("Add files to ignore")
-
-        # Get initial model name (all files included)
-        with mlflow.start_run():
-            mlflow.genai.autolog(enable_git_versioning=True, silent=True)
-            initial_model_id = mlflow.get_active_model_id()
-            initial_model = mlflow.get_logged_model(initial_model_id)
-            initial_name = initial_model.name
-
-        # Create .mlflowignore file
-        mlflowignore_path = os.path.join(tmpdir, ".mlflowignore")
-        with open(mlflowignore_path, "w") as f:
-            f.write("*.log\n")
-            f.write("temp/\n")
-            f.write("**/__pycache__/**\n")
-            f.write("# Comment line\n")
-            f.write("\n")  # Empty line
-
-        # Get model name after adding .mlflowignore (should be different)
-        with mlflow.start_run():
-            mlflow.genai.autolog(enable_git_versioning=True, silent=True)
-            ignored_model_id = mlflow.get_active_model_id()
-            ignored_model = mlflow.get_logged_model(ignored_model_id)
-            ignored_name = ignored_model.name
-
-        # Model names should be different (ignored files don't affect hash)
-        assert initial_name != ignored_name
-
-        # Modify an ignored file - should not change model name
-        with open(log_file, "w") as f:
-            f.write("modified log content")
-
-        with mlflow.start_run():
-            mlflow.genai.autolog(enable_git_versioning=True, silent=True)
-            after_ignored_change_model_id = mlflow.get_active_model_id()
-            after_ignored_change_model = mlflow.get_logged_model(after_ignored_change_model_id)
-            after_ignored_change_name = after_ignored_change_model.name
-
-        # Should be same as ignored_name (ignored file changes don't matter)
-        assert ignored_name == after_ignored_change_name
-
-        # Modify a non-ignored file - should change model name
-        with open(test_file, "w") as f:
-            f.write("# Final modified content\ndef hello():\n    return 'final'\n")
-
-        with mlflow.start_run():
-            mlflow.genai.autolog(enable_git_versioning=True, silent=True)
-            final_model_id = mlflow.get_active_model_id()
-            final_model = mlflow.get_logged_model(final_model_id)
-            final_name = final_model.name
-
-        # Should be different from previous names
-        assert final_name != ignored_name
-        assert final_name != after_ignored_change_name
-
-    def test_mlflowignore_patterns(self, git_repo):
-        """Test specific .mlflowignore pattern matching."""
-        tmpdir = git_repo["tmpdir"]
-
-        # Import the internal functions for testing
-        from mlflow.genai.autolog import _load_mlflowignore_patterns, _should_ignore_file
-
-        # Create .mlflowignore with various patterns
-        mlflowignore_path = os.path.join(tmpdir, ".mlflowignore")
-        with open(mlflowignore_path, "w") as f:
-            f.write("*.log\n")
-            f.write("build/\n")
-            f.write("**/__pycache__/**\n")
-            f.write("*.tmp\n")
-
-        patterns = _load_mlflowignore_patterns(tmpdir)
-        assert "*.log" in patterns
-        assert "build/" in patterns
-        assert "**/__pycache__/**" in patterns
-        assert "*.tmp" in patterns
-
-        # Test pattern matching
-        test_cases = [
-            ("app.log", True),  # matches *.log
-            ("debug.log", True),  # matches *.log
-            ("build/output.bin", True),  # matches build/
-            ("build/subdir/file.txt", True),  # matches build/
-            ("src/__pycache__/module.pyc", True),  # matches **/__pycache__/**
-            ("deep/src/__pycache__/other.pyc", True),  # matches **/__pycache__/**
-            ("cache.tmp", True),  # matches *.tmp
-            ("normal.py", False),  # doesn't match any pattern
-            ("logs/app.txt", False),  # doesn't match *.log
-        ]
-
-        for file_path, should_ignore in test_cases:
-            full_path = os.path.join(tmpdir, file_path)
-            result = _should_ignore_file(full_path, patterns, tmpdir)
-            assert result == should_ignore, f"Pattern matching failed for {file_path}"
-
-    def test_versioning_strategy_content(self, git_repo):
-        """Test content-based versioning strategy (default)."""
-        test_file = git_repo["test_file"]
-
-        # Test default (content strategy)
-        with mlflow.start_run():
-            mlflow.genai.autolog(enable_git_versioning=True, silent=True)
-            initial_model_id = mlflow.get_active_model_id()
-            initial_model = mlflow.get_logged_model(initial_model_id)
-            initial_name = initial_model.name
-
-        # Modify file content - should change model name
-        with open(test_file, "w") as f:
-            f.write("# Modified content\ndef hello():\n    return 'modified'\n")
-
-        with mlflow.start_run():
-            mlflow.genai.autolog(enable_git_versioning=True, silent=True)
-            modified_model_id = mlflow.get_active_model_id()
-            modified_model = mlflow.get_logged_model(modified_model_id)
-            modified_name = modified_model.name
-
-        # Model names should be different due to content change
-        assert initial_name != modified_name
-
-        # Both should contain content hash (4 parts: repo-branch-commit-hash)
-        assert len(initial_name.split("-")) == 4
-        assert len(modified_name.split("-")) == 4
-
-    def test_versioning_strategy_commit(self, git_repo):
-        """Test commit-based versioning strategy."""
+    def test_commit_strategy_with_commit_changes(self, git_repo):
+        """Test that model name changes when committing changes."""
         test_file = git_repo["test_file"]
         repo = git_repo["repo"]
 
-        # Test commit strategy
+        # Initial state (clean)
         with mlflow.start_run():
-            mlflow.genai.autolog(
-                enable_git_versioning=True, git_versioning_strategy="commit", silent=True
-            )
+            mlflow.genai.autolog(enable_git_versioning=True, silent=True)
             initial_model_id = mlflow.get_active_model_id()
             initial_model = mlflow.get_logged_model(initial_model_id)
             initial_name = initial_model.name
 
-        # Modify file content - should NOT change model name (same commit)
+        # Modify file and commit
         with open(test_file, "w") as f:
-            f.write("# Modified content\ndef hello():\n    return 'modified'\n")
+            f.write("# Committed content\ndef hello():\n    return 'committed'\n")
 
-        with mlflow.start_run():
-            mlflow.genai.autolog(
-                enable_git_versioning=True, git_versioning_strategy="commit", silent=True
-            )
-            modified_model_id = mlflow.get_active_model_id()
-            modified_model = mlflow.get_logged_model(modified_model_id)
-            modified_name = modified_model.name
-
-        # Model names should be different due to dirty state
-        assert initial_name != modified_name
-        assert modified_name.endswith("-dirty")
-
-        # Commit the changes
         repo.index.add([test_file])
         repo.index.commit("Update file content")
 
         with mlflow.start_run():
-            mlflow.genai.autolog(
-                enable_git_versioning=True, git_versioning_strategy="commit", silent=True
-            )
+            mlflow.genai.autolog(enable_git_versioning=True, silent=True)
             committed_model_id = mlflow.get_active_model_id()
             committed_model = mlflow.get_logged_model(committed_model_id)
             committed_name = committed_model.name
 
-        # Should be different from both previous names (new commit, not dirty)
-        assert committed_name != initial_name
-        assert committed_name != modified_name
-        assert not committed_name.endswith("-dirty")
+        # Should be different due to new commit
+        assert initial_name != committed_name
+        assert not committed_name.endswith("-dirty")  # Clean state after commit
 
-        # Should have 3 parts: repo-branch-commit (no content hash)
+        # Should have 3 parts: repo-branch-commit
         assert len(committed_name.split("-")) == 3
-
-    def test_versioning_strategy_comparison(self, git_repo):
-        """Test that different strategies produce different model names."""
-        # Get model name with content strategy
-        with mlflow.start_run():
-            mlflow.genai.autolog(
-                enable_git_versioning=True, git_versioning_strategy="content", silent=True
-            )
-            content_model_id = mlflow.get_active_model_id()
-            content_model = mlflow.get_logged_model(content_model_id)
-            content_name = content_model.name
-
-        # Get model name with commit strategy
-        with mlflow.start_run():
-            mlflow.genai.autolog(
-                enable_git_versioning=True, git_versioning_strategy="commit", silent=True
-            )
-            commit_model_id = mlflow.get_active_model_id()
-            commit_model = mlflow.get_logged_model(commit_model_id)
-            commit_name = commit_model.name
-
-        # Names should be different
-        assert content_name != commit_name
-
-        # Content strategy should have 4 parts, commit strategy should have 3
-        assert len(content_name.split("-")) == 4
-        assert len(commit_name.split("-")) == 3
-
-    def test_versioning_strategy_validation(self, git_repo):
-        """Test that invalid versioning strategies raise errors."""
-        with mlflow.start_run():
-            with pytest.raises(ValueError, match="Invalid git_versioning_strategy"):
-                mlflow.genai.autolog(
-                    enable_git_versioning=True, git_versioning_strategy="invalid", silent=True
-                )
-
-    def test_versioning_strategy_with_mlflowignore(self, git_repo):
-        """Test that versioning strategies work correctly with .mlflowignore."""
-        tmpdir = git_repo["tmpdir"]
-
-        # Create a file to ignore
-        log_file = os.path.join(tmpdir, "app.log")
-        with open(log_file, "w") as f:
-            f.write("log content")
-
-        # Create .mlflowignore
-        mlflowignore_path = os.path.join(tmpdir, ".mlflowignore")
-        with open(mlflowignore_path, "w") as f:
-            f.write("*.log\n")
-
-        # Add files to git
-        repo = git_repo["repo"]
-        repo.index.add([log_file])
-        repo.index.commit("Add log file")
-
-        # Test content strategy - ignored file changes shouldn't affect model
-        with mlflow.start_run():
-            mlflow.genai.autolog(
-                enable_git_versioning=True, git_versioning_strategy="content", silent=True
-            )
-            initial_model_id = mlflow.get_active_model_id()
-            initial_model = mlflow.get_logged_model(initial_model_id)
-            initial_name = initial_model.name
-
-        # Modify ignored file
-        with open(log_file, "w") as f:
-            f.write("modified log content")
-
-        with mlflow.start_run():
-            mlflow.genai.autolog(
-                enable_git_versioning=True, git_versioning_strategy="content", silent=True
-            )
-            after_ignored_model_id = mlflow.get_active_model_id()
-            after_ignored_model = mlflow.get_logged_model(after_ignored_model_id)
-            after_ignored_name = after_ignored_model.name
-
-        # Names should be same (ignored file change with content strategy)
-        assert initial_name == after_ignored_name
-
-        # Test commit strategy - ignored file changes should still affect dirty state
-        with mlflow.start_run():
-            mlflow.genai.autolog(
-                enable_git_versioning=True, git_versioning_strategy="commit", silent=True
-            )
-            commit_model_id = mlflow.get_active_model_id()
-            commit_model = mlflow.get_logged_model(commit_model_id)
-            commit_name = commit_model.name
-
-        # Should be dirty due to uncommitted changes
-        assert commit_name.endswith("-dirty")
