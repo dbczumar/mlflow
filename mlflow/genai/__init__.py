@@ -2,6 +2,7 @@ from mlflow.genai import (
     judges,
     scorers,
 )
+from mlflow.genai.autolog import autolog
 from mlflow.genai.datasets import (
     create_dataset,
     delete_dataset,
@@ -38,6 +39,7 @@ from mlflow.genai.scheduled_scorers import (
 from mlflow.genai.scorers import Scorer, scorer
 
 __all__ = [
+    "autolog",
     "evaluate",
     "to_predict_fn",
     "Scorer",
