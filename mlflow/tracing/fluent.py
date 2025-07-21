@@ -6,6 +6,7 @@ import importlib
 import inspect
 import json
 import logging
+import os
 from contextvars import ContextVar
 from typing import TYPE_CHECKING, Any, Callable, Generator, Literal, Optional, Union
 
@@ -161,11 +162,27 @@ def trace(
     """
 
     def decorator(fn):
-        # Capture the line number where the decorator was applied
+        # Capture the line number and file path where the decorator was applied
         frame = inspect.currentframe()
         decorator_line_number = None
+        decorator_file_path = None
         if frame and frame.f_back and frame.f_back.f_back:
-            decorator_line_number = frame.f_back.f_back.f_lineno
+            decorator_frame = frame.f_back.f_back
+            decorator_line_number = decorator_frame.f_lineno
+
+            # Capture file path relative to module root
+            file_path = decorator_frame.f_code.co_filename
+            try:
+                # Try to make it relative to current working directory
+                cwd = os.getcwd()
+                if file_path.startswith(cwd):
+                    decorator_file_path = os.path.relpath(file_path, cwd)
+                else:
+                    # Fallback to just filename if not under cwd
+                    decorator_file_path = os.path.basename(file_path)
+            except Exception:
+                # Fallback to absolute path if relative path calculation fails
+                decorator_file_path = file_path
 
         # Check if the function is a classmethod or staticmethod
         is_classmethod = isinstance(fn, classmethod)
@@ -174,10 +191,12 @@ def trace(
         # Extract the original function if it's a descriptor
         original_fn = fn.__func__ if is_classmethod or is_staticmethod else fn
 
-        # Merge line number into attributes
+        # Merge line number and file path into attributes
         merged_attributes = dict(attributes) if attributes is not None else {}
         if decorator_line_number is not None:
             merged_attributes[SpanAttributeKey.LINE_NUMBER] = decorator_line_number
+        if decorator_file_path is not None:
+            merged_attributes[SpanAttributeKey.FILE_PATH] = decorator_file_path
 
         # Apply the appropriate wrapper to the original function
         if inspect.isgeneratorfunction(original_fn) or inspect.isasyncgenfunction(original_fn):
@@ -474,10 +493,26 @@ def start_span(
         mlflow_span = create_mlflow_span(otel_span, request_id, span_type)
         attributes = dict(attributes) if attributes is not None else {}
 
-        # Capture the line number where start_span() was called
+        # Capture the line number and file path where start_span() was called
         frame = inspect.currentframe()
         if frame and frame.f_back and frame.f_back.f_back:
-            attributes[SpanAttributeKey.LINE_NUMBER] = frame.f_back.f_back.f_lineno
+            caller_frame = frame.f_back.f_back
+            attributes[SpanAttributeKey.LINE_NUMBER] = caller_frame.f_lineno
+
+            # Capture file path relative to module root
+            file_path = caller_frame.f_code.co_filename
+            try:
+                # Try to make it relative to current working directory
+                cwd = os.getcwd()
+                if file_path.startswith(cwd):
+                    relative_path = os.path.relpath(file_path, cwd)
+                else:
+                    # Fallback to just filename if not under cwd
+                    relative_path = os.path.basename(file_path)
+                attributes[SpanAttributeKey.FILE_PATH] = relative_path
+            except Exception:
+                # Fallback to absolute path if relative path calculation fails
+                attributes[SpanAttributeKey.FILE_PATH] = file_path
 
         mlflow_span.set_attributes(attributes)
         InMemoryTraceManager.get_instance().register_span(mlflow_span)

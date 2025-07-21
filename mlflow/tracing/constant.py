@@ -69,6 +69,8 @@ class SpanAttributeKey:
     INTERMEDIATE_OUTPUTS = "mlflow.trace.intermediate_outputs"
     # Line number where the span was created (for start_span() API and @trace decorator)
     LINE_NUMBER = "mlflow.spanLineNumber"
+    # File path where the span was created, relative to module root
+    FILE_PATH = "mlflow.spanFilePath"
 
 
 class AssessmentMetadataKey:
