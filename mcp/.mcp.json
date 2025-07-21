@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "mlflow-tracing": {
+      "command": "mlflow-mcp",
+      "env": {
+        "MLFLOW_TRACKING_URI": "${MLFLOW_TRACKING_URI}"
+      },
+      "description": "MLflow MCP server for trace debugging"
+    }
+  }
+}
