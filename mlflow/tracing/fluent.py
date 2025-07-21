@@ -161,6 +161,12 @@ def trace(
     """
 
     def decorator(fn):
+        # Capture the line number where the decorator was applied
+        frame = inspect.currentframe()
+        decorator_line_number = None
+        if frame and frame.f_back and frame.f_back.f_back:
+            decorator_line_number = frame.f_back.f_back.f_lineno
+
         # Check if the function is a classmethod or staticmethod
         is_classmethod = isinstance(fn, classmethod)
         is_staticmethod = isinstance(fn, staticmethod)
@@ -168,13 +174,18 @@ def trace(
         # Extract the original function if it's a descriptor
         original_fn = fn.__func__ if is_classmethod or is_staticmethod else fn
 
+        # Merge line number into attributes
+        merged_attributes = dict(attributes) if attributes is not None else {}
+        if decorator_line_number is not None:
+            merged_attributes[SpanAttributeKey.LINE_NUMBER] = decorator_line_number
+
         # Apply the appropriate wrapper to the original function
         if inspect.isgeneratorfunction(original_fn) or inspect.isasyncgenfunction(original_fn):
             wrapped = _wrap_generator(
                 original_fn,
                 name,
                 span_type,
-                attributes,
+                merged_attributes,
                 output_reducer,
             )
         else:
@@ -182,7 +193,7 @@ def trace(
                 raise MlflowException.invalid_parameter_value(
                     "The output_reducer argument is only supported for generator functions."
                 )
-            wrapped = _wrap_function(original_fn, name, span_type, attributes)
+            wrapped = _wrap_function(original_fn, name, span_type, merged_attributes)
 
         # If the original was a descriptor, wrap the result back as the same type of descriptor
         if is_classmethod:
@@ -462,6 +473,12 @@ def start_span(
         request_id = get_otel_attribute(otel_span, SpanAttributeKey.REQUEST_ID)
         mlflow_span = create_mlflow_span(otel_span, request_id, span_type)
         attributes = dict(attributes) if attributes is not None else {}
+
+        # Capture the line number where start_span() was called
+        frame = inspect.currentframe()
+        if frame and frame.f_back and frame.f_back.f_back:
+            attributes[SpanAttributeKey.LINE_NUMBER] = frame.f_back.f_back.f_lineno
+
         mlflow_span.set_attributes(attributes)
         InMemoryTraceManager.get_instance().register_span(mlflow_span)
 
