@@ -155,9 +155,23 @@ class SearchUtils:
     VALID_METRIC_COMPARATORS = {">", ">=", "!=", "=", "<", "<="}
     VALID_PARAM_COMPARATORS = {"!=", "=", LIKE_OPERATOR, ILIKE_OPERATOR}
     VALID_TAG_COMPARATORS = {"!=", "=", LIKE_OPERATOR, ILIKE_OPERATOR}
-    VALID_STRING_ATTRIBUTE_COMPARATORS = {"!=", "=", LIKE_OPERATOR, ILIKE_OPERATOR, "IN", "NOT IN"}
+    VALID_STRING_ATTRIBUTE_COMPARATORS = {
+        "!=",
+        "=",
+        LIKE_OPERATOR,
+        ILIKE_OPERATOR,
+        "IN",
+        "NOT IN",
+    }
     VALID_NUMERIC_ATTRIBUTE_COMPARATORS = VALID_METRIC_COMPARATORS
-    VALID_DATASET_COMPARATORS = {"!=", "=", LIKE_OPERATOR, ILIKE_OPERATOR, "IN", "NOT IN"}
+    VALID_DATASET_COMPARATORS = {
+        "!=",
+        "=",
+        LIKE_OPERATOR,
+        ILIKE_OPERATOR,
+        "IN",
+        "NOT IN",
+    }
     _BUILTIN_NUMERIC_ATTRIBUTES = {"start_time", "end_time"}
     _ALTERNATE_NUMERIC_ATTRIBUTES = {"created", "Created"}
     _ALTERNATE_STRING_ATTRIBUTES = {"run name", "Run name", "Run Name"}
@@ -201,7 +215,10 @@ class SearchUtils:
     STRING_VALUE_TYPES = {TokenType.Literal.String.Single}
     DELIMITER_VALUE_TYPES = {TokenType.Punctuation}
     WHITESPACE_VALUE_TYPE = TokenType.Text.Whitespace
-    NUMERIC_VALUE_TYPES = {TokenType.Literal.Number.Integer, TokenType.Literal.Number.Float}
+    NUMERIC_VALUE_TYPES = {
+        TokenType.Literal.Number.Integer,
+        TokenType.Literal.Number.Float,
+    }
     # Registered Models Constants
     ORDER_BY_KEY_TIMESTAMP = "timestamp"
     ORDER_BY_KEY_LAST_UPDATED_TIMESTAMP = "last_updated_timestamp"
@@ -211,9 +228,15 @@ class SearchUtils:
         ORDER_BY_KEY_LAST_UPDATED_TIMESTAMP,
         ORDER_BY_KEY_MODEL_NAME,
     }
-    VALID_TIMESTAMP_ORDER_BY_KEYS = {ORDER_BY_KEY_TIMESTAMP, ORDER_BY_KEY_LAST_UPDATED_TIMESTAMP}
+    VALID_TIMESTAMP_ORDER_BY_KEYS = {
+        ORDER_BY_KEY_TIMESTAMP,
+        ORDER_BY_KEY_LAST_UPDATED_TIMESTAMP,
+    }
     # We encourage users to use timestamp for order-by
-    RECOMMENDED_ORDER_BY_KEYS_REGISTERED_MODELS = {ORDER_BY_KEY_MODEL_NAME, ORDER_BY_KEY_TIMESTAMP}
+    RECOMMENDED_ORDER_BY_KEYS_REGISTERED_MODELS = {
+        ORDER_BY_KEY_MODEL_NAME,
+        ORDER_BY_KEY_TIMESTAMP,
+    }
 
     @staticmethod
     def get_comparison_func(comparator):
@@ -519,7 +542,8 @@ class SearchUtils:
             parsed = sqlparse.parse(filter_string)
         except Exception:
             raise MlflowException(
-                f"Error on parsing filter '{filter_string}'", error_code=INVALID_PARAMETER_VALUE
+                f"Error on parsing filter '{filter_string}'",
+                error_code=INVALID_PARAMETER_VALUE,
             )
         if len(parsed) == 0 or not isinstance(parsed[0], Statement):
             raise MlflowException(
@@ -654,7 +678,8 @@ class SearchUtils:
                 )
         else:
             raise MlflowException(
-                f"Invalid search expression type '{key_type}'", error_code=INVALID_PARAMETER_VALUE
+                f"Invalid search expression type '{key_type}'",
+                error_code=INVALID_PARAMETER_VALUE,
             )
         if lhs is None:
             return False
@@ -801,7 +826,8 @@ class SearchUtils:
             sort_value = getattr(run.info, key)
         else:
             raise MlflowException(
-                f"Invalid order_by entity type '{key_type}'", error_code=INVALID_PARAMETER_VALUE
+                f"Invalid order_by entity type '{key_type}'",
+                error_code=INVALID_PARAMETER_VALUE,
             )
 
         # Return a key such that None values are always at the end.
@@ -884,11 +910,13 @@ class SearchUtils:
             decoded_token = base64.b64decode(page_token)
         except TypeError:
             raise MlflowException(
-                "Invalid page token, could not base64-decode", error_code=INVALID_PARAMETER_VALUE
+                "Invalid page token, could not base64-decode",
+                error_code=INVALID_PARAMETER_VALUE,
             )
         except base64.binascii.Error:
             raise MlflowException(
-                "Invalid page token, could not base64-decode", error_code=INVALID_PARAMETER_VALUE
+                "Invalid page token, could not base64-decode",
+                error_code=INVALID_PARAMETER_VALUE,
             )
 
         try:
@@ -986,7 +1014,12 @@ class SearchUtils:
 
 class SearchExperimentsUtils(SearchUtils):
     VALID_SEARCH_ATTRIBUTE_KEYS = {"name", "creation_time", "last_update_time"}
-    VALID_ORDER_BY_ATTRIBUTE_KEYS = {"name", "experiment_id", "creation_time", "last_update_time"}
+    VALID_ORDER_BY_ATTRIBUTE_KEYS = {
+        "name",
+        "experiment_id",
+        "creation_time",
+        "last_update_time",
+    }
     NUMERIC_ATTRIBUTES = {"creation_time", "last_update_time"}
 
     @classmethod
@@ -1080,7 +1113,8 @@ class SearchExperimentsUtils(SearchUtils):
                 return experiment
         else:
             raise MlflowException(
-                f"Invalid search expression type '{key_type}'", error_code=INVALID_PARAMETER_VALUE
+                f"Invalid search expression type '{key_type}'",
+                error_code=INVALID_PARAMETER_VALUE,
             )
 
         return SearchUtils.get_comparison_func(comparator)(lhs, value)
@@ -1166,7 +1200,11 @@ def _apply_reversor(model, key, ascending):
 class SearchModelUtils(SearchUtils):
     NUMERIC_ATTRIBUTES = {"creation_timestamp", "last_updated_timestamp"}
     VALID_SEARCH_ATTRIBUTE_KEYS = {"name"}
-    VALID_ORDER_BY_KEYS_REGISTERED_MODELS = {"name", "creation_timestamp", "last_updated_timestamp"}
+    VALID_ORDER_BY_KEYS_REGISTERED_MODELS = {
+        "name",
+        "creation_timestamp",
+        "last_updated_timestamp",
+    }
 
     @classmethod
     def _does_registered_model_match_clauses(cls, model, sed):
@@ -1187,7 +1225,8 @@ class SearchModelUtils(SearchUtils):
             lhs = model._tags.get(key, None)
         else:
             raise MlflowException(
-                f"Invalid search expression type '{key_type}'", error_code=INVALID_PARAMETER_VALUE
+                f"Invalid search expression type '{key_type}'",
+                error_code=INVALID_PARAMETER_VALUE,
             )
 
         # NB: Handling the special `mlflow.prompt.is_prompt` tag. This tag is used for
@@ -1348,7 +1387,11 @@ class SearchModelUtils(SearchUtils):
 
 
 class SearchModelVersionUtils(SearchUtils):
-    NUMERIC_ATTRIBUTES = {"version_number", "creation_timestamp", "last_updated_timestamp"}
+    NUMERIC_ATTRIBUTES = {
+        "version_number",
+        "creation_timestamp",
+        "last_updated_timestamp",
+    }
     VALID_SEARCH_ATTRIBUTE_KEYS = {
         "name",
         "version_number",
@@ -1381,7 +1424,8 @@ class SearchModelVersionUtils(SearchUtils):
             lhs = mv.tags.get(key, None)
         else:
             raise MlflowException(
-                f"Invalid search expression type '{key_type}'", error_code=INVALID_PARAMETER_VALUE
+                f"Invalid search expression type '{key_type}'",
+                error_code=INVALID_PARAMETER_VALUE,
             )
 
         # NB: Handling the special `mlflow.prompt.is_prompt` tag. This tag is used for
@@ -1566,7 +1610,8 @@ class SearchModelVersionUtils(SearchUtils):
             parsed = sqlparse.parse(filter_string)
         except Exception:
             raise MlflowException(
-                f"Error on parsing filter '{filter_string}'", error_code=INVALID_PARAMETER_VALUE
+                f"Error on parsing filter '{filter_string}'",
+                error_code=INVALID_PARAMETER_VALUE,
             )
         if len(parsed) == 0 or not isinstance(parsed[0], Statement):
             raise MlflowException(
@@ -1622,8 +1667,19 @@ class SearchTraceUtils(SearchUtils):
     # cause performance issues with large attributes and tags. We can revisit this
     # decision if we find a way to support them efficiently.
     VALID_TAG_COMPARATORS = {"!=", "="}
-    VALID_STRING_ATTRIBUTE_COMPARATORS = {"!=", "=", "IN", "NOT IN"}
-    VALID_FEEDBACK_COMPARATORS = {"!=", "=", ">", ">=", "<", "<=", "LIKE", "ILIKE", "IN", "NOT IN"}
+    VALID_STRING_ATTRIBUTE_COMPARATORS = {"!=", "=", "IN", "NOT IN", "LIKE", "ILIKE"}
+    VALID_FEEDBACK_COMPARATORS = {
+        "!=",
+        "=",
+        ">",
+        ">=",
+        "<",
+        "<=",
+        "LIKE",
+        "ILIKE",
+        "IN",
+        "NOT IN",
+    }
 
     _REQUEST_METADATA_IDENTIFIER = "request_metadata"
     _TAG_IDENTIFIER = "tag"
@@ -1737,6 +1793,10 @@ class SearchTraceUtils(SearchUtils):
         Replace search key to tag or metadata key if it is in the mapping.
         """
         key = parsed.get("key").lower()
+        # Don't replace keys for span or feedback identifiers - they have their own namespace
+        if parsed.get("type") in (cls._SPAN_IDENTIFIER, cls._FEEDBACK_IDENTIFIER):
+            return parsed
+
         if key in cls.SEARCH_KEY_TO_TAG:
             parsed["type"] = cls._TAG_IDENTIFIER
             parsed["key"] = cls.SEARCH_KEY_TO_TAG[key]
@@ -1783,18 +1843,18 @@ class SearchTraceUtils(SearchUtils):
                         f"got '{comparator}'",
                         error_code=INVALID_PARAMETER_VALUE,
                     )
-            # span.type supports all string comparators
-            elif key_name == "type":
+            # span.type, span.name, and span.status support all string comparators
+            elif key_name in ("type", "name", "status"):
                 if comparator not in cls.VALID_STRING_ATTRIBUTE_COMPARATORS:
                     raise MlflowException(
-                        f"span.type comparator '{comparator}' not one of "
+                        f"span.{key_name} comparator '{comparator}' not one of "
                         f"'{cls.VALID_STRING_ATTRIBUTE_COMPARATORS}'",
                         error_code=INVALID_PARAMETER_VALUE,
                     )
             else:
                 raise MlflowException(
                     f"Invalid span attribute '{key_name}'. "
-                    "Supported attributes are 'type' and 'content'.",
+                    "Supported attributes are 'type', 'name', 'status', and 'content'.",
                     error_code=INVALID_PARAMETER_VALUE,
                 )
             return True
