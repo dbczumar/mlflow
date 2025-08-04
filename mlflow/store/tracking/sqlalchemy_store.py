@@ -593,7 +593,10 @@ class SqlAlchemyStore(AbstractStore):
             .select_from(SqlInput)
             .join(SqlDataset, SqlInput.source_id == SqlDataset.dataset_uuid)
             .outerjoin(SqlInputTag, SqlInputTag.input_uuid == SqlInput.input_uuid)
-            .filter(SqlInput.destination_type == "RUN", SqlInput.destination_id.in_(run_uuids))
+            .filter(
+                SqlInput.destination_type == "RUN",
+                SqlInput.destination_id.in_(run_uuids),
+            )
             .order_by("run_uuid")
         ).all()
 
@@ -2016,7 +2019,11 @@ class SqlAlchemyStore(AbstractStore):
                 [
                     # Sort nulls last
                     sqlalchemy.case((subquery.c.metric_value.is_(None), 1), else_=0).asc(),
-                    subquery.c.metric_value.asc() if ascending else subquery.c.metric_value.desc(),
+                    (
+                        subquery.c.metric_value.asc()
+                        if ascending
+                        else subquery.c.metric_value.desc()
+                    ),
                 ]
             )
 
@@ -2033,7 +2040,10 @@ class SqlAlchemyStore(AbstractStore):
         filter_string: Optional[str],
         datasets: Optional[list[dict[str, Any]]],
     ):
-        from mlflow.utils.search_logged_model_utils import EntityType, parse_filter_string
+        from mlflow.utils.search_logged_model_utils import (
+            EntityType,
+            parse_filter_string,
+        )
 
         comparisons = parse_filter_string(filter_string)
         dialect = self._get_dialect()
@@ -2272,7 +2282,14 @@ class SqlAlchemyStore(AbstractStore):
                 filter_string, session, self._get_dialect()
             )
             for non_attr_filter in non_attribute_filters:
-                stmt = stmt.join(non_attr_filter)
+                # Check if this is a span subquery and add join condition
+                if hasattr(non_attr_filter.columns, "trace_id"):
+                    stmt = stmt.join(
+                        non_attr_filter,
+                        non_attr_filter.c.trace_id == SqlTraceInfo.request_id,
+                    )
+                else:
+                    stmt = stmt.join(non_attr_filter)
 
             # using an outer join is necessary here because we want to be able to sort
             # on a column (tag, metric or param) without removing the lines that
@@ -2542,7 +2559,7 @@ class SqlAlchemyStore(AbstractStore):
                     span_id=existing.span_id,
                     create_time_ms=existing.create_time_ms,
                     last_update_time_ms=updated_timestamp,
-                    rationale=rationale if rationale is not None else existing.rationale,
+                    rationale=(rationale if rationale is not None else existing.rationale),
                 )
 
             updated_assessment.assessment_id = existing.assessment_id
@@ -2568,7 +2585,8 @@ class SqlAlchemyStore(AbstractStore):
             )
 
             session.query(SqlAssessments).filter(
-                SqlAssessments.trace_id == trace_id, SqlAssessments.assessment_id == assessment_id
+                SqlAssessments.trace_id == trace_id,
+                SqlAssessments.assessment_id == assessment_id,
             ).update(
                 {
                     "name": updated_assessment.name,
@@ -2618,7 +2636,8 @@ class SqlAlchemyStore(AbstractStore):
         sql_assessment = (
             session.query(SqlAssessments)
             .filter(
-                SqlAssessments.trace_id == trace_id, SqlAssessments.assessment_id == assessment_id
+                SqlAssessments.trace_id == trace_id,
+                SqlAssessments.assessment_id == assessment_id,
             )
             .one_or_none()
         )
@@ -2796,7 +2815,7 @@ class SqlAlchemyStore(AbstractStore):
                     parent_span_id=span.parent_id,
                     name=span.name,
                     type=span.span_type,
-                    status=span.status.status_code,
+                    status=span.status.status_code.name,
                     start_time_unix_nano=span.start_time_ns,
                     end_time_unix_nano=span.end_time_ns,
                     trace_state=span._trace_state,
@@ -3190,10 +3209,11 @@ def _get_filter_clauses_for_search_traces(filter_string, session, dialect):
                 # Build the span filter
                 span_filters = []
 
-                if key_name == "type":
-                    # Direct column comparison for span.type
+                if key_name in ("type", "name", "status"):
+                    # Direct column comparison for span.type, span.name, and span.status
+                    column = getattr(SqlSpan, key_name)
                     val_filter = SearchTraceUtils.get_sql_comparison_func(comparator, dialect)(
-                        SqlSpan.type, value
+                        column, value
                     )
                 elif key_name == "content":
                     # JSON content search for span.content
@@ -3220,8 +3240,11 @@ def _get_filter_clauses_for_search_traces(filter_string, session, dialect):
                     error_code=INVALID_PARAMETER_VALUE,
                 )
 
-            if key_type != SearchTraceUtils._FEEDBACK_IDENTIFIER:
-                # Handle non-feedback filters (tags, metadata)
+            if key_type not in (
+                SearchTraceUtils._FEEDBACK_IDENTIFIER,
+                SearchTraceUtils._SPAN_IDENTIFIER,
+            ):
+                # Handle non-feedback and non-span filters (tags, metadata)
                 key_filter = SearchTraceUtils.get_sql_comparison_func("=", dialect)(
                     entity.key, key_name
                 )

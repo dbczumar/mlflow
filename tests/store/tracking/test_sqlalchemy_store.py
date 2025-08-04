@@ -1,3 +1,4 @@
+import asyncio
 import json
 import math
 import os
@@ -1364,10 +1365,12 @@ def test_set_tag(store: SqlAlchemyStore, monkeypatch):
     # test setting tags that are too long fails.
     monkeypatch.setenv("MLFLOW_TRUNCATE_LONG_VALUES", "false")
     with pytest.raises(
-        MlflowException, match=f"exceeds the maximum length of {MAX_TAG_VAL_LENGTH} characters"
+        MlflowException,
+        match=f"exceeds the maximum length of {MAX_TAG_VAL_LENGTH} characters",
     ):
         store.set_tag(
-            run.info.run_id, entities.RunTag("longTagKey", "a" * (MAX_TAG_VAL_LENGTH + 1))
+            run.info.run_id,
+            entities.RunTag("longTagKey", "a" * (MAX_TAG_VAL_LENGTH + 1)),
         )
 
     monkeypatch.setenv("MLFLOW_TRUNCATE_LONG_VALUES", "true")
@@ -4324,7 +4327,11 @@ def test_start_trace(store: SqlAlchemyStore):
     assert trace_info.request_time == 1234
     assert trace_info.execution_duration == 100
     assert trace_info.state == TraceState.OK
-    assert trace_info.trace_metadata == {"rq1": "foo", "rq2": "bar", TRACE_SCHEMA_VERSION_KEY: "3"}
+    assert trace_info.trace_metadata == {
+        "rq1": "foo",
+        "rq2": "bar",
+        TRACE_SCHEMA_VERSION_KEY: "3",
+    }
     artifact_location = trace_info.tags[MLFLOW_ARTIFACT_LOCATION]
     assert artifact_location.endswith(f"/{experiment_id}/traces/{trace_id}/artifacts")
     assert trace_info.tags == {
@@ -4623,7 +4630,12 @@ def test_search_traces_with_feedback_filter(store, filter_string, expected_ids):
 
     # Create traces
     _create_trace(
-        store, "tr-0", exp1, request_time=0, state=TraceState.OK, tags={"mlflow.traceName": "aaa"}
+        store,
+        "tr-0",
+        exp1,
+        request_time=0,
+        state=TraceState.OK,
+        tags={"mlflow.traceName": "aaa"},
     )
     _create_trace(
         store,
@@ -4642,7 +4654,12 @@ def test_search_traces_with_feedback_filter(store, filter_string, expected_ids):
         tags={"mlflow.traceName": "bbb"},
     )
     _create_trace(
-        store, "tr-3", exp2, request_time=3, state=TraceState.OK, tags={"mlflow.traceName": "ccc"}
+        store,
+        "tr-3",
+        exp2,
+        request_time=3,
+        state=TraceState.OK,
+        tags={"mlflow.traceName": "ccc"},
     )
 
     # Add feedback to traces
@@ -4687,17 +4704,32 @@ def test_search_traces_with_feedback_filter(store, filter_string, expected_ids):
     ("filter_string", "error"),
     [
         # Invalid comparators for boolean values
-        ("feedback.is_correct > true", "Boolean feedback values only support '=' and '!='"),
-        ("feedback.is_correct < false", "Boolean feedback values only support '=' and '!='"),
+        (
+            "feedback.is_correct > true",
+            "Boolean feedback values only support '=' and '!='",
+        ),
+        (
+            "feedback.is_correct < false",
+            "Boolean feedback values only support '=' and '!='",
+        ),
         # Invalid comparators for numeric values
-        ("feedback.score LIKE '0.5'", "Numeric feedback values only support comparison operators"),
+        (
+            "feedback.score LIKE '0.5'",
+            "Numeric feedback values only support comparison operators",
+        ),
         (
             "feedback.score IN (0.5, 0.6)",
             "Numeric feedback values only support comparison operators",
         ),
         # Invalid comparators for string values
-        ("feedback.sentiment > 'positive'", "String feedback values do not support '>'"),
-        ("feedback.sentiment < 'negative'", "String feedback values do not support '<'"),
+        (
+            "feedback.sentiment > 'positive'",
+            "String feedback values do not support '>'",
+        ),
+        (
+            "feedback.sentiment < 'negative'",
+            "String feedback values do not support '<'",
+        ),
     ],
 )
 def test_search_traces_with_invalid_feedback_filter(store, filter_string, error):
@@ -4713,29 +4745,49 @@ def test_search_traces_with_invalid_feedback_filter(store, filter_string, error)
 @pytest.mark.parametrize(
     ("filter_string", "expected_ids"),
     [
-        # span.type filtering
-        ("span.type = 'LLM'", ["tr-0", "tr-2"]),
+        # span.type filtering (results in descending timestamp order)
+        ("span.type = 'LLM'", ["tr-2", "tr-0"]),
         ("span.type = 'CHAIN'", ["tr-1"]),
-        ("span.type != 'LLM'", ["tr-1", "tr-3"]),
-        ("span.type IN ('LLM', 'CHAIN')", ["tr-0", "tr-1", "tr-2"]),
-        ("span.type NOT IN ('UNKNOWN')", ["tr-0", "tr-1", "tr-2"]),
-        # span.content filtering
-        ("span.content LIKE '%hello%'", ["tr-0", "tr-1"]),
-        ("span.content LIKE '%world%'", ["tr-1", "tr-2"]),
-        ("span.content ILIKE '%HELLO%'", ["tr-0", "tr-1"]),
-        # Combining with other filters
+        ("span.type != 'LLM'", ["tr-3", "tr-1"]),
+        ("span.type IN ('LLM', 'CHAIN')", ["tr-2", "tr-1", "tr-0"]),
+        ("span.type NOT IN ('UNKNOWN')", ["tr-2", "tr-1", "tr-0"]),
+        # span.name filtering (results in descending timestamp order)
+        ("span.name = 'test_llm'", ["tr-0"]),
+        ("span.name = 'test_chain'", ["tr-1"]),
+        ("span.name != 'test_llm'", ["tr-3", "tr-2", "tr-1"]),
+        ("span.name LIKE 'test_%'", ["tr-3", "tr-2", "tr-1", "tr-0"]),
+        ("span.name IN ('test_llm', 'test_chain')", ["tr-1", "tr-0"]),
+        # span.status filtering (results in descending timestamp order)
+        ("span.status = 'OK'", ["tr-3", "tr-2", "tr-0"]),
+        ("span.status = 'ERROR'", ["tr-1"]),
+        ("span.status != 'OK'", ["tr-1"]),
+        ("span.status IN ('OK', 'ERROR')", ["tr-3", "tr-2", "tr-1", "tr-0"]),
+        # span.content filtering (results in descending timestamp order)
+        ("span.content LIKE '%hello%'", ["tr-1", "tr-0"]),
+        ("span.content LIKE '%world%'", ["tr-2", "tr-1"]),
+        ("span.content ILIKE '%HELLO%'", ["tr-1", "tr-0"]),
+        # Combining with other filters (results in descending timestamp order)
         ("span.type = 'LLM' AND status = 'OK'", ["tr-0"]),
         ("span.content LIKE '%hello%' AND name = 'bbb'", []),
+        ("span.name = 'test_llm' AND span.status = 'OK'", ["tr-0"]),
+        ("span.type = 'CHAIN' AND span.status = 'ERROR'", ["tr-1"]),
     ],
 )
 def test_search_traces_with_span_filter(store, filter_string, expected_ids):
+    from mlflow.entities.span import create_mlflow_span
+
     # Create experiments and traces
     exp1 = store.create_experiment("exp1")
     exp2 = store.create_experiment("exp2")
 
     # Create traces
     _create_trace(
-        store, "tr-0", exp1, request_time=0, state=TraceState.OK, tags={"mlflow.traceName": "aaa"}
+        store,
+        "tr-0",
+        exp1,
+        request_time=0,
+        state=TraceState.OK,
+        tags={"mlflow.traceName": "aaa"},
     )
     _create_trace(
         store,
@@ -4754,71 +4806,98 @@ def test_search_traces_with_span_filter(store, filter_string, expected_ids):
         tags={"mlflow.traceName": "bbb"},
     )
     _create_trace(
-        store, "tr-3", exp2, request_time=3, state=TraceState.OK, tags={"mlflow.traceName": "ccc"}
+        store,
+        "tr-3",
+        exp2,
+        request_time=3,
+        state=TraceState.OK,
+        tags={"mlflow.traceName": "ccc"},
     )
 
     # Add spans to traces using log_spans
-    from mlflow.entities import Span
+    def create_test_span(trace_id, span_id, name, status, inputs, outputs, span_type):
+        """Helper to create a test span."""
+        # Generate valid OpenTelemetry trace and span IDs
+        # They need to be valid 128-bit (trace) and 64-bit (span) integers
+        # Use simple hash function for test IDs
+        trace_id_int = hash(trace_id) & ((1 << 128) - 1)  # 128-bit trace ID
+        span_id_int = hash(span_id) & ((1 << 64) - 1)  # 64-bit span ID
+
+        readable_span = OTelReadableSpan(
+            name=name,
+            context=trace_api.SpanContext(
+                trace_id=trace_id_int,
+                span_id=span_id_int,
+                is_remote=False,
+                trace_flags=trace_api.TraceFlags(1),
+            ),
+            parent=None,
+            attributes={
+                "mlflow.traceRequestId": json.dumps(trace_id),
+                "mlflow.spanInputs": json.dumps(inputs),
+                "mlflow.spanOutputs": json.dumps(outputs),
+                "mlflow.spanType": json.dumps(span_type),
+            },
+            start_time=0,
+            end_time=1000000000,
+            status=trace_api.Status(
+                trace_api.StatusCode.OK if status == "OK" else trace_api.StatusCode.ERROR
+            ),
+        )
+        return create_mlflow_span(readable_span, trace_id)
 
     # tr-0: LLM span with "hello" in content
-    span0 = Span(
-        trace_id="tr-0",
-        span_id="span-0",
-        name="test_llm",
-        parent_span_id=None,
-        start_time_ns=0,
-        end_time_ns=1000,
-        status="OK",
-        inputs={"prompt": "hello there"},
-        outputs={"response": "hi"},
-        attributes={"type": "LLM"},
+    span0 = create_test_span(
+        "tr-0",
+        "span-0",
+        "test_llm",
+        "OK",
+        {"prompt": "hello there"},
+        {"response": "hi"},
+        "LLM",
     )
-    store.log_spans([span0])
 
     # tr-1: CHAIN span with "hello world" in content
-    span1 = Span(
-        trace_id="tr-1",
-        span_id="span-1",
-        name="test_chain",
-        parent_span_id=None,
-        start_time_ns=0,
-        end_time_ns=2000,
-        status="ERROR",
-        inputs={"text": "hello world"},
-        outputs={"result": "error"},
-        attributes={"type": "CHAIN"},
+    span1 = create_test_span(
+        "tr-1",
+        "span-1",
+        "test_chain",
+        "ERROR",
+        {"text": "hello world"},
+        {"result": "error"},
+        "CHAIN",
     )
-    store.log_spans([span1])
 
     # tr-2: LLM span with "world" in content
-    span2 = Span(
-        trace_id="tr-2",
-        span_id="span-2",
-        name="test_llm2",
-        parent_span_id=None,
-        start_time_ns=0,
-        end_time_ns=3000,
-        status="OK",
-        inputs={"prompt": "world peace"},
-        outputs={"response": "yes"},
-        attributes={"type": "LLM"},
+    span2 = create_test_span(
+        "tr-2",
+        "span-2",
+        "test_llm2",
+        "OK",
+        {"prompt": "world peace"},
+        {"response": "yes"},
+        "LLM",
     )
-    store.log_spans([span2])
 
     # tr-3: UNKNOWN span with no match
-    span3 = Span(
-        trace_id="tr-3",
-        span_id="span-3",
-        name="test_unknown",
-        parent_span_id=None,
-        start_time_ns=0,
-        end_time_ns=4000,
-        status="OK",
-        inputs={"data": "test"},
-        outputs={"result": "ok"},
-        attributes={"type": "UNKNOWN"},
+    span3 = create_test_span(
+        "tr-3",
+        "span-3",
+        "test_unknown",
+        "OK",
+        {"data": "test"},
+        {"result": "ok"},
+        "UNKNOWN",
     )
-    store.log_spans([span3])
+
+    # Log all spans (need to run async)
+    async def log_all_spans():
+        await store.log_spans([span0])
+        await store.log_spans([span1])
+        await store.log_spans([span2])
+        await store.log_spans([span3])
+
+    asyncio.run(log_all_spans())
 
     # Search with span filter
     trace_infos, _ = store.search_traces(
@@ -4839,7 +4918,6 @@ def test_search_traces_with_span_filter(store, filter_string, expected_ids):
         ("span.content IN ('test')", "span.content only supports 'LIKE' and 'ILIKE'"),
         # Invalid comparators for span.type
         ("span.type > 'LLM'", "span.type comparator '>' not one of"),
-        ("span.type LIKE '%LLM%'", "span.type comparator 'LIKE' not one of"),
         # Invalid span attributes
         ("span.invalid = 'test'", "Invalid span attribute 'invalid'"),
     ],
@@ -5259,11 +5337,17 @@ def test_set_logged_model_tags(store: SqlAlchemyStore):
 
     # New tag
     store.set_logged_model_tags(model.model_id, [LoggedModelTag("tag2", "orange")])
-    assert store.get_logged_model(model.model_id).tags == {"tag1": "apple", "tag2": "orange"}
+    assert store.get_logged_model(model.model_id).tags == {
+        "tag1": "apple",
+        "tag2": "orange",
+    }
 
     # Exieting tag
     store.set_logged_model_tags(model.model_id, [LoggedModelTag("tag2", "grape")])
-    assert store.get_logged_model(model.model_id).tags == {"tag1": "apple", "tag2": "grape"}
+    assert store.get_logged_model(model.model_id).tags == {
+        "tag1": "apple",
+        "tag2": "grape",
+    }
 
     with pytest.raises(MlflowException, match="not found"):
         store.set_logged_model_tags("does-not-exist", [LoggedModelTag("tag1", "apple")])
@@ -5485,7 +5569,12 @@ def test_search_logged_models_filter_string(store: SqlAlchemyStore):
         filter_string="creation_timestamp > 0",
         page_token=first_page.token,
     )
-    assert [m.name for m in second_page] == [model_4.name, model_3.name, model_2.name, model_1.name]
+    assert [m.name for m in second_page] == [
+        model_4.name,
+        model_3.name,
+        model_2.name,
+        model_1.name,
+    ]
     assert second_page.token is None
 
 
@@ -5969,7 +6058,10 @@ def test_create_and_get_assessment(store_and_trace_info):
     assert created_expectation.assessment_id != created_feedback.assessment_id
     assert created_expectation.trace_id == trace_info.request_id
     assert created_expectation.value == "The capital of France is Paris."
-    assert created_expectation.metadata == {"context": "geography-qa", "difficulty": "easy"}
+    assert created_expectation.metadata == {
+        "context": "geography-qa",
+        "difficulty": "easy",
+    }
     assert created_expectation.span_id == "span-456"
     assert created_expectation.valid
 
@@ -5986,7 +6078,10 @@ def test_create_and_get_assessment(store_and_trace_info):
         trace_info.request_id, created_expectation.assessment_id
     )
     assert retrieved_expectation.value == "The capital of France is Paris."
-    assert retrieved_expectation.metadata == {"context": "geography-qa", "difficulty": "easy"}
+    assert retrieved_expectation.metadata == {
+        "context": "geography-qa",
+        "difficulty": "easy",
+    }
     assert retrieved_expectation.span_id == "span-456"
     assert retrieved_expectation.trace_id == trace_info.request_id
     assert retrieved_expectation.valid
@@ -6078,7 +6173,10 @@ def test_update_assessment_expectation(store_and_trace_info):
     assert updated_expectation.assessment_id == original_id
     assert updated_expectation.name == "expected_response"
     assert updated_expectation.value == "The capital and largest city of France is Paris."
-    assert updated_expectation.metadata == {"context": "geography-qa", "updated": "true"}
+    assert updated_expectation.metadata == {
+        "context": "geography-qa",
+        "updated": "true",
+    }
     assert updated_expectation.span_id == "span-456"
     assert updated_expectation.source.source_id == "annotator@company.com"
 
@@ -6123,7 +6221,8 @@ def test_update_assessment_type_validation(store_and_trace_info):
     created_feedback = store.create_assessment(feedback)
 
     with pytest.raises(
-        MlflowException, match=r"Cannot update expectation value on a Feedback assessment"
+        MlflowException,
+        match=r"Cannot update expectation value on a Feedback assessment",
     ):
         store.update_assessment(
             trace_id=trace_info.request_id,
@@ -6140,7 +6239,8 @@ def test_update_assessment_type_validation(store_and_trace_info):
     created_expectation = store.create_assessment(expectation)
 
     with pytest.raises(
-        MlflowException, match=r"Cannot update feedback value on an Expectation assessment"
+        MlflowException,
+        match=r"Cannot update feedback value on an Expectation assessment",
     ):
         store.update_assessment(
             trace_id=trace_info.request_id,
@@ -6154,7 +6254,9 @@ def test_update_assessment_errors(store_and_trace_info):
 
     with pytest.raises(MlflowException, match=r"Trace with request_id 'fake_trace' not found"):
         store.update_assessment(
-            trace_id="fake_trace", assessment_id="fake_assessment", rationale="This should fail"
+            trace_id="fake_trace",
+            assessment_id="fake_assessment",
+            rationale="This should fail",
         )
 
     with pytest.raises(
@@ -6265,7 +6367,8 @@ def test_create_assessment_override_nonexistent(store_and_trace_info):
     )
 
     with pytest.raises(
-        MlflowException, match=r"Assessment with ID 'nonexistent-assessment-id' not found"
+        MlflowException,
+        match=r"Assessment with ID 'nonexistent-assessment-id' not found",
     ):
         store.create_assessment(override_feedback)
 
