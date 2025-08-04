@@ -4932,6 +4932,195 @@ def test_search_traces_with_invalid_span_filter(store, filter_string, error):
         )
 
 
+@pytest.mark.parametrize(
+    ("filter_string", "expected_ids"),
+    [
+        # Count expressions with different comparators
+        ("count(span.type = 'LLM') > 1", ["tr-0"]),  # tr-0 has 2 LLM spans
+        (
+            "count(span.type = 'TOOL') = 1",
+            ["tr-0", "tr-1", "tr-2"],
+        ),  # all have 1 TOOL span
+        (
+            "count(span.type = 'TOOL') >= 1",
+            ["tr-0", "tr-1", "tr-2"],
+        ),  # all have at least 1 TOOL
+        (
+            "count(span.type = 'CHAIN') < 1",
+            ["tr-0", "tr-2"],
+        ),  # tr-0 and tr-2 have 0 CHAIN spans
+        ("count(span.status = 'ERROR') = 0", ["tr-0", "tr-2"]),  # no ERROR spans
+        ("count(span.status = 'OK') > 2", ["tr-0"]),  # tr-0 has 3 OK spans
+        ("count(span.name = 'test_llm') = 2", ["tr-0"]),  # tr-0 has 2 test_llm spans
+        # Combined with other filters
+        ("tags.tag1 = 'value1' AND count(span.type = 'LLM') > 1", ["tr-0"]),
+        (
+            "count(span.type = 'TOOL') = 1 AND timestamp < 100000000000",
+            ["tr-0", "tr-1", "tr-2"],
+        ),
+    ],
+)
+def test_search_traces_with_count_expression(store, filter_string, expected_ids):
+    from mlflow.entities.span import create_mlflow_span
+
+    # Create experiments and traces
+    exp1 = store.create_experiment("exp1")
+    exp2 = store.create_experiment("exp2")
+
+    # Create traces
+    _create_trace(
+        store,
+        "tr-0",
+        exp1,
+        request_time=99999999999,
+        tags={"tag1": "value1"},
+        trace_metadata={"prompt": "hello"},
+    )
+    _create_trace(
+        store,
+        "tr-1",
+        exp1,
+        request_time=88888888888,
+        tags={"tag2": "value2"},
+        trace_metadata={"response": "world"},
+    )
+    _create_trace(
+        store,
+        "tr-2",
+        exp2,
+        request_time=77777777777,
+        tags={"tag3": "value3"},
+        trace_metadata={"context": "test"},
+    )
+
+    # Helper to create a test span
+    def create_test_span(trace_id, span_id, name, status, inputs, outputs, span_type):
+        """Helper to create a test span."""
+        # Use simple hash function for test IDs
+        trace_id_int = hash(trace_id) & ((1 << 128) - 1)  # 128-bit trace ID
+        span_id_int = hash(span_id) & ((1 << 64) - 1)  # 64-bit span ID
+
+        otel_span = OTelReadableSpan(
+            name=name,
+            context=trace_api.SpanContext(
+                trace_id=trace_id_int,
+                span_id=span_id_int,
+                is_remote=False,
+                trace_flags=trace_api.TraceFlags(0x01),
+                trace_state=trace_api.TraceState(),
+            ),
+            parent=None,
+            resource=None,
+            attributes={
+                "mlflow.traceRequestId": json.dumps(trace_id),
+                "mlflow.spanType": json.dumps(span_type),
+                "mlflow.spanInputs": json.dumps(inputs),
+                "mlflow.spanOutputs": json.dumps(outputs),
+            },
+            events=[],
+            links=[],
+            kind=trace_api.SpanKind.INTERNAL,
+            instrumentation_info=None,
+            status=trace_api.Status(
+                trace_api.StatusCode.OK if status == "OK" else trace_api.StatusCode.ERROR
+            ),
+            start_time=0,
+            end_time=1000000000,
+            instrumentation_scope=None,
+        )
+
+        return create_mlflow_span(otel_span, trace_id)
+
+    # Define spans with the pattern matching the test cases
+    # tr-0: 2 LLM spans, 1 TOOL span (all OK)
+    spans_tr0 = [
+        create_test_span("tr-0", "sp1", "test_llm", "OK", {"query": "q1"}, {"reply": "r1"}, "LLM"),
+        create_test_span("tr-0", "sp2", "test_llm", "OK", {"query": "q2"}, {"reply": "r2"}, "LLM"),
+        create_test_span(
+            "tr-0", "sp3", "test_tool", "OK", {"tool": "t1"}, {"result": "res1"}, "TOOL"
+        ),
+    ]
+
+    # tr-1: 1 CHAIN span (ERROR), 1 TOOL span (OK)
+    spans_tr1 = [
+        create_test_span(
+            "tr-1",
+            "sp4",
+            "test_chain",
+            "ERROR",
+            {"chain": "c1"},
+            {"error": "e1"},
+            "CHAIN",
+        ),
+        create_test_span(
+            "tr-1", "sp5", "test_tool", "OK", {"tool": "t2"}, {"result": "res2"}, "TOOL"
+        ),
+    ]
+
+    # tr-2: 1 TOOL span (OK), 1 LLM span (OK)
+    spans_tr2 = [
+        create_test_span(
+            "tr-2", "sp6", "test_tool", "OK", {"tool": "t3"}, {"result": "res3"}, "TOOL"
+        ),
+        create_test_span(
+            "tr-2",
+            "sp7",
+            "test_llm_other",
+            "OK",
+            {"query": "q3"},
+            {"reply": "r3"},
+            "LLM",
+        ),
+    ]
+
+    # Log all spans
+    async def log_all_spans():
+        await store.log_spans(spans_tr0)
+        await store.log_spans(spans_tr1)
+        await store.log_spans(spans_tr2)
+
+    asyncio.run(log_all_spans())
+
+    # Search with count expression filter
+    trace_infos, _ = store.search_traces(
+        experiment_ids=[exp1, exp2],
+        filter_string=filter_string,
+        max_results=10,
+    )
+    actual_ids = [trace_info.trace_id for trace_info in trace_infos]
+    assert actual_ids == expected_ids
+
+
+@pytest.mark.parametrize(
+    ("filter_string", "error"),
+    [
+        # Invalid count syntax
+        ("count()", "Invalid clause"),
+        ("count(span.type)", "Invalid clause"),
+        ("count(span.type = 'LLM')", "Invalid clause"),
+        ("count(span.type = 'LLM') 'invalid'", "Invalid clause"),
+        ("count(span.type = 'LLM') > 'abc'", "Count value must be numeric"),
+        # Count on non-span entities
+        (
+            "count(tag.test = 'value') > 1",
+            "Count expressions currently only support span conditions",
+        ),
+        (
+            "count(name = 'test') > 1",
+            "Count expressions currently only support span conditions",
+        ),
+    ],
+)
+def test_search_traces_with_invalid_count_expression(store, filter_string, error):
+    exp1 = store.create_experiment("exp1")
+
+    with pytest.raises(MlflowException, match=error):
+        store.search_traces(
+            experiment_ids=[exp1],
+            filter_string=filter_string,
+        )
+
+
 def test_set_and_delete_tags(store: SqlAlchemyStore):
     exp1 = store.create_experiment("exp1")
     trace_id = "tr-123"

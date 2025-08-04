@@ -12,6 +12,7 @@ import sqlparse
 from packaging.version import Version
 from sqlparse.sql import (
     Comparison,
+    Function,
     Identifier,
     Parenthesis,
     Statement,
@@ -1792,7 +1793,15 @@ class SearchTraceUtils(SearchUtils):
         """
         Replace search key to tag or metadata key if it is in the mapping.
         """
-        key = parsed.get("key").lower()
+        # Count expressions don't have a key field
+        if parsed.get("type") == "count":
+            return parsed
+
+        key = parsed.get("key")
+        if not key:
+            return parsed
+
+        key = key.lower()
         # Don't replace keys for span or feedback identifiers - they have their own namespace
         if parsed.get("type") in (cls._SPAN_IDENTIFIER, cls._FEEDBACK_IDENTIFIER):
             return parsed
@@ -2077,6 +2086,13 @@ class SearchTraceUtils(SearchUtils):
     @classmethod
     def _get_comparison(cls, comparison):
         stripped_comparison = [token for token in comparison.tokens if not token.is_whitespace]
+
+        # Check if this is a count expression
+        if isinstance(stripped_comparison[0], Function):
+            func_name = stripped_comparison[0].get_name()
+            if func_name and func_name.lower() == "count":
+                return cls._get_count_comparison(comparison)
+
         cls._validate_comparison(stripped_comparison, search_traces=True)
         comp = cls._get_identifier(stripped_comparison[0].value, cls.VALID_SEARCH_ATTRIBUTE_KEYS)
         comp["comparator"] = stripped_comparison[1].value
@@ -2091,6 +2107,93 @@ class SearchTraceUtils(SearchUtils):
             cls.is_span(comp["type"], comp["key"], comp["comparator"])
 
         return comp
+
+    @classmethod
+    def _get_count_comparison(cls, comparison):
+        """Parse a count expression like count(span.type = 'TOOL') > 5"""
+        stripped_comparison = [token for token in comparison.tokens if not token.is_whitespace]
+
+        if len(stripped_comparison) < 3:
+            raise MlflowException(
+                "Invalid count expression. Expected format: count(condition) comparator value",
+                error_code=INVALID_PARAMETER_VALUE,
+            )
+
+        count_func = stripped_comparison[0]
+        comparator = stripped_comparison[1]
+        value = stripped_comparison[2]
+
+        # Validate that it's a count function
+        if not isinstance(count_func, Function):
+            raise MlflowException(
+                f"Expected count function, got {count_func}",
+                error_code=INVALID_PARAMETER_VALUE,
+            )
+
+        func_name = count_func.get_name()
+        if not func_name or func_name.lower() != "count":
+            raise MlflowException(
+                f"Expected count function, got {func_name or count_func}",
+                error_code=INVALID_PARAMETER_VALUE,
+            )
+
+        # Validate comparator
+        if comparator.ttype != TokenType.Operator.Comparison:
+            raise MlflowException(
+                f"Invalid comparator in count expression: {comparator}",
+                error_code=INVALID_PARAMETER_VALUE,
+            )
+
+        # Validate value is numeric
+        if value.ttype not in cls.NUMERIC_VALUE_TYPES:
+            raise MlflowException(
+                f"Count value must be numeric, got {value}",
+                error_code=INVALID_PARAMETER_VALUE,
+            )
+
+        # Parse the inner condition from the count function
+        # count_func.tokens looks like: [Identifier('count'), Parenthesis('(...)')]
+        parenthesis = None
+        for token in count_func.tokens:
+            if isinstance(token, Parenthesis):
+                parenthesis = token
+                break
+
+        if not parenthesis:
+            raise MlflowException(
+                "Count function must have parentheses with a condition",
+                error_code=INVALID_PARAMETER_VALUE,
+            )
+
+        # Extract the inner comparison from parenthesis
+        inner_tokens = [
+            t
+            for t in parenthesis.tokens
+            if not t.is_whitespace and t.ttype != TokenType.Punctuation
+        ]
+        if len(inner_tokens) != 1 or not isinstance(inner_tokens[0], Comparison):
+            raise MlflowException(
+                "Count function must contain exactly one comparison condition",
+                error_code=INVALID_PARAMETER_VALUE,
+            )
+
+        # Parse the inner comparison recursively
+        inner_comp = cls._get_comparison(inner_tokens[0])
+
+        # Validate that the inner condition is for a valid countable entity (currently only span)
+        if inner_comp.get("type") != cls._SPAN_IDENTIFIER:
+            raise MlflowException(
+                f"Count expressions currently only support span conditions, "
+                f"got {inner_comp.get('type')}",
+                error_code=INVALID_PARAMETER_VALUE,
+            )
+
+        return {
+            "type": "count",
+            "inner_condition": inner_comp,
+            "comparator": comparator.value,
+            "value": int(value.value),
+        }
 
 
 class SearchLoggedModelsUtils(SearchUtils):

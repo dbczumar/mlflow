@@ -3132,6 +3132,94 @@ def _get_filter_clauses_for_search_traces(filter_string, session, dialect):
     parsed_filters = SearchTraceUtils.parse_search_filter_for_search_traces(filter_string)
     for sql_statement in parsed_filters:
         key_type = sql_statement.get("type")
+
+        # Handle count expressions
+        if key_type == "count":
+            inner_condition = sql_statement.get("inner_condition")
+            count_comparator = sql_statement.get("comparator").upper()
+            count_value = sql_statement.get("value")
+
+            # For now, we only support counting spans
+            if inner_condition.get("type") == SearchTraceUtils._SPAN_IDENTIFIER:
+                from mlflow.store.tracking.dbmodels.models import SqlSpan
+
+                # Build the inner span filter
+                inner_key_name = inner_condition.get("key")
+                inner_value = inner_condition.get("value")
+                inner_comparator = inner_condition.get("comparator").upper()
+
+                span_filters = []
+                if inner_key_name in ("type", "name", "status"):
+                    column = getattr(SqlSpan, inner_key_name)
+                    val_filter = SearchTraceUtils.get_sql_comparison_func(
+                        inner_comparator, dialect
+                    )(column, inner_value)
+                    span_filters.append(val_filter)
+                elif inner_key_name == "content":
+                    # JSON content search for span.content
+                    if dialect == POSTGRES:
+                        val_filter = SearchTraceUtils.get_sql_comparison_func(
+                            inner_comparator, dialect
+                        )(sa.cast(SqlSpan.content, sa.Text), inner_value)
+                    else:
+                        val_filter = SearchTraceUtils.get_sql_comparison_func(
+                            inner_comparator, dialect
+                        )(SqlSpan.content, inner_value)
+                    span_filters.append(val_filter)
+
+                # Create a subquery that counts matching spans per trace
+                count_subquery = (
+                    session.query(
+                        SqlSpan.trace_id,
+                        sa.func.count(SqlSpan.span_id).label("span_count"),
+                    )
+                    .filter(*span_filters)
+                    .group_by(SqlSpan.trace_id)
+                    .subquery()
+                )
+
+                # For comparisons that need to include zero counts (like < or <=),
+                # we need to use a different approach that includes all traces
+                if count_comparator in ("<", "<=", "!=", "="):
+                    # Create a subquery that includes all traces with their counts
+                    # (0 for traces not in the count_subquery)
+                    all_traces_with_counts = (
+                        session.query(
+                            SqlTraceInfo.request_id,
+                            sa.func.coalesce(count_subquery.c.span_count, 0).label("span_count"),
+                        )
+                        .outerjoin(
+                            count_subquery,
+                            SqlTraceInfo.request_id == count_subquery.c.trace_id,
+                        )
+                        .subquery()
+                    )
+
+                    # Apply the count comparison
+                    count_filter = SearchTraceUtils.get_sql_comparison_func(
+                        count_comparator, dialect
+                    )(all_traces_with_counts.c.span_count, count_value)
+
+                    # Create final subquery
+                    final_subquery = (
+                        session.query(all_traces_with_counts.c.request_id.label("trace_id"))
+                        .filter(count_filter)
+                        .subquery()
+                    )
+                else:
+                    # For > and >= comparisons, we can use the simpler approach
+                    # since we only care about traces that have at least some matching spans
+                    count_filter = SearchTraceUtils.get_sql_comparison_func(
+                        count_comparator, dialect
+                    )(count_subquery.c.span_count, count_value)
+
+                    final_subquery = (
+                        session.query(count_subquery.c.trace_id).filter(count_filter).subquery()
+                    )
+
+                non_attribute_filters.append(final_subquery)
+            continue
+
         key_name = sql_statement.get("key")
         value = sql_statement.get("value")
         comparator = sql_statement.get("comparator").upper()
