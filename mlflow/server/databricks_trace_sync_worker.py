@@ -3,12 +3,16 @@ Background worker for synchronizing traces from Databricks experiments to local 
 """
 
 import logging
+import os
 import random
 import threading
-import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
+
+# Configure boto3 to use larger connection pools for S3
+# This prevents "Connection pool is full" warnings when downloading many traces in parallel
+os.environ.setdefault("AWS_MAX_POOL_CONNECTIONS", "50")
 
 from mlflow.entities.trace import Trace
 from mlflow.exceptions import MlflowException
@@ -197,7 +201,7 @@ class DatabricksTraceSyncWorker:
         """Search for traces in source experiments and sync them to destination."""
         page_token = None
         total_synced = 0
-        batch_size = 100  # Process smaller batches to avoid connection pool exhaustion
+        batch_size = 1000  # Process 1000 traces at a time
 
         # Build filter string for traces after cursor
         filter_string = None
@@ -263,10 +267,7 @@ class DatabricksTraceSyncWorker:
 
                 # Check if there are more pages
                 page_token = traces_page.token
-                if page_token:
-                    # Add a small delay between batches to avoid connection pool exhaustion
-                    time.sleep(1)
-                else:
+                if not page_token:
                     break
 
             except Exception as e:
@@ -288,7 +289,7 @@ class DatabricksTraceSyncWorker:
         synced_count = 0
         last_synced_trace = None
 
-        with ThreadPoolExecutor(max_workers=2, thread_name_prefix="TraceSync") as executor:
+        with ThreadPoolExecutor(max_workers=5, thread_name_prefix="TraceSync") as executor:
             futures = []
             for trace in traces:
                 future = executor.submit(self._sync_single_trace, trace, dest_experiment_id)
