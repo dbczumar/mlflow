@@ -407,6 +407,21 @@ def initialize_backend_stores(
     except UnsupportedModelRegistryStoreURIException:
         pass
 
+    # Initialize and validate databricks trace sync configuration if provided
+    try:
+        from mlflow.server.databricks_trace_sync import get_databricks_trace_sync_config
+
+        config = get_databricks_trace_sync_config()
+        if config:
+            _logger.info(
+                f"Databricks trace sync configured: "
+                f"source_experiments={config.source_experiment_names}, "
+                f"destination_experiment={config.destination_experiment_name}, "
+                f"sampling_rate={config.sampling_rate}"
+            )
+    except Exception as e:
+        _logger.error(f"Failed to initialize databricks trace sync: {e}")
+
 
 def _assert_string(x):
     assert isinstance(x, str)

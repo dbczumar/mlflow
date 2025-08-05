@@ -377,6 +377,17 @@ def _validate_static_prefix(ctx, param, value):
         "Unsupported on Windows."
     ),
 )
+@click.option(
+    "--databricks-trace-sync",
+    envvar="MLFLOW_DATABRICKS_TRACE_SYNC",
+    default=None,
+    help=(
+        "Path to YAML configuration file for syncing traces from Databricks experiments. "
+        "The YAML file should contain: source_experiment_names (list), "
+        "destination_experiment_name (string), and optionally sampling_rate (float, default 1.0) "
+        "and databricks_tracking_uri (string, default 'databricks')."
+    ),
+)
 def server(
     backend_store_uri,
     registry_store_uri,
@@ -394,6 +405,7 @@ def server(
     expose_prometheus,
     app_name,
     dev,
+    databricks_trace_sync,
 ):
     """
     Run the MLflow tracking server.
@@ -471,6 +483,7 @@ def server(
             app_name,
             use_uvicorn,
             uvicorn_opts,
+            databricks_trace_sync,
         )
     except ShellCommandException:
         eprint("Running the mlflow server failed. Please see the logs above for details.")

@@ -41,6 +41,7 @@ ARTIFACTS_DESTINATION_ENV_VAR = "_MLFLOW_SERVER_ARTIFACT_DESTINATION"
 PROMETHEUS_EXPORTER_ENV_VAR = "prometheus_multiproc_dir"
 SERVE_ARTIFACTS_ENV_VAR = "_MLFLOW_SERVER_SERVE_ARTIFACTS"
 ARTIFACTS_ONLY_ENV_VAR = "_MLFLOW_SERVER_ARTIFACTS_ONLY"
+DATABRICKS_TRACE_SYNC_ENV_VAR = "_MLFLOW_SERVER_DATABRICKS_TRACE_SYNC"
 
 REL_STATIC_DIR = "js/build"
 
@@ -282,6 +283,7 @@ def _run_server(
     app_name=None,
     use_uvicorn=False,
     uvicorn_opts=None,
+    databricks_trace_sync=None,
 ):
     """
     Run the MLflow server, wrapping it in gunicorn, uvicorn, or waitress on windows
@@ -313,6 +315,9 @@ def _run_server(
 
     if expose_prometheus:
         env_map[PROMETHEUS_EXPORTER_ENV_VAR] = expose_prometheus
+
+    if databricks_trace_sync:
+        env_map[DATABRICKS_TRACE_SYNC_ENV_VAR] = databricks_trace_sync
 
     secret_key = MLFLOW_FLASK_SERVER_SECRET_KEY.get()
     if secret_key:
