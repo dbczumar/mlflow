@@ -173,6 +173,7 @@ from mlflow.utils.validation import (
 _logger = logging.getLogger(__name__)
 _tracking_store = None
 _model_registry_store = None
+_databricks_sync_initialized = False
 _artifact_repo = None
 STATIC_PREFIX_ENV_VAR = "_MLFLOW_STATIC_PREFIX"
 MAX_RUNS_GET_METRIC_HISTORY_BULK = 100
@@ -371,6 +372,33 @@ def _get_proxied_run_artifact_destination_path(proxied_artifact_root, relative_p
     )
 
 
+def _initialize_databricks_trace_sync_once():
+    """Initialize databricks trace sync if configured (only runs once)."""
+    global _databricks_sync_initialized
+    if _databricks_sync_initialized:
+        return
+
+    _databricks_sync_initialized = True
+
+    try:
+        from mlflow.server.databricks_trace_sync import get_databricks_trace_sync_config
+        from mlflow.server.databricks_trace_sync_worker import start_databricks_trace_sync
+
+        config = get_databricks_trace_sync_config()
+        if config:
+            _logger.info(
+                f"Databricks trace sync configured: "
+                f"source_experiment={config.source_experiment_name}, "
+                f"destination_experiment={config.destination_experiment_name}, "
+                f"sampling_rate={config.sampling_rate}"
+            )
+            # Start the background sync worker
+            start_databricks_trace_sync(config)
+            _logger.info("Started Databricks trace sync worker")
+    except Exception as e:
+        _logger.error(f"Failed to initialize databricks trace sync: {e}")
+
+
 def _get_tracking_store(backend_store_uri=None, default_artifact_root=None):
     from mlflow.server import ARTIFACT_ROOT_ENV_VAR, BACKEND_STORE_URI_ENV_VAR
 
@@ -380,6 +408,9 @@ def _get_tracking_store(backend_store_uri=None, default_artifact_root=None):
         artifact_root = default_artifact_root or os.environ.get(ARTIFACT_ROOT_ENV_VAR, None)
         _tracking_store = _tracking_store_registry.get_store(store_uri, artifact_root)
         utils.set_tracking_uri(store_uri)
+
+        # Initialize databricks trace sync when tracking store is first accessed
+        _initialize_databricks_trace_sync_once()
     return _tracking_store
 
 
