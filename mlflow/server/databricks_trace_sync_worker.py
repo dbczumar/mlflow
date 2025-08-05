@@ -148,7 +148,7 @@ class DatabricksTraceSyncWorker:
                 experiment_ids=[dest_experiment_id],
                 filter_string=filter_string,
                 max_results=1,
-                order_by=["timestamp DESC"],
+                order_by=["timestamp_ms DESC"],
                 include_spans=False,  # We only need trace info
             )
 
@@ -192,11 +192,8 @@ class DatabricksTraceSyncWorker:
 
             if source_trace_id:
                 # Filter for traces created after cursor timestamp
-                # or traces with same timestamp but ID > cursor ID (for stable ordering)
-                filter_string = (
-                    f"(timestamp > {cursor_timestamp}) OR "
-                    f"(timestamp = {cursor_timestamp} AND trace_id > '{source_trace_id}')"
-                )
+                # Since Databricks doesn't support trace_id in filters, we'll use timestamp only
+                filter_string = f"timestamp_ms > {cursor_timestamp}"
                 _logger.debug(f"Using filter: {filter_string}")
 
         current_cursor = cursor_trace
@@ -210,10 +207,7 @@ class DatabricksTraceSyncWorker:
                         or current_cursor.info.trace_id
                     )
                     cursor_timestamp = current_cursor.info.timestamp_ms
-                    filter_string = (
-                        f"(timestamp > {cursor_timestamp}) OR "
-                        f"(timestamp = {cursor_timestamp} AND trace_id > '{source_trace_id}')"
-                    )
+                    filter_string = f"timestamp_ms > {cursor_timestamp}"
                     _logger.debug(f"Updated filter after batch: {filter_string}")
 
                 # Search for traces in source experiments
@@ -222,7 +216,7 @@ class DatabricksTraceSyncWorker:
                     filter_string=filter_string,
                     max_results=batch_size,
                     page_token=page_token,
-                    order_by=["timestamp ASC", "trace_id ASC"],  # Ensure stable ordering
+                    order_by=["timestamp_ms ASC"],  # Order by timestamp
                     include_spans=True,  # We need the full trace data
                 )
 
