@@ -37,6 +37,15 @@ def create_fastapi_app():
 
     fastapi_app.include_router(otel_router)
 
+    # Add startup event to initialize databricks sync
+    @fastapi_app.on_event("startup")
+    async def startup_event():
+        """Initialize services on startup."""
+        # Trigger tracking store initialization which will start sync
+        from mlflow.server.handlers import _get_tracking_store
+
+        _get_tracking_store()
+
     # Mount the entire Flask application at the root path
     # This ensures 100% compatibility with existing APIs
     fastapi_app.mount("/", WSGIMiddleware(flask_app))

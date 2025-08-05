@@ -165,9 +165,25 @@ class DatabricksTraceSyncWorker:
             experiment = self.dest_mlflow_client.get_experiment_by_name(experiment_name)
             if experiment is None:
                 _logger.info(f"Creating destination experiment '{experiment_name}'")
-                experiment_id = self.dest_mlflow_client.create_experiment(experiment_name)
-                experiment = self.dest_mlflow_client.get_experiment(experiment_id)
+                try:
+                    experiment_id = self.dest_mlflow_client.create_experiment(experiment_name)
+                    experiment = self.dest_mlflow_client.get_experiment(experiment_id)
+                except Exception as create_error:
+                    # Handle race condition where another process created it
+                    if "already exists" in str(create_error):
+                        _logger.info(
+                            f"Experiment '{experiment_name}' was created by another process"
+                        )
+                        experiment = self.dest_mlflow_client.get_experiment_by_name(experiment_name)
+                        if experiment is None:
+                            raise MlflowException(
+                                f"Failed to get experiment after creation race: {create_error}"
+                            )
+                    else:
+                        raise create_error
             return experiment
+        except MlflowException:
+            raise
         except Exception as e:
             raise MlflowException(f"Failed to ensure experiment '{experiment_name}' exists: {e}")
 
@@ -216,7 +232,7 @@ class DatabricksTraceSyncWorker:
                     max_results=batch_size,
                     page_token=page_token,
                     order_by=["timestamp_ms ASC"],  # Order by timestamp
-                    include_spans=True,  # We need the full trace data
+                    # Don't include spans here - we'll download trace data separately
                 )
 
                 if not traces_page:
@@ -337,12 +353,23 @@ class DatabricksTraceSyncWorker:
             # 1. Create the trace in the destination
             returned_trace_info = self.dest_client.start_trace(new_trace_info)
 
-            # 2. Upload trace data as artifact
-            # Note: We don't need to update span trace IDs since the spans are already
-            # associated with the trace through the artifact upload
-            if trace.data:
+            # 2. Download trace data from source if not already present
+            trace_data = trace.data
+            if not trace_data:
                 try:
-                    self.dest_client._upload_trace_data(returned_trace_info, trace.data)
+                    # Download the trace data from the source
+                    trace_data = self.source_client._download_trace_data(trace.info)
+                except Exception as e:
+                    _logger.warning(
+                        f"Failed to download trace data for trace {trace.info.trace_id}: {e}. "
+                        "Skipping data upload."
+                    )
+                    trace_data = None
+
+            # 3. Upload trace data as artifact if available
+            if trace_data:
+                try:
+                    self.dest_client._upload_trace_data(returned_trace_info, trace_data)
                 except Exception as e:
                     _logger.error(
                         f"Failed to upload trace data for trace {trace.info.trace_id}: {e}"
@@ -358,26 +385,29 @@ class DatabricksTraceSyncWorker:
             return False
 
 
-# Global worker instance
+# Global worker instance and lock
 _sync_worker: Optional[DatabricksTraceSyncWorker] = None
+_sync_worker_lock = threading.Lock()
 
 
 def start_databricks_trace_sync(config: DatabricksTraceSyncConfig):
     """Start the Databricks trace synchronization worker."""
     global _sync_worker
 
-    if _sync_worker is not None:
-        _logger.warning("Stopping existing trace sync worker")
-        _sync_worker.stop()
+    with _sync_worker_lock:
+        if _sync_worker is not None:
+            _logger.warning("Trace sync worker already running, skipping initialization")
+            return
 
-    _sync_worker = DatabricksTraceSyncWorker(config)
-    _sync_worker.start()
+        _sync_worker = DatabricksTraceSyncWorker(config)
+        _sync_worker.start()
 
 
 def stop_databricks_trace_sync():
     """Stop the Databricks trace synchronization worker."""
     global _sync_worker
 
-    if _sync_worker is not None:
-        _sync_worker.stop()
-        _sync_worker = None
+    with _sync_worker_lock:
+        if _sync_worker is not None:
+            _sync_worker.stop()
+            _sync_worker = None
