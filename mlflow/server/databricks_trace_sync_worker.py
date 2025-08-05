@@ -5,6 +5,7 @@ Background worker for synchronizing traces from Databricks experiments to local 
 import logging
 import random
 import threading
+import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
@@ -196,7 +197,7 @@ class DatabricksTraceSyncWorker:
         """Search for traces in source experiments and sync them to destination."""
         page_token = None
         total_synced = 0
-        batch_size = 1000  # Process 1000 traces at a time
+        batch_size = 100  # Process smaller batches to avoid connection pool exhaustion
 
         # Build filter string for traces after cursor
         filter_string = None
@@ -262,7 +263,10 @@ class DatabricksTraceSyncWorker:
 
                 # Check if there are more pages
                 page_token = traces_page.token
-                if not page_token:
+                if page_token:
+                    # Add a small delay between batches to avoid connection pool exhaustion
+                    time.sleep(1)
+                else:
                     break
 
             except Exception as e:
@@ -284,7 +288,7 @@ class DatabricksTraceSyncWorker:
         synced_count = 0
         last_synced_trace = None
 
-        with ThreadPoolExecutor(max_workers=5, thread_name_prefix="TraceSync") as executor:
+        with ThreadPoolExecutor(max_workers=2, thread_name_prefix="TraceSync") as executor:
             futures = []
             for trace in traces:
                 future = executor.submit(self._sync_single_trace, trace, dest_experiment_id)
