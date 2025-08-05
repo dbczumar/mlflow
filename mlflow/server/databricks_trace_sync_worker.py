@@ -2,15 +2,14 @@
 Background worker for synchronizing traces from Databricks experiments to local experiments.
 """
 
-import asyncio
 import logging
 import random
 import threading
+import uuid
 from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
 
 from mlflow.entities.trace import Trace
-from mlflow.entities.trace_data import TraceData
 from mlflow.exceptions import MlflowException
 from mlflow.server.databricks_trace_sync import DatabricksTraceSyncConfig
 from mlflow.store.entities.paged_list import PagedList
@@ -295,50 +294,59 @@ class DatabricksTraceSyncWorker:
         """
         try:
             # Create a new trace info with the destination experiment ID
-            # Note: We preserve the original timestamp to maintain chronological order
-            new_trace_info = trace.info._copy_with_overrides(
-                experiment_id=dest_experiment_id,
-                # Keep original trace ID to maintain traceability
+            # Since TraceInfo doesn't have _copy_with_overrides, we need to create a new object
+            from mlflow.entities.trace_info import TraceInfo
+            from mlflow.entities.trace_location import (
+                MlflowExperimentLocation,
+                TraceLocation,
+                TraceLocationType,
+            )
+
+            # Create new trace location with destination experiment
+            new_trace_location = TraceLocation(
+                type=TraceLocationType.MLFLOW_EXPERIMENT,
+                mlflow_experiment=MlflowExperimentLocation(experiment_id=dest_experiment_id),
+            )
+
+            # Create new trace info with updated location and tags
+            # Generate a new trace ID for the destination to avoid conflicts
+            new_trace_id = f"tr-{uuid.uuid4().hex}"
+
+            # Filter out tags that will be set by the destination system
+            tags_to_exclude = {"mlflow.artifactLocation", "mlflow.traceRequestId"}
+            filtered_tags = {k: v for k, v in trace.info.tags.items() if k not in tags_to_exclude}
+
+            new_trace_info = TraceInfo(
+                trace_id=new_trace_id,
+                trace_location=new_trace_location,
+                request_time=trace.info.request_time,
+                state=trace.info.state,
+                request_preview=trace.info.request_preview,
+                response_preview=trace.info.response_preview,
+                client_request_id=trace.info.client_request_id,
+                execution_duration=trace.info.execution_duration,
+                trace_metadata=trace.info.trace_metadata.copy(),
                 tags={
-                    **trace.info.tags,
+                    **filtered_tags,
                     "mlflow.databricks.sourceTraceId": trace.info.trace_id,
                     "mlflow.databricks.sourceExperimentId": trace.info.experiment_id,
                 },
+                assessments=trace.info.assessments.copy(),
             )
 
             # 1. Create the trace in the destination
             returned_trace_info = self.dest_client.start_trace(new_trace_info)
 
-            # 2. Log spans using the log_spans API
-            if trace.data and trace.data.spans:
+            # 2. Upload trace data as artifact
+            # Note: We don't need to update span trace IDs since the spans are already
+            # associated with the trace through the artifact upload
+            if trace.data:
                 try:
-                    # Update span trace IDs to match the new trace
-                    updated_spans = []
-                    for span in trace.data.spans:
-                        updated_span = span._copy_with_overrides(
-                            trace_id=returned_trace_info.trace_id
-                        )
-                        updated_spans.append(updated_span)
-
-                    # Log spans asynchronously
-                    asyncio.run(self.dest_client.log_spans(updated_spans))
+                    self.dest_client._upload_trace_data(returned_trace_info, trace.data)
                 except Exception as e:
-                    _logger.error(f"Failed to log spans for trace {trace.info.trace_id}: {e}")
-
-            # 3. Upload trace data as artifact
-            try:
-                # Update trace data with new trace ID
-                updated_trace_data = TraceData(
-                    spans=[
-                        span._copy_with_overrides(trace_id=returned_trace_info.trace_id)
-                        for span in trace.data.spans
-                    ]
-                    if trace.data
-                    else []
-                )
-                self.dest_client._upload_trace_data(returned_trace_info, updated_trace_data)
-            except Exception as e:
-                _logger.error(f"Failed to upload trace data for trace {trace.info.trace_id}: {e}")
+                    _logger.error(
+                        f"Failed to upload trace data for trace {trace.info.trace_id}: {e}"
+                    )
 
             _logger.debug(
                 f"Successfully synced trace {trace.info.trace_id} -> {returned_trace_info.trace_id}"
