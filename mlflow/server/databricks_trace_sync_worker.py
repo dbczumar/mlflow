@@ -31,8 +31,9 @@ class DatabricksTraceSyncWorker:
         self.source_client = TracingClient(tracking_uri=config.tracking_uri)
         # Destination client uses local tracking URI
         self.dest_client = TracingClient()  # Use default local tracking URI
-        # MLflow client for source experiment management
-        self.mlflow_client = MlflowClient(tracking_uri=config.tracking_uri)
+        # MLflow clients - source for Databricks, dest for local
+        self.source_mlflow_client = MlflowClient(tracking_uri=config.tracking_uri)
+        self.dest_mlflow_client = MlflowClient()  # Local client for destination
         self._stop_event = threading.Event()
         self._worker_thread = None
 
@@ -88,13 +89,13 @@ class DatabricksTraceSyncWorker:
             if self.config.source_experiment_name.isdigit():
                 source_experiment_id = self.config.source_experiment_name
                 # Verify the experiment exists
-                source_exp = self.mlflow_client.get_experiment(source_experiment_id)
+                source_exp = self.source_mlflow_client.get_experiment(source_experiment_id)
                 _logger.debug(
                     f"Using source experiment ID: {source_experiment_id} "
                     f"(name: {source_exp.name if source_exp else 'Unknown'})"
                 )
             else:
-                source_exp = self.mlflow_client.get_experiment_by_name(
+                source_exp = self.source_mlflow_client.get_experiment_by_name(
                     self.config.source_experiment_name
                 )
                 if source_exp:
@@ -162,11 +163,11 @@ class DatabricksTraceSyncWorker:
     def _ensure_experiment_exists(self, experiment_name: str):
         """Ensure the experiment exists, creating it if necessary."""
         try:
-            experiment = self.mlflow_client.get_experiment_by_name(experiment_name)
+            experiment = self.dest_mlflow_client.get_experiment_by_name(experiment_name)
             if experiment is None:
                 _logger.info(f"Creating destination experiment '{experiment_name}'")
-                experiment_id = self.mlflow_client.create_experiment(experiment_name)
-                experiment = self.mlflow_client.get_experiment(experiment_id)
+                experiment_id = self.dest_mlflow_client.create_experiment(experiment_name)
+                experiment = self.dest_mlflow_client.get_experiment(experiment_id)
             return experiment
         except Exception as e:
             raise MlflowException(f"Failed to ensure experiment '{experiment_name}' exists: {e}")
