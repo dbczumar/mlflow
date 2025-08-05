@@ -187,8 +187,23 @@ class DatabricksTraceSyncWorker:
                 )
                 _logger.debug(f"Using filter: {filter_string}")
 
+        current_cursor = cursor_trace
+
         while True:
             try:
+                # Update filter if we have a new cursor from previous batch
+                if current_cursor != cursor_trace:
+                    source_trace_id = (
+                        current_cursor.info.tags.get("mlflow.databricks.sourceTraceId")
+                        or current_cursor.info.trace_id
+                    )
+                    cursor_timestamp = current_cursor.info.timestamp_ms
+                    filter_string = (
+                        f"(timestamp > {cursor_timestamp}) OR "
+                        f"(timestamp = {cursor_timestamp} AND trace_id > '{source_trace_id}')"
+                    )
+                    _logger.debug(f"Updated filter after batch: {filter_string}")
+
                 # Search for traces in source experiments
                 traces_page: PagedList[Trace] = self.source_client.search_traces(
                     experiment_ids=source_experiment_ids,
@@ -211,8 +226,18 @@ class DatabricksTraceSyncWorker:
 
                 # Sync traces in parallel
                 if traces_to_sync:
-                    synced_count = self._sync_traces_batch(traces_to_sync, dest_experiment_id)
+                    synced_count, last_synced = self._sync_traces_batch(
+                        traces_to_sync, dest_experiment_id
+                    )
                     total_synced += synced_count
+
+                    # Update cursor to the last successfully synced trace
+                    if last_synced:
+                        current_cursor = last_synced
+                        _logger.debug(
+                            f"Updated cursor to trace {last_synced.info.trace_id} "
+                            f"(timestamp: {last_synced.info.timestamp_ms})"
+                        )
 
                 # Check if there are more pages
                 page_token = traces_page.token
@@ -226,24 +251,35 @@ class DatabricksTraceSyncWorker:
         if total_synced > 0:
             _logger.info(f"Synced {total_synced} traces in this cycle")
 
-    def _sync_traces_batch(self, traces: list[Trace], dest_experiment_id: str) -> int:
-        """Sync a batch of traces to the destination in parallel."""
+    def _sync_traces_batch(
+        self, traces: list[Trace], dest_experiment_id: str
+    ) -> tuple[int, Optional[Trace]]:
+        """
+        Sync a batch of traces to the destination in parallel.
+
+        Returns:
+            Tuple of (synced_count, last_synced_trace)
+        """
         synced_count = 0
+        last_synced_trace = None
 
         with ThreadPoolExecutor(max_workers=10, thread_name_prefix="TraceSync") as executor:
             futures = []
             for trace in traces:
                 future = executor.submit(self._sync_single_trace, trace, dest_experiment_id)
-                futures.append((trace.info.trace_id, future))
+                futures.append((trace, future))
 
-            for trace_id, future in futures:
+            for trace, future in futures:
                 try:
                     if future.result():
                         synced_count += 1
+                        # Track the last successfully synced trace
+                        # Since we process in timestamp order, the last one is the newest
+                        last_synced_trace = trace
                 except Exception as e:
-                    _logger.error(f"Failed to sync trace {trace_id}: {e}")
+                    _logger.error(f"Failed to sync trace {trace.info.trace_id}: {e}")
 
-        return synced_count
+        return synced_count, last_synced_trace
 
     def _sync_single_trace(self, trace: Trace, dest_experiment_id: str) -> bool:
         """
