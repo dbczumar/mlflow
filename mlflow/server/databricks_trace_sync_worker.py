@@ -27,11 +27,12 @@ class DatabricksTraceSyncWorker:
 
     def __init__(self, config: DatabricksTraceSyncConfig):
         self.config = config
-        # For testing, use the same tracking URI for both source and destination
-        # In production, source would be Databricks and destination would be local
-        self.source_client = TracingClient()  # Use default tracking URI for testing
+        # Source client connects to Databricks
+        self.source_client = TracingClient(tracking_uri=config.tracking_uri)
+        # Destination client uses local tracking URI
         self.dest_client = TracingClient()  # Use default local tracking URI
-        self.mlflow_client = MlflowClient()  # For experiment management
+        # MLflow client for source experiment management
+        self.mlflow_client = MlflowClient(tracking_uri=config.tracking_uri)
         self._stop_event = threading.Event()
         self._worker_thread = None
 
@@ -83,27 +84,37 @@ class DatabricksTraceSyncWorker:
 
         # Get source experiment ID
         try:
-            source_exp = self.mlflow_client.get_experiment_by_name(
-                self.config.source_experiment_name
-            )
-            if source_exp:
-                source_experiment_id = source_exp.experiment_id
+            # Check if source_experiment_name is actually an ID (numeric)
+            if self.config.source_experiment_name.isdigit():
+                source_experiment_id = self.config.source_experiment_name
+                # Verify the experiment exists
+                source_exp = self.mlflow_client.get_experiment(source_experiment_id)
                 _logger.debug(
-                    f"Found source experiment: {self.config.source_experiment_name} "
-                    f"(ID: {source_experiment_id})"
+                    f"Using source experiment ID: {source_experiment_id} "
+                    f"(name: {source_exp.name if source_exp else 'Unknown'})"
                 )
             else:
-                _logger.warning(
-                    f"Source experiment '{self.config.source_experiment_name}' not found"
+                source_exp = self.mlflow_client.get_experiment_by_name(
+                    self.config.source_experiment_name
                 )
-                return
+                if source_exp:
+                    source_experiment_id = source_exp.experiment_id
+                    _logger.debug(
+                        f"Found source experiment: {self.config.source_experiment_name} "
+                        f"(ID: {source_experiment_id})"
+                    )
+                else:
+                    _logger.warning(
+                        f"Source experiment '{self.config.source_experiment_name}' not found"
+                    )
+                    return
         except Exception as e:
             _logger.error(f"Failed to get experiment '{self.config.source_experiment_name}': {e}")
             return
 
         # Find the last synced trace (cursor) in destination
         cursor_trace = self._find_last_synced_trace(
-            dest_experiment.experiment_id, source_exp.experiment_id
+            dest_experiment.experiment_id, source_experiment_id
         )
 
         if cursor_trace:
