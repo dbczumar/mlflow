@@ -34,7 +34,6 @@ class DatabricksTraceSyncWorker:
         self.mlflow_client = MlflowClient()  # For experiment management
         self._stop_event = threading.Event()
         self._worker_thread = None
-        self._processed_traces = set()  # Track processed trace IDs to avoid duplicates
 
     def start(self):
         """Start the background synchronization worker."""
@@ -102,8 +101,52 @@ class DatabricksTraceSyncWorker:
             _logger.error(f"Failed to get experiment '{self.config.source_experiment_name}': {e}")
             return
 
+        # Find the last synced trace (cursor) in destination
+        cursor_trace = self._find_last_synced_trace(
+            dest_experiment.experiment_id, source_exp.experiment_id
+        )
+
+        if cursor_trace:
+            _logger.info(
+                f"Found cursor trace {cursor_trace.info.trace_id} "
+                f"(timestamp: {cursor_trace.info.timestamp_ms})"
+            )
+        else:
+            _logger.info("No previously synced traces found, starting from beginning")
+
         # Search and sync traces from source experiment
-        self._search_and_sync_traces([source_experiment_id], dest_experiment.experiment_id)
+        self._search_and_sync_traces(
+            [source_experiment_id], dest_experiment.experiment_id, cursor_trace
+        )
+
+    def _find_last_synced_trace(
+        self, dest_experiment_id: str, source_experiment_id: str
+    ) -> Optional[Trace]:
+        """
+        Find the most recently synced trace in the destination experiment.
+
+        Returns the trace with the latest timestamp that has the source experiment tag.
+        """
+        try:
+            # Search for traces with the source experiment tag
+            filter_string = f"tags.mlflow.databricks.sourceExperimentId = '{source_experiment_id}'"
+
+            # Get the most recent trace by ordering by timestamp descending
+            traces = self.dest_client.search_traces(
+                experiment_ids=[dest_experiment_id],
+                filter_string=filter_string,
+                max_results=1,
+                order_by=["timestamp DESC"],
+                include_spans=False,  # We only need trace info
+            )
+
+            if traces:
+                return traces[0]
+            return None
+
+        except Exception as e:
+            _logger.error(f"Error finding cursor trace: {e}")
+            return None
 
     def _ensure_experiment_exists(self, experiment_name: str):
         """Ensure the experiment exists, creating it if necessary."""
@@ -117,19 +160,42 @@ class DatabricksTraceSyncWorker:
         except Exception as e:
             raise MlflowException(f"Failed to ensure experiment '{experiment_name}' exists: {e}")
 
-    def _search_and_sync_traces(self, source_experiment_ids: list[str], dest_experiment_id: str):
+    def _search_and_sync_traces(
+        self,
+        source_experiment_ids: list[str],
+        dest_experiment_id: str,
+        cursor_trace: Optional[Trace],
+    ):
         """Search for traces in source experiments and sync them to destination."""
         page_token = None
         total_synced = 0
         batch_size = 1000  # Process 1000 traces at a time
+
+        # Build filter string for traces after cursor
+        filter_string = None
+        if cursor_trace:
+            # Get the original trace ID and timestamp from the cursor
+            source_trace_id = cursor_trace.info.tags.get("mlflow.databricks.sourceTraceId")
+            cursor_timestamp = cursor_trace.info.timestamp_ms
+
+            if source_trace_id:
+                # Filter for traces created after cursor timestamp
+                # or traces with same timestamp but ID > cursor ID (for stable ordering)
+                filter_string = (
+                    f"(timestamp > {cursor_timestamp}) OR "
+                    f"(timestamp = {cursor_timestamp} AND trace_id > '{source_trace_id}')"
+                )
+                _logger.debug(f"Using filter: {filter_string}")
 
         while True:
             try:
                 # Search for traces in source experiments
                 traces_page: PagedList[Trace] = self.source_client.search_traces(
                     experiment_ids=source_experiment_ids,
+                    filter_string=filter_string,
                     max_results=batch_size,
                     page_token=page_token,
+                    order_by=["timestamp ASC", "trace_id ASC"],  # Ensure stable ordering
                     include_spans=True,  # We need the full trace data
                 )
 
@@ -139,10 +205,6 @@ class DatabricksTraceSyncWorker:
                 # Process traces in parallel
                 traces_to_sync = []
                 for trace in traces_page:
-                    # Skip if already processed
-                    if trace.info.trace_id in self._processed_traces:
-                        continue
-
                     # Apply sampling
                     if random.random() <= self.config.sampling_rate:
                         traces_to_sync.append(trace)
@@ -178,7 +240,6 @@ class DatabricksTraceSyncWorker:
                 try:
                     if future.result():
                         synced_count += 1
-                        self._processed_traces.add(trace_id)
                 except Exception as e:
                     _logger.error(f"Failed to sync trace {trace_id}: {e}")
 
@@ -192,6 +253,7 @@ class DatabricksTraceSyncWorker:
         """
         try:
             # Create a new trace info with the destination experiment ID
+            # Note: We preserve the original timestamp to maintain chronological order
             new_trace_info = trace.info._copy_with_overrides(
                 experiment_id=dest_experiment_id,
                 # Keep original trace ID to maintain traceability
