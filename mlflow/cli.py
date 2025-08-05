@@ -382,8 +382,8 @@ def _validate_static_prefix(ctx, param, value):
     envvar="MLFLOW_DATABRICKS_TRACE_SYNC",
     default=None,
     help=(
-        "Path to YAML configuration file for syncing traces from Databricks experiments. "
-        "The YAML file should contain: source_experiment_names (list), "
+        "Path to YAML configuration file for syncing traces from a Databricks experiment. "
+        "The YAML file should contain: source_experiment_name (string), "
         "destination_experiment_name (string), and optionally sampling_rate (float, default 1.0) "
         "and databricks_tracking_uri (string, default 'databricks')."
     ),

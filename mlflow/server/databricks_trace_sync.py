@@ -18,7 +18,7 @@ class DatabricksTraceSyncConfig:
     Configuration for syncing traces from Databricks experiments.
     """
 
-    source_experiment_names: list[str]
+    source_experiment_name: str
     destination_experiment_name: str
     sampling_rate: float = 1.0
     tracking_uri: Optional[str] = None  # Default to "databricks" if not specified
@@ -32,9 +32,7 @@ def parse_databricks_trace_sync_config(
 
     Expected YAML format:
     ```
-    source_experiment_names:
-      - exp1
-      - exp2
+    source_experiment_name: exp1
     destination_experiment_name: local_exp
     sampling_rate: 0.5  # optional, default 1.0
     databricks_tracking_uri: databricks  # optional, default "databricks"
@@ -65,12 +63,12 @@ def parse_databricks_trace_sync_config(
             raise ValueError("Configuration file must contain a YAML dictionary")
 
         # Parse required fields
-        if "source_experiment_names" not in config_data:
-            raise ValueError("'source_experiment_names' is required in configuration")
+        if "source_experiment_name" not in config_data:
+            raise ValueError("'source_experiment_name' is required in configuration")
 
-        source_experiments = config_data["source_experiment_names"]
-        if not isinstance(source_experiments, list) or not source_experiments:
-            raise ValueError("'source_experiment_names' must be a non-empty list")
+        source_experiment = config_data["source_experiment_name"]
+        if not isinstance(source_experiment, str) or not source_experiment.strip():
+            raise ValueError("'source_experiment_name' must be a non-empty string")
 
         if "destination_experiment_name" not in config_data:
             raise ValueError("'destination_experiment_name' is required in configuration")
@@ -89,7 +87,7 @@ def parse_databricks_trace_sync_config(
             raise ValueError("'databricks_tracking_uri' must be a string")
 
         return DatabricksTraceSyncConfig(
-            source_experiment_names=[str(exp).strip() for exp in source_experiments],
+            source_experiment_name=source_experiment.strip(),
             destination_experiment_name=dest_experiment.strip(),
             sampling_rate=float(sampling_rate),
             tracking_uri=databricks_tracking_uri,

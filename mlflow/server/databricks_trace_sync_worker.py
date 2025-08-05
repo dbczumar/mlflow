@@ -50,7 +50,7 @@ class DatabricksTraceSyncWorker:
         )
         self._worker_thread.start()
         _logger.info(
-            f"Started trace sync worker for experiments {self.config.source_experiment_names}"
+            f"Started trace sync worker for experiment '{self.config.source_experiment_name}'"
         )
 
     def stop(self):
@@ -78,28 +78,32 @@ class DatabricksTraceSyncWorker:
             self._stop_event.wait(30)
 
     def _sync_traces(self):
-        """Synchronize traces from all configured source experiments."""
+        """Synchronize traces from the configured source experiment."""
         # Ensure destination experiment exists
         dest_experiment = self._ensure_experiment_exists(self.config.destination_experiment_name)
 
-        # Get source experiment IDs
-        source_experiment_ids = []
-        for exp_name in self.config.source_experiment_names:
-            try:
-                exp = self.mlflow_client.get_experiment_by_name(exp_name)
-                if exp:
-                    source_experiment_ids.append(exp.experiment_id)
-                else:
-                    _logger.warning(f"Source experiment '{exp_name}' not found")
-            except Exception as e:
-                _logger.error(f"Failed to get experiment '{exp_name}': {e}")
-
-        if not source_experiment_ids:
-            _logger.warning("No valid source experiments found")
+        # Get source experiment ID
+        try:
+            source_exp = self.mlflow_client.get_experiment_by_name(
+                self.config.source_experiment_name
+            )
+            if source_exp:
+                source_experiment_id = source_exp.experiment_id
+                _logger.debug(
+                    f"Found source experiment: {self.config.source_experiment_name} "
+                    f"(ID: {source_experiment_id})"
+                )
+            else:
+                _logger.warning(
+                    f"Source experiment '{self.config.source_experiment_name}' not found"
+                )
+                return
+        except Exception as e:
+            _logger.error(f"Failed to get experiment '{self.config.source_experiment_name}': {e}")
             return
 
-        # Search and sync traces from all source experiments
-        self._search_and_sync_traces(source_experiment_ids, dest_experiment.experiment_id)
+        # Search and sync traces from source experiment
+        self._search_and_sync_traces([source_experiment_id], dest_experiment.experiment_id)
 
     def _ensure_experiment_exists(self, experiment_name: str):
         """Ensure the experiment exists, creating it if necessary."""

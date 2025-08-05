@@ -416,7 +416,7 @@ def initialize_backend_stores(
         if config:
             _logger.info(
                 f"Databricks trace sync configured: "
-                f"source_experiments={config.source_experiment_names}, "
+                f"source_experiment={config.source_experiment_name}, "
                 f"destination_experiment={config.destination_experiment_name}, "
                 f"sampling_rate={config.sampling_rate}"
             )
