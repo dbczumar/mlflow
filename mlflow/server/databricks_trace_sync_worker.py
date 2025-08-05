@@ -226,13 +226,13 @@ class DatabricksTraceSyncWorker:
                     _logger.debug(f"Updated filter after batch: {filter_string}")
 
                 # Search for traces in source experiments
+                # Note: We search without spans first to avoid loading too much data at once
                 traces_page: PagedList[Trace] = self.source_client.search_traces(
                     experiment_ids=source_experiment_ids,
                     filter_string=filter_string,
                     max_results=batch_size,
                     page_token=page_token,
                     order_by=["timestamp_ms ASC"],  # Order by timestamp
-                    # Don't include spans here - we'll download trace data separately
                 )
 
                 if not traces_page:
@@ -284,7 +284,7 @@ class DatabricksTraceSyncWorker:
         synced_count = 0
         last_synced_trace = None
 
-        with ThreadPoolExecutor(max_workers=10, thread_name_prefix="TraceSync") as executor:
+        with ThreadPoolExecutor(max_workers=5, thread_name_prefix="TraceSync") as executor:
             futures = []
             for trace in traces:
                 future = executor.submit(self._sync_single_trace, trace, dest_experiment_id)
@@ -360,10 +360,20 @@ class DatabricksTraceSyncWorker:
                     # Download the trace data from the source
                     trace_data = self.source_client._download_trace_data(trace.info)
                 except Exception as e:
-                    _logger.warning(
-                        f"Failed to download trace data for trace {trace.info.trace_id}: {e}. "
-                        "Skipping data upload."
-                    )
+                    # Check if it's a missing data error
+                    error_msg = str(e)
+                    if "missing span data" in error_msg or "MlflowTraceDataNotFound" in str(
+                        type(e)
+                    ):
+                        _logger.info(
+                            f"Trace {trace.info.trace_id} has no span data, "
+                            "creating metadata-only trace"
+                        )
+                    else:
+                        _logger.warning(
+                            f"Failed to download trace data for trace {trace.info.trace_id}: {e}. "
+                            "Creating metadata-only trace."
+                        )
                     trace_data = None
 
             # 3. Upload trace data as artifact if available
@@ -374,6 +384,9 @@ class DatabricksTraceSyncWorker:
                     _logger.error(
                         f"Failed to upload trace data for trace {trace.info.trace_id}: {e}"
                     )
+            else:
+                # Even without span data, the trace metadata was successfully synced
+                _logger.debug(f"Synced trace metadata for {trace.info.trace_id} (no span data)")
 
             _logger.debug(
                 f"Successfully synced trace {trace.info.trace_id} -> {returned_trace_info.trace_id}"
