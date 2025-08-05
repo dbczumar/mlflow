@@ -410,6 +410,7 @@ def initialize_backend_stores(
     # Initialize and validate databricks trace sync configuration if provided
     try:
         from mlflow.server.databricks_trace_sync import get_databricks_trace_sync_config
+        from mlflow.server.databricks_trace_sync_worker import start_databricks_trace_sync
 
         config = get_databricks_trace_sync_config()
         if config:
@@ -419,6 +420,9 @@ def initialize_backend_stores(
                 f"destination_experiment={config.destination_experiment_name}, "
                 f"sampling_rate={config.sampling_rate}"
             )
+            # Start the background sync worker
+            start_databricks_trace_sync(config)
+            _logger.info("Started Databricks trace sync worker")
     except Exception as e:
         _logger.error(f"Failed to initialize databricks trace sync: {e}")
 
