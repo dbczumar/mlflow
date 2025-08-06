@@ -415,6 +415,11 @@ def server(
     to pass ``--host 0.0.0.0`` to listen on all network interfaces
     (or a specific interface address).
     """
+    # Set larger connection pool sizes BEFORE importing MLflow modules
+    # This prevents "Connection pool is full" warnings during parallel operations
+    os.environ.setdefault("MLFLOW_HTTP_POOL_CONNECTIONS", "50")
+    os.environ.setdefault("MLFLOW_HTTP_POOL_MAXSIZE", "50")
+
     from mlflow.server import _run_server
     from mlflow.server.handlers import initialize_backend_stores
 

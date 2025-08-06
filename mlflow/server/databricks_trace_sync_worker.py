@@ -3,14 +3,23 @@ Background worker for synchronizing traces from Databricks experiments to local 
 """
 
 import logging
+
+# Configure larger connection pools to prevent "Connection pool is full" warnings
+# when downloading many traces in parallel
+# 1. Configure urllib3/requests connection pools used by MLflow
+# These are used for Databricks API calls and artifact downloads
+import os
 import random
 import threading
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
 
-# Configure boto3 to use larger connection pools for S3
-# This prevents "Connection pool is full" warnings when downloading many traces in parallel
+# Increase connection pool sizes from default 10 to 50
+os.environ.setdefault("MLFLOW_HTTP_POOL_CONNECTIONS", "50")
+os.environ.setdefault("MLFLOW_HTTP_POOL_MAXSIZE", "50")
+
+# 2. Configure boto3 to use larger connection pools for S3
 # We need to monkey patch botocore's default config since MLflow doesn't expose this
 try:
     import botocore.config
@@ -19,7 +28,7 @@ try:
     original_config_init = botocore.config.Config.__init__
 
     def patched_config_init(self, **kwargs):
-        # Ensure max_pool_connections is set to at least 50
+        # ALWAYS set max_pool_connections to at least 50 if not specified
         if "max_pool_connections" not in kwargs or kwargs.get("max_pool_connections", 0) < 50:
             kwargs["max_pool_connections"] = 50
         original_config_init(self, **kwargs)
