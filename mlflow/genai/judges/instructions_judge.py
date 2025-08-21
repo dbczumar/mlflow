@@ -24,11 +24,15 @@ class InstructionsJudge(Judge):
     making it flexible for various assessment criteria.
     """
 
+    _TEMPLATE_VARIABLE_INPUTS = "inputs"
+    _TEMPLATE_VARIABLE_OUTPUTS = "outputs"
+    _TEMPLATE_VARIABLE_TRACE = "trace"
+    _TEMPLATE_VARIABLE_EXPECTATIONS = "expectations"
     _RESERVED_INSTRUCTION_TEMPLATE_VARIABLES = [
-        "inputs",
-        "outputs",
-        "trace",
-        "expectations",
+        _TEMPLATE_VARIABLE_INPUTS,
+        _TEMPLATE_VARIABLE_OUTPUTS,
+        _TEMPLATE_VARIABLE_TRACE,
+        _TEMPLATE_VARIABLE_EXPECTATIONS,
     ]
 
     def __init__(self, name: str, instructions: str, model: str | None = None, **kwargs):
@@ -46,11 +50,12 @@ class InstructionsJudge(Judge):
         self.model = model
         # Create a dummy PromptVersion to represent the instructions as a formattable template
         # with an API for variable extraction
-        self._prompt_version = PromptVersion(
+        self._instructions_prompt = PromptVersion(
             name=name,
             version=1,
             template=instructions,
         )
+        self._validate_instructions_template()
 
     def __call__(
         self,
@@ -84,7 +89,28 @@ class InstructionsJudge(Judge):
     @property
     def template_variables(self) -> set[str]:
         """Get the template variables from the instructions."""
-        return self._prompt_version.variables
+        return self._instructions_prompt.variables
+
+    def _validate_instructions_template(self) -> None:
+        """
+        Validate that instructions don't contain both trace and inputs/outputs variables.
+
+        Raises:
+            MlflowException: If instructions contain both trace and inputs/outputs variables
+        """
+        template_vars = self.template_variables
+
+        has_trace = self._TEMPLATE_VARIABLE_TRACE in template_vars
+        has_inputs = self._TEMPLATE_VARIABLE_INPUTS in template_vars
+        has_outputs = self._TEMPLATE_VARIABLE_OUTPUTS in template_vars
+
+        if has_trace and (has_inputs or has_outputs):
+            raise MlflowException(
+                "Instructions template cannot contain both 'trace' and 'inputs'/'outputs' "
+                "variables. Use either 'trace' for trace-based evaluation or 'inputs'/'outputs' "
+                "for field-based evaluation.",
+                error_code=INVALID_PARAMETER_VALUE,
+            )
 
     def _validate_template_variables(
         self,
