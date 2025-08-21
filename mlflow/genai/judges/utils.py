@@ -121,13 +121,11 @@ def _invoke_litellm(provider: str, model_name: str, prompt: str, trace: Trace | 
     litellm_model_uri = f"{provider}/{model_name}"
     messages = [{"role": "user", "content": prompt}]
 
-    # Get tools if trace is provided (empty list if no trace or no tools)
     tools = []
     if trace is not None:
         judge_tools = list_judge_tools()
         tools = [asdict(tool.get_definition()) for tool in judge_tools]
 
-    # Main completion loop - handles both tool and non-tool cases
     while True:
         try:
             response = litellm.completion(
@@ -136,20 +134,13 @@ def _invoke_litellm(provider: str, model_name: str, prompt: str, trace: Trace | 
                 tools=tools if tools else None,  # Only pass tools if we have them
                 tool_choice="auto" if tools else None,
             )
-
             message = response.choices[0].message
-
-            # If no tool calls, we're done
             if not message.tool_calls:
                 return message.content
 
-            # Add assistant's message to history
             messages.append(message.model_dump())
-
-            # Execute tool calls
             for tool_call in message.tool_calls:
                 try:
-                    # Create MLflow ToolCall and invoke
                     mlflow_tool_call = ToolCall(
                         id=tool_call.id,
                         function={
@@ -158,19 +149,6 @@ def _invoke_litellm(provider: str, model_name: str, prompt: str, trace: Trace | 
                         },
                     )
                     result = _judge_tool_registry.invoke(mlflow_tool_call, trace)
-
-                    # Convert result to string if needed
-                    if not isinstance(result, str):
-                        result = json.dumps(result)
-
-                    messages.append(
-                        {
-                            "tool_call_id": tool_call.id,
-                            "role": "tool",
-                            "name": tool_call.function.name,
-                            "content": result,
-                        }
-                    )
                 except Exception as e:
                     messages.append(
                         {
@@ -180,7 +158,16 @@ def _invoke_litellm(provider: str, model_name: str, prompt: str, trace: Trace | 
                             "content": f"Error: {e!s}",
                         }
                     )
-
+                else:
+                    result = json.dumps(result)
+                    messages.append(
+                        {
+                            "tool_call_id": tool_call.id,
+                            "role": "tool",
+                            "name": tool_call.function.name,
+                            "content": result,
+                        }
+                    )
         except Exception as e:
             raise MlflowException(f"Failed to invoke the judge model via litellm: {e}") from e
 

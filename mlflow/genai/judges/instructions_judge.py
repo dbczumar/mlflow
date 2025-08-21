@@ -191,6 +191,17 @@ class InstructionsJudge(Judge):
                 error_code=INVALID_PARAMETER_VALUE,
             )
 
+        # If trace is used, no other variables (besides reserved ones) should be defined
+        if has_trace:
+            non_reserved_vars = template_vars - set(self._RESERVED_INSTRUCTION_TEMPLATE_VARIABLES)
+            if non_reserved_vars:
+                raise MlflowException(
+                    f"When using 'trace' variable, no other variables are allowed. "
+                    f"Found: {non_reserved_vars}. The 'trace' variable provides complete context "
+                    "and should not be mixed with other template variables.",
+                    error_code=INVALID_PARAMETER_VALUE,
+                )
+
         # Check that model is not "databricks" when using trace
         if has_trace and self._model == _DEFAULT_MODEL_DATABRICKS:
             raise MlflowException(

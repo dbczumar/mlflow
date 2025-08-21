@@ -198,6 +198,22 @@ def test_databricks_model_with_trace_variable_raises_error():
     assert "Model cannot be 'databricks' when using 'trace' variable" in str(exc_info.value)
 
 
+def test_trace_with_custom_variables_raises_error():
+    """Test that using trace with custom variables raises error."""
+    with pytest.raises(
+        MlflowException, match="When using 'trace' variable, no other variables are allowed"
+    ) as exc_info:
+        make_judge(
+            name="test_judge",
+            instructions="Evaluate the {{trace}} with {{custom_field}} and {{another_field}}.",
+            model="openai/gpt-4o",
+        )
+
+    assert exc_info.value.error_code == "INVALID_PARAMETER_VALUE"
+    assert "no other variables are allowed" in str(exc_info.value)
+    assert "custom_field" in str(exc_info.value) or "another_field" in str(exc_info.value)
+
+
 def test_expectations_template_variable_raises_not_implemented():
     """Test that {{expectations}} as a template variable raises NotImplementedError."""
     with pytest.raises(
