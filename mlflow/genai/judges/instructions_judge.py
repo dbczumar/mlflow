@@ -62,23 +62,32 @@ class InstructionsJudge(Judge):
         *,
         inputs: dict[str, Any] | None = None,
         outputs: dict[str, Any] | None = None,
-        expectations: dict[str, Any] | None = None,
         trace: Any = None,
-        **kwargs,
+        expectations: dict[str, Any] | None = None,
     ) -> Any:
         """
         Evaluate the provided data using the judge's instructions.
 
         Args:
-            inputs: Input dictionary to evaluate
-            outputs: Output dictionary to evaluate
-            expectations: Expected outcomes or ground truth
-            trace: Trace object for evaluation
-            kwargs: Additional context for evaluation
+            inputs: Input dictionary to evaluate. Cannot be used with 'trace'.
+            outputs: Output dictionary to evaluate. Cannot be used with 'trace'.
+            trace: Trace object for evaluation. Cannot be used with 'inputs' or 'outputs'.
+            expectations: Expected outcomes or ground truth that can be used with any mode.
 
         Returns:
             Evaluation results
+
+        Raises:
+            MlflowException: If both trace and inputs/outputs are specified
         """
+        # Validate that trace is not specified together with inputs/outputs
+        if trace is not None and (inputs is not None or outputs is not None):
+            raise MlflowException(
+                "Cannot specify both 'trace' and 'inputs'/'outputs'. Use either 'trace' for "
+                "trace-based evaluation or 'inputs'/'outputs' for field-based evaluation.",
+                error_code=INVALID_PARAMETER_VALUE,
+            )
+
         raise NotImplementedError("InstructionsJudge evaluation is not yet implemented")
 
     @property
