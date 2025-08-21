@@ -1,5 +1,6 @@
 import json
 import re
+from dataclasses import asdict
 
 import mlflow
 from mlflow.entities.assessment import Feedback
@@ -7,7 +8,7 @@ from mlflow.entities.assessment_source import AssessmentSource, AssessmentSource
 from mlflow.entities.trace import Trace
 from mlflow.exceptions import MlflowException
 from mlflow.genai.utils.enum_utils import StrEnum
-from mlflow.protos.databricks_pb2 import INVALID_PARAMETER_VALUE
+from mlflow.protos.databricks_pb2 import BAD_REQUEST, INVALID_PARAMETER_VALUE
 from mlflow.utils.uri import is_databricks_uri
 
 # "endpoints" is a special case for Databricks model serving endpoints.
@@ -60,7 +61,13 @@ def invoke_judge_model(
 
     # Try litellm first for better performance.
     if _is_litellm_available():
-        response = _invoke_litellm(provider, model_name, prompt)
+        response = _invoke_litellm(provider, model_name, prompt, trace)
+    elif trace is not None:
+        raise MlflowException(
+            "LiteLLM is required for using traces with judge models. "
+            "Please install it with `pip install litellm`.",
+            error_code=BAD_REQUEST,
+        )
     elif provider in _NATIVE_PROVIDERS:
         response = score_model_on_payload(
             model_uri=model_uri,
@@ -71,7 +78,7 @@ def invoke_judge_model(
         raise MlflowException(
             f"LiteLLM is required for using '{provider}' LLM. Please install it with "
             "`pip install litellm`.",
-            error_code=INVALID_PARAMETER_VALUE,
+            error_code=BAD_REQUEST,
         )
 
     try:
@@ -103,18 +110,79 @@ def _is_litellm_available() -> bool:
         return False
 
 
-def _invoke_litellm(provider: str, model_name: str, prompt: str) -> str:
+def _invoke_litellm(provider: str, model_name: str, prompt: str, trace: Trace | None) -> str:
     """Invoke the judge model via litellm."""
     import litellm
 
+    from mlflow.genai.judges.tools import list_judge_tools
+    from mlflow.genai.judges.tools.registry import _judge_tool_registry
+    from mlflow.types.llm import ToolCall
+
     litellm_model_uri = f"{provider}/{model_name}"
-    try:
-        response = litellm.completion(
-            model=litellm_model_uri, messages=[{"role": "user", "content": prompt}]
-        )
-        return response.choices[0].message.content
-    except Exception as e:
-        raise MlflowException("Failed to invoke the judge model via litellm.") from e
+    messages = [{"role": "user", "content": prompt}]
+
+    # Get tools if trace is provided (empty list if no trace or no tools)
+    tools = []
+    if trace is not None:
+        judge_tools = list_judge_tools()
+        tools = [asdict(tool.get_definition()) for tool in judge_tools]
+
+    # Main completion loop - handles both tool and non-tool cases
+    while True:
+        try:
+            response = litellm.completion(
+                model=litellm_model_uri,
+                messages=messages,
+                tools=tools if tools else None,  # Only pass tools if we have them
+                tool_choice="auto" if tools else None,
+            )
+
+            message = response.choices[0].message
+
+            # If no tool calls, we're done
+            if not message.tool_calls:
+                return message.content
+
+            # Add assistant's message to history
+            messages.append(message.model_dump())
+
+            # Execute tool calls
+            for tool_call in message.tool_calls:
+                try:
+                    # Create MLflow ToolCall and invoke
+                    mlflow_tool_call = ToolCall(
+                        id=tool_call.id,
+                        function={
+                            "name": tool_call.function.name,
+                            "arguments": tool_call.function.arguments,
+                        },
+                    )
+                    result = _judge_tool_registry.invoke(mlflow_tool_call, trace)
+
+                    # Convert result to string if needed
+                    if not isinstance(result, str):
+                        result = json.dumps(result)
+
+                    messages.append(
+                        {
+                            "tool_call_id": tool_call.id,
+                            "role": "tool",
+                            "name": tool_call.function.name,
+                            "content": result,
+                        }
+                    )
+                except Exception as e:
+                    messages.append(
+                        {
+                            "tool_call_id": tool_call.id,
+                            "role": "tool",
+                            "name": tool_call.function.name,
+                            "content": f"Error: {e!s}",
+                        }
+                    )
+
+        except Exception as e:
+            raise MlflowException(f"Failed to invoke the judge model via litellm: {e}") from e
 
 
 class CategoricalRating(StrEnum):
