@@ -31,7 +31,7 @@ class SpanInfo:
 
 @experimental(version="3.4.0")
 @dataclass
-class SpansListResult:
+class ListSpansResult:
     """Result from listing spans with optional pagination."""
 
     spans: list[SpanInfo]
@@ -82,7 +82,7 @@ class ListSpansTool(JudgeTool):
 
     def invoke(
         self, trace: Trace, max_results: int = 100, page_token: str | None = None
-    ) -> SpansListResult:
+    ) -> ListSpansResult:
         """
         List spans from a trace with pagination support.
 
@@ -92,10 +92,10 @@ class ListSpansTool(JudgeTool):
             page_token: Token for retrieving the next page of results
 
         Returns:
-            SpansListResult containing spans list and optional next page token
+            ListSpansResult containing spans list and optional next page token
         """
         if not trace or not trace.data or not trace.data.spans:
-            return SpansListResult(spans=[])
+            return ListSpansResult(spans=[])
 
         # Parse page token to get start index
         start_index = 0
@@ -134,4 +134,4 @@ class ListSpansTool(JudgeTool):
         if end_index < len(all_spans):
             next_page_token = str(end_index)
 
-        return SpansListResult(spans=spans_info, next_page_token=next_page_token)
+        return ListSpansResult(spans=spans_info, next_page_token=next_page_token)
