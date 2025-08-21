@@ -7,6 +7,7 @@ This module provides a registry system for managing and invoking JudgeTool insta
 import json
 from typing import Any
 
+from mlflow.entities.trace import Trace
 from mlflow.exceptions import MlflowException
 from mlflow.genai.judges.tools.base import JudgeTool
 from mlflow.protos.databricks_pb2 import RESOURCE_DOES_NOT_EXIST
@@ -33,9 +34,9 @@ class JudgeToolStore:
             )
         return self._tools[name]
 
-    def list_tools(self) -> dict[str, JudgeTool]:
+    def list_tools(self) -> list[JudgeTool]:
         """List all registered tools."""
-        return self._tools.copy()
+        return list(self._tools.values())
 
 
 @experimental(version="3.4.0")
@@ -54,12 +55,13 @@ class JudgeToolRegistry:
         """
         self._store.register_tool(tool)
 
-    def invoke(self, tool_call: ToolCall) -> Any:
+    def invoke(self, tool_call: ToolCall, trace: Trace) -> Any:
         """
-        Invoke a tool using a ToolCall instance.
+        Invoke a tool using a ToolCall instance and trace.
 
         Args:
             tool_call: The ToolCall containing function name and arguments
+            trace: The MLflow trace object to analyze
 
         Returns:
             The result of the tool execution
@@ -81,21 +83,21 @@ class JudgeToolRegistry:
                 error_code="INVALID_PARAMETER_VALUE",
             )
 
-        # Invoke the tool with the parsed arguments
+        # Invoke the tool with the trace and parsed arguments
         try:
-            return tool.invoke(**arguments)
+            return tool.invoke(trace, **arguments)
         except TypeError as e:
             raise MlflowException(
                 f"Invalid arguments for tool '{function_name}': {e}",
                 error_code="INVALID_PARAMETER_VALUE",
             )
 
-    def list_tools(self) -> dict[str, JudgeTool]:
+    def list_tools(self) -> list[JudgeTool]:
         """
         List all registered tools.
 
         Returns:
-            Dictionary mapping tool names to JudgeTool instances
+            List of registered JudgeTool instances
         """
         return self._store.list_tools()
 
@@ -116,36 +118,26 @@ def register_judge_tool(tool: JudgeTool) -> None:
 
 
 @experimental(version="3.4.0")
-def invoke_judge_tool(tool_call: ToolCall) -> Any:
+def invoke_judge_tool(tool_call: ToolCall, trace: Trace) -> Any:
     """
-    Invoke a judge tool using a ToolCall instance.
+    Invoke a judge tool using a ToolCall instance and trace.
 
     Args:
         tool_call: The ToolCall containing function name and arguments
+        trace: The MLflow trace object to analyze
 
     Returns:
         The result of the tool execution
     """
-    return _judge_tool_registry.invoke(tool_call)
+    return _judge_tool_registry.invoke(tool_call, trace)
 
 
 @experimental(version="3.4.0")
-def list_judge_tools() -> dict[str, JudgeTool]:
+def list_judge_tools() -> list[JudgeTool]:
     """
     List all registered judge tools.
 
     Returns:
-        Dictionary mapping tool names to JudgeTool instances
+        List of registered JudgeTool instances
     """
     return _judge_tool_registry.list_tools()
-
-
-@experimental(version="3.4.0")
-def get_judge_tool_registry() -> JudgeToolRegistry:
-    """
-    Get the global judge tool registry instance.
-
-    Returns:
-        The global JudgeToolRegistry instance
-    """
-    return _judge_tool_registry
