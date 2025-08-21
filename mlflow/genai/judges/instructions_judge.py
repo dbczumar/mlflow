@@ -8,8 +8,10 @@ based on user-provided instructions.
 from typing import Any
 
 from mlflow.entities.model_registry.prompt_version import PromptVersion
+from mlflow.exceptions import MlflowException
 from mlflow.genai.judges.base import Judge
 from mlflow.genai.scorers.base import ScorerKind
+from mlflow.protos.databricks_pb2 import INVALID_PARAMETER_VALUE
 from mlflow.utils.annotations import experimental
 
 
@@ -97,29 +99,32 @@ class InstructionsJudge(Judge):
             outputs: List of output dictionaries to validate
 
         Raises:
-            ValueError: If any dictionary is missing required template variables
+            MlflowException: If any dictionary is missing required template variables
         """
         # Get non-reserved template variables
-        required_vars = self.template_variables - set(self._RESERVED_INSTRUCTION_TEMPLATE_VARIABLES)
+        vars_to_check = self.template_variables - set(self._RESERVED_INSTRUCTION_TEMPLATE_VARIABLES)
 
-        if not required_vars:
+        if not vars_to_check:
             return  # No validation needed if no non-reserved variables
 
         # Check inputs
         if inputs is not None:
             for i, input_dict in enumerate(inputs):
-                missing_vars = required_vars - set(input_dict.keys())
+                missing_vars = vars_to_check - set(input_dict.keys())
                 if missing_vars:
-                    raise ValueError(
-                        f"Input at index {i} is missing required template variables: {missing_vars}"
+                    raise MlflowException(
+                        f"Input at index {i} is missing required template variables: "
+                        f"{missing_vars}",
+                        error_code=INVALID_PARAMETER_VALUE,
                     )
 
         # Check outputs
         if outputs is not None:
             for i, output_dict in enumerate(outputs):
-                missing_vars = required_vars - set(output_dict.keys())
+                missing_vars = vars_to_check - set(output_dict.keys())
                 if missing_vars:
-                    raise ValueError(
+                    raise MlflowException(
                         f"Output at index {i} is missing required template variables: "
-                        f"{missing_vars}"
+                        f"{missing_vars}",
+                        error_code=INVALID_PARAMETER_VALUE,
                     )
