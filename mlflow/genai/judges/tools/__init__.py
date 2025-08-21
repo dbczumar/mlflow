@@ -1,5 +1,5 @@
 from mlflow.genai.judges.tools.base import JudgeTool
-from mlflow.genai.judges.tools.definitions import ListSpansTool, SpanInfo, SpansListResult
+from mlflow.genai.judges.tools.list_spans import ListSpansTool, SpanInfo, SpansListResult
 from mlflow.genai.judges.tools.registry import (
     JudgeToolRegistry,
     invoke_judge_tool,
