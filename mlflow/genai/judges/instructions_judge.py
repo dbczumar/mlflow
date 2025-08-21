@@ -183,14 +183,6 @@ class InstructionsJudge(Judge):
                 "This feature will be added in a future release."
             )
 
-        if has_trace and (has_inputs or has_outputs):
-            raise MlflowException(
-                "Instructions template cannot contain both 'trace' and 'inputs'/'outputs' "
-                "variables. Use either 'trace' for trace-based evaluation or 'inputs'/'outputs' "
-                "for field-based evaluation.",
-                error_code=INVALID_PARAMETER_VALUE,
-            )
-
         # If trace is used, no other variables (besides reserved ones) should be defined
         if has_trace:
             non_reserved_vars = template_vars - set(self._RESERVED_INSTRUCTION_TEMPLATE_VARIABLES)
@@ -199,6 +191,14 @@ class InstructionsJudge(Judge):
                     f"When using 'trace' variable, no other variables are allowed. "
                     f"Found: {non_reserved_vars}. The 'trace' variable provides complete context "
                     "and should not be mixed with other template variables.",
+                    error_code=INVALID_PARAMETER_VALUE,
+                )
+            # Check for inputs/outputs specifically for clearer error message
+            if has_inputs or has_outputs:
+                raise MlflowException(
+                    "Instructions template cannot contain both 'trace' and 'inputs'/'outputs' "
+                    "variables. Use either 'trace' for trace-based evaluation or "
+                    "'inputs'/'outputs' for field-based evaluation.",
                     error_code=INVALID_PARAMETER_VALUE,
                 )
 
