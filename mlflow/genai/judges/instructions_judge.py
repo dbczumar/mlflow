@@ -138,17 +138,26 @@ class InstructionsJudge(Judge):
         outputs: list[dict[str, Any]] | None = None,
     ) -> None:
         """
-        Validate that required template variables are present in either inputs or outputs
-        at each index.
+        Validate that inputs and outputs have the same length and that required template
+        variables are present in either inputs or outputs at each index.
 
         Args:
             inputs: List of input dictionaries to validate
             outputs: List of output dictionaries to validate
 
         Raises:
-            MlflowException: If any required template variable is missing from both
-                inputs and outputs at the same index
+            MlflowException: If inputs and outputs have different lengths or if any required
+                template variable is missing from both inputs and outputs at the same index
         """
+        # Check that inputs and outputs have the same length if both are provided
+        if inputs is not None and outputs is not None:
+            if len(inputs) != len(outputs):
+                raise MlflowException(
+                    f"Inputs and outputs must have the same length. Got {len(inputs)} inputs "
+                    f"and {len(outputs)} outputs.",
+                    error_code=INVALID_PARAMETER_VALUE,
+                )
+
         # Get non-reserved template variables
         vars_to_check = self.template_variables - set(self._RESERVED_INSTRUCTION_TEMPLATE_VARIABLES)
 
@@ -156,16 +165,12 @@ class InstructionsJudge(Judge):
             return  # No validation needed if no non-reserved variables
 
         # Determine the length of data to validate
-        max_len = 0
-        if inputs is not None:
-            max_len = len(inputs)
-        if outputs is not None:
-            max_len = max(max_len, len(outputs))
+        data_len = len(inputs) if inputs is not None else len(outputs) if outputs is not None else 0
 
         # Check that each required variable exists in either inputs or outputs at each index
-        for i in range(max_len):
-            input_dict = inputs[i] if inputs and i < len(inputs) else {}
-            output_dict = outputs[i] if outputs and i < len(outputs) else {}
+        for i in range(data_len):
+            input_dict = inputs[i] if inputs is not None else {}
+            output_dict = outputs[i] if outputs is not None else {}
 
             # Get all available keys from both inputs and outputs at this index
             available_vars = set(input_dict.keys()) | set(output_dict.keys())
