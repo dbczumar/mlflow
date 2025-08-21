@@ -4,6 +4,7 @@ import re
 import mlflow
 from mlflow.entities.assessment import Feedback
 from mlflow.entities.assessment_source import AssessmentSource, AssessmentSourceType
+from mlflow.entities.trace import Trace
 from mlflow.exceptions import MlflowException
 from mlflow.genai.utils.enum_utils import StrEnum
 from mlflow.protos.databricks_pb2 import INVALID_PARAMETER_VALUE
@@ -34,7 +35,9 @@ def _sanitize_justification(justification: str) -> str:
     return justification.replace("Let's think step by step. ", "")
 
 
-def invoke_judge_model(model_uri: str, prompt: str, assessment_name: str) -> Feedback:
+def invoke_judge_model(
+    model_uri: str, prompt: str, assessment_name: str, trace: Trace | None = None
+) -> Feedback:
     """
     Invoke the judge model.
 
@@ -45,6 +48,7 @@ def invoke_judge_model(model_uri: str, prompt: str, assessment_name: str) -> Fee
         model_uri: The model URI.
         prompt: The prompt to evaluate.
         assessment_name: The name of the assessment.
+        trace: Optional trace object for context (default=None).
     """
     from mlflow.metrics.genai.model_utils import (
         _parse_model_uri,
