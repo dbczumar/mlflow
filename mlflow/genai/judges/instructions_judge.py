@@ -60,8 +60,8 @@ class InstructionsJudge(Judge):
     def __call__(
         self,
         *,
-        inputs: list[dict[str, Any]] | None = None,
-        outputs: list[dict[str, Any]] | None = None,
+        inputs: dict[str, Any] | None = None,
+        outputs: dict[str, Any] | None = None,
         expectations: dict[str, Any] | None = None,
         trace: Any = None,
         **kwargs,
@@ -70,8 +70,8 @@ class InstructionsJudge(Judge):
         Evaluate the provided data using the judge's instructions.
 
         Args:
-            inputs: List of input dictionaries to evaluate
-            outputs: List of output dictionaries to evaluate
+            inputs: Input dictionary to evaluate
+            outputs: Output dictionary to evaluate
             expectations: Expected outcomes or ground truth
             trace: Trace object for evaluation
             kwargs: Additional context for evaluation
@@ -134,54 +134,37 @@ class InstructionsJudge(Judge):
 
     def _validate_template_variables(
         self,
-        inputs: list[dict[str, Any]] | None = None,
-        outputs: list[dict[str, Any]] | None = None,
+        inputs: dict[str, Any] | None = None,
+        outputs: dict[str, Any] | None = None,
     ) -> None:
         """
-        Validate that inputs and outputs have the same length and that required template
-        variables are present in either inputs or outputs at each index.
+        Validate that required template variables are present in either inputs or outputs.
 
         Args:
-            inputs: List of input dictionaries to validate
-            outputs: List of output dictionaries to validate
+            inputs: Input dictionary to validate
+            outputs: Output dictionary to validate
 
         Raises:
-            MlflowException: If inputs and outputs have different lengths or if any required
-                template variable is missing from both inputs and outputs at the same index
+            MlflowException: If any required template variable is missing from both
+                inputs and outputs
         """
-        # Check that inputs and outputs have the same length if both are provided
-        if inputs is not None and outputs is not None:
-            if len(inputs) != len(outputs):
-                raise MlflowException(
-                    f"Inputs and outputs must have the same length. Got {len(inputs)} inputs "
-                    f"and {len(outputs)} outputs.",
-                    error_code=INVALID_PARAMETER_VALUE,
-                )
-
         # Get non-reserved template variables
         vars_to_check = self.template_variables - set(self._RESERVED_INSTRUCTION_TEMPLATE_VARIABLES)
 
         if not vars_to_check:
             return  # No validation needed if no non-reserved variables
 
-        # Determine the length of data to validate
-        data_len = len(inputs) if inputs is not None else len(outputs) if outputs is not None else 0
+        # Get all available keys from both inputs and outputs
+        input_keys = set(inputs.keys()) if inputs is not None else set()
+        output_keys = set(outputs.keys()) if outputs is not None else set()
+        available_vars = input_keys | output_keys
 
-        # Check that each required variable exists in either inputs or outputs at each index
-        for i in range(data_len):
-            input_dict = inputs[i] if inputs is not None else {}
-            output_dict = outputs[i] if outputs is not None else {}
+        # Check which required variables are missing from both
+        missing_vars = vars_to_check - available_vars
 
-            # Get all available keys from both inputs and outputs at this index
-            available_vars = set(input_dict.keys()) | set(output_dict.keys())
-
-            # Check which required variables are missing from both
-            missing_vars = vars_to_check - available_vars
-
-            if missing_vars:
-                raise MlflowException(
-                    f"At index {i}, required template variables {missing_vars} are missing "
-                    f"from both inputs and outputs. Each variable must be present in at least "
-                    f"one of them.",
-                    error_code=INVALID_PARAMETER_VALUE,
-                )
+        if missing_vars:
+            raise MlflowException(
+                f"Required template variables {missing_vars} are missing from both inputs "
+                f"and outputs. Each variable must be present in at least one of them.",
+                error_code=INVALID_PARAMETER_VALUE,
+            )
