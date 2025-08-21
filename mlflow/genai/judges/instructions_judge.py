@@ -94,11 +94,12 @@ class InstructionsJudge(Judge):
     def _validate_instructions_template(self) -> None:
         """
         Validate that instructions contain at least one variable and don't contain both
-        trace and inputs/outputs variables.
+        trace and inputs/outputs variables. Also validate that model is defined when
+        using trace or expectations.
 
         Raises:
-            MlflowException: If instructions don't contain any variables or contain both
-                trace and inputs/outputs variables
+            MlflowException: If instructions don't contain any variables, contain both
+                trace and inputs/outputs variables, or use trace/expectations without a model
         """
         template_vars = self.template_variables
 
@@ -113,12 +114,21 @@ class InstructionsJudge(Judge):
         has_trace = self._TEMPLATE_VARIABLE_TRACE in template_vars
         has_inputs = self._TEMPLATE_VARIABLE_INPUTS in template_vars
         has_outputs = self._TEMPLATE_VARIABLE_OUTPUTS in template_vars
+        has_expectations = self._TEMPLATE_VARIABLE_EXPECTATIONS in template_vars
 
         if has_trace and (has_inputs or has_outputs):
             raise MlflowException(
                 "Instructions template cannot contain both 'trace' and 'inputs'/'outputs' "
                 "variables. Use either 'trace' for trace-based evaluation or 'inputs'/'outputs' "
                 "for field-based evaluation.",
+                error_code=INVALID_PARAMETER_VALUE,
+            )
+
+        # Check that model is defined when using trace or expectations
+        if (has_trace or has_expectations) and not self.model:
+            raise MlflowException(
+                "Model must be specified when using 'trace' or 'expectations' variables in the "
+                "instructions template. Provide a model identifier (e.g., 'openai/gpt-4o').",
                 error_code=INVALID_PARAMETER_VALUE,
             )
 
