@@ -93,12 +93,22 @@ class InstructionsJudge(Judge):
 
     def _validate_instructions_template(self) -> None:
         """
-        Validate that instructions don't contain both trace and inputs/outputs variables.
+        Validate that instructions contain at least one variable and don't contain both
+        trace and inputs/outputs variables.
 
         Raises:
-            MlflowException: If instructions contain both trace and inputs/outputs variables
+            MlflowException: If instructions don't contain any variables or contain both
+                trace and inputs/outputs variables
         """
         template_vars = self.template_variables
+
+        # Check that template contains at least one variable
+        if not template_vars:
+            raise MlflowException(
+                "Instructions template must contain at least one variable (e.g., {{inputs}}, "
+                "{{outputs}}, {{trace}}, or custom variables).",
+                error_code=INVALID_PARAMETER_VALUE,
+            )
 
         has_trace = self._TEMPLATE_VARIABLE_TRACE in template_vars
         has_inputs = self._TEMPLATE_VARIABLE_INPUTS in template_vars
