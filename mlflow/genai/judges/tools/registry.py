@@ -5,7 +5,6 @@ This module provides a registry system for managing and invoking JudgeTool insta
 """
 
 import json
-from abc import ABC, abstractmethod
 from typing import Any
 
 from mlflow.exceptions import MlflowException
@@ -16,25 +15,8 @@ from mlflow.utils.annotations import experimental
 
 
 @experimental(version="3.4.0")
-class AbstractJudgeToolStore(ABC):
-    """Abstract base class for judge tool storage."""
-
-    @abstractmethod
-    def register_tool(self, tool: JudgeTool) -> None:
-        """Register a judge tool in the store."""
-
-    @abstractmethod
-    def get_tool(self, name: str) -> JudgeTool:
-        """Get a judge tool by name."""
-
-    @abstractmethod
-    def list_tools(self) -> dict[str, JudgeTool]:
-        """List all registered tools."""
-
-
-@experimental(version="3.4.0")
-class InMemoryJudgeToolStore(AbstractJudgeToolStore):
-    """In-memory implementation of judge tool storage."""
+class JudgeToolStore:
+    """Judge tool storage implementation."""
 
     def __init__(self):
         self._tools: dict[str, JudgeTool] = {}
@@ -60,8 +42,8 @@ class InMemoryJudgeToolStore(AbstractJudgeToolStore):
 class JudgeToolRegistry:
     """Registry for managing and invoking JudgeTool instances."""
 
-    def __init__(self, store: AbstractJudgeToolStore = None):
-        self._store = store or InMemoryJudgeToolStore()
+    def __init__(self, store: JudgeToolStore = None):
+        self._store = store or JudgeToolStore()
 
     def register(self, tool: JudgeTool) -> None:
         """
