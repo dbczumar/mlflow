@@ -69,8 +69,8 @@ class InstructionsJudge(Judge):
         *,
         inputs: dict[str, Any] | None = None,
         outputs: dict[str, Any] | None = None,
-        trace: Trace | None = None,
         expectations: dict[str, Any] | None = None,
+        trace: Trace | None = None,
     ) -> Any:
         """
         Evaluate the provided data using the judge's instructions.
@@ -78,8 +78,8 @@ class InstructionsJudge(Judge):
         Args:
             inputs: Input dictionary to evaluate. Cannot be used with 'trace'.
             outputs: Output dictionary to evaluate. Cannot be used with 'trace'.
-            trace: Trace object for evaluation. Cannot be used with 'inputs' or 'outputs'.
             expectations: Expected outcomes or ground truth that can be used with any mode.
+            trace: Trace object for evaluation. Cannot be used with 'inputs' or 'outputs'.
 
         Returns:
             Evaluation results
@@ -97,16 +97,17 @@ class InstructionsJudge(Judge):
 
         # Handle field-based evaluation (inputs/outputs)
         if inputs is not None or outputs is not None:
-            # Validate that inputs/outputs contain required template fields
-            self._validate_inputs_outputs_contain_template_fields(inputs, outputs)
+            # Validate that inputs/outputs/expectations contain required template fields
+            self._validate_inputs_outputs_contain_template_fields(inputs, outputs, expectations)
 
-            # Prepare template values by merging inputs and outputs
+            # Prepare template values by merging inputs, outputs, and expectations
             template_values = {}
             if inputs is not None:
                 template_values.update(inputs)
             if outputs is not None:
                 template_values.update(outputs)
-            # Note: expectations support will be added in a future release
+            if expectations is not None:
+                template_values.update(expectations)
 
             # Format the instructions with the provided values
             formatted_prompt = format_prompt(self.instructions, **template_values)
@@ -158,10 +159,10 @@ class InstructionsJudge(Judge):
         has_outputs = self._TEMPLATE_VARIABLE_OUTPUTS in template_vars
         has_expectations = self._TEMPLATE_VARIABLE_EXPECTATIONS in template_vars
 
-        # Check if expectations is used in the template
+        # Check if expectations is used as a template variable (not yet supported)
         if has_expectations:
             raise NotImplementedError(
-                "The 'expectations' template variable is not yet supported. "
+                "The 'expectations' template variable ({{expectations}}) is not yet supported. "
                 "This feature will be added in a future release."
             )
 
@@ -186,17 +187,19 @@ class InstructionsJudge(Judge):
         self,
         inputs: dict[str, Any] | None = None,
         outputs: dict[str, Any] | None = None,
+        expectations: dict[str, Any] | None = None,
     ) -> None:
         """
-        Validate that required template variables are present in either inputs or outputs.
+        Validate that required template variables are present in inputs, outputs, or expectations.
 
         Args:
             inputs: Input dictionary to validate
             outputs: Output dictionary to validate
+            expectations: Expectations dictionary to validate
 
         Raises:
-            MlflowException: If any required template variable is missing from both
-                inputs and outputs
+            MlflowException: If any required template variable is missing from all
+                provided dictionaries
         """
         # Get non-reserved template variables
         vars_to_check = self.template_variables - set(self._RESERVED_INSTRUCTION_TEMPLATE_VARIABLES)
@@ -204,17 +207,18 @@ class InstructionsJudge(Judge):
         if not vars_to_check:
             return  # No validation needed if no non-reserved variables
 
-        # Get all available keys from both inputs and outputs
+        # Get all available keys from inputs, outputs, and expectations
         input_keys = set(inputs.keys()) if inputs is not None else set()
         output_keys = set(outputs.keys()) if outputs is not None else set()
-        available_vars = input_keys | output_keys
+        expectation_keys = set(expectations.keys()) if expectations is not None else set()
+        available_vars = input_keys | output_keys | expectation_keys
 
-        # Check which required variables are missing from both
+        # Check which required variables are missing from all sources
         missing_vars = vars_to_check - available_vars
 
         if missing_vars:
             raise MlflowException(
-                f"Required template variables {missing_vars} are missing from both inputs "
-                f"and outputs. Each variable must be present in at least one of them.",
+                f"Required template variables {missing_vars} are missing from inputs, outputs, "
+                f"and expectations. Each variable must be present in at least one of them.",
                 error_code=INVALID_PARAMETER_VALUE,
             )
