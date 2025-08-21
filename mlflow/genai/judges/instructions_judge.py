@@ -7,6 +7,8 @@ based on user-provided instructions.
 
 from typing import Any
 
+from pydantic import PrivateAttr
+
 from mlflow.entities.model_registry.prompt_version import PromptVersion
 from mlflow.entities.trace import Trace
 from mlflow.exceptions import MlflowException
@@ -42,6 +44,11 @@ class InstructionsJudge(Judge):
         _TEMPLATE_VARIABLE_EXPECTATIONS,
     ]
 
+    # Private attributes to store instructions and model
+    _instructions: str = PrivateAttr()
+    _model: str = PrivateAttr()
+    _instructions_prompt: PromptVersion = PrivateAttr()
+
     def __init__(self, name: str, instructions: str, model: str | None = None, **kwargs):
         """
         Initialize the InstructionsJudge.
@@ -53,8 +60,8 @@ class InstructionsJudge(Judge):
             kwargs: Additional configuration parameters
         """
         super().__init__(name=name, **kwargs)
-        self.instructions = instructions
-        self.model = model or get_default_model()
+        self._instructions = instructions
+        self._model = model or get_default_model()
         # Create a dummy PromptVersion to represent the instructions as a formattable template
         # with an API for variable extraction
         self._instructions_prompt = PromptVersion(
@@ -63,6 +70,16 @@ class InstructionsJudge(Judge):
             template=instructions,
         )
         self._validate_instructions_template()
+
+    @property
+    def instructions(self) -> str:
+        """Get the instructions for this judge."""
+        return self._instructions
+
+    @property
+    def model(self) -> str:
+        """Get the model for this judge."""
+        return self._model
 
     def __call__(
         self,
@@ -110,10 +127,10 @@ class InstructionsJudge(Judge):
                 template_values.update(expectations)
 
             # Format the instructions with the provided values
-            formatted_prompt = format_prompt(self.instructions, **template_values)
+            formatted_prompt = format_prompt(self._instructions, **template_values)
 
             # Invoke the judge model
-            return invoke_judge_model(self.model, formatted_prompt, self.name)
+            return invoke_judge_model(self._model, formatted_prompt, self.name)
 
         # Handle trace-based evaluation
         if trace is not None:
@@ -175,7 +192,7 @@ class InstructionsJudge(Judge):
             )
 
         # Check that model is not "databricks" when using trace
-        if has_trace and self.model == _DEFAULT_MODEL_DATABRICKS:
+        if has_trace and self._model == _DEFAULT_MODEL_DATABRICKS:
             raise MlflowException(
                 f"Model cannot be '{_DEFAULT_MODEL_DATABRICKS}' when using 'trace' variable in "
                 "the instructions template. Specify a different model "
