@@ -6,14 +6,22 @@ that can evaluate traces based on user-defined criteria.
 """
 
 from mlflow.genai.judges.base import Judge
+from mlflow.genai.judges.instructions_judge import InstructionsJudge
 from mlflow.utils.annotations import experimental
 
 
 @experimental(version="3.4.0")
-def make_judge(*args, **kwargs) -> Judge:
+def make_judge(name: str, instructions: str, model: str | None = None, **kwargs) -> Judge:
     """
     Create a custom MLflow judge instance.
 
-    This is a placeholder function that will be implemented later.
+    Args:
+        name: The name of the judge
+        instructions: Natural language instructions for evaluation
+        model: The model identifier to use for evaluation (e.g., "openai/gpt-4o")
+        kwargs: Additional configuration parameters
+
+    Returns:
+        An InstructionsJudge instance configured with the provided parameters
     """
-    raise NotImplementedError("make_judge function is not yet implemented")
+    return InstructionsJudge(name=name, instructions=instructions, model=model, **kwargs)
