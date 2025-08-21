@@ -10,12 +10,14 @@ from mlflow.genai.judges.builtin import (
     meets_guidelines,
 )
 from mlflow.genai.judges.custom_prompt_judge import custom_prompt_judge
+from mlflow.genai.judges.instructions_judge import InstructionsJudge
 from mlflow.genai.judges.make_judge import make_judge
 from mlflow.genai.judges.utils import CategoricalRating
 
 __all__ = [
     # Core Judge class
     "Judge",
+    "InstructionsJudge",
     # Factory function
     "make_judge",
     # Tools module
