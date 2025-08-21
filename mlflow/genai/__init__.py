@@ -9,6 +9,7 @@ from mlflow.genai.datasets import (
     get_dataset,
 )
 from mlflow.genai.evaluation import evaluate, to_predict_fn
+from mlflow.genai.judges import make_judge
 from mlflow.genai.labeling import (
     Agent,
     LabelingSession,
@@ -40,6 +41,7 @@ __all__ = [
     "scorer",
     "judges",
     "scorers",
+    "make_judge",
     "create_dataset",
     "delete_dataset",
     "get_dataset",

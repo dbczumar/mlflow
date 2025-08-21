@@ -614,22 +614,55 @@ class RelevanceToQuery(BuiltInScorer):
     model: str | None = None
     required_columns: set[str] = {"inputs", "outputs"}
 
-    def __call__(self, *, inputs: dict[str, Any], outputs: Any) -> Feedback:
+    def __call__(
+        self,
+        *,
+        inputs: dict[str, Any] | None = None,
+        outputs: Any | None = None,
+        trace: Trace | None = None,
+    ) -> Feedback:
         """
         Evaluate relevance to the user's query.
+
+        Either both inputs & outputs OR trace must be provided.
 
         Args:
             inputs: A dictionary of input data, e.g. {"question": "What is the capital of France?"}.
             outputs: The response from the model, e.g. "The capital of France is Paris."
+            trace: The trace of the model's execution. If provided, inputs and outputs will be
+                extracted from the trace's root span.
 
         Returns:
             An :py:class:`mlflow.entities.assessment.Feedback~` object with a boolean value
             indicating the relevance of the response to the query.
         """
-        request = parse_inputs_to_str(inputs)
+        # Validate input parameters
+        if trace is not None:
+            if inputs is not None or outputs is not None:
+                raise MlflowException.invalid_parameter_value(
+                    "Cannot provide both trace and inputs/outputs. "
+                    "Either provide trace OR both inputs and outputs."
+                )
+            if self.model is None:
+                raise MlflowException(
+                    "Trace parameter is only supported when model is specified. "
+                    "Please provide a model or use inputs and outputs parameters instead.",
+                    error_code="BAD_REQUEST",
+                )
+            # Extract inputs and outputs from trace
+            request = parse_inputs_to_str(trace.data.spans[0].inputs)
+            response = parse_outputs_to_str(trace.data.spans[0].outputs)
+        elif inputs is not None and outputs is not None:
+            request = parse_inputs_to_str(inputs)
+            response = outputs
+        else:
+            raise MlflowException.invalid_parameter_value(
+                "Must provide either trace OR both inputs and outputs parameters."
+            )
+
         # NB: Reuse is_context_relevant judge to evaluate response
         return judges.is_context_relevant(
-            request=request, context=outputs, name=self.name, model=self.model
+            request=request, context=response, name=self.name, model=self.model
         )
 
 
