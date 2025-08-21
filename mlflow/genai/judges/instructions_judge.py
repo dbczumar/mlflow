@@ -128,7 +128,7 @@ class InstructionsJudge(Judge):
         if (has_trace or has_expectations) and not self.model:
             raise MlflowException(
                 "Model must be specified when using 'trace' or 'expectations' variables in the "
-                "instructions template. Provide a model identifier (e.g., 'openai/gpt-4o').",
+                "instructions template. Specify the model parameter (e.g., model='openai/gpt-4o').",
                 error_code=INVALID_PARAMETER_VALUE,
             )
 
@@ -138,14 +138,16 @@ class InstructionsJudge(Judge):
         outputs: list[dict[str, Any]] | None = None,
     ) -> None:
         """
-        Validate that all dictionaries in inputs/outputs contain required template variables.
+        Validate that required template variables are present in either inputs or outputs
+        at each index.
 
         Args:
             inputs: List of input dictionaries to validate
             outputs: List of output dictionaries to validate
 
         Raises:
-            MlflowException: If any dictionary is missing required template variables
+            MlflowException: If any required template variable is missing from both
+                inputs and outputs at the same index
         """
         # Get non-reserved template variables
         vars_to_check = self.template_variables - set(self._RESERVED_INSTRUCTION_TEMPLATE_VARIABLES)
@@ -153,24 +155,28 @@ class InstructionsJudge(Judge):
         if not vars_to_check:
             return  # No validation needed if no non-reserved variables
 
-        # Check inputs
+        # Determine the length of data to validate
+        max_len = 0
         if inputs is not None:
-            for i, input_dict in enumerate(inputs):
-                missing_vars = vars_to_check - set(input_dict.keys())
-                if missing_vars:
-                    raise MlflowException(
-                        f"Input at index {i} is missing required template variables: "
-                        f"{missing_vars}",
-                        error_code=INVALID_PARAMETER_VALUE,
-                    )
-
-        # Check outputs
+            max_len = len(inputs)
         if outputs is not None:
-            for i, output_dict in enumerate(outputs):
-                missing_vars = vars_to_check - set(output_dict.keys())
-                if missing_vars:
-                    raise MlflowException(
-                        f"Output at index {i} is missing required template variables: "
-                        f"{missing_vars}",
-                        error_code=INVALID_PARAMETER_VALUE,
-                    )
+            max_len = max(max_len, len(outputs))
+
+        # Check that each required variable exists in either inputs or outputs at each index
+        for i in range(max_len):
+            input_dict = inputs[i] if inputs and i < len(inputs) else {}
+            output_dict = outputs[i] if outputs and i < len(outputs) else {}
+
+            # Get all available keys from both inputs and outputs at this index
+            available_vars = set(input_dict.keys()) | set(output_dict.keys())
+
+            # Check which required variables are missing from both
+            missing_vars = vars_to_check - available_vars
+
+            if missing_vars:
+                raise MlflowException(
+                    f"At index {i}, required template variables {missing_vars} are missing "
+                    f"from both inputs and outputs. Each variable must be present in at least "
+                    f"one of them.",
+                    error_code=INVALID_PARAMETER_VALUE,
+                )
