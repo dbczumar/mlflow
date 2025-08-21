@@ -83,3 +83,43 @@ class InstructionsJudge(Judge):
     def template_variables(self) -> set[str]:
         """Get the template variables from the instructions."""
         return self._prompt_version.variables
+
+    def _validate_template_variables(
+        self,
+        inputs: list[dict[str, Any]] | None = None,
+        outputs: list[dict[str, Any]] | None = None,
+    ) -> None:
+        """
+        Validate that all dictionaries in inputs/outputs contain required template variables.
+
+        Args:
+            inputs: List of input dictionaries to validate
+            outputs: List of output dictionaries to validate
+
+        Raises:
+            ValueError: If any dictionary is missing required template variables
+        """
+        # Get non-reserved template variables
+        required_vars = self.template_variables - set(self._RESERVED_INSTRUCTION_TEMPLATE_VARIABLES)
+
+        if not required_vars:
+            return  # No validation needed if no non-reserved variables
+
+        # Check inputs
+        if inputs is not None:
+            for i, input_dict in enumerate(inputs):
+                missing_vars = required_vars - set(input_dict.keys())
+                if missing_vars:
+                    raise ValueError(
+                        f"Input at index {i} is missing required template variables: {missing_vars}"
+                    )
+
+        # Check outputs
+        if outputs is not None:
+            for i, output_dict in enumerate(outputs):
+                missing_vars = required_vars - set(output_dict.keys())
+                if missing_vars:
+                    raise ValueError(
+                        f"Output at index {i} is missing required template variables: "
+                        f"{missing_vars}"
+                    )
