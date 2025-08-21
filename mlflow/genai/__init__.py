@@ -2,6 +2,7 @@ from mlflow.genai import (
     datasets,
     judges,
     scorers,
+    tools,
 )
 from mlflow.genai.datasets import (
     create_dataset,
@@ -41,6 +42,7 @@ __all__ = [
     "scorer",
     "judges",
     "scorers",
+    "tools",
     "make_judge",
     "create_dataset",
     "delete_dataset",
