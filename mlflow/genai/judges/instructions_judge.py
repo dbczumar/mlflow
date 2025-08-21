@@ -97,8 +97,8 @@ class InstructionsJudge(Judge):
 
         # Handle field-based evaluation (inputs/outputs)
         if inputs is not None or outputs is not None:
-            # Validate template variables
-            self._validate_template_variables(inputs, outputs)
+            # Validate that inputs/outputs contain required template fields
+            self._validate_inputs_outputs_contain_template_fields(inputs, outputs)
 
             # Prepare template values by merging inputs and outputs
             template_values = {}
@@ -182,7 +182,7 @@ class InstructionsJudge(Judge):
                 error_code=INVALID_PARAMETER_VALUE,
             )
 
-    def _validate_template_variables(
+    def _validate_inputs_outputs_contain_template_fields(
         self,
         inputs: dict[str, Any] | None = None,
         outputs: dict[str, Any] | None = None,
