@@ -10,6 +10,7 @@ from typing import Any
 from mlflow.entities.model_registry.prompt_version import PromptVersion
 from mlflow.exceptions import MlflowException
 from mlflow.genai.judges.base import Judge
+from mlflow.genai.judges.utils import format_prompt, get_default_model, invoke_judge_model
 from mlflow.genai.scorers.base import ScorerKind
 from mlflow.protos.databricks_pb2 import INVALID_PARAMETER_VALUE
 from mlflow.utils.annotations import experimental
@@ -88,7 +89,37 @@ class InstructionsJudge(Judge):
                 error_code=INVALID_PARAMETER_VALUE,
             )
 
-        raise NotImplementedError("InstructionsJudge evaluation is not yet implemented")
+        # Handle field-based evaluation (inputs/outputs)
+        if inputs is not None or outputs is not None:
+            # Validate template variables
+            self._validate_template_variables(inputs, outputs)
+
+            # Prepare template values by merging inputs, outputs, and expectations
+            template_values = {}
+            if inputs is not None:
+                template_values.update(inputs)
+            if outputs is not None:
+                template_values.update(outputs)
+            if expectations is not None:
+                template_values[self._TEMPLATE_VARIABLE_EXPECTATIONS] = expectations
+
+            # Format the instructions with the provided values
+            formatted_prompt = format_prompt(self.instructions, **template_values)
+
+            # Use the specified model or get the default model
+            model_to_use = self.model or get_default_model()
+
+            # Invoke the judge model
+            return invoke_judge_model(model_to_use, formatted_prompt, self.name)
+
+        # Handle trace-based evaluation
+        if trace is not None:
+            raise NotImplementedError("Trace-based evaluation is not yet implemented")
+
+        raise MlflowException(
+            "Must specify either 'trace' or 'inputs'/'outputs' for evaluation.",
+            error_code=INVALID_PARAMETER_VALUE,
+        )
 
     @property
     def kind(self) -> ScorerKind:
