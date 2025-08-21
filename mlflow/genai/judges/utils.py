@@ -12,10 +12,12 @@ from mlflow.utils.uri import is_databricks_uri
 # "endpoints" is a special case for Databricks model serving endpoints.
 _NATIVE_PROVIDERS = ["openai", "anthropic", "bedrock", "mistral", "endpoints"]
 
+_DEFAULT_MODEL_DATABRICKS = "databricks"
+
 
 def get_default_model() -> str:
     if is_databricks_uri(mlflow.get_tracking_uri()):
-        return "databricks"
+        return _DEFAULT_MODEL_DATABRICKS
     else:
         return "openai:/gpt-4.1-mini"
 

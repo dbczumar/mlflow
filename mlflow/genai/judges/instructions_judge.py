@@ -10,7 +10,12 @@ from typing import Any
 from mlflow.entities.model_registry.prompt_version import PromptVersion
 from mlflow.exceptions import MlflowException
 from mlflow.genai.judges.base import Judge
-from mlflow.genai.judges.utils import format_prompt, get_default_model, invoke_judge_model
+from mlflow.genai.judges.utils import (
+    _DEFAULT_MODEL_DATABRICKS,
+    format_prompt,
+    get_default_model,
+    invoke_judge_model,
+)
 from mlflow.genai.scorers.base import ScorerKind
 from mlflow.protos.databricks_pb2 import INVALID_PARAMETER_VALUE
 from mlflow.utils.annotations import experimental
@@ -169,6 +174,15 @@ class InstructionsJudge(Judge):
             raise MlflowException(
                 "Model must be specified when using 'trace' or 'expectations' variables in the "
                 "instructions template. Specify the model parameter (e.g., model='openai/gpt-4o').",
+                error_code=INVALID_PARAMETER_VALUE,
+            )
+
+        # Check that model is not "databricks" when using trace
+        if has_trace and self.model == _DEFAULT_MODEL_DATABRICKS:
+            raise MlflowException(
+                f"Model cannot be '{_DEFAULT_MODEL_DATABRICKS}' when using 'trace' variable in "
+                "the instructions template. Specify a different model "
+                "(e.g., model='openai/gpt-4o').",
                 error_code=INVALID_PARAMETER_VALUE,
             )
 
