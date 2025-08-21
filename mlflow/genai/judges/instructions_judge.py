@@ -100,14 +100,13 @@ class InstructionsJudge(Judge):
             # Validate template variables
             self._validate_template_variables(inputs, outputs)
 
-            # Prepare template values by merging inputs, outputs, and expectations
+            # Prepare template values by merging inputs and outputs
             template_values = {}
             if inputs is not None:
                 template_values.update(inputs)
             if outputs is not None:
                 template_values.update(outputs)
-            if expectations is not None:
-                template_values[self._TEMPLATE_VARIABLE_EXPECTATIONS] = expectations
+            # Note: expectations support will be added in a future release
 
             # Format the instructions with the provided values
             formatted_prompt = format_prompt(self.instructions, **template_values)
@@ -157,6 +156,14 @@ class InstructionsJudge(Judge):
         has_trace = self._TEMPLATE_VARIABLE_TRACE in template_vars
         has_inputs = self._TEMPLATE_VARIABLE_INPUTS in template_vars
         has_outputs = self._TEMPLATE_VARIABLE_OUTPUTS in template_vars
+        has_expectations = self._TEMPLATE_VARIABLE_EXPECTATIONS in template_vars
+
+        # Check if expectations is used in the template
+        if has_expectations:
+            raise NotImplementedError(
+                "The 'expectations' template variable is not yet supported. "
+                "This feature will be added in a future release."
+            )
 
         if has_trace and (has_inputs or has_outputs):
             raise MlflowException(
