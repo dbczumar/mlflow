@@ -104,11 +104,14 @@ class InstructionsJudge(Judge):
         Raises:
             MlflowException: If both trace and inputs/outputs are specified
         """
-        # Validate that trace is not specified together with inputs/outputs
-        if trace is not None and (inputs is not None or outputs is not None):
+        # Validate that trace is not specified together with inputs/outputs/expectations
+        if trace is not None and (
+            inputs is not None or outputs is not None or expectations is not None
+        ):
             raise MlflowException(
-                "Cannot specify both 'trace' and 'inputs'/'outputs'. Use either 'trace' for "
-                "trace-based evaluation or 'inputs'/'outputs' for field-based evaluation.",
+                "Cannot specify both 'trace' and 'inputs'/'outputs'/'expectations'. Use either "
+                "'trace' for trace-based evaluation or 'inputs'/'outputs'/'expectations' for "
+                "field-based evaluation.",
                 error_code=INVALID_PARAMETER_VALUE,
             )
 

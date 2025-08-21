@@ -172,7 +172,7 @@ def test_specifying_both_trace_and_inputs_in_call_raises_error():
     mock_trace = mock.Mock()
 
     with pytest.raises(
-        MlflowException, match="Cannot specify both 'trace' and 'inputs'/'outputs'"
+        MlflowException, match="Cannot specify both 'trace' and 'inputs'/'outputs'/'expectations'"
     ) as exc_info:
         judge(
             trace=mock_trace,
@@ -180,7 +180,33 @@ def test_specifying_both_trace_and_inputs_in_call_raises_error():
         )
 
     assert exc_info.value.error_code == "INVALID_PARAMETER_VALUE"
-    assert "Cannot specify both 'trace' and 'inputs'/'outputs'" in str(exc_info.value)
+    assert "Cannot specify both 'trace' and 'inputs'/'outputs'/'expectations'" in str(
+        exc_info.value
+    )
+
+
+def test_specifying_both_trace_and_expectations_in_call_raises_error():
+    """Test that specifying both trace and expectations in call raises error."""
+    judge = make_judge(
+        name="test_judge",
+        instructions="Evaluate {{response}}.",
+    )
+
+    # Create a mock trace
+    mock_trace = mock.Mock()
+
+    with pytest.raises(
+        MlflowException, match="Cannot specify both 'trace' and 'inputs'/'outputs'/'expectations'"
+    ) as exc_info:
+        judge(
+            trace=mock_trace,
+            expectations={"expected_answer": "42"},
+        )
+
+    assert exc_info.value.error_code == "INVALID_PARAMETER_VALUE"
+    assert "Cannot specify both 'trace' and 'inputs'/'outputs'/'expectations'" in str(
+        exc_info.value
+    )
 
 
 def test_databricks_model_with_trace_variable_raises_error():
