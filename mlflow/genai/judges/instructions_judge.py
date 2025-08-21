@@ -8,6 +8,7 @@ based on user-provided instructions.
 from typing import Any
 
 from mlflow.entities.model_registry.prompt_version import PromptVersion
+from mlflow.entities.trace import Trace
 from mlflow.exceptions import MlflowException
 from mlflow.genai.judges.base import Judge
 from mlflow.genai.judges.utils import (
@@ -53,7 +54,7 @@ class InstructionsJudge(Judge):
         """
         super().__init__(name=name, **kwargs)
         self.instructions = instructions
-        self.model = model
+        self.model = model or get_default_model()
         # Create a dummy PromptVersion to represent the instructions as a formattable template
         # with an API for variable extraction
         self._instructions_prompt = PromptVersion(
@@ -68,7 +69,7 @@ class InstructionsJudge(Judge):
         *,
         inputs: dict[str, Any] | None = None,
         outputs: dict[str, Any] | None = None,
-        trace: Any = None,
+        trace: Trace | None = None,
         expectations: dict[str, Any] | None = None,
     ) -> Any:
         """
@@ -111,11 +112,8 @@ class InstructionsJudge(Judge):
             # Format the instructions with the provided values
             formatted_prompt = format_prompt(self.instructions, **template_values)
 
-            # Use the specified model or get the default model
-            model_to_use = self.model or get_default_model()
-
             # Invoke the judge model
-            return invoke_judge_model(model_to_use, formatted_prompt, self.name)
+            return invoke_judge_model(self.model, formatted_prompt, self.name)
 
         # Handle trace-based evaluation
         if trace is not None:
@@ -159,21 +157,12 @@ class InstructionsJudge(Judge):
         has_trace = self._TEMPLATE_VARIABLE_TRACE in template_vars
         has_inputs = self._TEMPLATE_VARIABLE_INPUTS in template_vars
         has_outputs = self._TEMPLATE_VARIABLE_OUTPUTS in template_vars
-        has_expectations = self._TEMPLATE_VARIABLE_EXPECTATIONS in template_vars
 
         if has_trace and (has_inputs or has_outputs):
             raise MlflowException(
                 "Instructions template cannot contain both 'trace' and 'inputs'/'outputs' "
                 "variables. Use either 'trace' for trace-based evaluation or 'inputs'/'outputs' "
                 "for field-based evaluation.",
-                error_code=INVALID_PARAMETER_VALUE,
-            )
-
-        # Check that model is defined when using trace or expectations
-        if (has_trace or has_expectations) and not self.model:
-            raise MlflowException(
-                "Model must be specified when using 'trace' or 'expectations' variables in the "
-                "instructions template. Specify the model parameter (e.g., model='openai/gpt-4o').",
                 error_code=INVALID_PARAMETER_VALUE,
             )
 
