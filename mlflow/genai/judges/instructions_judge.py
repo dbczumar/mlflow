@@ -7,6 +7,7 @@ based on user-provided instructions.
 
 from typing import Any
 
+from mlflow.entities.model_registry.prompt_version import PromptVersion
 from mlflow.genai.judges.base import Judge
 from mlflow.genai.scorers.base import ScorerKind
 from mlflow.utils.annotations import experimental
@@ -21,6 +22,13 @@ class InstructionsJudge(Judge):
     making it flexible for various assessment criteria.
     """
 
+    _RESERVED_INSTRUCTION_TEMPLATE_VARIABLES = [
+        "inputs",
+        "outputs",
+        "trace",
+        "expectations",
+    ]
+
     def __init__(self, name: str, instructions: str, model: str | None = None, **kwargs):
         """
         Initialize the InstructionsJudge.
@@ -34,12 +42,19 @@ class InstructionsJudge(Judge):
         super().__init__(name=name, **kwargs)
         self.instructions = instructions
         self.model = model
+        # Create a dummy PromptVersion to represent the instructions as a formattable template
+        # with an API for variable extraction
+        self._prompt_version = PromptVersion(
+            name=name,
+            version=1,
+            template=instructions,
+        )
 
     def __call__(
         self,
         *,
-        inputs: Any = None,
-        outputs: Any = None,
+        inputs: list[dict[str, Any]] | None = None,
+        outputs: list[dict[str, Any]] | None = None,
         expectations: dict[str, Any] | None = None,
         trace: Any = None,
         **kwargs,
@@ -48,8 +63,8 @@ class InstructionsJudge(Judge):
         Evaluate the provided data using the judge's instructions.
 
         Args:
-            inputs: Input data to evaluate
-            outputs: Output data to evaluate
+            inputs: List of input dictionaries to evaluate
+            outputs: List of output dictionaries to evaluate
             expectations: Expected outcomes or ground truth
             trace: Trace object for evaluation
             kwargs: Additional context for evaluation
@@ -62,4 +77,9 @@ class InstructionsJudge(Judge):
     @property
     def kind(self) -> ScorerKind:
         """Return the kind of scorer this judge represents."""
-        raise NotImplementedError("InstructionsJudge kind property is not yet implemented")
+        return ScorerKind.CLASS
+
+    @property
+    def template_variables(self) -> set[str]:
+        """Get the template variables from the instructions."""
+        return self._prompt_version.variables
