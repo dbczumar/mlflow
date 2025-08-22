@@ -309,7 +309,8 @@ def test_trace_based_evaluation_with_methodology():
         # Verify the augmented prompt includes the required methodology
         prompt = mock_invoke.call_args.kwargs["prompt"]
         assert "You MUST follow this methodology:" in prompt
-        assert "ALWAYS start by calling 'get_root_span'" in prompt
+        assert "ALWAYS start by calling 'get_trace_info'" in prompt
+        assert "ALWAYS call 'get_root_span'" in prompt
         assert "ALWAYS call 'list_spans'" in prompt
         assert "Use 'get_span' to examine specific spans" in prompt
 
