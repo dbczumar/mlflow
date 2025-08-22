@@ -163,7 +163,7 @@ class InstructionsJudge(Judge):
                 "the flow of execution\n\n"
                 "IMPORTANT: Make all three required tool calls IN A SINGLE MESSAGE for best "
                 "performance. The tools can execute in parallel.\n\n"
-                "After completing the required steps, use additional tools as needed:\n"
+                "After completing these required steps, use more tools as needed. For example:\n"
                 "- Retrieve specific spans by ID to examine their details\n"
                 "- Search for patterns or specific text across the entire trace\n"
                 "- Continue using tools until you have gathered sufficient information\n\n"
