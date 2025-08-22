@@ -9,6 +9,11 @@ from mlflow.genai.judges.tools.registry import (
     list_judge_tools,
     register_judge_tool,
 )
+from mlflow.genai.judges.tools.search_trace_regex import (
+    RegexMatch,
+    SearchTraceRegexResult,
+    SearchTraceRegexTool,
+)
 
 __all__ = [
     "JudgeTool",
@@ -20,6 +25,9 @@ __all__ = [
     "ListSpansResult",
     "GetSpanTool",
     "GetSpanResult",
+    "SearchTraceRegexTool",
+    "SearchTraceRegexResult",
+    "RegexMatch",
     "JudgeToolRegistry",
     "register_judge_tool",
     "invoke_judge_tool",
