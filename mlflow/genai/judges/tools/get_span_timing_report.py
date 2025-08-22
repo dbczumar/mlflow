@@ -1,0 +1,214 @@
+"""
+Get span timing report tool for MLflow traces.
+
+This tool generates a detailed timing report showing span latencies, execution order,
+and concurrency.
+"""
+
+from collections import defaultdict
+
+from mlflow.entities.trace import Trace
+from mlflow.genai.judges.tools.base import JudgeTool
+from mlflow.types.llm import FunctionToolDefinition, ToolDefinition, ToolParamsSchema
+from mlflow.utils.annotations import experimental
+
+
+@experimental(version="3.4.0")
+class GetSpanTimingReportTool(JudgeTool):
+    """
+    A tool that generates a span timing report for a trace.
+
+    The report includes:
+    - Span timing table with hierarchy
+    - Summary statistics by span type
+    - Top 10 longest-running spans
+    - Concurrent operations detection
+    """
+
+    @property
+    def name(self) -> str:
+        """Return the name of this tool."""
+        return "get_span_timing_report"
+
+    def get_definition(self) -> ToolDefinition:
+        """Get the tool definition for LiteLLM/OpenAI function calling."""
+        return ToolDefinition(
+            function=FunctionToolDefinition(
+                name=self.name,
+                description=(
+                    "Generate a comprehensive span timing report for the trace, showing "
+                    "latencies, execution order, hierarchy, duration statistics, longest "
+                    "spans, and concurrent operations. Useful for analyzing system "
+                    "performance and identifying bottlenecks."
+                ),
+                parameters=ToolParamsSchema(
+                    type="object",
+                    properties={},
+                    required=[],
+                ),
+            ),
+            type="function",
+        )
+
+    def invoke(self, trace: Trace) -> str:
+        """
+        Generate span timing report for the trace.
+
+        Args:
+            trace: The trace to analyze
+
+        Returns:
+            Formatted timing report as a string
+        """
+        if not trace or not trace.data or not trace.data.spans:
+            return "No spans found in trace"
+
+        spans = trace.data.spans
+        trace_info = trace.info
+
+        # Build parent-child relationships
+        children_by_parent = defaultdict(list)
+        span_to_number = {}  # Map span_id to s1, s2, etc.
+
+        for span in spans:
+            children_by_parent[span.parent_id].append(span)
+
+        # Sort children by start time
+        for parent_spans in children_by_parent.values():
+            parent_spans.sort(key=lambda s: s.start_time_ns)
+
+        # Get trace start time
+        trace_start_ns = trace_info.timestamp_ms * 1_000_000
+
+        # Build output
+        lines = []
+
+        # Header
+        lines.append(f"SPAN TIMING REPORT FOR TRACE: {trace_info.trace_id}")
+        lines.append(f"Total Duration: {trace_info.execution_time_ms / 1000:.2f}s")
+        lines.append(f"Total Spans: {len(spans)}")
+        lines.append("")
+
+        # Span table
+        lines.append("SPAN TABLE:")
+        lines.append("-" * 120)
+        lines.append(
+            f"{'span_num':<8} {'span_id':<20} {'name':<40} "
+            f"{'type':<12} {'start':>8} {'end':>8} {'dur':>8} {'parent':<8}"
+        )
+        lines.append("-" * 120)
+
+        span_counter = [0]
+
+        def traverse_span(span_id):
+            """Recursively traverse span tree."""
+            child_spans = children_by_parent.get(span_id, [])
+
+            for span in child_spans:
+                span_counter[0] += 1
+                span_num = f"s{span_counter[0]}"
+                span_to_number[span.span_id] = span_num
+
+                # Calculate times in seconds from trace start
+                start_s = (span.start_time_ns - trace_start_ns) / 1_000_000_000
+                end_s = (span.end_time_ns - trace_start_ns) / 1_000_000_000
+                dur_s = (span.end_time_ns - span.start_time_ns) / 1_000_000_000
+
+                # Get parent number
+                parent_num = span_to_number.get(span.parent_id, "-") if span.parent_id else "-"
+
+                # Format name - truncate if too long
+                name = span.name[:37] + "..." if len(span.name) > 40 else span.name
+
+                # Write row
+                lines.append(
+                    f"{span_num:<8} {span.span_id:<20} {name:<40} "
+                    f"{span.span_type:<12} {start_s:>8.2f} {end_s:>8.2f} "
+                    f"{dur_s:>8.2f} {parent_num:<8}"
+                )
+
+                # Traverse children
+                traverse_span(span.span_id)
+
+        # Start from root spans
+        traverse_span(None)
+
+        # Summary by type
+        lines.append("")
+        lines.append("SUMMARY BY TYPE:")
+        lines.append("-" * 80)
+        lines.append(f"{'type':<20} {'count':>8} {'total_dur':>12} {'avg_dur':>12}")
+        lines.append("-" * 80)
+
+        span_types = defaultdict(int)
+        total_duration_by_type = defaultdict(float)
+
+        for span in spans:
+            span_types[span.span_type] += 1
+            total_duration_by_type[span.span_type] += (
+                span.end_time_ns - span.start_time_ns
+            ) / 1_000_000_000
+
+        for span_type in sorted(span_types.keys()):
+            count = span_types[span_type]
+            total_dur = total_duration_by_type[span_type]
+            avg_dur = total_dur / count
+            lines.append(f"{span_type:<20} {count:>8} {total_dur:>12.3f}s {avg_dur:>12.3f}s")
+
+        # Top 10 longest spans
+        lines.append("")
+        lines.append("TOP 10 LONGEST SPANS:")
+        lines.append("-" * 110)
+        lines.append(
+            f"{'rank':<6} {'span_num':<10} {'span_id':<20} {'name':<30} "
+            f"{'type':<12} {'duration':>12}"
+        )
+        lines.append("-" * 110)
+
+        sorted_spans = sorted(spans, key=lambda s: s.end_time_ns - s.start_time_ns, reverse=True)
+        for i, span in enumerate(sorted_spans[:10]):
+            span_num = span_to_number.get(span.span_id, "?")
+            name = span.name[:27] + "..." if len(span.name) > 30 else span.name
+            dur_s = (span.end_time_ns - span.start_time_ns) / 1_000_000_000
+            lines.append(
+                f"{i + 1:<6} {span_num:<10} {span.span_id:<20} {name:<30} "
+                f"{span.span_type:<12} {dur_s:>12.3f}s"
+            )
+
+        # Detect concurrent operations
+        lines.append("")
+        lines.append("CONCURRENT OPERATIONS:")
+        lines.append("-" * 100)
+
+        concurrent_pairs = []
+
+        for i, span1 in enumerate(spans):
+            for span2 in spans[i + 1 :]:
+                # Check if spans overlap and are siblings (same parent)
+                if (
+                    span1.start_time_ns < span2.end_time_ns
+                    and span2.start_time_ns < span1.end_time_ns
+                    and span1.parent_id == span2.parent_id
+                ):
+                    overlap_start = max(span1.start_time_ns, span2.start_time_ns)
+                    overlap_end = min(span1.end_time_ns, span2.end_time_ns)
+                    overlap_s = (overlap_end - overlap_start) / 1_000_000_000
+
+                    if overlap_s > 0.01:  # Only show significant overlaps (>10ms)
+                        concurrent_pairs.append((span1, span2, overlap_s))
+                        break  # Only show first concurrent pair for each span
+
+        if concurrent_pairs:
+            lines.append(f"{'span1':<10} {'span2':<10} {'name1':<30} {'name2':<30} {'overlap':>10}")
+            lines.append("-" * 100)
+
+            for span1, span2, overlap_s in concurrent_pairs[:20]:  # Limit to 20 pairs
+                num1 = span_to_number.get(span1.span_id, "?")
+                num2 = span_to_number.get(span2.span_id, "?")
+                name1 = span1.name[:27] + "..." if len(span1.name) > 30 else span1.name
+                name2 = span2.name[:27] + "..." if len(span2.name) > 30 else span2.name
+                lines.append(f"{num1:<10} {num2:<10} {name1:<30} {name2:<30} {overlap_s:>10.3f}s")
+        else:
+            lines.append("No significant concurrent operations detected.")
+
+        return "\n".join(lines)

@@ -19,6 +19,27 @@ LiteLLM is required for:
 
 For optimal judge performance, we recommend using **OpenAI GPT-4o** or models with equivalent or greater intelligence and reasoning capabilities. The judge features, especially trace analysis with tools, require strong reasoning abilities to provide accurate evaluations.
 
+### Debug Logging
+
+To see how judges are behaving internally, including tool calls and reasoning steps, enable debug logging:
+
+```python
+import logging
+
+# Enable debug logging for judge behavior
+logging.basicConfig(level=logging.INFO)
+logging.getLogger("mlflow.genai.judges.utils").setLevel(logging.DEBUG)
+```
+
+This will show:
+
+- Tool invocations (get_trace_info, get_root_span, list_spans, etc.)
+- LLM reasoning steps
+- Intermediate processing details
+- Tool responses and data flow
+
+Debug logging is especially helpful when developing custom judges or troubleshooting evaluation issues.
+
 ## Quick Start with `make_judge()`
 
 ### Trace-Based Evaluation
