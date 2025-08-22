@@ -8,7 +8,6 @@ using regular expressions with case-insensitive matching.
 import json
 import re
 from dataclasses import dataclass
-from typing import Any
 
 from mlflow.entities.trace import Trace
 from mlflow.genai.judges.tools.base import JudgeTool
@@ -21,13 +20,8 @@ class RegexMatch:
     """Represents a single regex match found in a span."""
 
     span_id: str
-    span_name: str
-    field_path: str  # e.g., "inputs.message" or "outputs.response"
     matched_text: str
-    context_before: str
-    context_after: str
-    match_start: int
-    match_end: int
+    surrounding_text: str  # Text with ~100 chars before and after, with ellipses
 
 
 @dataclass
@@ -82,9 +76,9 @@ class SearchTraceRegexTool(JudgeTool):
                             "type": "integer",
                             "description": (
                                 "Number of characters to include before and after each match "
-                                "for context. Default is 50."
+                                "for context. Default is 100."
                             ),
-                            "default": 50,
+                            "default": 100,
                         },
                         "max_matches": {
                             "type": "integer",
@@ -101,7 +95,7 @@ class SearchTraceRegexTool(JudgeTool):
         )
 
     def invoke(
-        self, trace: Trace, pattern: str, context_chars: int = 50, max_matches: int = 100
+        self, trace: Trace, pattern: str, context_chars: int = 100, max_matches: int = 100
     ) -> SearchTraceRegexResult:
         """
         Search the trace for regex pattern matches.
@@ -109,7 +103,7 @@ class SearchTraceRegexTool(JudgeTool):
         Args:
             trace: The trace to search
             pattern: Regular expression pattern (case-insensitive)
-            context_chars: Number of context characters before/after match
+            context_chars: Number of context characters before/after match (default 100)
             max_matches: Maximum number of matches to return
 
         Returns:
@@ -137,94 +131,42 @@ class SearchTraceRegexTool(JudgeTool):
         matches = []
         total_matches = 0
 
+        # Convert entire trace to JSON string for searching
         for span in trace.data.spans:
             if total_matches >= max_matches:
                 break
 
-            # Search in various span fields
-            fields_to_search = {}
+            # Convert span to JSON representation
+            span_json = json.dumps(span.to_dict(), default=str, indent=2)
 
-            # Add inputs if present
-            if span.inputs:
-                fields_to_search["inputs"] = span.inputs
-
-            # Add outputs if present
-            if span.outputs:
-                fields_to_search["outputs"] = span.outputs
-
-            # Add relevant attributes
-            if span.attributes:
-                for key, value in span.attributes.items():
-                    # Skip internal MLflow attributes
-                    if not key.startswith("mlflow."):
-                        fields_to_search[f"attributes.{key}"] = value
-
-            # Search each field
-            for field_path, field_value in fields_to_search.items():
+            # Find all matches in this span's JSON
+            for match in regex.finditer(span_json):
                 if total_matches >= max_matches:
                     break
 
-                # Convert field value to searchable text
-                text = self._value_to_text(field_value)
+                # Extract context around the match
+                start = max(0, match.start() - context_chars)
+                end = min(len(span_json), match.end() + context_chars)
 
-                # Find all matches in this text
-                for match in regex.finditer(text):
-                    if total_matches >= max_matches:
-                        break
+                # Create surrounding text with ellipses
+                prefix = "..." if start > 0 else ""
+                suffix = "..." if end < len(span_json) else ""
+                surrounding = prefix + span_json[start:end] + suffix
 
-                    # Extract context around the match
-                    start = max(0, match.start() - context_chars)
-                    end = min(len(text), match.end() + context_chars)
-
-                    context_before = text[start : match.start()]
-                    context_after = text[match.end() : end]
-
-                    matches.append(
-                        RegexMatch(
-                            span_id=span.span_id,
-                            span_name=span.name,
-                            field_path=field_path,
-                            matched_text=match.group(0),
-                            context_before=context_before,
-                            context_after=context_after,
-                            match_start=match.start(),
-                            match_end=match.end(),
-                        )
+                matches.append(
+                    RegexMatch(
+                        span_id=span.span_id,
+                        matched_text=match.group(0),
+                        surrounding_text=surrounding,
                     )
-                    total_matches += 1
+                )
+                total_matches += 1
 
         return SearchTraceRegexResult(
             pattern=pattern,
             total_matches=total_matches,
             matches=matches,
         )
-
-    def _value_to_text(self, value: Any) -> str:
-        """
-        Convert any value to searchable text.
-
-        Args:
-            value: Value to convert
-
-        Returns:
-            String representation of the value
-        """
-        if isinstance(value, str):
-            return value
-        elif isinstance(value, dict):
-            # Convert dict to JSON string for searching
-            try:
-                return json.dumps(value, default=str, indent=2)
-            except Exception:
-                return str(value)
-        elif isinstance(value, list):
-            # Convert list to JSON string for searching
-            try:
-                return json.dumps(value, default=str, indent=2)
-            except Exception:
-                return str(value)
-        else:
-            return str(value)
 
 
 # Register the tool
