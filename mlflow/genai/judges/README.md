@@ -4,7 +4,7 @@ MLflow Judges provide a flexible framework for evaluating LLM traces and outputs
 
 ## Prerequisites
 
-To use MLflow Judges with LLM providers, you need to install LiteLLM:
+For the best quality and reliability with MLflow Judges, you need to install LiteLLM (highly recommended):
 
 ```bash
 pip install litellm
