@@ -125,6 +125,8 @@ def _invoke_litellm(provider: str, model_name: str, prompt: str, trace: Trace | 
     messages = [{"role": "user", "content": prompt}]
 
     tools = []
+    response_format = None
+
     if trace is not None:
         judge_tools = list_judge_tools()
         tools = [tool.get_definition().to_dict() for tool in judge_tools]
@@ -132,15 +134,44 @@ def _invoke_litellm(provider: str, model_name: str, prompt: str, trace: Trace | 
         for tool in judge_tools:
             _logger.debug(f"  - Tool: {tool.name}")
 
+        # Use structured outputs for trace-based evaluation
+        response_format = {
+            "type": "json_schema",
+            "json_schema": {
+                "name": "judge_evaluation",
+                "strict": True,
+                "schema": {
+                    "type": "object",
+                    "properties": {
+                        "result": {"type": "string", "description": "The evaluation rating/result"},
+                        "rationale": {
+                            "type": "string",
+                            "description": "Detailed explanation for the evaluation",
+                        },
+                    },
+                    "required": ["result", "rationale"],
+                    "additionalProperties": False,
+                },
+            },
+        }
+
     while True:
         try:
             _logger.debug(f"Calling LiteLLM with {len(messages)} messages and {len(tools)} tools")
-            response = litellm.completion(
-                model=litellm_model_uri,
-                messages=messages,
-                tools=tools if tools else None,  # Only pass tools if we have them
-                tool_choice="auto" if tools else None,
-            )
+            # Build completion kwargs
+            completion_kwargs = {
+                "model": litellm_model_uri,
+                "messages": messages,
+            }
+
+            if tools:
+                completion_kwargs["tools"] = tools
+                completion_kwargs["tool_choice"] = "auto"
+
+            if response_format:
+                completion_kwargs["response_format"] = response_format
+
+            response = litellm.completion(**completion_kwargs)
             message = response.choices[0].message
             if not message.tool_calls:
                 _logger.debug("No tool calls in response, returning final content")
