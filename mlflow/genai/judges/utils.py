@@ -158,20 +158,13 @@ def _invoke_litellm(provider: str, model_name: str, prompt: str, trace: Trace | 
     while True:
         try:
             _logger.debug(f"Calling LiteLLM with {len(messages)} messages and {len(tools)} tools")
-            # Build completion kwargs
-            completion_kwargs = {
-                "model": litellm_model_uri,
-                "messages": messages,
-            }
-
-            if tools:
-                completion_kwargs["tools"] = tools
-                completion_kwargs["tool_choice"] = "auto"
-
-            if response_format:
-                completion_kwargs["response_format"] = response_format
-
-            response = litellm.completion(**completion_kwargs)
+            response = litellm.completion(
+                model=litellm_model_uri,
+                messages=messages,
+                tools=tools if tools else None,
+                tool_choice="auto" if tools else None,
+                response_format=response_format,
+            )
             message = response.choices[0].message
             if not message.tool_calls:
                 _logger.debug("No tool calls in response, returning final content")
