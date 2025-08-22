@@ -70,6 +70,7 @@ class GetSpanTimingReportTool(JudgeTool):
         children_by_parent = defaultdict(list)
         span_to_number = {}  # Map span_id to s1, s2, etc.
         span_self_duration = {}  # Map span_id to self duration in seconds
+        span_ancestors = {}  # Map span_id to list of ancestor span numbers
 
         for span in spans:
             children_by_parent[span.parent_id].append(span)
@@ -123,23 +124,30 @@ class GetSpanTimingReportTool(JudgeTool):
 
         # Span table
         lines.append("SPAN TABLE:")
-        lines.append("-" * 140)
+        lines.append("-" * 200)
         lines.append(
             f"{'span_num':<8} {'span_id':<20} {'name':<30} "
-            f"{'type':<12} {'self_dur':>9} {'total_dur':>10} {'child_dur':>10} {'parent':<8}"
+            f"{'type':<12} {'self_dur':>9} {'total_dur':>10} {'child_dur':>10} "
+            f"{'parent':<8} {'ancestors':<60}"
         )
-        lines.append("-" * 140)
+        lines.append("-" * 200)
 
         span_counter = [0]
 
-        def traverse_span(span_id):
+        def traverse_span(span_id, ancestors=None):
             """Recursively traverse span tree."""
+            if ancestors is None:
+                ancestors = []
+
             child_spans = children_by_parent.get(span_id, [])
 
             for span in child_spans:
                 span_counter[0] += 1
                 span_num = f"s{span_counter[0]}"
                 span_to_number[span.span_id] = span_num
+
+                # Store ancestors for this span
+                span_ancestors[span.span_id] = ancestors.copy()
 
                 # Get durations
                 total_dur_s = (span.end_time_ns - span.start_time_ns) / 1_000_000_000
@@ -149,6 +157,9 @@ class GetSpanTimingReportTool(JudgeTool):
                 # Get parent number
                 parent_num = span_to_number.get(span.parent_id, "-") if span.parent_id else "-"
 
+                # Format ancestors string
+                ancestors_str = "→".join(ancestors) if ancestors else "root"
+
                 # Format name - truncate if too long
                 name = span.name[:27] + "..." if len(span.name) > 30 else span.name
 
@@ -156,11 +167,11 @@ class GetSpanTimingReportTool(JudgeTool):
                 lines.append(
                     f"{span_num:<8} {span.span_id:<20} {name:<30} "
                     f"{span.span_type:<12} {self_dur_s:>9.3f} {total_dur_s:>10.3f} "
-                    f"{child_dur_s:>10.3f} {parent_num:<8}"
+                    f"{child_dur_s:>10.3f} {parent_num:<8} {ancestors_str:<60}"
                 )
 
-                # Traverse children
-                traverse_span(span.span_id)
+                # Traverse children with updated ancestors
+                traverse_span(span.span_id, ancestors + [span_num])
 
         # Start from root spans
         traverse_span(None)
