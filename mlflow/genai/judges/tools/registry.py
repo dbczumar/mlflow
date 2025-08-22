@@ -143,13 +143,21 @@ def list_judge_tools() -> list[JudgeTool]:
     return _judge_tool_registry.list_tools()
 
 
-# Register built-in tools
-from mlflow.genai.judges.tools.get_root_span import GetRootSpanTool
-from mlflow.genai.judges.tools.get_span import GetSpanTool
-from mlflow.genai.judges.tools.get_trace_info import GetTraceInfoTool
-from mlflow.genai.judges.tools.list_spans import ListSpansTool
+# Register built-in tools - import at the end to avoid circular imports
+def _register_builtin_tools():
+    from mlflow.genai.judges.tools.get_root_span import GetRootSpanTool
+    from mlflow.genai.judges.tools.get_span import GetSpanTool
+    from mlflow.genai.judges.tools.get_span_timing_report import GetSpanTimingReportTool
+    from mlflow.genai.judges.tools.get_trace_info import GetTraceInfoTool
+    from mlflow.genai.judges.tools.list_spans import ListSpansTool
+    from mlflow.genai.judges.tools.search_trace_regex import SearchTraceRegexTool
 
-_judge_tool_registry.register(GetTraceInfoTool())
-_judge_tool_registry.register(GetRootSpanTool())
-_judge_tool_registry.register(ListSpansTool())
-_judge_tool_registry.register(GetSpanTool())
+    _judge_tool_registry.register(GetTraceInfoTool())
+    _judge_tool_registry.register(GetRootSpanTool())
+    _judge_tool_registry.register(ListSpansTool())
+    _judge_tool_registry.register(GetSpanTool())
+    _judge_tool_registry.register(GetSpanTimingReportTool())
+    _judge_tool_registry.register(SearchTraceRegexTool())
+
+
+_register_builtin_tools()

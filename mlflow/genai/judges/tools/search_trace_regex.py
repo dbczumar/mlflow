@@ -11,7 +11,6 @@ from dataclasses import dataclass
 
 from mlflow.entities.trace import Trace
 from mlflow.genai.judges.tools.base import JudgeTool
-from mlflow.genai.judges.tools.registry import register_judge_tool
 from mlflow.types.llm import ToolDefinition
 
 
@@ -167,7 +166,3 @@ class SearchTraceRegexTool(JudgeTool):
             total_matches=total_matches,
             matches=matches,
         )
-
-
-# Register the tool
-register_judge_tool(SearchTraceRegexTool())

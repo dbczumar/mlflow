@@ -24,8 +24,9 @@ class GetRootSpanResult:
     """Result from getting the root span."""
 
     span_id: str | None
-    content: str | None  # JSON string of root span content
+    content: str | None  # JSON string of root span content (may be truncated)
     content_size_bytes: int
+    page_token: str | None = None  # Token to get next page if content was truncated
     error: str | None = None
 
 
@@ -50,23 +51,36 @@ class GetRootSpanTool(JudgeTool):
                     "to the agent and final outputs. Note that in some traces, the root span "
                     "may not contain outputs, but it typically should. If the root span doesn't "
                     "have outputs, you may need to look at other spans to find the final results. "
-                    "The content is returned as a JSON string with all span details."
+                    "The content is returned as a JSON string. Large content may be paginated."
                 ),
                 parameters=ToolParamsSchema(
                     type="object",
-                    properties={},
+                    properties={
+                        "max_content_length": {
+                            "type": "integer",
+                            "description": "Maximum content size in bytes (default: 100000)",
+                        },
+                        "page_token": {
+                            "type": "string",
+                            "description": "Token to retrieve the next page of content",
+                        },
+                    },
                     required=[],
                 ),
             ),
             type="function",
         )
 
-    def invoke(self, trace: Trace) -> GetRootSpanResult:
+    def invoke(
+        self, trace: Trace, max_content_length: int = 100000, page_token: str | None = None
+    ) -> GetRootSpanResult:
         """
         Get the root span from the trace.
 
         Args:
             trace: The MLflow trace object to analyze
+            max_content_length: Maximum content size in bytes to return
+            page_token: Token to retrieve the next page (offset in bytes)
 
         Returns:
             GetRootSpanResult with the root span content as JSON string
@@ -91,45 +105,29 @@ class GetRootSpanTool(JudgeTool):
                 error="No root span found in trace",
             )
 
-        # Calculate timing information
-        start_time_ms = root_span.start_time_ns / 1_000_000
-        end_time_ms = root_span.end_time_ns / 1_000_000
-        duration_ms = end_time_ms - start_time_ms
+        # Parse page token to get offset
+        offset = 0
+        if page_token:
+            try:
+                offset = int(page_token)
+            except (ValueError, TypeError):
+                offset = 0
 
-        # Build root span data
-        span_data = {
-            "span_id": root_span.span_id,
-            "name": root_span.name,
-            "span_type": root_span.span_type,
-            "is_root": True,
-            "start_time_ms": start_time_ms,
-            "end_time_ms": end_time_ms,
-            "duration_ms": duration_ms,
-            "status": {
-                "status_code": root_span.status.status_code,
-                "description": root_span.status.description,
-            },
-            "inputs": root_span.inputs,
-            "outputs": root_span.outputs,
-            "attributes": root_span.attributes,
-            "events": [
-                {
-                    "name": event.name,
-                    "timestamp_ms": event.timestamp_ns / 1_000_000 if event.timestamp_ns else None,
-                    "attributes": event.attributes,
-                }
-                for event in (root_span.events or [])
-            ],
-            "has_outputs": root_span.outputs is not None and len(str(root_span.outputs)) > 0,
-            "child_span_count": sum(
-                1 for s in trace.data.spans if s.parent_id == root_span.span_id
-            ),
-        }
+        # Convert span directly to JSON
+        full_content = json.dumps(root_span.to_dict(), default=str, indent=2)
+        total_size = len(full_content.encode("utf-8"))
 
-        # Convert to JSON string
-        content = json.dumps(span_data, default=str, indent=2)
-        content_size = len(content.encode("utf-8"))
+        # Get the chunk for this page
+        end_offset = min(offset + max_content_length, total_size)
+        content_chunk = full_content[offset:end_offset]
+
+        # Determine if there's more content
+        next_page_token = str(end_offset) if end_offset < total_size else None
 
         return GetRootSpanResult(
-            span_id=root_span.span_id, content=content, content_size_bytes=content_size, error=None
+            span_id=root_span.span_id,
+            content=content_chunk,
+            content_size_bytes=len(content_chunk.encode("utf-8")),
+            page_token=next_page_token,
+            error=None,
         )

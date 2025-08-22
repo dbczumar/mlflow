@@ -1,6 +1,7 @@
 from mlflow.genai.judges.tools.base import JudgeTool
 from mlflow.genai.judges.tools.get_root_span import GetRootSpanResult, GetRootSpanTool
 from mlflow.genai.judges.tools.get_span import GetSpanResult, GetSpanTool
+from mlflow.genai.judges.tools.get_span_timing_report import GetSpanTimingReportTool
 from mlflow.genai.judges.tools.get_trace_info import GetTraceInfoTool
 from mlflow.genai.judges.tools.list_spans import ListSpansResult, ListSpansTool, SpanInfo
 from mlflow.genai.judges.tools.registry import (
@@ -25,6 +26,7 @@ __all__ = [
     "ListSpansResult",
     "GetSpanTool",
     "GetSpanResult",
+    "GetSpanTimingReportTool",
     "SearchTraceRegexTool",
     "SearchTraceRegexResult",
     "RegexMatch",

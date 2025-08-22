@@ -15,6 +15,10 @@ LiteLLM is required for:
 - All trace-based evaluation (using `{{trace}}` in instructions)
 - Non-native model providers (anything except OpenAI, Anthropic, Bedrock, Mistral, and Databricks endpoints)
 
+### Recommended Models
+
+For optimal judge performance, we recommend using **OpenAI GPT-4o** or models with equivalent or greater intelligence and reasoning capabilities. The judge features, especially trace analysis with tools, require strong reasoning abilities to provide accurate evaluations.
+
 ## Quick Start with `make_judge()`
 
 ### Trace-Based Evaluation
@@ -38,7 +42,7 @@ judge = make_judge(
 
     Rate as: "excellent", "good", "fair", or "poor"
     """,
-    model="openai:/gpt-4o",
+    model="openai/gpt-4o",
 )
 
 # Get a trace and evaluate it
@@ -63,7 +67,7 @@ judge = make_judge(
     Check each guideline and determine overall compliance.
     Rate as: "compliant", "partially_compliant", or "non_compliant"
     """,
-    model="openai:/gpt-4o",
+    model="openai/gpt-4o",
 )
 
 # Evaluate with specific expectations
@@ -91,7 +95,7 @@ judge = make_judge(
     Compare the {{answer}} with the {{expected_answer}}.
     Rate as "correct" if they match, "incorrect" otherwise.
     """,
-    model="openai:/gpt-4o",
+    model="openai/gpt-4o",
 )
 
 feedback = judge(outputs={"answer": "Paris"}, expectations={"expected_answer": "Paris"})
@@ -112,7 +116,7 @@ judge = make_judge(
     Consider accuracy, fluency, and preservation of meaning.
     Rate as: "excellent", "good", "acceptable", or "poor"
     """,
-    model="openai:/gpt-4o",
+    model="openai/gpt-4o",
 )
 
 feedback = judge(
