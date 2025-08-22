@@ -75,13 +75,13 @@ def test_field_based_evaluation_with_inputs_outputs():
         mock_invoke.assert_called_once()
 
         # Verify the formatted prompt contains substituted values
-        formatted_prompt = mock_invoke.call_args[0][1]
+        formatted_prompt = mock_invoke.call_args.kwargs["prompt"]
         assert "What is MLflow?" in formatted_prompt
         assert "MLflow is an open source platform for ML lifecycle." in formatted_prompt
 
         # Verify model and assessment name
-        assert mock_invoke.call_args[0][0] == "openai/gpt-4o"
-        assert mock_invoke.call_args[0][2] == "quality_judge"
+        assert mock_invoke.call_args.kwargs["model_uri"] == "openai/gpt-4o"
+        assert mock_invoke.call_args.kwargs["assessment_name"] == "quality_judge"
 
 
 def test_field_based_evaluation_with_expectations():
@@ -110,7 +110,7 @@ def test_field_based_evaluation_with_expectations():
         assert result == mock_feedback
 
         # Verify all fields are in the formatted prompt
-        formatted_prompt = mock_invoke.call_args[0][1]
+        formatted_prompt = mock_invoke.call_args.kwargs["prompt"]
         assert "What is 2+2?" in formatted_prompt
         assert "The answer is four" in formatted_prompt  # From response
         assert "4" in formatted_prompt  # From expected_answer
@@ -279,13 +279,13 @@ def test_expectations_parameter_provides_field_values():
         assert result == mock_feedback
 
         # Verify both fields are in the formatted prompt
-        formatted_prompt = mock_invoke.call_args[0][1]
+        formatted_prompt = mock_invoke.call_args.kwargs["prompt"]
         assert "36" in formatted_prompt
         assert "42" in formatted_prompt
 
 
-def test_trace_based_evaluation_not_implemented():
-    """Test that trace-based evaluation raises NotImplementedError."""
+def test_trace_based_evaluation_with_methodology():
+    """Test that trace-based evaluation includes required methodology instructions."""
     judge = make_judge(
         name="test_judge",
         instructions="Evaluate the {{trace}}.",
@@ -293,13 +293,25 @@ def test_trace_based_evaluation_not_implemented():
     )
 
     mock_trace = mock.Mock()
+    mock_feedback = Feedback(
+        name="test_judge",
+        value="good",
+        rationale="Trace looks good.",
+    )
 
-    with pytest.raises(
-        NotImplementedError, match="Trace-based evaluation is not yet implemented"
-    ) as exc_info:
-        judge(trace=mock_trace)
+    with mock.patch("mlflow.genai.judges.instructions_judge.invoke_judge_model") as mock_invoke:
+        mock_invoke.return_value = mock_feedback
 
-    assert "Trace-based evaluation is not yet implemented" in str(exc_info.value)
+        result = judge(trace=mock_trace)
+
+        assert result == mock_feedback
+
+        # Verify the augmented prompt includes the required methodology
+        prompt = mock_invoke.call_args.kwargs["prompt"]
+        assert "You MUST follow this methodology:" in prompt
+        assert "ALWAYS start by calling 'get_root_span'" in prompt
+        assert "ALWAYS call 'list_spans'" in prompt
+        assert "Use 'get_span' to examine specific spans" in prompt
 
 
 def test_neither_trace_nor_inputs_outputs_raises_error():

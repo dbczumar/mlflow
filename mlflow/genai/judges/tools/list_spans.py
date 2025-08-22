@@ -10,7 +10,12 @@ from dataclasses import dataclass
 from mlflow.entities.span_status import SpanStatus
 from mlflow.entities.trace import Trace
 from mlflow.genai.judges.tools.base import JudgeTool
-from mlflow.types.llm import ToolDefinition
+from mlflow.types.llm import (
+    FunctionToolDefinition,
+    ParamProperty,
+    ToolDefinition,
+    ToolParamsSchema,
+)
 from mlflow.utils.annotations import experimental
 
 
@@ -27,6 +32,7 @@ class SpanInfo:
     duration_ms: float
     parent_id: str | None
     status: SpanStatus
+    is_root: bool  # True if parent_id is None, else False
 
 
 @experimental(version="3.4.0")
@@ -53,31 +59,30 @@ class ListSpansTool(JudgeTool):
 
     def get_definition(self) -> ToolDefinition:
         return ToolDefinition(
-            name="list_spans",
-            description=(
-                "List information about spans within a trace with pagination support. "
-                "Returns span metadata including span_id, name, span_type, timing data "
-                "(start_time_ms, end_time_ms, duration_ms), parent_id, and status. "
-                "This provides an overview of all spans but does not fetch full span content."
+            function=FunctionToolDefinition(
+                name="list_spans",
+                description=(
+                    "List information about spans within a trace with pagination support. "
+                    "Returns span metadata including span_id, name, span_type, timing data "
+                    "(start_time_ms, end_time_ms, duration_ms), parent_id, and status. "
+                    "This provides an overview of all spans but does not fetch full span content."
+                ),
+                parameters=ToolParamsSchema(
+                    type="object",
+                    properties={
+                        "max_results": ParamProperty(
+                            type="integer",
+                            description="Maximum number of spans to return (default: 100)",
+                        ),
+                        "page_token": ParamProperty(
+                            type="string",
+                            description="Token for retrieving the next page of results",
+                        ),
+                    },
+                    required=[],
+                ),
             ),
-            parameters={
-                "type": "object",
-                "properties": {
-                    "max_results": {
-                        "type": "integer",
-                        "description": "Maximum number of spans to return",
-                        "default": 100,
-                        "minimum": 1,
-                        "maximum": 1000,
-                    },
-                    "page_token": {
-                        "type": "string",
-                        "description": "Token for retrieving the next page of results",
-                        "required": False,
-                    },
-                },
-                "required": [],
-            },
+            type="function",
         )
 
     def invoke(
@@ -126,6 +131,7 @@ class ListSpansTool(JudgeTool):
                 duration_ms=duration_ms,
                 parent_id=span.parent_id,
                 status=span.status,
+                is_root=(span.parent_id is None),
             )
             spans_info.append(span_info)
 

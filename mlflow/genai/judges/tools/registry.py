@@ -141,3 +141,13 @@ def list_judge_tools() -> list[JudgeTool]:
         List of registered JudgeTool instances
     """
     return _judge_tool_registry.list_tools()
+
+
+# Register built-in tools
+from mlflow.genai.judges.tools.get_root_span import GetRootSpanTool
+from mlflow.genai.judges.tools.get_span import GetSpanTool
+from mlflow.genai.judges.tools.list_spans import ListSpansTool
+
+_judge_tool_registry.register(ListSpansTool())
+_judge_tool_registry.register(GetSpanTool())
+_judge_tool_registry.register(GetRootSpanTool())

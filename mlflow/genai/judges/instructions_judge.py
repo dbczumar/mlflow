@@ -133,11 +133,36 @@ class InstructionsJudge(Judge):
             formatted_prompt = format_prompt(self._instructions, **template_values)
 
             # Invoke the judge model
-            return invoke_judge_model(self._model, formatted_prompt, self.name)
+            return invoke_judge_model(
+                model_uri=self._model,
+                prompt=formatted_prompt,
+                assessment_name=self.name,
+            )
 
         # Handle trace-based evaluation
         if trace is not None:
-            raise NotImplementedError("Trace-based evaluation is not yet implemented")
+            # Augment the prompt with instructions about how to use tools
+            augmented_prompt = (
+                f"{self._instructions}\n\n"
+                "You have access to tools to analyze the trace. "
+                "You MUST follow this methodology:\n\n"
+                "1. ALWAYS start by calling 'get_root_span' to understand the top-level "
+                "inputs and outputs\n"
+                "2. ALWAYS call 'list_spans' to see all spans and understand the trace structure\n"
+                "3. After completing steps 1 and 2, use additional tools as needed:\n"
+                "   - Use 'get_span' to examine specific spans in detail\n"
+                "   - Continue using other tools until you have gathered sufficient information\n\n"
+                "IMPORTANT: Your FINAL response must be ONLY valid JSON in this exact format "
+                "(no markdown, no code blocks, no extra text):\n"
+                '{"result": "<rating>", "rationale": "<your detailed explanation>"}\n'
+                "where <rating> should be one of the values specified in the instructions."
+            )
+            return invoke_judge_model(
+                model_uri=self._model,
+                prompt=augmented_prompt,
+                assessment_name=self.name,
+                trace=trace,
+            )
 
         raise MlflowException(
             "Must specify either 'trace' or 'inputs'/'outputs' for evaluation.",

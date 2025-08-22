@@ -1,6 +1,7 @@
 import json
+import logging
 import re
-from dataclasses import asdict
+from dataclasses import asdict, is_dataclass
 
 import mlflow
 from mlflow.entities.assessment import Feedback
@@ -10,6 +11,8 @@ from mlflow.exceptions import MlflowException
 from mlflow.genai.utils.enum_utils import StrEnum
 from mlflow.protos.databricks_pb2 import BAD_REQUEST, INVALID_PARAMETER_VALUE
 from mlflow.utils.uri import is_databricks_uri
+
+_logger = logging.getLogger(__name__)
 
 # "endpoints" is a special case for Databricks model serving endpoints.
 _NATIVE_PROVIDERS = ["openai", "anthropic", "bedrock", "mistral", "endpoints"]
@@ -124,10 +127,14 @@ def _invoke_litellm(provider: str, model_name: str, prompt: str, trace: Trace | 
     tools = []
     if trace is not None:
         judge_tools = list_judge_tools()
-        tools = [asdict(tool.get_definition()) for tool in judge_tools]
+        tools = [tool.get_definition().to_dict() for tool in judge_tools]
+        _logger.debug(f"Registered {len(judge_tools)} judge tools for trace evaluation")
+        for tool in judge_tools:
+            _logger.debug(f"  - Tool: {tool.name}")
 
     while True:
         try:
+            _logger.debug(f"Calling LiteLLM with {len(messages)} messages and {len(tools)} tools")
             response = litellm.completion(
                 model=litellm_model_uri,
                 messages=messages,
@@ -136,11 +143,17 @@ def _invoke_litellm(provider: str, model_name: str, prompt: str, trace: Trace | 
             )
             message = response.choices[0].message
             if not message.tool_calls:
+                _logger.debug("No tool calls in response, returning final content")
                 return message.content
 
+            _logger.debug(f"Model requested {len(message.tool_calls)} tool calls")
             messages.append(message.model_dump())
             for tool_call in message.tool_calls:
                 try:
+                    _logger.debug(
+                        f"Invoking judge tool: {tool_call.function.name} with arguments: "
+                        f"{tool_call.function.arguments}"
+                    )
                     mlflow_tool_call = ToolCall(
                         id=tool_call.id,
                         function={
@@ -149,7 +162,9 @@ def _invoke_litellm(provider: str, model_name: str, prompt: str, trace: Trace | 
                         },
                     )
                     result = _judge_tool_registry.invoke(mlflow_tool_call, trace)
+                    _logger.debug(f"Tool {tool_call.function.name} completed successfully")
                 except Exception as e:
+                    _logger.debug(f"Tool {tool_call.function.name} failed with error: {e}")
                     messages.append(
                         {
                             "tool_call_id": tool_call.id,
@@ -159,13 +174,18 @@ def _invoke_litellm(provider: str, model_name: str, prompt: str, trace: Trace | 
                         }
                     )
                 else:
-                    result = json.dumps(result)
+                    # Convert dataclass results to dict if needed
+                    # The tool result is either a dict, string, or dataclass
+                    if is_dataclass(result):
+                        result = asdict(result)
+                    result_json = json.dumps(result) if not isinstance(result, str) else result
+                    _logger.debug(f"Tool {tool_call.function.name} result: {result_json}")
                     messages.append(
                         {
                             "tool_call_id": tool_call.id,
                             "role": "tool",
                             "name": tool_call.function.name,
-                            "content": result,
+                            "content": result_json,
                         }
                     )
         except Exception as e:
