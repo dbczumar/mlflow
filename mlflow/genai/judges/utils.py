@@ -125,7 +125,27 @@ def _invoke_litellm(provider: str, model_name: str, prompt: str, trace: Trace | 
     messages = [{"role": "user", "content": prompt}]
 
     tools = []
-    response_format = None
+
+    # Always use structured outputs with LiteLLM for consistent JSON responses
+    response_format = {
+        "type": "json_schema",
+        "json_schema": {
+            "name": "judge_evaluation",
+            "strict": True,
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "result": {"type": "string", "description": "The evaluation rating/result"},
+                    "rationale": {
+                        "type": "string",
+                        "description": "Detailed explanation for the evaluation",
+                    },
+                },
+                "required": ["result", "rationale"],
+                "additionalProperties": False,
+            },
+        },
+    }
 
     if trace is not None:
         judge_tools = list_judge_tools()
@@ -133,27 +153,6 @@ def _invoke_litellm(provider: str, model_name: str, prompt: str, trace: Trace | 
         _logger.debug(f"Registered {len(judge_tools)} judge tools for trace evaluation")
         for tool in judge_tools:
             _logger.debug(f"  - Tool: {tool.name}")
-
-        # Use structured outputs for trace-based evaluation
-        response_format = {
-            "type": "json_schema",
-            "json_schema": {
-                "name": "judge_evaluation",
-                "strict": True,
-                "schema": {
-                    "type": "object",
-                    "properties": {
-                        "result": {"type": "string", "description": "The evaluation rating/result"},
-                        "rationale": {
-                            "type": "string",
-                            "description": "Detailed explanation for the evaluation",
-                        },
-                    },
-                    "required": ["result", "rationale"],
-                    "additionalProperties": False,
-                },
-            },
-        }
 
     while True:
         try:
