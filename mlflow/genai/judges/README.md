@@ -2,6 +2,19 @@
 
 MLflow Judges provide a flexible framework for evaluating LLM traces and outputs using natural language instructions.
 
+## Prerequisites
+
+To use MLflow Judges with LLM providers, you need to install LiteLLM:
+
+```bash
+pip install litellm
+```
+
+LiteLLM is required for:
+
+- All trace-based evaluation (using `{{trace}}` in instructions)
+- Non-native model providers (anything except OpenAI, Anthropic, Bedrock, Mistral, and Databricks endpoints)
+
 ## Quick Start with `make_judge()`
 
 ### Trace-Based Evaluation
