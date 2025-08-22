@@ -335,10 +335,11 @@ def test_trace_based_evaluation_with_methodology():
 
         # Verify the augmented prompt includes tool usage instructions
         prompt = mock_invoke.call_args.kwargs["prompt"]
-        # Just check that key tool names are mentioned, not exact wording
-        assert "get_trace_info" in prompt
-        assert "get_root_span" in prompt
-        assert "list_spans" in prompt
+        # Check that key capabilities are mentioned, not specific tool names
+        assert "trace metadata" in prompt
+        assert "root span" in prompt
+        assert "list all spans" in prompt
+        assert "REQUIRED STEPS" in prompt
 
 
 def test_neither_trace_nor_inputs_outputs_raises_error():
