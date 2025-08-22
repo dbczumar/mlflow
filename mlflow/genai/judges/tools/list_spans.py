@@ -33,6 +33,7 @@ class SpanInfo:
     parent_id: str | None
     status: SpanStatus
     is_root: bool  # True if parent_id is None, else False
+    attribute_names: list[str]  # Names of attributes in this span
 
 
 @experimental(version="3.4.0")
@@ -64,8 +65,9 @@ class ListSpansTool(JudgeTool):
                 description=(
                     "List information about spans within a trace with pagination support. "
                     "Returns span metadata including span_id, name, span_type, timing data "
-                    "(start_time_ms, end_time_ms, duration_ms), parent_id, and status. "
-                    "This provides an overview of all spans but does not fetch full span content."
+                    "(start_time_ms, end_time_ms, duration_ms), parent_id, status, and "
+                    "attribute_names (list of attribute keys). This provides an overview of "
+                    "all spans but does not fetch full span content."
                 ),
                 parameters=ToolParamsSchema(
                     type="object",
@@ -122,6 +124,9 @@ class ListSpansTool(JudgeTool):
             end_time_ms = span.end_time_ns / 1_000_000
             duration_ms = end_time_ms - start_time_ms
 
+            # Get attribute names
+            attribute_names = list(span.attributes.keys()) if span.attributes else []
+
             span_info = SpanInfo(
                 span_id=span.span_id,
                 name=span.name,
@@ -132,6 +137,7 @@ class ListSpansTool(JudgeTool):
                 parent_id=span.parent_id,
                 status=span.status,
                 is_root=(span.parent_id is None),
+                attribute_names=attribute_names,
             )
             spans_info.append(span_info)
 
