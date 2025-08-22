@@ -82,6 +82,19 @@ class InstructionsJudge(Judge):
         """Get the model for this judge."""
         return self._model
 
+    @property
+    def description(self) -> str:
+        """Get the description of this judge."""
+        # Use the first line of instructions as description, or a default
+        if self._instructions:
+            # Take first line or first sentence, whichever is shorter
+            first_line = self._instructions.split("\n")[0].strip()
+            first_sentence = self._instructions.split(".")[0].strip() + "."
+            if len(first_sentence) < len(first_line):
+                return first_sentence
+            return first_line
+        return f"Instructions-based judge: {self.name}"
+
     def __call__(
         self,
         *,
