@@ -69,6 +69,7 @@ class GetSpanTimingReportTool(JudgeTool):
         # Build parent-child relationships
         children_by_parent = defaultdict(list)
         span_to_number = {}  # Map span_id to s1, s2, etc.
+        span_self_duration = {}  # Map span_id to self duration in seconds
 
         for span in spans:
             children_by_parent[span.parent_id].append(span)
@@ -77,8 +78,39 @@ class GetSpanTimingReportTool(JudgeTool):
         for parent_spans in children_by_parent.values():
             parent_spans.sort(key=lambda s: s.start_time_ns)
 
-        # Get trace start time
-        trace_start_ns = trace_info.timestamp_ms * 1_000_000
+        # Calculate self duration for each span
+        for span in spans:
+            total_dur_s = (span.end_time_ns - span.start_time_ns) / 1_000_000_000
+
+            # Calculate actual time covered by children (accounting for overlaps)
+            children = children_by_parent.get(span.span_id, [])
+            if children:
+                # Create intervals for all children
+                intervals = []
+                for child in children:
+                    intervals.append((child.start_time_ns, child.end_time_ns))
+
+                # Merge overlapping intervals
+                intervals.sort()
+                merged = []
+                for start, end in intervals:
+                    if merged and start <= merged[-1][1]:
+                        # Overlapping interval, merge
+                        merged[-1] = (merged[-1][0], max(merged[-1][1], end))
+                    else:
+                        # Non-overlapping interval
+                        merged.append((start, end))
+
+                # Calculate total time covered by children
+                children_dur_s = 0
+                for start, end in merged:
+                    children_dur_s += (end - start) / 1_000_000_000
+            else:
+                children_dur_s = 0
+
+            # Self duration is total minus actual time covered by children
+            self_dur_s = total_dur_s - children_dur_s
+            span_self_duration[span.span_id] = self_dur_s
 
         # Build output
         lines = []
@@ -91,12 +123,12 @@ class GetSpanTimingReportTool(JudgeTool):
 
         # Span table
         lines.append("SPAN TABLE:")
-        lines.append("-" * 120)
+        lines.append("-" * 140)
         lines.append(
-            f"{'span_num':<8} {'span_id':<20} {'name':<40} "
-            f"{'type':<12} {'start':>8} {'end':>8} {'dur':>8} {'parent':<8}"
+            f"{'span_num':<8} {'span_id':<20} {'name':<30} "
+            f"{'type':<12} {'self_dur':>9} {'total_dur':>10} {'child_dur':>10} {'parent':<8}"
         )
-        lines.append("-" * 120)
+        lines.append("-" * 140)
 
         span_counter = [0]
 
@@ -109,22 +141,22 @@ class GetSpanTimingReportTool(JudgeTool):
                 span_num = f"s{span_counter[0]}"
                 span_to_number[span.span_id] = span_num
 
-                # Calculate times in seconds from trace start
-                start_s = (span.start_time_ns - trace_start_ns) / 1_000_000_000
-                end_s = (span.end_time_ns - trace_start_ns) / 1_000_000_000
-                dur_s = (span.end_time_ns - span.start_time_ns) / 1_000_000_000
+                # Get durations
+                total_dur_s = (span.end_time_ns - span.start_time_ns) / 1_000_000_000
+                self_dur_s = span_self_duration[span.span_id]
+                child_dur_s = total_dur_s - self_dur_s
 
                 # Get parent number
                 parent_num = span_to_number.get(span.parent_id, "-") if span.parent_id else "-"
 
                 # Format name - truncate if too long
-                name = span.name[:37] + "..." if len(span.name) > 40 else span.name
+                name = span.name[:27] + "..." if len(span.name) > 30 else span.name
 
                 # Write row
                 lines.append(
-                    f"{span_num:<8} {span.span_id:<20} {name:<40} "
-                    f"{span.span_type:<12} {start_s:>8.2f} {end_s:>8.2f} "
-                    f"{dur_s:>8.2f} {parent_num:<8}"
+                    f"{span_num:<8} {span.span_id:<20} {name:<30} "
+                    f"{span.span_type:<12} {self_dur_s:>9.3f} {total_dur_s:>10.3f} "
+                    f"{child_dur_s:>10.3f} {parent_num:<8}"
                 )
 
                 # Traverse children
@@ -155,24 +187,25 @@ class GetSpanTimingReportTool(JudgeTool):
             avg_dur = total_dur / count
             lines.append(f"{span_type:<20} {count:>8} {total_dur:>12.3f}s {avg_dur:>12.3f}s")
 
-        # Top 10 longest spans
+        # Top 10 spans by self duration
         lines.append("")
-        lines.append("TOP 10 LONGEST SPANS:")
+        lines.append("TOP 10 SPANS BY SELF DURATION (actual work, not including children):")
         lines.append("-" * 110)
         lines.append(
             f"{'rank':<6} {'span_num':<10} {'span_id':<20} {'name':<30} "
-            f"{'type':<12} {'duration':>12}"
+            f"{'type':<12} {'self_dur':>12}"
         )
         lines.append("-" * 110)
 
-        sorted_spans = sorted(spans, key=lambda s: s.end_time_ns - s.start_time_ns, reverse=True)
+        # Sort by self duration
+        sorted_spans = sorted(spans, key=lambda s: span_self_duration[s.span_id], reverse=True)
         for i, span in enumerate(sorted_spans[:10]):
             span_num = span_to_number.get(span.span_id, "?")
             name = span.name[:27] + "..." if len(span.name) > 30 else span.name
-            dur_s = (span.end_time_ns - span.start_time_ns) / 1_000_000_000
+            self_dur_s = span_self_duration[span.span_id]
             lines.append(
                 f"{i + 1:<6} {span_num:<10} {span.span_id:<20} {name:<30} "
-                f"{span.span_type:<12} {dur_s:>12.3f}s"
+                f"{span.span_type:<12} {self_dur_s:>12.3f}s"
             )
 
         # Detect concurrent operations

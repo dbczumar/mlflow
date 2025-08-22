@@ -45,7 +45,8 @@ class GetSpanTool(JudgeTool):
                     "Retrieve a specific span by its ID. Returns the complete span data "
                     "including inputs, outputs, attributes, events, and timing information. "
                     "Use this when you need to examine the full details of a particular span. "
-                    "Large content may be paginated."
+                    "Large content may be paginated. Consider selecting only relevant attributes "
+                    "to reduce data size and improve efficiency."
                 ),
                 parameters=ToolParamsSchema(
                     type="object",
@@ -53,6 +54,16 @@ class GetSpanTool(JudgeTool):
                         "span_id": {
                             "type": "string",
                             "description": "The ID of the span to retrieve",
+                        },
+                        "attributes_to_fetch": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": (
+                                "List of specific attributes to fetch from the span. If specified, "
+                                "only these attributes will be returned. If not specified, all "
+                                "attributes are returned. Use list_spans first to see available "
+                                "attribute names, then select only the relevant ones."
+                            ),
                         },
                         "max_content_length": {
                             "type": "integer",
@@ -73,6 +84,7 @@ class GetSpanTool(JudgeTool):
         self,
         trace: Trace,
         span_id: str,
+        attributes_to_fetch: list[str] | None = None,
         max_content_length: int = 100000,
         page_token: str | None = None,
     ) -> GetSpanResult:
@@ -82,6 +94,7 @@ class GetSpanTool(JudgeTool):
         Args:
             trace: The MLflow trace object to analyze
             span_id: The ID of the span to retrieve
+            attributes_to_fetch: List of specific attributes to fetch (None for all)
             max_content_length: Maximum content size in bytes to return
             page_token: Token to retrieve the next page (offset in bytes)
 
@@ -116,8 +129,19 @@ class GetSpanTool(JudgeTool):
             except (ValueError, TypeError):
                 offset = 0
 
-        # Convert span directly to JSON
-        full_content = json.dumps(target_span.to_dict(), default=str, indent=2)
+        # Get span data and filter attributes if requested
+        span_dict = target_span.to_dict()
+
+        if attributes_to_fetch is not None and span_dict.get("attributes"):
+            # Filter to only requested attributes
+            filtered_attributes = {}
+            for attr in attributes_to_fetch:
+                if attr in span_dict["attributes"]:
+                    filtered_attributes[attr] = span_dict["attributes"][attr]
+            span_dict["attributes"] = filtered_attributes
+
+        # Convert to JSON
+        full_content = json.dumps(span_dict, default=str, indent=2)
         total_size = len(full_content.encode("utf-8"))
 
         # Get the chunk for this page

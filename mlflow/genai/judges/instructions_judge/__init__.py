@@ -159,7 +159,9 @@ class InstructionsJudge(Judge):
         # Handle trace-based evaluation
         if trace is not None:
             # Augment the prompt with instructions about how to use tools
-            augmented_prompt = f"{self._instructions}\n{INSTRUCTIONS_JUDGE_TRACE_PROMPT_TEMPLATE}"
+            augmented_prompt = INSTRUCTIONS_JUDGE_TRACE_PROMPT_TEMPLATE.format(
+                task_instructions=self._instructions
+            )
             return invoke_judge_model(
                 model_uri=self._model,
                 prompt=augmented_prompt,
