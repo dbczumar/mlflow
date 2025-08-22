@@ -5,6 +5,7 @@ This module provides the InstructionsJudge class that evaluates traces
 based on user-provided instructions.
 """
 
+import json
 from typing import Any
 
 from pydantic import PrivateAttr
@@ -127,6 +128,13 @@ class InstructionsJudge(Judge):
             if outputs is not None:
                 template_values.update(outputs)
             if expectations is not None:
+                # If the template uses {{expectations}}, convert the dict to JSON
+                if self._TEMPLATE_VARIABLE_EXPECTATIONS in self.template_variables:
+                    # Convert the expectations dict to JSON string
+                    template_values[self._TEMPLATE_VARIABLE_EXPECTATIONS] = json.dumps(
+                        expectations, default=str, indent=2
+                    )
+                # Also add individual expectation fields for custom variables
                 template_values.update(expectations)
 
             # Format the instructions with the provided values
@@ -207,14 +215,8 @@ class InstructionsJudge(Judge):
         has_trace = self._TEMPLATE_VARIABLE_TRACE in template_vars
         has_inputs = self._TEMPLATE_VARIABLE_INPUTS in template_vars
         has_outputs = self._TEMPLATE_VARIABLE_OUTPUTS in template_vars
-        has_expectations = self._TEMPLATE_VARIABLE_EXPECTATIONS in template_vars
 
-        # Check if expectations is used as a template variable (not yet supported)
-        if has_expectations:
-            raise NotImplementedError(
-                "The 'expectations' template variable ({{expectations}}) is not yet supported. "
-                "This feature will be added in a future release."
-            )
+        # Note: expectations template variable is now supported and will be handled in __call__
 
         # If trace is used, no other variables (besides reserved ones) should be defined
         if has_trace:

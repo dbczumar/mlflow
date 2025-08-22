@@ -240,18 +240,45 @@ def test_trace_with_custom_variables_raises_error():
     assert "custom_field" in str(exc_info.value) or "another_field" in str(exc_info.value)
 
 
-def test_expectations_template_variable_raises_not_implemented():
-    """Test that {{expectations}} as a template variable raises NotImplementedError."""
-    with pytest.raises(
-        NotImplementedError, match="'expectations' template variable.*not yet supported"
-    ) as exc_info:
-        make_judge(
-            name="test_judge",
-            instructions="Evaluate {{response}} against {{expectations}}.",
+def test_expectations_template_variable_as_json():
+    """Test that {{expectations}} template variable converts dict to JSON."""
+    judge = make_judge(
+        name="test_judge",
+        instructions="Evaluate {{response}} against these expectations: {{expectations}}.",
+    )
+
+    mock_feedback = Feedback(
+        name="test_judge",
+        value="good",
+        rationale="Response meets expectations.",
+    )
+
+    with mock.patch("mlflow.genai.judges.instructions_judge.invoke_judge_model") as mock_invoke:
+        mock_invoke.return_value = mock_feedback
+
+        # Provide expectations as a dict
+        expectations_dict = {
+            "accuracy": "high",
+            "completeness": "full",
+            "format": "JSON",
+            "score": 0.95,
+        }
+
+        result = judge(
+            outputs={"response": "The answer is 42."},
+            expectations=expectations_dict,
         )
 
-    assert "'expectations' template variable" in str(exc_info.value)
-    assert "not yet supported" in str(exc_info.value)
+        assert result == mock_feedback
+
+        # Verify the formatted prompt contains the JSON representation of expectations
+        formatted_prompt = mock_invoke.call_args.kwargs["prompt"]
+        assert "The answer is 42" in formatted_prompt
+        # The expectations dict should be converted to JSON
+        assert '"accuracy": "high"' in formatted_prompt
+        assert '"completeness": "full"' in formatted_prompt
+        assert '"format": "JSON"' in formatted_prompt
+        assert '"score": 0.95' in formatted_prompt
 
 
 def test_expectations_parameter_provides_field_values():
