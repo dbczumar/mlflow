@@ -122,6 +122,17 @@ class GetSpanTimingReportTool(JudgeTool):
         lines.append(f"Total Spans: {len(spans)}")
         lines.append("")
 
+        # Column definitions
+        lines.append("COLUMN DEFINITIONS:")
+        lines.append("  self_dur:  Time spent in this span excluding its children (actual work)")
+        lines.append(
+            "  total_dur: Total time from span start to end (includes waiting for children)"
+        )
+        lines.append("  child_dur: Time spent waiting for child spans to complete")
+        lines.append("  parent:    The immediate parent span number (e.g., s5 is parent of s10)")
+        lines.append("  ancestors: Complete chain from root to parent (e.g., s1→s2→s4→s5 for s10)")
+        lines.append("")
+
         # Span table
         lines.append("SPAN TABLE:")
         lines.append("-" * 200)
