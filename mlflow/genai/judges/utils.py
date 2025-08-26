@@ -44,7 +44,7 @@ def invoke_judge_model(
     prompt: str,
     assessment_name: str,
     trace: Trace | None = None,
-    num_retries: int = 7,
+    num_retries: int = 10,
 ) -> Feedback:
     """
     Invoke the judge model.
@@ -119,7 +119,7 @@ def _is_litellm_available() -> bool:
 
 
 def _invoke_litellm(
-    provider: str, model_name: str, prompt: str, trace: Trace | None, num_retries: int = 7
+    provider: str, model_name: str, prompt: str, trace: Trace | None, num_retries: int
 ) -> str:
     """
     Invoke the judge model via litellm with retry support.
