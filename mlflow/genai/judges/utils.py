@@ -40,7 +40,11 @@ def _sanitize_justification(justification: str) -> str:
 
 
 def invoke_judge_model(
-    model_uri: str, prompt: str, assessment_name: str, trace: Trace | None = None
+    model_uri: str,
+    prompt: str,
+    assessment_name: str,
+    trace: Trace | None = None,
+    num_retries: int = 7,
 ) -> Feedback:
     """
     Invoke the judge model.
@@ -53,6 +57,7 @@ def invoke_judge_model(
         prompt: The prompt to evaluate.
         assessment_name: The name of the assessment.
         trace: Optional trace object for context (default=None).
+        num_retries: Number of retries on transient failures when using litellm.
     """
     from mlflow.metrics.genai.model_utils import (
         _parse_model_uri,
@@ -64,7 +69,7 @@ def invoke_judge_model(
 
     # Try litellm first for better performance.
     if _is_litellm_available():
-        response = _invoke_litellm(provider, model_name, prompt, trace)
+        response = _invoke_litellm(provider, model_name, prompt, trace, num_retries)
     elif trace is not None:
         raise MlflowException(
             "LiteLLM is required for using traces with judge models. "
@@ -113,8 +118,24 @@ def _is_litellm_available() -> bool:
         return False
 
 
-def _invoke_litellm(provider: str, model_name: str, prompt: str, trace: Trace | None) -> str:
-    """Invoke the judge model via litellm."""
+def _invoke_litellm(
+    provider: str, model_name: str, prompt: str, trace: Trace | None, num_retries: int = 7
+) -> str:
+    """
+    Invoke the judge model via litellm with retry support.
+
+    Args:
+        provider: The provider name (e.g., 'openai', 'anthropic').
+        model_name: The model name.
+        prompt: The prompt to send to the model.
+        num_retries: Number of retries with exponential backoff on transient failures.
+
+    Returns:
+        The model's response content.
+
+    Raises:
+        MlflowException: If the request fails after all retries.
+    """
     import litellm
 
     from mlflow.genai.judges.tools import list_judge_tools
@@ -163,6 +184,11 @@ def _invoke_litellm(provider: str, model_name: str, prompt: str, trace: Trace | 
                 tools=tools if tools else None,
                 tool_choice="auto" if tools else None,
                 response_format=response_format,
+                retry_policy=_get_litellm_retry_policy(num_retries),
+                retry_strategy="exponential_backoff_retry",
+                # In LiteLLM version 1.55.3+, max_retries is stacked on top of retry_policy.
+                # To avoid double-retry, we set max_retries=0
+                max_retries=0,
             )
             message = response.choices[0].message
             if not message.tool_calls:
@@ -213,6 +239,32 @@ def _invoke_litellm(provider: str, model_name: str, prompt: str, trace: Trace | 
                     )
         except Exception as e:
             raise MlflowException(f"Failed to invoke the judge model via litellm: {e}") from e
+
+
+def _get_litellm_retry_policy(num_retries: int):
+    """
+    Get a LiteLLM retry policy for retrying requests when transient API errors occur.
+
+    Args:
+        num_retries: The number of times to retry a request if it fails transiently due to
+                     network error, rate limiting, etc. Requests are retried with exponential
+                     backoff.
+
+    Returns:
+        A LiteLLM RetryPolicy instance.
+    """
+    from litellm import RetryPolicy
+
+    return RetryPolicy(
+        TimeoutErrorRetries=num_retries,
+        RateLimitErrorRetries=num_retries,
+        InternalServerErrorRetries=num_retries,
+        ContentPolicyViolationErrorRetries=num_retries,
+        # We don't retry on errors that are unlikely to be transient
+        # (e.g. bad request, invalid auth credentials)
+        BadRequestErrorRetries=0,
+        AuthenticationErrorRetries=0,
+    )
 
 
 class CategoricalRating(StrEnum):
