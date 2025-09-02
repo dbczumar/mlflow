@@ -12,6 +12,7 @@ from mlflow.exceptions import MlflowException
 from mlflow.genai.judges.constants import _DATABRICKS_DEFAULT_JUDGE_MODEL
 from mlflow.genai.utils.enum_utils import StrEnum
 from mlflow.protos.databricks_pb2 import BAD_REQUEST, INVALID_PARAMETER_VALUE
+from mlflow.types.chat import ChatMessage
 from mlflow.utils.uri import is_databricks_uri
 
 _logger = logging.getLogger(__name__)
@@ -22,6 +23,40 @@ _NATIVE_PROVIDERS = ["openai", "anthropic", "bedrock", "mistral", "endpoints"]
 # Global cache to track model capabilities across function calls
 # Key: model URI (e.g., "openai/gpt-4"), Value: boolean indicating response_format support
 _MODEL_RESPONSE_FORMAT_CAPABILITIES: dict[str, bool] = {}
+
+# Type alias for prompt that can be either string or list of ChatMessage
+Prompt = str | list[ChatMessage]
+
+
+def _normalize_prompt_to_messages(prompt: Prompt) -> list[ChatMessage]:
+    """Convert prompt to standardized ChatMessage format."""
+    if isinstance(prompt, str):
+        # Use "system" role as default for string prompts
+        return [ChatMessage(role="system", content=prompt)]
+    elif isinstance(prompt, list):
+        # Validate that all items are ChatMessage instances
+        for i, msg in enumerate(prompt):
+            if not isinstance(msg, ChatMessage):
+                raise MlflowException(
+                    f"All messages must be ChatMessage instances. Item at index {i} is {type(msg)}",
+                    error_code=INVALID_PARAMETER_VALUE,
+                )
+        return prompt
+    else:
+        raise MlflowException(
+            f"Prompt must be string or list of ChatMessage instances, got {type(prompt)}",
+            error_code=INVALID_PARAMETER_VALUE,
+        )
+
+
+def _messages_to_litellm_format(messages: list[ChatMessage]) -> list[dict[str, Any]]:
+    """Convert ChatMessage list to litellm-compatible dict format."""
+    return [{"role": msg.role, "content": msg.content} for msg in messages]
+
+
+def _messages_to_string(messages: list[ChatMessage]) -> str:
+    """Convert ChatMessage list to string for native providers."""
+    return "\n".join(msg.content or "" for msg in messages if msg.content)
 
 
 def get_default_model() -> str:
@@ -45,7 +80,7 @@ def _sanitize_justification(justification: str) -> str:
 
 def invoke_judge_model(
     model_uri: str,
-    prompt: str,
+    prompt: Prompt,
     assessment_name: str,
     trace: Trace | None = None,
     num_retries: int = 10,
@@ -58,7 +93,7 @@ def invoke_judge_model(
 
     Args:
         model_uri: The model URI.
-        prompt: The prompt to evaluate.
+        prompt: The prompt to evaluate. Can be a string or list of ChatMessage instances.
         assessment_name: The name of the assessment.
         trace: Optional trace object for context.
         num_retries: Number of retries on transient failures when using litellm.
@@ -81,9 +116,12 @@ def invoke_judge_model(
             error_code=BAD_REQUEST,
         )
     elif provider in _NATIVE_PROVIDERS:
+        # Convert prompt to string for native providers
+        messages = _normalize_prompt_to_messages(prompt)
+        prompt_string = _messages_to_string(messages)
         response = score_model_on_payload(
             model_uri=model_uri,
-            payload=prompt,
+            payload=prompt_string,
             endpoint_type=get_endpoint_type(model_uri) or "llm/v1/chat",
         )
     else:
@@ -123,7 +161,7 @@ def _is_litellm_available() -> bool:
 
 
 def _invoke_litellm(
-    provider: str, model_name: str, prompt: str, trace: Trace | None, num_retries: int
+    provider: str, model_name: str, prompt: Prompt, trace: Trace | None, num_retries: int
 ) -> str:
     """
     Invoke the judge via litellm with retry support.
@@ -131,7 +169,7 @@ def _invoke_litellm(
     Args:
         provider: The provider name (e.g., 'openai', 'anthropic').
         model_name: The model name.
-        prompt: The prompt to send to the model.
+        prompt: The prompt to send to the model. Can be a string or list of ChatMessage instances.
         trace: Optional trace object for context with tool calling support.
         num_retries: Number of retries with exponential backoff on transient failures.
 
@@ -149,7 +187,9 @@ def _invoke_litellm(
     from mlflow.genai.judges.tools.registry import _judge_tool_registry
 
     litellm_model_uri = f"{provider}/{model_name}"
-    messages = [{"role": "user", "content": prompt}]
+    # Convert prompt to standardized ChatMessage format, then to litellm dict format
+    chat_messages = _normalize_prompt_to_messages(prompt)
+    messages = _messages_to_litellm_format(chat_messages)
     tools = []
     response_format = _get_judge_response_format()
 

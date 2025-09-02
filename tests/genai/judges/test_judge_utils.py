@@ -12,6 +12,7 @@ from mlflow.entities.trace_location import TraceLocation
 from mlflow.entities.trace_state import TraceState
 from mlflow.exceptions import MlflowException
 from mlflow.genai.judges.utils import CategoricalRating, invoke_judge_model
+from mlflow.types.chat import ChatMessage
 from mlflow.types.llm import ToolCall
 
 
@@ -76,7 +77,7 @@ def test_invoke_judge_model_successful_with_litellm(num_retries, mock_response):
 
     mock_litellm.assert_called_once_with(
         model="openai/gpt-4",
-        messages=[{"role": "user", "content": "Evaluate this response"}],
+        messages=[{"role": "system", "content": "Evaluate this response"}],
         tools=None,
         tool_choice=None,
         response_format={
@@ -414,3 +415,172 @@ def test_invoke_judge_model_caches_capabilities_globally():
         assert "response_format" not in call_kwargs
 
         assert feedback2.name == "test2"
+
+
+def test_invoke_judge_model_with_chat_messages(mock_response):
+    """Test that invoke_judge_model works with ChatMessage list."""
+    messages = [
+        ChatMessage(role="system", content="You are an expert judge."),
+        ChatMessage(role="user", content="Evaluate this response for quality."),
+    ]
+
+    with mock.patch("litellm.completion", return_value=mock_response) as mock_litellm:
+        feedback = invoke_judge_model(
+            model_uri="openai:/gpt-4",
+            prompt=messages,
+            assessment_name="quality_check",
+        )
+
+    # Verify litellm was called with the correct messages
+    mock_litellm.assert_called_once()
+    call_kwargs = mock_litellm.call_args.kwargs
+    assert call_kwargs["messages"] == [
+        {"role": "system", "content": "You are an expert judge."},
+        {"role": "user", "content": "Evaluate this response for quality."},
+    ]
+
+    assert feedback.name == "quality_check"
+    assert feedback.value == CategoricalRating.YES
+
+
+def test_invoke_judge_model_with_single_chat_message(mock_response):
+    """Test that invoke_judge_model works with a single ChatMessage."""
+    messages = [ChatMessage(role="user", content="Rate this response.")]
+
+    with mock.patch("litellm.completion", return_value=mock_response) as mock_litellm:
+        feedback = invoke_judge_model(
+            model_uri="openai:/gpt-4",
+            prompt=messages,
+            assessment_name="rating_check",
+        )
+
+    # Verify litellm was called with the correct message
+    mock_litellm.assert_called_once()
+    call_kwargs = mock_litellm.call_args.kwargs
+    assert call_kwargs["messages"] == [{"role": "user", "content": "Rate this response."}]
+
+    assert feedback.name == "rating_check"
+    assert feedback.value == CategoricalRating.YES
+
+
+def test_invoke_judge_model_chat_messages_with_native_provider():
+    """Test that ChatMessage list is converted to string for native providers."""
+    messages = [
+        ChatMessage(role="system", content="You are an expert judge."),
+        ChatMessage(role="user", content="Evaluate this response."),
+    ]
+
+    mock_response = json.dumps({"result": "yes", "rationale": "The response is good."})
+
+    with (
+        mock.patch("mlflow.genai.judges.utils._is_litellm_available", return_value=False),
+        mock.patch(
+            "mlflow.metrics.genai.model_utils.score_model_on_payload", return_value=mock_response
+        ) as mock_score_model,
+    ):
+        feedback = invoke_judge_model(
+            model_uri="openai:/gpt-4",
+            prompt=messages,
+            assessment_name="quality_check",
+        )
+
+    # Verify native provider was called with string payload
+    mock_score_model.assert_called_once()
+    call_args = mock_score_model.call_args.kwargs
+    # Should combine content from all messages
+    expected_payload = "You are an expert judge.\nEvaluate this response."
+    assert call_args["payload"] == expected_payload
+
+    assert feedback.name == "quality_check"
+    assert feedback.value == CategoricalRating.YES
+
+
+def test_normalize_prompt_to_messages_string():
+    """Test _normalize_prompt_to_messages with string input."""
+    from mlflow.genai.judges.utils import _normalize_prompt_to_messages
+
+    result = _normalize_prompt_to_messages("Test prompt")
+
+    assert len(result) == 1
+    assert isinstance(result[0], ChatMessage)
+    assert result[0].role == "system"
+    assert result[0].content == "Test prompt"
+
+
+def test_normalize_prompt_to_messages_chat_message_list():
+    """Test _normalize_prompt_to_messages with ChatMessage list."""
+    from mlflow.genai.judges.utils import _normalize_prompt_to_messages
+
+    messages = [
+        ChatMessage(role="system", content="System message"),
+        ChatMessage(role="user", content="User message"),
+    ]
+
+    result = _normalize_prompt_to_messages(messages)
+
+    assert result is messages  # Should return the same list
+    assert len(result) == 2
+    assert result[0].role == "system"
+    assert result[1].role == "user"
+
+
+def test_normalize_prompt_to_messages_invalid_type():
+    """Test _normalize_prompt_to_messages with invalid input type."""
+    from mlflow.genai.judges.utils import _normalize_prompt_to_messages
+
+    with pytest.raises(MlflowException, match="Prompt must be string or list of ChatMessage"):
+        _normalize_prompt_to_messages(123)
+
+    with pytest.raises(MlflowException, match="All messages must be ChatMessage instances"):
+        _normalize_prompt_to_messages([{"role": "user", "content": "test"}])
+
+
+def test_messages_to_litellm_format():
+    """Test _messages_to_litellm_format conversion."""
+    from mlflow.genai.judges.utils import _messages_to_litellm_format
+
+    messages = [
+        ChatMessage(role="system", content="System prompt"),
+        ChatMessage(role="user", content="User query"),
+    ]
+
+    result = _messages_to_litellm_format(messages)
+
+    expected = [
+        {"role": "system", "content": "System prompt"},
+        {"role": "user", "content": "User query"},
+    ]
+    assert result == expected
+
+
+def test_messages_to_string():
+    """Test _messages_to_string conversion."""
+    from mlflow.genai.judges.utils import _messages_to_string
+
+    messages = [
+        ChatMessage(role="system", content="System prompt"),
+        ChatMessage(role="user", content="User query"),
+        ChatMessage(role="assistant", content="Assistant response"),
+    ]
+
+    result = _messages_to_string(messages)
+
+    expected = "System prompt\nUser query\nAssistant response"
+    assert result == expected
+
+
+def test_messages_to_string_with_none_content():
+    """Test _messages_to_string with None content."""
+    from mlflow.genai.judges.utils import _messages_to_string
+
+    messages = [
+        ChatMessage(role="system", content="Valid content"),
+        ChatMessage(role="user", content=None),
+        ChatMessage(role="assistant", content="More content"),
+    ]
+
+    result = _messages_to_string(messages)
+
+    # Should skip None content
+    expected = "Valid content\nMore content"
+    assert result == expected
