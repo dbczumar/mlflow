@@ -57,7 +57,7 @@ def main():
         set_outputs_for_current_span(feedback)
 
     print(f"\n\n{feedback}")
-    
+
     # Get the judge trace ID for logging
     judge_trace_id = mlflow.get_active_trace_id()
 

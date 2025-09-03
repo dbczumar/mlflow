@@ -28,6 +28,7 @@ def observe_judge_execution() -> Generator[None, None, None]:
     
     # Create span for judge execution
     with mlflow.start_span(name="judge_overall") as span:
+        mlflow.update_current_trace(request_preview=f"judge execution")
         mlflow.update_current_trace(tags={
             "judge": "judge_overall", 
             "is_judge": "yes"
