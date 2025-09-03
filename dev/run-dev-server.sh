@@ -36,12 +36,12 @@ else
   registry_store_uri=""
 fi
 
-if [ ! -d "mlflow/server/js/node_modules" ]; then
-  pushd mlflow/server/js
-  yarn install
-  popd
-fi
+# if [ ! -d "mlflow/server/js/node_modules" ]; then
+#   pushd mlflow/server/js
+#   yarn install
+#   popd
+# fi
 
 mlflow server $backend_store_uri $default_artifact_root $registry_store_uri --dev &
 wait_server_ready localhost:5000/health
-yarn --cwd mlflow/server/js start
+# yarn --cwd mlflow/server/js start
