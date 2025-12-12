@@ -9,7 +9,6 @@ from mlflow.entities import (
     GatewayEndpoint,
     GatewayEndpointBinding,
     GatewayEndpointModelMapping,
-    GatewayEndpointTag,
     GatewayModelDefinition,
     GatewayResourceType,
     GatewaySecretInfo,
@@ -20,7 +19,6 @@ from mlflow.protos.service_pb2 import (
     CreateGatewayEndpointBinding,
     CreateGatewayModelDefinition,
     CreateGatewaySecret,
-    DeleteEndpointTag,
     DeleteGatewayEndpoint,
     DeleteGatewayEndpointBinding,
     DeleteGatewayModelDefinition,
@@ -33,7 +31,6 @@ from mlflow.protos.service_pb2 import (
     ListGatewayEndpoints,
     ListGatewayModelDefinitions,
     ListGatewaySecretInfos,
-    SetEndpointTag,
     UpdateGatewayEndpoint,
     UpdateGatewayModelDefinition,
     UpdateGatewaySecret,
@@ -74,16 +71,14 @@ class RestGatewayStoreMixin:
         CreateGatewayEndpointBinding,
         DeleteGatewayEndpointBinding,
         ListGatewayEndpointBindings,
-        SetEndpointTag,
-        DeleteEndpointTag,
     }
 
     # ========== Secrets Management APIs ==========
 
-    def create_gateway_secret(
+    def create_secret(
         self,
         secret_name: str,
-        secret_value: dict[str, str],
+        secret_value: str,
         provider: str | None = None,
         auth_config: dict[str, Any] | None = None,
         created_by: str | None = None,
@@ -93,10 +88,7 @@ class RestGatewayStoreMixin:
 
         Args:
             secret_name: Name to identify the secret.
-            secret_value: The secret value(s) to encrypt and store as key-value pairs.
-                For simple API keys: {"api_key": "sk-xxx"}
-                For compound credentials: {"aws_access_key_id": "...",
-                  "aws_secret_access_key": "..."}
+            secret_value: The secret value to encrypt and store.
             provider: Optional provider name (e.g., "openai", "anthropic").
             auth_config: Optional dict with authentication configuration. For providers
                 with multiple auth modes, include "auth_mode" key (e.g.,
@@ -106,7 +98,7 @@ class RestGatewayStoreMixin:
         Returns:
             The created GatewaySecretInfo object with masked value.
         """
-        auth_config_json = json.dumps(auth_config) if auth_config is not None else None
+        auth_config_json = json.dumps(auth_config) if auth_config else None
         req_body = message_to_json(
             CreateGatewaySecret(
                 secret_name=secret_name,
@@ -138,10 +130,11 @@ class RestGatewayStoreMixin:
         response_proto = self._call_endpoint(GetGatewaySecretInfo, req_body)
         return GatewaySecretInfo.from_proto(response_proto.secret)
 
-    def update_gateway_secret(
+    def update_secret(
         self,
         secret_id: str,
-        secret_value: dict[str, str] | None = None,
+        secret_value: str | None = None,
+        credential_name: str | None = None,
         auth_config: dict[str, Any] | None = None,
         updated_by: str | None = None,
     ) -> GatewaySecretInfo:
@@ -150,22 +143,20 @@ class RestGatewayStoreMixin:
 
         Args:
             secret_id: The unique identifier of the secret to update.
-            secret_value: Optional new secret value(s) for key rotation as key-value pairs,
-                or None to leave unchanged.
-                For simple API keys: {"api_key": "sk-xxx"}
-                For compound credentials: {"aws_access_key_id": "...",
-                  "aws_secret_access_key": "..."}
+            secret_value: Optional new secret value for key rotation.
+            credential_name: Optional credential/auth mode name to update.
             auth_config: Optional dict with authentication configuration.
             updated_by: Optional identifier of the user updating the secret.
 
         Returns:
             The updated GatewaySecretInfo object with masked value.
         """
-        auth_config_json = json.dumps(auth_config) if auth_config is not None else None
+        auth_config_json = json.dumps(auth_config) if auth_config else None
         req_body = message_to_json(
             UpdateGatewaySecret(
                 secret_id=secret_id,
-                secret_value=secret_value or {},
+                secret_value=secret_value or "",
+                credential_name=credential_name,
                 auth_config_json=auth_config_json,
                 updated_by=updated_by,
             )
@@ -173,7 +164,7 @@ class RestGatewayStoreMixin:
         response_proto = self._call_endpoint(UpdateGatewaySecret, req_body)
         return GatewaySecretInfo.from_proto(response_proto.secret)
 
-    def delete_gateway_secret(self, secret_id: str) -> None:
+    def delete_secret(self, secret_id: str) -> None:
         """
         Delete a secret.
 
@@ -199,7 +190,7 @@ class RestGatewayStoreMixin:
 
     # ========== Endpoints Management APIs ==========
 
-    def create_gateway_endpoint(
+    def create_endpoint(
         self,
         name: str,
         model_definition_ids: list[str],
@@ -226,7 +217,7 @@ class RestGatewayStoreMixin:
         response_proto = self._call_endpoint(CreateGatewayEndpoint, req_body)
         return GatewayEndpoint.from_proto(response_proto.endpoint)
 
-    def get_gateway_endpoint(
+    def get_endpoint(
         self, endpoint_id: str | None = None, name: str | None = None
     ) -> GatewayEndpoint:
         """
@@ -243,7 +234,7 @@ class RestGatewayStoreMixin:
         response_proto = self._call_endpoint(GetGatewayEndpoint, req_body)
         return GatewayEndpoint.from_proto(response_proto.endpoint)
 
-    def update_gateway_endpoint(
+    def update_endpoint(
         self,
         endpoint_id: str,
         name: str | None = None,
@@ -270,7 +261,7 @@ class RestGatewayStoreMixin:
         response_proto = self._call_endpoint(UpdateGatewayEndpoint, req_body)
         return GatewayEndpoint.from_proto(response_proto.endpoint)
 
-    def delete_gateway_endpoint(self, endpoint_id: str) -> None:
+    def delete_endpoint(self, endpoint_id: str) -> None:
         """
         Delete an endpoint and all its associated models and bindings.
 
@@ -280,7 +271,7 @@ class RestGatewayStoreMixin:
         req_body = message_to_json(DeleteGatewayEndpoint(endpoint_id=endpoint_id))
         self._call_endpoint(DeleteGatewayEndpoint, req_body)
 
-    def list_gateway_endpoints(self, provider: str | None = None) -> list[GatewayEndpoint]:
+    def list_endpoints(self, provider: str | None = None) -> list[GatewayEndpoint]:
         """
         List all endpoints, optionally filtered by provider.
 
@@ -296,7 +287,7 @@ class RestGatewayStoreMixin:
 
     # ========== Model Definitions Management APIs ==========
 
-    def create_gateway_model_definition(
+    def create_model_definition(
         self,
         name: str,
         secret_id: str,
@@ -329,7 +320,7 @@ class RestGatewayStoreMixin:
         response_proto = self._call_endpoint(CreateGatewayModelDefinition, req_body)
         return GatewayModelDefinition.from_proto(response_proto.model_definition)
 
-    def get_gateway_model_definition(self, model_definition_id: str) -> GatewayModelDefinition:
+    def get_model_definition(self, model_definition_id: str) -> GatewayModelDefinition:
         """
         Retrieve a model definition by ID.
 
@@ -345,7 +336,7 @@ class RestGatewayStoreMixin:
         response_proto = self._call_endpoint(GetGatewayModelDefinition, req_body)
         return GatewayModelDefinition.from_proto(response_proto.model_definition)
 
-    def list_gateway_model_definitions(
+    def list_model_definitions(
         self,
         provider: str | None = None,
         secret_id: str | None = None,
@@ -366,7 +357,7 @@ class RestGatewayStoreMixin:
         response_proto = self._call_endpoint(ListGatewayModelDefinitions, req_body)
         return [GatewayModelDefinition.from_proto(m) for m in response_proto.model_definitions]
 
-    def update_gateway_model_definition(
+    def update_model_definition(
         self,
         model_definition_id: str,
         name: str | None = None,
@@ -399,7 +390,7 @@ class RestGatewayStoreMixin:
         response_proto = self._call_endpoint(UpdateGatewayModelDefinition, req_body)
         return GatewayModelDefinition.from_proto(response_proto.model_definition)
 
-    def delete_gateway_model_definition(self, model_definition_id: str) -> None:
+    def delete_model_definition(self, model_definition_id: str) -> None:
         """
         Delete a model definition (fails if in use by any endpoint).
 
@@ -541,36 +532,3 @@ class RestGatewayStoreMixin:
         )
         response_proto = self._call_endpoint(ListGatewayEndpointBindings, req_body)
         return [GatewayEndpointBinding.from_proto(b) for b in response_proto.bindings]
-
-    def set_gateway_endpoint_tag(self, endpoint_id: str, tag: GatewayEndpointTag) -> None:
-        """
-        Set a tag on an endpoint.
-
-        Args:
-            endpoint_id: ID of the endpoint to tag.
-            tag: GatewayEndpointTag with key and value to set.
-        """
-        req_body = message_to_json(
-            SetEndpointTag(
-                endpoint_id=endpoint_id,
-                key=tag.key,
-                value=tag.value,
-            )
-        )
-        self._call_endpoint(SetEndpointTag, req_body)
-
-    def delete_gateway_endpoint_tag(self, endpoint_id: str, key: str) -> None:
-        """
-        Delete a tag from an endpoint.
-
-        Args:
-            endpoint_id: ID of the endpoint.
-            key: Tag key to delete.
-        """
-        req_body = message_to_json(
-            DeleteEndpointTag(
-                endpoint_id=endpoint_id,
-                key=key,
-            )
-        )
-        self._call_endpoint(DeleteEndpointTag, req_body)
