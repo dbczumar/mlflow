@@ -81,7 +81,7 @@ export const GatewayApi = {
   getProviderConfig: (provider: string) => {
     const params = new URLSearchParams();
     params.append('provider', provider);
-    const relativeUrl = ['ajax-api/3.0/mlflow/gateway/endpoints/provider-config', params.toString()].join('?');
+    const relativeUrl = ['ajax-api/3.0/mlflow/endpoints/provider-config', params.toString()].join('?');
     return fetchEndpoint({
       relativeUrl,
       error: defaultErrorHandler,
