@@ -148,6 +148,7 @@ from mlflow.protos.service_pb2 import (
     GetMetricHistoryBulkInterval,
     GetRun,
     GetScorer,
+    GetSecretsConfig,
     GetTrace,
     GetTraceInfo,
     GetTraceInfoV3,
@@ -4650,6 +4651,18 @@ def _get_dataset_records_handler(dataset_id):
     return _wrap_response(response_message)
 
 
+@catch_mlflow_exception
+@_disable_if_artifacts_only
+def _get_secrets_config():
+    """Check if secrets encryption is available (passphrase is configured)."""
+    from mlflow.server.constants import CRYPTO_KEK_PASSPHRASE_ENV_VAR
+
+    secrets_available = bool(os.getenv(CRYPTO_KEK_PASSPHRASE_ENV_VAR))
+    response_message = GetSecretsConfig.Response()
+    response_message.secrets_available = secrets_available
+    return _wrap_response(response_message)
+
+
 HANDLERS = {
     # Tracking Server APIs
     CreateExperiment: _create_experiment,
@@ -4796,4 +4809,5 @@ HANDLERS = {
     # Endpoint Tags APIs
     SetEndpointTag: _set_gateway_endpoint_tag,
     DeleteEndpointTag: _delete_gateway_endpoint_tag,
+    GetSecretsConfig: _get_secrets_config,
 }

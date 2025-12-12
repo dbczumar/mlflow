@@ -91,7 +91,7 @@ export const GatewayApi = {
   // Secrets Management
   createSecret: (request: CreateSecretRequest) => {
     return fetchEndpoint({
-      relativeUrl: 'ajax-api/3.0/mlflow/secrets/create',
+      relativeUrl: 'ajax-api/3.0/mlflow/gateway/secrets/create',
       method: 'POST',
       body: JSON.stringify(request),
       error: defaultErrorHandler,
@@ -101,7 +101,7 @@ export const GatewayApi = {
   getSecret: (secretId: string) => {
     const params = new URLSearchParams();
     params.append('secret_id', secretId);
-    const relativeUrl = ['ajax-api/3.0/mlflow/secrets/get', params.toString()].join('?');
+    const relativeUrl = ['ajax-api/3.0/mlflow/gateway/secrets/get', params.toString()].join('?');
     return fetchEndpoint({
       relativeUrl,
       error: defaultErrorHandler,
@@ -110,7 +110,7 @@ export const GatewayApi = {
 
   updateSecret: (request: UpdateSecretRequest) => {
     return fetchEndpoint({
-      relativeUrl: 'ajax-api/3.0/mlflow/secrets/update',
+      relativeUrl: 'ajax-api/3.0/mlflow/gateway/secrets/update',
       method: 'POST',
       body: JSON.stringify(request),
       error: defaultErrorHandler,
@@ -119,7 +119,7 @@ export const GatewayApi = {
 
   deleteSecret: (secretId: string) => {
     return fetchEndpoint({
-      relativeUrl: 'ajax-api/3.0/mlflow/secrets/delete',
+      relativeUrl: 'ajax-api/3.0/mlflow/gateway/secrets/delete',
       method: 'DELETE',
       body: JSON.stringify({ secret_id: secretId }),
       error: defaultErrorHandler,
@@ -131,7 +131,7 @@ export const GatewayApi = {
     if (provider) {
       params.append('provider', provider);
     }
-    const relativeUrl = ['ajax-api/3.0/mlflow/secrets/list', params.toString()].join('?');
+    const relativeUrl = ['ajax-api/3.0/mlflow/gateway/secrets/list', params.toString()].join('?');
     return fetchEndpoint({
       relativeUrl,
       error: defaultErrorHandler,
@@ -191,7 +191,7 @@ export const GatewayApi = {
   // Model Definitions Management
   createModelDefinition: (request: CreateModelDefinitionRequest) => {
     return fetchEndpoint({
-      relativeUrl: 'ajax-api/3.0/mlflow/model-definitions/create',
+      relativeUrl: 'ajax-api/3.0/mlflow/gateway/model-definitions/create',
       method: 'POST',
       body: JSON.stringify(request),
       error: defaultErrorHandler,
@@ -201,7 +201,7 @@ export const GatewayApi = {
   getModelDefinition: (modelDefinitionId: string) => {
     const params = new URLSearchParams();
     params.append('model_definition_id', modelDefinitionId);
-    const relativeUrl = ['ajax-api/3.0/mlflow/model-definitions/get', params.toString()].join('?');
+    const relativeUrl = ['ajax-api/3.0/mlflow/gateway/model-definitions/get', params.toString()].join('?');
     return fetchEndpoint({
       relativeUrl,
       error: defaultErrorHandler,
@@ -210,14 +210,14 @@ export const GatewayApi = {
 
   listModelDefinitions: () => {
     return fetchEndpoint({
-      relativeUrl: 'ajax-api/3.0/mlflow/model-definitions/list',
+      relativeUrl: 'ajax-api/3.0/mlflow/gateway/model-definitions/list',
       error: defaultErrorHandler,
     }) as Promise<ListModelDefinitionsResponse>;
   },
 
   updateModelDefinition: (request: UpdateModelDefinitionRequest) => {
     return fetchEndpoint({
-      relativeUrl: 'ajax-api/3.0/mlflow/model-definitions/update',
+      relativeUrl: 'ajax-api/3.0/mlflow/gateway/model-definitions/update',
       method: 'POST',
       body: JSON.stringify(request),
       error: defaultErrorHandler,
@@ -226,7 +226,7 @@ export const GatewayApi = {
 
   deleteModelDefinition: (modelDefinitionId: string) => {
     return fetchEndpoint({
-      relativeUrl: 'ajax-api/3.0/mlflow/model-definitions/delete',
+      relativeUrl: 'ajax-api/3.0/mlflow/gateway/model-definitions/delete',
       method: 'DELETE',
       body: JSON.stringify({ model_definition_id: modelDefinitionId }),
       error: defaultErrorHandler,

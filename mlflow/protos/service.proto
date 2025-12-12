@@ -1982,6 +1982,24 @@ service MlflowService {
       rpc_doc_title: "Gateway Delete Endpoint Tag"
     };
   }
+
+  // Get secrets storage configuration status
+  rpc getSecretsConfig(GetSecretsConfig) returns (GetSecretsConfig.Response) {
+    option (rpc) = {
+      endpoints: [
+        {
+          method: "GET"
+          path: "/mlflow/secrets/config"
+          since: {
+            major: 3
+            minor: 0
+          }
+        }
+      ]
+      visibility: PUBLIC
+      rpc_doc_title: "Get Secrets Config"
+    };
+  }
 }
 
 // View type for ListExperiments query.
