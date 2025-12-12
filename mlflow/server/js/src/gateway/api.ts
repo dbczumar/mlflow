@@ -59,7 +59,7 @@ const defaultErrorHandler = async ({
 export const GatewayApi = {
   // Provider Metadata
   listProviders: () => {
-    const relativeUrl = 'ajax-api/3.0/mlflow/gateway/endpoints/supported-providers';
+    const relativeUrl = 'ajax-api/3.0/mlflow/endpoints/supported-providers';
     return fetchEndpoint({
       relativeUrl,
       error: defaultErrorHandler,
@@ -71,7 +71,7 @@ export const GatewayApi = {
     if (provider) {
       params.append('provider', provider);
     }
-    const relativeUrl = ['ajax-api/3.0/mlflow/gateway/endpoints/supported-models', params.toString()].join('?');
+    const relativeUrl = ['ajax-api/3.0/mlflow/endpoints/supported-models', params.toString()].join('?');
     return fetchEndpoint({
       relativeUrl,
       error: defaultErrorHandler,
