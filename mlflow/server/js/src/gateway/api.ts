@@ -59,7 +59,7 @@ const defaultErrorHandler = async ({
 export const GatewayApi = {
   // Provider Metadata
   listProviders: () => {
-    const relativeUrl = 'ajax-api/3.0/mlflow/endpoints/supported-providers';
+    const relativeUrl = 'ajax-api/3.0/mlflow/gateway/endpoints/supported-providers';
     return fetchEndpoint({
       relativeUrl,
       error: defaultErrorHandler,
@@ -71,7 +71,7 @@ export const GatewayApi = {
     if (provider) {
       params.append('provider', provider);
     }
-    const relativeUrl = ['ajax-api/3.0/mlflow/endpoints/supported-models', params.toString()].join('?');
+    const relativeUrl = ['ajax-api/3.0/mlflow/gateway/endpoints/supported-models', params.toString()].join('?');
     return fetchEndpoint({
       relativeUrl,
       error: defaultErrorHandler,
@@ -81,7 +81,7 @@ export const GatewayApi = {
   getProviderConfig: (provider: string) => {
     const params = new URLSearchParams();
     params.append('provider', provider);
-    const relativeUrl = ['ajax-api/3.0/mlflow/endpoints/provider-config', params.toString()].join('?');
+    const relativeUrl = ['ajax-api/3.0/mlflow/gateway/endpoints/provider-config', params.toString()].join('?');
     return fetchEndpoint({
       relativeUrl,
       error: defaultErrorHandler,
@@ -141,7 +141,7 @@ export const GatewayApi = {
   // Endpoints Management
   createEndpoint: (request: CreateEndpointRequest) => {
     return fetchEndpoint({
-      relativeUrl: 'ajax-api/3.0/mlflow/endpoints/create',
+      relativeUrl: 'ajax-api/3.0/mlflow/gateway/endpoints/create',
       method: 'POST',
       body: JSON.stringify(request),
       error: defaultErrorHandler,
@@ -151,7 +151,7 @@ export const GatewayApi = {
   getEndpoint: (endpointId: string) => {
     const params = new URLSearchParams();
     params.append('endpoint_id', endpointId);
-    const relativeUrl = ['ajax-api/3.0/mlflow/endpoints/get', params.toString()].join('?');
+    const relativeUrl = ['ajax-api/3.0/mlflow/gateway/endpoints/get', params.toString()].join('?');
     return fetchEndpoint({
       relativeUrl,
       error: defaultErrorHandler,
@@ -160,7 +160,7 @@ export const GatewayApi = {
 
   updateEndpoint: (request: UpdateEndpointRequest) => {
     return fetchEndpoint({
-      relativeUrl: 'ajax-api/3.0/mlflow/endpoints/update',
+      relativeUrl: 'ajax-api/3.0/mlflow/gateway/endpoints/update',
       method: 'POST',
       body: JSON.stringify(request),
       error: defaultErrorHandler,
@@ -169,7 +169,7 @@ export const GatewayApi = {
 
   deleteEndpoint: (endpointId: string) => {
     return fetchEndpoint({
-      relativeUrl: 'ajax-api/3.0/mlflow/endpoints/delete',
+      relativeUrl: 'ajax-api/3.0/mlflow/gateway/endpoints/delete',
       method: 'DELETE',
       body: JSON.stringify({ endpoint_id: endpointId }),
       error: defaultErrorHandler,
@@ -181,7 +181,7 @@ export const GatewayApi = {
     if (provider) {
       params.append('provider', provider);
     }
-    const relativeUrl = ['ajax-api/3.0/mlflow/endpoints/list', params.toString()].join('?');
+    const relativeUrl = ['ajax-api/3.0/mlflow/gateway/endpoints/list', params.toString()].join('?');
     return fetchEndpoint({
       relativeUrl,
       error: defaultErrorHandler,
@@ -236,7 +236,7 @@ export const GatewayApi = {
   // Attach/Detach Models to Endpoints
   attachModelToEndpoint: (request: AttachModelToEndpointRequest) => {
     return fetchEndpoint({
-      relativeUrl: 'ajax-api/3.0/mlflow/endpoints/models/attach',
+      relativeUrl: 'ajax-api/3.0/mlflow/gateway/endpoints/models/attach',
       method: 'POST',
       body: JSON.stringify(request),
       error: defaultErrorHandler,
@@ -245,7 +245,7 @@ export const GatewayApi = {
 
   detachModelFromEndpoint: (request: DetachModelFromEndpointRequest) => {
     return fetchEndpoint({
-      relativeUrl: 'ajax-api/3.0/mlflow/endpoints/models/detach',
+      relativeUrl: 'ajax-api/3.0/mlflow/gateway/endpoints/models/detach',
       method: 'POST',
       body: JSON.stringify(request),
       error: defaultErrorHandler,
@@ -255,7 +255,7 @@ export const GatewayApi = {
   // Endpoint Bindings Management
   createEndpointBinding: (request: CreateEndpointBindingRequest) => {
     return fetchEndpoint({
-      relativeUrl: 'ajax-api/3.0/mlflow/endpoints/bindings/create',
+      relativeUrl: 'ajax-api/3.0/mlflow/gateway/endpoints/bindings/create',
       method: 'POST',
       body: JSON.stringify(request),
       error: defaultErrorHandler,
@@ -264,7 +264,7 @@ export const GatewayApi = {
 
   deleteEndpointBinding: (bindingId: string) => {
     return fetchEndpoint({
-      relativeUrl: 'ajax-api/3.0/mlflow/endpoints/bindings/delete',
+      relativeUrl: 'ajax-api/3.0/mlflow/gateway/endpoints/bindings/delete',
       method: 'DELETE',
       body: JSON.stringify({ binding_id: bindingId }),
       error: defaultErrorHandler,
@@ -282,7 +282,7 @@ export const GatewayApi = {
     if (resourceId) {
       params.append('resource_id', resourceId);
     }
-    const relativeUrl = ['ajax-api/3.0/mlflow/endpoints/bindings/list', params.toString()].join('?');
+    const relativeUrl = ['ajax-api/3.0/mlflow/gateway/endpoints/bindings/list', params.toString()].join('?');
     return fetchEndpoint({
       relativeUrl,
       error: defaultErrorHandler,
