@@ -232,18 +232,30 @@ class IssueDescription(pydantic.BaseModel):
 class SessionIssueAnalysis(pydantic.BaseModel):
     """Schema for complete issue analysis results."""
 
+    guidelines_adherence_explanation: str = pydantic.Field(
+        description=(
+            "Detailed explanation of how you followed each guideline in your analysis process. "
+            "For each guideline, explicitly describe the actions you took and evidence "
+            "you gathered to adhere to it."
+        )
+    )
     issues: list[IssueDescription] = pydantic.Field(
         description="List of distinct issues identified in the session"
     )
 
 
-def _collect_negative_feedback(session: list[Trace], model: str | None = None) -> str:
+def _collect_negative_feedback(
+    session: list[Trace],
+    model: str | None = None,
+    model_params: dict[str, Any] | None = None,
+) -> str:
     """
     Collect and summarize all negative feedback from traces in the session using LLM.
 
     Args:
         session: List of traces from the same session.
         model: Optional model URI to use for feedback analysis. If None, uses default model.
+        model_params: Optional dictionary of model parameters to pass to the LLM.
 
     Returns:
         String summary of all negative feedback with trace IDs in parentheticals.
@@ -263,7 +275,7 @@ def _collect_negative_feedback(session: list[Trace], model: str | None = None) -
             if not isinstance(assessment, Feedback):
                 continue
 
-            if _is_negative_feedback(assessment, model=model):
+            if _is_negative_feedback(assessment, model=model, model_params=model_params):
                 negative_feedback_list.append((trace_id, assessment))
 
     if not negative_feedback_list:
@@ -304,6 +316,7 @@ def _collect_negative_feedback(session: list[Trace], model: str | None = None) -
         model_uri=model,
         messages=[system_message, user_message],
         output_schema=FeedbackSummary,
+        inference_params=model_params,
     )
     _logger.info(f"Feedback summary: {result.summary}")
     return result.summary
@@ -320,13 +333,18 @@ class FeedbackAnalysis(pydantic.BaseModel):
     )
 
 
-def _is_negative_feedback(feedback: Feedback, model: str | None = None) -> bool:
+def _is_negative_feedback(
+    feedback: Feedback,
+    model: str | None = None,
+    model_params: dict[str, Any] | None = None,
+) -> bool:
     """
     Determine if feedback is negative using an LLM.
 
     Args:
         feedback: Feedback assessment to check.
         model: Optional model URI to use for analysis. If None, uses default model.
+        model_params: Optional dictionary of model parameters to pass to the LLM.
 
     Returns:
         True if the feedback is considered negative, False otherwise.
@@ -359,6 +377,7 @@ Feedback rationale: {feedback.rationale or "Not provided"}
         model_uri=model,
         messages=[system_message, user_message],
         output_schema=FeedbackAnalysis,
+        inference_params=model_params,
     )
     _logger.debug(
         f"Feedback '{feedback.name}' with value '{feedback.value}' "
@@ -372,6 +391,7 @@ def _find_issues_in_session(
     session: list[Trace],
     model: str | None = None,
     context: str | None = None,
+    model_params: dict[str, Any] | None = None,
 ) -> list[Issue]:
     """
     Find and analyze issues in a session based on negative feedback.
@@ -388,6 +408,8 @@ def _find_issues_in_session(
         context: Optional context about the agent/use case to help characterize issues
                 more accurately (e.g., "This is a customer support chatbot that helps
                 users with product questions").
+        model_params: Optional dictionary of model parameters (e.g., temperature, top_p,
+                     max_tokens) to pass to the LLM for all completion calls.
 
     Returns:
         List of Issue objects found in the session. Returns empty list if no
@@ -419,7 +441,7 @@ def _find_issues_in_session(
     conversation = _extract_conversation_with_trace_ids(session)
 
     # Step 2: Collect and summarize all negative feedback with trace ID parentheticals
-    feedback_summary = _collect_negative_feedback(session, model=model)
+    feedback_summary = _collect_negative_feedback(session, model=model, model_params=model_params)
 
     if not feedback_summary:
         return []
@@ -455,18 +477,21 @@ def _find_issues_in_session(
 
     system_content += (
         "Your task is to explore the traces using the available tools to identify the "
-        "underlying issues that caused the negative feedback. "
+        "top underlying issues that caused the negative feedback."
         "\n\n"
         "In order to identify issues precisely and correctly, you must think "
         "methodically and explain your reasoning before taking actions and act "
         "step-by-step. Your goal is to identify evidence-based root causes that are as "
         "specific as possible. There must be evidence backing the root causes; if you do "
         "not have evidence, more general root causes are acceptable."
-        "You MUST follow these guidelines:\n\n"
+        "IMPORTANT: You MUST follow these guidelines AND explain your reasoning about "
+        "how they're met:\n\n"
         "1. You MUST use the tools provided to you to analyze traces in detail before "
         "confirming that there's an issue. This includes reading information about a "
-        "trace, feedback on a trace, analyzing span details, and examining inputs and "
-        "outputs.\n"
+        "trace and feedback on a trace, reading the full list of spans executed, "
+        "reading relevant span details including inputs and outputs, and listing all "
+        "tool calls & analyzing relevant ones deeply. It's okay if this takes time - "
+        "be thorough!\n"
         "2. You must carefully read and analyze the information you've gathered from the "
         "traces\n."
         "3. Think critically about whether you have enough information to confirm that an "
@@ -476,6 +501,27 @@ def _find_issues_in_session(
         "possible with the evidence you have. If you don't have evidence for a specific "
         "root cause, try to verify a more general root cause using the evidence. Only "
         "return issues that you can confirm with evidence from the traces.\n"
+        "5. Avoid speculation. If you don't have concrete evidence to confirm an issue, "
+        "pursue a different root cause, broadening if necessary. For example, do not "
+        "make claims about computer system / code base threading or process state if "
+        "you do not have direct information about threads or processes from the traces."
+        "Another example: do not assume that the agent has capability X unless you observe "
+        "it in the traces or context (it's *strongly encouraged* to look for the capability by "
+        "doing additional analysis of the context and traces if you are unsure!).\n"
+        "6. IF the negative feedback is specific, issues MUST be directly relevant to the negative"
+        " feedback.\n"
+        "7. Issues MUST be INDEPENDENT. Do NOT return overlapping issues. For example, if an "
+        "agent returned an unhelpful response because information was missing from a tool call, "
+        "the missing information would be part of the root cause of the unhelpful response, not a "
+        "separate issue. Before responding, you MUST RIGOROUSLY VERIFY that each issue is "
+        "independent AND is NOT a root cause of another issue based on its description & analysis. "
+        "If you suspect this guideline has been violated, you MUST and adjust, regroup, or "
+        "continue the analysis process as necessary.\n"
+        "8. Draw clear boundaries between distinct issues. Example: if an agent performed an "
+        "operation incorrectly *and* without permission, that would be two distinct issues. "
+        "Counterexample: if an agent returned an unhelpful response because information was "
+        "missing from a tool call, the missing information would be part of the root cause of the "
+        "unhelpful response, not a separate issue."
         "\n\n"
         f"Available trace IDs to inspect: {trace_ids}"
     )
@@ -509,7 +555,11 @@ def _find_issues_in_session(
         messages=[system_message, user_message],
         output_schema=SessionIssueAnalysis,
         tools=wrapped_tools,
+        inference_params=model_params,
     )
+
+    # Log guidelines adherence explanation
+    _logger.info(f"Guidelines adherence explanation:\n{analysis.guidelines_adherence_explanation}")
 
     # Convert Pydantic models to dataclass instances
     issues = []
