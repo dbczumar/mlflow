@@ -371,6 +371,7 @@ Feedback rationale: {feedback.rationale or "Not provided"}
 def _find_issues_in_session(
     session: list[Trace],
     model: str | None = None,
+    context: str | None = None,
 ) -> list[Issue]:
     """
     Find and analyze issues in a session based on negative feedback.
@@ -384,6 +385,9 @@ def _find_issues_in_session(
         session: List of Trace objects representing a session.
         model: Optional model URI to use for feedback analysis and issue detection.
                If None, uses default model.
+        context: Optional context about the agent/use case to help characterize issues
+                more accurately (e.g., "This is a customer support chatbot that helps
+                users with product questions").
 
     Returns:
         List of Issue objects found in the session. Returns empty list if no
@@ -468,17 +472,21 @@ def _find_issues_in_session(
         ),
     )
 
-    user_message = ChatMessage(
-        role="user",
-        content=(
-            f"===== Negative Feedback Summary ====="
-            f"{feedback_summary}\n\n"
-            f"===== Conversation History =====\n\n"
-            f"{conversation_context}\n\n"
-            "Please explore the traces using the available tools to identify issues that "
-            "caused the negative feedback. Provide a detailed analysis of what went wrong."
-        ),
+    # Build user message with optional context
+    user_content = ""
+    if context:
+        user_content += f"===== Agent/Use Case Context =====\n{context}\n\n"
+
+    user_content += (
+        f"===== Negative Feedback Summary =====\n"
+        f"{feedback_summary}\n\n"
+        f"===== Conversation History =====\n\n"
+        f"{conversation_context}\n\n"
+        "Please explore the traces using the available tools to identify issues that "
+        "caused the negative feedback. Provide a detailed analysis of what went wrong."
     )
+
+    user_message = ChatMessage(role="user", content=user_content)
 
     if model is None:
         from mlflow.genai.judges.utils import get_default_model
