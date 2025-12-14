@@ -440,37 +440,47 @@ def _find_issues_in_session(
         content_preview = content[:200] + "..." if len(content) > 200 else content
         conversation_context += f"  Turn {i} ({role}, trace {trace_id}): {content_preview}\n"
 
-    system_message = ChatMessage(
-        role="system",
-        content=(
-            "You are an expert at analyzing AI system traces to identify root causes of issues. "
-            "You have been given a summary of negative feedback and a conversation history. "
-            "Your task is to explore the traces using the available tools to identify the "
-            "underlying issues that caused the negative feedback. "
-            "\n\n"
-            "In order to identify issues precisely and correctly, you must think "
-            "methodically and explain your reasoning before taking actions and act "
-            "step-by-step. Your goal is to identify evidence-based root causes that are as "
-            "specific as possible. There must be evidence backing the root causes; if you do "
-            "not have evidence, more general root causes are acceptable."
-            "You MUST follow these guidelines:\n\n"
-            "1. You MUST use the tools provided to you to analyze traces in detail before "
-            "confirming that there's an issue. This includes reading information about a "
-            "trace, feedback on a trace, analyzing span details, and examining inputs and "
-            "outputs.\n"
-            "2. You must carefully read and analyze the information you've gathered from the "
-            "traces\n."
-            "3. Think critically about whether you have enough information to confirm that an "
-            "issue occurred. If you don't have enough information, use the tools to gather "
-            "more evidence.\n"
-            "4. Think critically about whether you've root caused the issue as deeply as "
-            "possible with the evidence you have. If you don't have evidence for a specific "
-            "root cause, try to verify a more general root cause using the evidence. Only "
-            "return issues that you can confirm with evidence from the traces.\n"
-            "\n\n"
-            f"Available trace IDs to inspect: {trace_ids}"
-        ),
+    # Build system message with context awareness
+    system_content = (
+        "You are an expert at analyzing AI system traces to identify root causes of issues. "
+        "You have been given a summary of negative feedback and a conversation history. "
     )
+
+    if context:
+        system_content += (
+            "You have also been provided with context about the agent/use case. Use this "
+            "context to better understand what the agent is supposed to do and to identify "
+            "when behavior deviates from expectations. "
+        )
+
+    system_content += (
+        "Your task is to explore the traces using the available tools to identify the "
+        "underlying issues that caused the negative feedback. "
+        "\n\n"
+        "In order to identify issues precisely and correctly, you must think "
+        "methodically and explain your reasoning before taking actions and act "
+        "step-by-step. Your goal is to identify evidence-based root causes that are as "
+        "specific as possible. There must be evidence backing the root causes; if you do "
+        "not have evidence, more general root causes are acceptable."
+        "You MUST follow these guidelines:\n\n"
+        "1. You MUST use the tools provided to you to analyze traces in detail before "
+        "confirming that there's an issue. This includes reading information about a "
+        "trace, feedback on a trace, analyzing span details, and examining inputs and "
+        "outputs.\n"
+        "2. You must carefully read and analyze the information you've gathered from the "
+        "traces\n."
+        "3. Think critically about whether you have enough information to confirm that an "
+        "issue occurred. If you don't have enough information, use the tools to gather "
+        "more evidence.\n"
+        "4. Think critically about whether you've root caused the issue as deeply as "
+        "possible with the evidence you have. If you don't have evidence for a specific "
+        "root cause, try to verify a more general root cause using the evidence. Only "
+        "return issues that you can confirm with evidence from the traces.\n"
+        "\n\n"
+        f"Available trace IDs to inspect: {trace_ids}"
+    )
+
+    system_message = ChatMessage(role="system", content=system_content)
 
     # Build user message with optional context
     user_content = ""
