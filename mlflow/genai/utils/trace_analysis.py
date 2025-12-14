@@ -271,18 +271,23 @@ class IssueDescription(pydantic.BaseModel):
 
     context: str = pydantic.Field(
         description=(
-            "Context explaining the type/nature of the query or environment in which the "
-            "issue occurred. This MUST describe what the query was trying to accomplish or "
-            "what scenario the agent was in, NOT system processing steps or internal "
-            "component behavior. "
-            "GOOD examples (describe a scenario): "
-            "'User asked about S&P 500 status', "
-            "'Agent was asked about holiday schedule'. "
-            "'Documents about HR policies were submitted to agent for processing'. "
-            "BAD examples (describe system processing - DO NOT USE): "
-            "'After receiving tool outputs that look like live data, ...', "
-            "'When the agent processed the financial data, ...', "
-            "'Following the database query failure, ...'."
+            "Context explaining what the USER was trying to do, what they asked for, or "
+            "what scenario/environment the interaction occurred in from the USER's perspective. "
+            "This MUST describe the user's intent, query, or situation - NOT system "
+            "architecture, instructions, processing steps, or internal component behavior. "
+            "\n\n"
+            "GOOD examples (describe user intent/scenario): "
+            "'User asked about S&P 500 stock status', "
+            "'User requested holiday schedule information via voice', "
+            "'User submitted documents about HR policies for analysis', "
+            "'User gave an emotionally charged voice command to delete something'. "
+            "\n\n"
+            "BAD examples (describe system environment/processing - NEVER USE): "
+            "'Assistant operates under system instructions emphasizing fast responses', "
+            "'After receiving tool outputs that look like live data', "
+            "'When the agent processed the financial data', "
+            "'System policy requires confirmation for deletions', "
+            "'Following the database query failure'."
         )
     )
     description: str = pydantic.Field(
