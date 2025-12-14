@@ -58,13 +58,13 @@ class Issue:
         title: Brief title following pattern "X occurred due to Y".
         context: Context about the user's query or environment where issue occurred.
         description: Concise summary of what the issue is.
-        analysis: Detailed evidence and root cause analysis.
+        root_causes: List of contributing root causes with evidence and citations.
     """
 
     title: str
     context: str
     description: str
-    analysis: Analysis
+    root_causes: list[Analysis]
 
 
 class TraceToolWrapper(JudgeTool):
@@ -229,15 +229,19 @@ class IssueCitation(pydantic.BaseModel):
     )
 
 
-class IssueAnalysis(pydantic.BaseModel):
-    """Schema for evidence and root cause analysis."""
+class RootCauseAnalysis(pydantic.BaseModel):
+    """Schema for a single root cause with evidence and citations."""
 
-    evidence: str = pydantic.Field(description="Description of the evidence supporting this issue")
     root_cause: str = pydantic.Field(
-        description="Root cause analysis explaining why the issue occurred"
+        description=(
+            "Root cause analysis explaining one contributing factor to why the issue occurred"
+        )
+    )
+    evidence: str = pydantic.Field(
+        description="Description of the evidence supporting this specific root cause"
     )
     citations: list[IssueCitation] = pydantic.Field(
-        description="Specific citations with content from traces supporting the analysis"
+        description="Specific citations with content from traces supporting this root cause"
     )
 
 
@@ -246,17 +250,18 @@ class IssueDescription(pydantic.BaseModel):
 
     context: str = pydantic.Field(
         description=(
-            "Context explaining the type/nature of the user's query or environment in which "
-            "the issue occurred. This MUST describe what the user was trying to do or what "
-            "scenario they were in, NOT system processing steps or internal component behavior. "
-            "GOOD examples (describe user scenario): "
+            "Context explaining the type/nature of the query or environment in which the "
+            "issue occurred. This MUST describe what the query was trying to accomplish or "
+            "what scenario the agent was in, NOT system processing steps or internal "
+            "component behavior. "
+            "GOOD examples (describe a scenario): "
             "'User asked about S&P 500 status', "
-            "'User requested timer to be set for 5 minutes', "
-            "'User asked about holiday schedule'. "
+            "'Agent was asked about holiday schedule'. "
+            "'Documents about HR policies were submitted to agent for processing'. "
             "BAD examples (describe system processing - DO NOT USE): "
-            "'After receiving tool outputs that look like live data', "
-            "'When the orchestrator processed the financial data', "
-            "'Following the database query failure'."
+            "'After receiving tool outputs that look like live data, ...', "
+            "'When the agent processed the financial data, ...', "
+            "'Following the database query failure, ...'."
         )
     )
     description: str = pydantic.Field(
@@ -265,8 +270,13 @@ class IssueDescription(pydantic.BaseModel):
             "Should describe the problem and its impact."
         )
     )
-    analysis: IssueAnalysis = pydantic.Field(
-        description="Detailed evidence and root cause analysis"
+    root_causes: list[RootCauseAnalysis] = pydantic.Field(
+        description=(
+            "List of likely contributing root causes for this issue. Each root cause should "
+            "represent a distinct contributing factor with its own evidence and citations. "
+            "If multiple factors contributed to the same problem, list them all here rather "
+            "than creating separate issues."
+        )
     )
 
 
@@ -377,8 +387,7 @@ class FeedbackAnalysis(pydantic.BaseModel):
 def _generate_issue_title(
     context: str,
     description: str,
-    evidence: str,
-    root_cause: str,
+    root_causes: list[tuple[str, str]],
     model: str | None = None,
     model_params: dict[str, Any] | None = None,
 ) -> str:
@@ -388,8 +397,7 @@ def _generate_issue_title(
     Args:
         context: Context about the user's query or environment.
         description: Description of the issue.
-        evidence: Evidence supporting the issue.
-        root_cause: Root cause analysis.
+        root_causes: List of (root_cause, evidence) tuples for all contributing factors.
         model: Optional model URI to use. If None, uses default model.
         model_params: Optional dictionary of model parameters to pass to the LLM.
 
@@ -401,22 +409,27 @@ def _generate_issue_title(
 
         model = get_default_model()
 
+    root_causes_text = ""
+    for i, (root_cause, evidence) in enumerate(root_causes, 1):
+        root_causes_text += f"\nRoot Cause {i}: {root_cause}\nEvidence {i}: {evidence}\n"
+
     issue_info = f"""
 Context: {context}
 
 Description: {description}
-
-Evidence: {evidence}
-
-Root Cause: {root_cause}
+{root_causes_text}
 """
 
     system_message = ChatMessage(
         role="system",
         content=(
             "You are an expert at creating concise, descriptive titles for AI system issues. "
-            "Generate a title that follows the pattern 'X occurred due to Y' where X is what "
-            "went wrong and Y is the root cause."
+            "Generate a title that follows the pattern 'X occurred due to Y' where X is "
+            "what went wrong and Y is the root cause(s). If there are multiple root causes, "
+            "combine them into a single coherent title. The title should be focused on the "
+            "agent, not the user. For example: 'the agent provided incorrect information ...', "
+            "not 'the user received incorrect information ...'. Always use the term 'agent', "
+            "not synonyms like 'system', 'model', or 'AI'."
         ),
     )
 
@@ -613,10 +626,10 @@ def _find_issues_in_session(
         " feedback.\n"
         "7. Issues MUST be INDEPENDENT. Do NOT return overlapping issues. "
         "CRITICAL patterns that signal NON-independence: "
-        "(a) If one issue's context describes a USER SCENARIO (e.g., 'User asked about X') and "
+        "(a) If one issue's context describes a SCENARIO (e.g., 'User asked about X') and "
         "another's context describes SYSTEM PROCESSING (e.g., 'After receiving tool outputs...', "
         "'When the orchestrator processed...'), they are likely the SAME issue - one describes "
-        "the user problem, the other describes an internal step. MERGE them into ONE issue. "
+        "the problem, the other describes an internal root cause. MERGE them into ONE issue. "
         "(b) If Issue A is 'X was missing' and Issue B is 'System didn't handle missing X', "
         "these are ONE issue with root cause 'Y occurred due to missing X and system not "
         "handling it'. "
@@ -675,26 +688,32 @@ def _find_issues_in_session(
     # Convert Pydantic models to dataclass instances and generate titles
     issues = []
     for issue_desc in analysis.issues:
-        citations = [
-            Citation(
-                trace_id=cite.trace_id,
-                span_id=cite.span_id,
-                content=cite.content,
-            )
-            for cite in issue_desc.analysis.citations
-        ]
-        analysis_obj = Analysis(
-            evidence=issue_desc.analysis.evidence,
-            root_cause=issue_desc.analysis.root_cause,
-            citations=citations,
-        )
+        # Convert each root cause analysis to an Analysis dataclass
+        root_causes_list = []
+        root_cause_tuples = []
 
-        # Generate title using separate LLM call
+        for rc in issue_desc.root_causes:
+            citations = [
+                Citation(
+                    trace_id=cite.trace_id,
+                    span_id=cite.span_id,
+                    content=cite.content,
+                )
+                for cite in rc.citations
+            ]
+            root_cause_obj = Analysis(
+                evidence=rc.evidence,
+                root_cause=rc.root_cause,
+                citations=citations,
+            )
+            root_causes_list.append(root_cause_obj)
+            root_cause_tuples.append((rc.root_cause, rc.evidence))
+
+        # Generate title using separate LLM call with all root causes
         title = _generate_issue_title(
             context=issue_desc.context,
             description=issue_desc.description,
-            evidence=issue_desc.analysis.evidence,
-            root_cause=issue_desc.analysis.root_cause,
+            root_causes=root_cause_tuples,
             model=model,
             model_params=model_params,
         )
@@ -704,7 +723,7 @@ def _find_issues_in_session(
                 title=title,
                 context=issue_desc.context,
                 description=issue_desc.description,
-                analysis=analysis_obj,
+                root_causes=root_causes_list,
             )
         )
 
