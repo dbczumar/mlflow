@@ -410,7 +410,17 @@ def _find_issues_in_session(
             "You have been given a summary of negative feedback and a conversation history. "
             "Your task is to explore the traces using the available tools to identify the "
             "underlying issues that caused the negative feedback. "
-            f"\n\nAvailable trace IDs to inspect: {trace_ids}"
+            "\n\n"
+            "IMPORTANT: When the assistant claims to have performed an action "
+            "(like saving information or recording feedback), you MUST use the available tools "
+            "to verify whether evidence of that action exists before concluding it's a "
+            "false claim. In particular:\n"
+            "- Feedback is recorded as assessments on traces. If the assistant claims to record "
+            "feedback, check whether assessments exist on the relevant trace.\n"
+            "- Memory or saved information would appear as tool calls or other trace evidence. "
+            "Check for such evidence before concluding the claim is false.\n"
+            "\n"
+            f"Available trace IDs to inspect: {trace_ids}"
         ),
     )
 
