@@ -226,6 +226,18 @@ class IssueClarification(pydantic.BaseModel):
     )
 
 
+class IssueClarificationList(pydantic.BaseModel):
+    """Schema for batch clarification of multiple issues."""
+
+    issues: list[IssueClarification] = pydantic.Field(
+        description=(
+            "List of clarified issues with concise titles and refined descriptions. "
+            "Each issue should have a distinct, non-overlapping title that clearly "
+            "differentiates it from other issues in the list."
+        )
+    )
+
+
 class IssueCitation(pydantic.BaseModel):
     """Schema for a citation supporting an issue."""
 
@@ -393,39 +405,42 @@ class FeedbackAnalysis(pydantic.BaseModel):
     )
 
 
-def _clarify_issue(
-    context: str,
-    description: str,
-    root_causes: list[tuple[str, str]],
+def _clarify_issues(
+    issues_data: list[tuple[str, str, list[tuple[str, str]]]],
     model: str | None = None,
     model_params: dict[str, Any] | None = None,
-) -> IssueClarification:
+) -> list[IssueClarification]:
     """
-    Clarify and refine an issue by generating a concise title and improved description.
+    Clarify and refine multiple issues by generating concise titles and improved descriptions.
 
-    Uses an LLM to create a shorter, more focused title that describes "what" happened,
-    and refines the description to incorporate the "why" details from root causes.
+    Processes all issues together so the LLM can ensure titles are distinct and non-overlapping.
+    Uses an LLM to create shorter, more focused titles that describe "what" happened,
+    and refines descriptions to incorporate the "why" details from root causes.
 
     Args:
-        context: Context about the user's query or environment.
-        description: Initial description of the issue.
-        root_causes: List of (root_cause, evidence) tuples for all contributing factors.
+        issues_data: List of tuples (context, description, root_causes) for each issue,
+                     where root_causes is a list of (root_cause, evidence) tuples.
         model: Optional model URI to use. If None, uses default model.
         model_params: Optional dictionary of model parameters to pass to the LLM.
 
     Returns:
-        IssueClarification object with concise title and refined description.
+        List of IssueClarification objects with concise titles and refined descriptions.
     """
     if model is None:
         from mlflow.genai.judges.utils import get_default_model
 
         model = get_default_model()
 
-    root_causes_text = ""
-    for i, (root_cause, evidence) in enumerate(root_causes, 1):
-        root_causes_text += f"\nRoot Cause {i}: {root_cause}\nEvidence {i}: {evidence}\n"
+    # Build detailed issue information for all issues
+    all_issues_text = ""
+    for i, (context, description, root_causes) in enumerate(issues_data, 1):
+        root_causes_text = ""
+        for j, (root_cause, evidence) in enumerate(root_causes, 1):
+            root_causes_text += f"\n  Root Cause {j}: {root_cause}\n  Evidence {j}: {evidence}\n"
 
-    issue_info = f"""
+        all_issues_text += f"""
+Issue {i}:
+---------
 Context: {context}
 
 Description: {description}
@@ -436,7 +451,11 @@ Description: {description}
         role="system",
         content=(
             "You are an expert at clarifying and refining AI system issue descriptions. "
-            "Your task is to create a concise title and refined description for an issue. "
+            "Your task is to create concise titles and refined descriptions for multiple issues. "
+            "\n\n"
+            "IMPORTANT: You are processing ALL issues at once, so you MUST ensure that each "
+            "issue's title is DISTINCT and clearly differentiates it from other issues. "
+            "If two issues are related, make sure their titles highlight what makes each unique. "
             "\n\n"
             "TITLE: Focus on WHAT happened, not WHY. Keep it brief and action-focused. "
             "Do NOT include explanations of causes. The title should be focused on the "
@@ -446,21 +465,22 @@ Description: {description}
             "DESCRIPTION: Refine the provided description by incorporating WHY the issue "
             "occurred based on the root causes. Maintain the original meaning but weave in "
             "high-level explanations from root causes to provide context. Keep it concise "
-            "(2-3 sentences). Don't lose any important information from the original description."
+            "(2-3 sentences). You MUST NOT lose ANY information from the original description."
         ),
     )
 
     user_message = ChatMessage(
         role="user",
-        content=f"Clarify and refine this issue:\n\n{issue_info}",
+        content=f"Clarify and refine these issues:\n\n{all_issues_text}",
     )
 
-    return get_chat_completions_with_structured_output(
+    result = get_chat_completions_with_structured_output(
         model_uri=model,
         messages=[system_message, user_message],
-        output_schema=IssueClarification,
+        output_schema=IssueClarificationList,
         inference_params=model_params,
     )
+    return result.issues
 
 
 def _is_negative_feedback(
@@ -701,8 +721,10 @@ def _find_issues_in_session(
     # Log guidelines adherence explanation
     _logger.info(f"Guidelines adherence explanation:\n{analysis.guidelines_adherence_explanation}")
 
-    # Convert Pydantic models to dataclass instances and generate titles
-    issues = []
+    # Convert Pydantic models to dataclass instances and prepare for batch clarification
+    issues_for_clarification = []
+    issues_root_causes_lists = []
+
     for issue_desc in analysis.issues:
         # Convert each root cause analysis to an Analysis dataclass
         root_causes_list = []
@@ -725,19 +747,26 @@ def _find_issues_in_session(
             root_causes_list.append(root_cause_obj)
             root_cause_tuples.append((rc.root_cause, rc.evidence))
 
-        # Clarify issue with concise title and refined description
-        clarification = _clarify_issue(
-            context=issue_desc.context,
-            description=issue_desc.description,
-            root_causes=root_cause_tuples,
-            model=model,
-            model_params=model_params,
+        # Store for batch clarification
+        issues_for_clarification.append(
+            (issue_desc.context, issue_desc.description, root_cause_tuples)
         )
+        issues_root_causes_lists.append((issue_desc.context, root_causes_list))
 
+    # Clarify all issues at once so LLM can ensure distinct titles
+    clarifications = _clarify_issues(
+        issues_data=issues_for_clarification,
+        model=model,
+        model_params=model_params,
+    )
+
+    # Build final Issue objects with clarified titles and descriptions
+    issues = []
+    for clarification, (context, root_causes_list) in zip(clarifications, issues_root_causes_lists):
         issues.append(
             Issue(
                 title=clarification.title,
-                context=issue_desc.context,
+                context=context,
                 description=clarification.description,
                 root_causes=root_causes_list,
             )
