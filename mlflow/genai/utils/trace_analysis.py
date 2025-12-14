@@ -55,10 +55,12 @@ class Issue:
     Represents an issue found in a session through trace analysis.
 
     Attributes:
+        title: Brief title providing context about what went wrong and the scenario.
         description: Concise summary of what the issue is.
         analysis: Detailed evidence and root cause analysis.
     """
 
+    title: str
     description: str
     analysis: Analysis
 
@@ -221,8 +223,19 @@ class IssueAnalysis(pydantic.BaseModel):
 class IssueDescription(pydantic.BaseModel):
     """Schema for a single issue identified in the session."""
 
+    title: str = pydantic.Field(
+        description=(
+            "Brief title providing enough context for a human to understand what went wrong "
+            "and the scenario (e.g., 'Agent provided incorrect stock information', "
+            "'Missing tool call parameters led to incomplete response')"
+        )
+    )
     description: str = pydantic.Field(
-        description="Concise summary of what the issue is (1-2 sentences)"
+        description=(
+            "Concise summary of what the issue is and why it matters (1-2 sentences). "
+            "Should expand on the title with additional context about the impact or nature "
+            "of the issue."
+        )
     )
     analysis: IssueAnalysis = pydantic.Field(
         description="Detailed evidence and root cause analysis"
@@ -577,7 +590,9 @@ def _find_issues_in_session(
             root_cause=issue_desc.analysis.root_cause,
             citations=citations,
         )
-        issues.append(Issue(description=issue_desc.description, analysis=analysis_obj))
+        issues.append(
+            Issue(title=issue_desc.title, description=issue_desc.description, analysis=analysis_obj)
+        )
 
     _logger.info(f"Found {len(issues)} issues through trace analysis")
     return issues
