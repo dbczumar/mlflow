@@ -24,11 +24,29 @@ class Citation:
 
     Attributes:
         trace_id: ID of the trace.
-        rationale: Rationale from the feedback or analysis.
+        span_id: Optional span ID within the trace.
+        content: The actual evidence content (e.g., quote, observation, data).
     """
 
     trace_id: str
-    rationale: str | None
+    span_id: str | None
+    content: str
+
+
+@dataclass
+class Analysis:
+    """
+    Evidence and root cause analysis for an issue.
+
+    Attributes:
+        evidence: Description of the evidence supporting this issue.
+        root_cause: Root cause analysis explaining why the issue occurred.
+        citations: Specific citations with content from traces supporting the analysis.
+    """
+
+    evidence: str
+    root_cause: str
+    citations: list[Citation]
 
 
 @dataclass
@@ -37,12 +55,12 @@ class Issue:
     Represents an issue found in a session through trace analysis.
 
     Attributes:
-        description: Detailed description of the issue, including root cause analysis.
-        citations: List of citations referencing traces and feedback that support this issue.
+        description: Concise summary of what the issue is.
+        analysis: Detailed evidence and root cause analysis.
     """
 
     description: str
-    citations: list[Citation]
+    analysis: Analysis
 
 
 class TraceToolWrapper(JudgeTool):
@@ -180,8 +198,23 @@ class IssueCitation(pydantic.BaseModel):
     """Schema for a citation supporting an issue."""
 
     trace_id: str = pydantic.Field(description="ID of the trace that supports this issue")
-    rationale: str | None = pydantic.Field(
-        description="Rationale for why this trace is cited as supporting evidence"
+    span_id: str | None = pydantic.Field(
+        description="Optional span ID within the trace", default=None
+    )
+    content: str = pydantic.Field(
+        description="The actual evidence content (e.g., quote, observation, data)"
+    )
+
+
+class IssueAnalysis(pydantic.BaseModel):
+    """Schema for evidence and root cause analysis."""
+
+    evidence: str = pydantic.Field(description="Description of the evidence supporting this issue")
+    root_cause: str = pydantic.Field(
+        description="Root cause analysis explaining why the issue occurred"
+    )
+    citations: list[IssueCitation] = pydantic.Field(
+        description="Specific citations with content from traces supporting the analysis"
     )
 
 
@@ -189,14 +222,14 @@ class IssueDescription(pydantic.BaseModel):
     """Schema for a single issue identified in the session."""
 
     description: str = pydantic.Field(
-        description="Detailed description of the issue, including root cause analysis"
+        description="Concise summary of what the issue is (1-2 sentences)"
     )
-    citations: list[IssueCitation] = pydantic.Field(
-        description="List of traces that support this issue with rationales"
+    analysis: IssueAnalysis = pydantic.Field(
+        description="Detailed evidence and root cause analysis"
     )
 
 
-class IssueAnalysis(pydantic.BaseModel):
+class SessionIssueAnalysis(pydantic.BaseModel):
     """Schema for complete issue analysis results."""
 
     issues: list[IssueDescription] = pydantic.Field(
@@ -411,11 +444,26 @@ def _find_issues_in_session(
             "Your task is to explore the traces using the available tools to identify the "
             "underlying issues that caused the negative feedback. "
             "\n\n"
-            "IMPORTANT: Before concluding that the assistant made a false claim about performing "
-            "an action, you MUST use the available tools to thoroughly verify whether evidence "
-            "of that action exists in the trace. Only flag it as a false claim if you've checked "
-            "and confirmed no such evidence exists.\n"
-            "\n"
+            "In order to identify issues precisely and correctly, you must think "
+            "methodically and explain your reasoning before taking actions and act "
+            "step-by-step. Your goal is to identify evidence-based root causes that are as "
+            "specific as possible. There must be evidence backing the root causes; if you do "
+            "not have evidence, more general root causes are acceptable."
+            "You MUST follow these guidelines:\n\n"
+            "1. You MUST use the tools provided to you to analyze traces in detail before "
+            "confirming that there's an issue. This includes reading information about a "
+            "trace, feedback on a trace, analyzing span details, and examining inputs and "
+            "outputs.\n"
+            "2. You must carefully read and analyze the information you've gathered from the "
+            "traces\n."
+            "3. Think critically about whether you have enough information to confirm that an "
+            "issue occurred. If you don't have enough information, use the tools to gather "
+            "more evidence.\n"
+            "4. Think critically about whether you've root caused the issue as deeply as "
+            "possible with the evidence you have. If you don't have evidence for a specific "
+            "root cause, try to verify a more general root cause using the evidence. Only "
+            "return issues that you can confirm with evidence from the traces.\n"
+            "\n\n"
             f"Available trace IDs to inspect: {trace_ids}"
         ),
     )
@@ -423,7 +471,9 @@ def _find_issues_in_session(
     user_message = ChatMessage(
         role="user",
         content=(
-            f"Negative Feedback Summary:\n{feedback_summary}\n\n"
+            f"===== Negative Feedback Summary ====="
+            f"{feedback_summary}\n\n"
+            f"===== Conversation History =====\n\n"
             f"{conversation_context}\n\n"
             "Please explore the traces using the available tools to identify issues that "
             "caused the negative feedback. Provide a detailed analysis of what went wrong."
@@ -439,7 +489,7 @@ def _find_issues_in_session(
     analysis = get_chat_completions_with_structured_output(
         model_uri=model,
         messages=[system_message, user_message],
-        output_schema=IssueAnalysis,
+        output_schema=SessionIssueAnalysis,
         tools=wrapped_tools,
     )
 
@@ -447,10 +497,19 @@ def _find_issues_in_session(
     issues = []
     for issue_desc in analysis.issues:
         citations = [
-            Citation(trace_id=cite.trace_id, rationale=cite.rationale)
-            for cite in issue_desc.citations
+            Citation(
+                trace_id=cite.trace_id,
+                span_id=cite.span_id,
+                content=cite.content,
+            )
+            for cite in issue_desc.analysis.citations
         ]
-        issues.append(Issue(description=issue_desc.description, citations=citations))
+        analysis_obj = Analysis(
+            evidence=issue_desc.analysis.evidence,
+            root_cause=issue_desc.analysis.root_cause,
+            citations=citations,
+        )
+        issues.append(Issue(description=issue_desc.description, analysis=analysis_obj))
 
     _logger.info(f"Found {len(issues)} issues through trace analysis")
     return issues
