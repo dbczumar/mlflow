@@ -198,21 +198,30 @@ class FeedbackSummary(pydantic.BaseModel):
     )
 
 
-class IssueTitle(pydantic.BaseModel):
-    """Schema for LLM-generated issue title."""
+class IssueClarification(pydantic.BaseModel):
+    """Schema for LLM-clarified issue with concise title and refined description."""
 
     title: str = pydantic.Field(
         description=(
-            "Brief title following the pattern 'X occurred due to Y' to explain both "
-            "the problem and its cause. "
-            "GOOD examples: "
-            "'Agent provided incorrect stock information due to missing tool call parameters', "
-            "'User received unhelpful response due to failed database query', "
-            "'Agent performed unauthorized action due to missing permission check'. "
-            "BAD examples (not descriptive enough): "
+            "Concise title focusing on WHAT happened, without explaining WHY. "
+            "Should be brief and action-focused. "
+            "GOOD examples (focus on what): "
+            "'Agent deleted all saved memories without confirmation', "
             "'Agent provided incorrect stock information', "
-            "'Missing tool call parameters led to incomplete response', "
-            "'Permission issue'."
+            "'Agent asked to save a memory instead of providing instructions'. "
+            "BAD examples (too verbose, includes why): "
+            "'Agent deleted memories due to missing confirmation and speed instructions', "
+            "'Agent provided incorrect stock information due to missing tool call parameters', "
+            "'User received unhelpful response due to failed database query'."
+        )
+    )
+    description: str = pydantic.Field(
+        description=(
+            "Refined description incorporating WHY the issue occurred based on root causes. "
+            "Should maintain the original issue description's clarity while weaving in "
+            "high-level explanations from root causes to provide context. Keep it concise "
+            "(2-3 sentences). Focus on what happened and why it matters, incorporating the "
+            "key contributing factors without losing information from the original description."
         )
     )
 
@@ -384,25 +393,28 @@ class FeedbackAnalysis(pydantic.BaseModel):
     )
 
 
-def _generate_issue_title(
+def _clarify_issue(
     context: str,
     description: str,
     root_causes: list[tuple[str, str]],
     model: str | None = None,
     model_params: dict[str, Any] | None = None,
-) -> str:
+) -> IssueClarification:
     """
-    Generate a title for an issue using an LLM.
+    Clarify and refine an issue by generating a concise title and improved description.
+
+    Uses an LLM to create a shorter, more focused title that describes "what" happened,
+    and refines the description to incorporate the "why" details from root causes.
 
     Args:
         context: Context about the user's query or environment.
-        description: Description of the issue.
+        description: Initial description of the issue.
         root_causes: List of (root_cause, evidence) tuples for all contributing factors.
         model: Optional model URI to use. If None, uses default model.
         model_params: Optional dictionary of model parameters to pass to the LLM.
 
     Returns:
-        Generated title following the pattern "X occurred due to Y".
+        IssueClarification object with concise title and refined description.
     """
     if model is None:
         from mlflow.genai.judges.utils import get_default_model
@@ -423,28 +435,32 @@ Description: {description}
     system_message = ChatMessage(
         role="system",
         content=(
-            "You are an expert at creating concise, descriptive titles for AI system issues. "
-            "Generate a title that follows the pattern 'X occurred due to Y' where X is "
-            "what went wrong and Y is the root cause(s). If there are multiple root causes, "
-            "combine them into a single coherent title. The title should be focused on the "
-            "agent, not the user. For example: 'the agent provided incorrect information ...', "
-            "not 'the user received incorrect information ...'. Always use the term 'agent', "
-            "not synonyms like 'system', 'model', or 'AI'."
+            "You are an expert at clarifying and refining AI system issue descriptions. "
+            "Your task is to create a concise title and refined description for an issue. "
+            "\n\n"
+            "TITLE: Focus on WHAT happened, not WHY. Keep it brief and action-focused. "
+            "Do NOT include explanations of causes. The title should be focused on the "
+            "agent, not the user (e.g., 'agent did X', not 'user received Y'). "
+            "Always use the term 'agent', not synonyms like 'system', 'model', or 'AI'. "
+            "\n\n"
+            "DESCRIPTION: Refine the provided description by incorporating WHY the issue "
+            "occurred based on the root causes. Maintain the original meaning but weave in "
+            "high-level explanations from root causes to provide context. Keep it concise "
+            "(2-3 sentences). Don't lose any important information from the original description."
         ),
     )
 
     user_message = ChatMessage(
         role="user",
-        content=f"Generate a title for this issue:\n\n{issue_info}",
+        content=f"Clarify and refine this issue:\n\n{issue_info}",
     )
 
-    result = get_chat_completions_with_structured_output(
+    return get_chat_completions_with_structured_output(
         model_uri=model,
         messages=[system_message, user_message],
-        output_schema=IssueTitle,
+        output_schema=IssueClarification,
         inference_params=model_params,
     )
-    return result.title
 
 
 def _is_negative_feedback(
@@ -709,8 +725,8 @@ def _find_issues_in_session(
             root_causes_list.append(root_cause_obj)
             root_cause_tuples.append((rc.root_cause, rc.evidence))
 
-        # Generate title using separate LLM call with all root causes
-        title = _generate_issue_title(
+        # Clarify issue with concise title and refined description
+        clarification = _clarify_issue(
             context=issue_desc.context,
             description=issue_desc.description,
             root_causes=root_cause_tuples,
@@ -720,9 +736,9 @@ def _find_issues_in_session(
 
         issues.append(
             Issue(
-                title=title,
+                title=clarification.title,
                 context=issue_desc.context,
-                description=issue_desc.description,
+                description=clarification.description,
                 root_causes=root_causes_list,
             )
         )
