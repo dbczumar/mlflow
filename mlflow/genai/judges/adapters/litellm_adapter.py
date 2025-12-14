@@ -169,6 +169,7 @@ def _invoke_litellm_and_handle_tools(
     num_retries: int,
     response_format: type[pydantic.BaseModel] | None = None,
     inference_params: dict[str, Any] | None = None,
+    tools: list[Any] | None = None,
 ) -> tuple[str, float | None]:
     """
     Invoke litellm with retry support and handle tool calling loop.
@@ -184,6 +185,8 @@ def _invoke_litellm_and_handle_tools(
                        schema-based extraction.
         inference_params: Optional dictionary of additional inference parameters to pass
                        to the model (e.g., temperature, top_p, max_tokens).
+        tools: Optional list of JudgeTool instances to make available to the LLM.
+               If provided, these tools will be used instead of the default trace tools.
 
     Returns:
         Tuple of the model's response content and the total cost.
@@ -193,16 +196,20 @@ def _invoke_litellm_and_handle_tools(
     """
     import litellm
 
-    from mlflow.genai.judges.tools import list_judge_tools
-
     messages = [litellm.Message(role=msg.role, content=msg.content) for msg in messages]
 
     litellm_model_uri = f"{provider}/{model_name}"
-    tools = []
+    tool_defs = []
 
-    if trace is not None:
+    if tools is not None:
+        # Use provided custom tools
+        tool_defs = [tool.get_definition().to_dict() for tool in tools]
+    elif trace is not None:
+        # Fall back to default trace inspection tools if trace is provided
+        from mlflow.genai.judges.tools import list_judge_tools
+
         judge_tools = list_judge_tools()
-        tools = [tool.get_definition().to_dict() for tool in judge_tools]
+        tool_defs = [tool.get_definition().to_dict() for tool in judge_tools]
 
     def _prune_messages_for_context_window():
         try:
@@ -239,7 +246,7 @@ def _invoke_litellm_and_handle_tools(
                 response = _invoke_litellm(
                     litellm_model_uri=litellm_model_uri,
                     messages=messages,
-                    tools=tools,
+                    tools=tool_defs,
                     num_retries=num_retries,
                     response_format=response_format,
                     include_response_format=include_response_format,
@@ -279,7 +286,9 @@ def _invoke_litellm_and_handle_tools(
                 return message.content, total_cost
 
             messages.append(message)
-            tool_response_messages = _process_tool_calls(tool_calls=message.tool_calls, trace=trace)
+            tool_response_messages = _process_tool_calls(
+                tool_calls=message.tool_calls, trace=trace, tools=tools
+            )
             messages.extend(tool_response_messages)
 
         except MlflowException:

@@ -96,6 +96,7 @@ def get_chat_completions_with_structured_output(
     trace: Trace | None = None,
     num_retries: int = 10,
     inference_params: dict[str, Any] | None = None,
+    tools: list[Any] | None = None,
 ) -> pydantic.BaseModel:
     """
     Get chat completions from an LLM with structured output conforming to a Pydantic schema.
@@ -114,6 +115,8 @@ def get_chat_completions_with_structured_output(
                      exponential backoff.
         inference_params: Optional dictionary of inference parameters to pass to the
                        model (e.g., temperature, top_p, max_tokens).
+        tools: Optional list of JudgeTool instances to make available to the LLM.
+               If provided, these tools will be used instead of the default trace tools.
 
     Returns:
         Instance of output_schema with the structured data from the LLM.
@@ -166,6 +169,7 @@ def get_chat_completions_with_structured_output(
         num_retries=num_retries,
         response_format=output_schema,
         inference_params=inference_params,
+        tools=tools,
     )
 
     cleaned_response = _strip_markdown_code_blocks(response)

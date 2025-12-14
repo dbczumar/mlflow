@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import asdict, is_dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     import litellm
@@ -16,6 +16,7 @@ if TYPE_CHECKING:
 def _process_tool_calls(
     tool_calls: list["litellm.ChatCompletionMessageToolCall"],
     trace: Trace | None,
+    tools: list[Any] | None = None,
 ) -> list["litellm.Message"]:
     """
     Process tool calls and return tool response messages.
@@ -23,17 +24,37 @@ def _process_tool_calls(
     Args:
         tool_calls: List of tool calls from the LLM response.
         trace: Optional trace object for context.
+        tools: Optional list of custom JudgeTool instances. If provided, these will be used
+               instead of the default tool registry.
 
     Returns:
         List of litellm Message objects containing tool responses.
     """
-    from mlflow.genai.judges.tools.registry import _judge_tool_registry
+    # Build tool lookup map
+    if tools is not None:
+        tool_map = {tool.name: tool for tool in tools}
+    else:
+        from mlflow.genai.judges.tools.registry import _judge_tool_registry
+
+        tool_map = None
 
     tool_response_messages = []
     for tool_call in tool_calls:
         try:
-            mlflow_tool_call = _create_mlflow_tool_call_from_litellm(litellm_tool_call=tool_call)
-            result = _judge_tool_registry.invoke(tool_call=mlflow_tool_call, trace=trace)
+            if tool_map is not None:
+                # Use custom tools - invoke them directly
+                tool = tool_map.get(tool_call.function.name)
+                if tool is None:
+                    raise Exception(f"Tool '{tool_call.function.name}' not found")
+
+                arguments = json.loads(tool_call.function.arguments)
+                result = tool.invoke(**arguments)
+            else:
+                # Use default tool registry
+                mlflow_tool_call = _create_mlflow_tool_call_from_litellm(
+                    litellm_tool_call=tool_call
+                )
+                result = _judge_tool_registry.invoke(tool_call=mlflow_tool_call, trace=trace)
         except Exception as e:
             tool_response_messages.append(
                 _create_litellm_tool_response_message(
