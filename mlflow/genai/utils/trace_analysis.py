@@ -226,8 +226,16 @@ class IssueDescription(pydantic.BaseModel):
     title: str = pydantic.Field(
         description=(
             "Brief title providing enough context for a human to understand what went wrong "
-            "and the scenario (e.g., 'Agent provided incorrect stock information', "
-            "'Missing tool call parameters led to incomplete response')"
+            "and the scenario. Should follow the pattern 'X occurred due to Y' to explain both "
+            "the problem and its cause. "
+            "GOOD examples: "
+            "'Agent provided incorrect stock information due to missing tool call parameters', "
+            "'User received unhelpful response due to failed database query', "
+            "'Agent performed unauthorized action due to missing permission check'. "
+            "BAD examples (not descriptive enough): "
+            "'Agent provided incorrect stock information', "
+            "'Missing tool call parameters led to incomplete response', "
+            "'Permission issue'."
         )
     )
     description: str = pydantic.Field(
