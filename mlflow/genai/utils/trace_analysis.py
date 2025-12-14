@@ -55,12 +55,14 @@ class Issue:
     Represents an issue found in a session through trace analysis.
 
     Attributes:
-        title: Brief title providing context about what went wrong and the scenario.
+        title: Brief title following pattern "X occurred due to Y".
+        context: Context about the user's query or environment where issue occurred.
         description: Concise summary of what the issue is.
         analysis: Detailed evidence and root cause analysis.
     """
 
     title: str
+    context: str
     description: str
     analysis: Analysis
 
@@ -196,6 +198,25 @@ class FeedbackSummary(pydantic.BaseModel):
     )
 
 
+class IssueTitle(pydantic.BaseModel):
+    """Schema for LLM-generated issue title."""
+
+    title: str = pydantic.Field(
+        description=(
+            "Brief title following the pattern 'X occurred due to Y' to explain both "
+            "the problem and its cause. "
+            "GOOD examples: "
+            "'Agent provided incorrect stock information due to missing tool call parameters', "
+            "'User received unhelpful response due to failed database query', "
+            "'Agent performed unauthorized action due to missing permission check'. "
+            "BAD examples (not descriptive enough): "
+            "'Agent provided incorrect stock information', "
+            "'Missing tool call parameters led to incomplete response', "
+            "'Permission issue'."
+        )
+    )
+
+
 class IssueCitation(pydantic.BaseModel):
     """Schema for a citation supporting an issue."""
 
@@ -223,26 +244,19 @@ class IssueAnalysis(pydantic.BaseModel):
 class IssueDescription(pydantic.BaseModel):
     """Schema for a single issue identified in the session."""
 
-    title: str = pydantic.Field(
+    context: str = pydantic.Field(
         description=(
-            "Brief title providing enough context for a human to understand what went wrong "
-            "and the scenario. Should follow the pattern 'X occurred due to Y' to explain both "
-            "the problem and its cause. "
-            "GOOD examples: "
-            "'Agent provided incorrect stock information due to missing tool call parameters', "
-            "'User received unhelpful response due to failed database query', "
-            "'Agent performed unauthorized action due to missing permission check'. "
-            "BAD examples (not descriptive enough): "
-            "'Agent provided incorrect stock information', "
-            "'Missing tool call parameters led to incomplete response', "
-            "'Permission issue'."
+            "Context explaining the type/nature of the user's query or environment in which "
+            "the issue occurred. This should describe what the user was trying to do or what "
+            "scenario they were in when the problem happened (e.g., 'User asked about stock "
+            "market trading on weekends', 'User requested information about holiday schedules', "
+            "'User was trying to set a timer')."
         )
     )
     description: str = pydantic.Field(
         description=(
             "Concise summary of what the issue is and why it matters (1-2 sentences). "
-            "Should expand on the title with additional context about the impact or nature "
-            "of the issue."
+            "Should describe the problem and its impact."
         )
     )
     analysis: IssueAnalysis = pydantic.Field(
@@ -352,6 +366,66 @@ class FeedbackAnalysis(pydantic.BaseModel):
     reasoning: str = pydantic.Field(
         description="Brief explanation of why this feedback is considered negative or positive"
     )
+
+
+def _generate_issue_title(
+    context: str,
+    description: str,
+    evidence: str,
+    root_cause: str,
+    model: str | None = None,
+    model_params: dict[str, Any] | None = None,
+) -> str:
+    """
+    Generate a title for an issue using an LLM.
+
+    Args:
+        context: Context about the user's query or environment.
+        description: Description of the issue.
+        evidence: Evidence supporting the issue.
+        root_cause: Root cause analysis.
+        model: Optional model URI to use. If None, uses default model.
+        model_params: Optional dictionary of model parameters to pass to the LLM.
+
+    Returns:
+        Generated title following the pattern "X occurred due to Y".
+    """
+    if model is None:
+        from mlflow.genai.judges.utils import get_default_model
+
+        model = get_default_model()
+
+    issue_info = f"""
+Context: {context}
+
+Description: {description}
+
+Evidence: {evidence}
+
+Root Cause: {root_cause}
+"""
+
+    system_message = ChatMessage(
+        role="system",
+        content=(
+            "You are an expert at creating concise, descriptive titles for AI system issues. "
+            "Generate a title that follows the pattern 'X occurred due to Y' where X is what "
+            "went wrong and Y is the root cause."
+        ),
+    )
+
+    user_message = ChatMessage(
+        role="user",
+        content=f"Generate a title for this issue:\n\n{issue_info}",
+    )
+
+    result = get_chat_completions_with_structured_output(
+        model_uri=model,
+        messages=[system_message, user_message],
+        output_schema=IssueTitle,
+        inference_params=model_params,
+    )
+    return result.title
 
 
 def _is_negative_feedback(
@@ -582,7 +656,7 @@ def _find_issues_in_session(
     # Log guidelines adherence explanation
     _logger.info(f"Guidelines adherence explanation:\n{analysis.guidelines_adherence_explanation}")
 
-    # Convert Pydantic models to dataclass instances
+    # Convert Pydantic models to dataclass instances and generate titles
     issues = []
     for issue_desc in analysis.issues:
         citations = [
@@ -598,8 +672,24 @@ def _find_issues_in_session(
             root_cause=issue_desc.analysis.root_cause,
             citations=citations,
         )
+
+        # Generate title using separate LLM call
+        title = _generate_issue_title(
+            context=issue_desc.context,
+            description=issue_desc.description,
+            evidence=issue_desc.analysis.evidence,
+            root_cause=issue_desc.analysis.root_cause,
+            model=model,
+            model_params=model_params,
+        )
+
         issues.append(
-            Issue(title=issue_desc.title, description=issue_desc.description, analysis=analysis_obj)
+            Issue(
+                title=title,
+                context=issue_desc.context,
+                description=issue_desc.description,
+                analysis=analysis_obj,
+            )
         )
 
     _logger.info(f"Found {len(issues)} issues through trace analysis")
