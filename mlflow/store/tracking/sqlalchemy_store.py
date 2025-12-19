@@ -33,6 +33,7 @@ from mlflow.entities import (
     Expectation,
     Experiment,
     Feedback,
+    Issue,
     Run,
     RunInputs,
     RunOutputs,
@@ -2986,6 +2987,12 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
         with self.ManagedSessionMaker() as session:
             existing_sql = self._get_sql_assessment(session, trace_id, assessment_id)
             existing = existing_sql.to_mlflow_entity()
+
+            # Issue assessments are immutable and cannot be updated
+            if isinstance(existing, Issue):
+                raise MlflowException.invalid_parameter_value(
+                    "Issue assessments are immutable and cannot be updated."
+                )
 
             if expectation is not None and feedback is not None:
                 raise MlflowException.invalid_parameter_value(

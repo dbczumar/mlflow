@@ -39,6 +39,7 @@ from mlflow.entities import (
     ExperimentTag,
     Feedback,
     GatewayEndpoint,
+    Issue,
     GatewayEndpointBinding,
     GatewayEndpointModelMapping,
     GatewayEndpointTag,
@@ -863,7 +864,7 @@ class SqlAssessments(Base):
     """
     assessment_type = Column(String(50), nullable=False)
     """
-    Assessment type: `String` (limit 50 characters). Either "feedback" or "expectation".
+    Assessment type: `String` (limit 50 characters). One of "feedback", "expectation", or "issue".
     """
     value = Column(Text, nullable=False)
     """
@@ -978,6 +979,27 @@ class SqlAssessments(Base):
             )
             assessment.overrides = self.overrides
             assessment.valid = self.valid
+        elif assessment_type_value == "issue":
+            from mlflow.entities.assessment import ISSUE_NAME_METADATA_KEY
+
+            # issue_id is stored as the assessment name
+            # issue_name is stored in metadata under ISSUE_NAME_METADATA_KEY
+            issue_name = (
+                parsed_metadata.pop(ISSUE_NAME_METADATA_KEY, "") if parsed_metadata else ""
+            )
+            assessment = Issue(
+                issue_id=self.name,
+                issue_name=issue_name,
+                source=source,
+                trace_id=self.trace_id,
+                rationale=self.rationale,
+                metadata=parsed_metadata if parsed_metadata else None,
+                span_id=self.span_id,
+                create_time_ms=self.created_timestamp,
+                last_update_time_ms=self.last_updated_timestamp,
+            )
+            assessment.overrides = self.overrides
+            assessment.valid = self.valid
         else:
             raise ValueError(f"Unknown assessment type: {assessment_type_value}")
 
@@ -1005,9 +1027,15 @@ class SqlAssessments(Base):
             assessment_type = "expectation"
             value_json = json.dumps(assessment.expectation.value)
             error_json = None
+        elif assessment.issue is not None:
+            assessment_type = "issue"
+            # IssueValue contains just a boolean value
+            # issue_id is stored as assessment.name, issue_name is in metadata
+            value_json = json.dumps(assessment.issue.value)
+            error_json = None
         else:
             raise MlflowException.invalid_parameter_value(
-                "Assessment must have either feedback or expectation value"
+                "Assessment must have either feedback, expectation, or issue value"
             )
 
         metadata_json = json.dumps(assessment.metadata) if assessment.metadata else None

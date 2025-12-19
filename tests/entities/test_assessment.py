@@ -12,12 +12,15 @@ from mlflow.entities.assessment import (
     ExpectationValue,
     Feedback,
     FeedbackValue,
+    Issue,
+    IssueValue,
 )
 from mlflow.entities.assessment_error import _STACK_TRACE_TRUNCATION_LENGTH
 from mlflow.exceptions import MlflowException
 from mlflow.protos.assessments_pb2 import Assessment as ProtoAssessment
 from mlflow.protos.assessments_pb2 import Expectation as ProtoExpectation
 from mlflow.protos.assessments_pb2 import Feedback as ProtoFeedback
+from mlflow.protos.assessments_pb2 import Issue as ProtoIssue
 from mlflow.protos.databricks_tracing_pb2 import Assessment as ProtoAssessmentV4
 from mlflow.protos.databricks_tracing_pb2 import TraceLocation, UCSchemaLocation
 from mlflow.tracing.constant import AssessmentMetadataKey
@@ -617,3 +620,224 @@ def test_feedback_rejects_invalid_error_types(invalid_error):
         MlflowException, match="'error' must be an Exception, AssessmentError, or string"
     ):
         Feedback(name="test", error=invalid_error)
+
+
+# ========================
+# Issue Assessment Tests
+# ========================
+
+
+def test_issue_creation():
+    from mlflow.entities.assessment import ISSUE_NAME_METADATA_KEY
+
+    issue = Issue(
+        issue_id="issue-123",
+        issue_name="Missing context in response",
+        trace_id="trace-456",
+        rationale="The agent did not retrieve relevant documents.",
+        metadata={"key1": "value1"},
+        span_id="span-789",
+    )
+
+    assert issue.issue_id == "issue-123"
+    assert issue.issue_name == "Missing context in response"
+    assert issue.trace_id == "trace-456"
+    assert issue.rationale == "The agent did not retrieve relevant documents."
+    # Metadata should include both user-provided and issue_name
+    assert issue.metadata["key1"] == "value1"
+    assert issue.metadata[ISSUE_NAME_METADATA_KEY] == "Missing context in response"
+    assert issue.span_id == "span-789"
+    # issue_id is used as the assessment name
+    assert issue.name == "issue-123"
+    # Default source should be LLM_JUDGE
+    assert issue.source.source_type == "LLM_JUDGE"
+
+
+def test_issue_creation_with_custom_source():
+    source = AssessmentSource(source_type="LLM_JUDGE", source_id="trace-insights-v1")
+    issue = Issue(
+        issue_id="issue-123",
+        issue_name="Test Issue",
+        source=source,
+    )
+
+    assert issue.source.source_type == "LLM_JUDGE"
+    assert issue.source.source_id == "trace-insights-v1"
+
+
+def test_issue_name_used_as_assessment_name():
+    # issue_id is now used as the assessment name
+    issue = Issue(
+        issue_id="custom-issue-id-123",
+        issue_name="Test Issue",
+    )
+
+    assert issue.name == "custom-issue-id-123"
+    assert issue.issue_id == "custom-issue-id-123"
+
+
+def test_issue_validation_missing_issue_id():
+    with pytest.raises(MlflowException, match="issue_id.*must be specified"):
+        Issue(issue_id="", issue_name="Test Issue")
+
+    with pytest.raises(MlflowException, match="issue_id.*must be specified"):
+        Issue(issue_id=None, issue_name="Test Issue")
+
+
+def test_issue_validation_missing_issue_name():
+    with pytest.raises(MlflowException, match="issue_name.*must be specified"):
+        Issue(issue_id="issue-123", issue_name="")
+
+    with pytest.raises(MlflowException, match="issue_name.*must be specified"):
+        Issue(issue_id="issue-123", issue_name=None)
+
+
+def test_issue_value_creation():
+    # IssueValue now contains just a boolean value
+    issue_value = IssueValue(value=True)
+    assert issue_value.value is True
+
+    issue_value_default = IssueValue()
+    assert issue_value_default.value is True
+
+
+def test_issue_value_proto_dict_conversion():
+    # IssueValue contains just a boolean value
+    issue_value = IssueValue(value=True)
+
+    # Test to_proto
+    proto = issue_value.to_proto()
+    assert isinstance(proto, ProtoIssue)
+    assert proto.value is True
+
+    # Test from_proto
+    result = IssueValue.from_proto(proto)
+    assert result.value == issue_value.value
+
+    # Test to_dictionary
+    issue_dict = issue_value.to_dictionary()
+    assert issue_dict.get("value", True) is True
+
+    # Test from_dictionary
+    result = IssueValue.from_dictionary(issue_dict)
+    assert result.value == issue_value.value
+
+
+def test_issue_proto_dict_conversion():
+    from mlflow.entities.assessment import ISSUE_NAME_METADATA_KEY
+
+    timestamp_ms = int(time.time() * 1000)
+    source = AssessmentSource(source_type="LLM_JUDGE", source_id="trace-insights-v1")
+
+    issue = Issue(
+        issue_id="issue-123",
+        issue_name="Missing context in response",
+        trace_id="trace-456",
+        source=source,
+        create_time_ms=timestamp_ms,
+        last_update_time_ms=timestamp_ms,
+        rationale="The agent did not retrieve relevant documents.",
+        metadata={"key1": "value1"},
+        span_id="span-789",
+    )
+
+    # Test to_proto
+    proto = issue.to_proto()
+    assert isinstance(proto, ProtoAssessment)
+    # issue_id is used as the assessment name
+    assert proto.assessment_name == "issue-123"
+    assert proto.trace_id == "trace-456"
+    assert proto.span_id == "span-789"
+    assert proto.rationale == "The agent did not retrieve relevant documents."
+    # issue_name should be in metadata
+    assert proto.metadata[ISSUE_NAME_METADATA_KEY] == "Missing context in response"
+
+    # Test from_proto
+    result = Assessment.from_proto(proto)
+    assert isinstance(result, Issue)
+    assert result.issue_id == "issue-123"
+    assert result.issue_name == "Missing context in response"
+    assert result.trace_id == "trace-456"
+    assert result.rationale == "The agent did not retrieve relevant documents."
+    # User-provided metadata should be preserved (issue_name is extracted to property)
+    assert result.metadata["key1"] == "value1"
+    assert result.span_id == "span-789"
+
+    # Test to_dictionary
+    issue_dict = issue.to_dictionary()
+    # issue_id is used as the assessment name
+    assert issue_dict["assessment_name"] == "issue-123"
+    assert issue_dict["trace_id"] == "trace-456"
+    # IssueValue now just contains a boolean
+    assert issue_dict["issue"].get("value", True) is True
+
+    # Test from_dictionary
+    result = Assessment.from_dictionary(issue_dict)
+    assert isinstance(result, Issue)
+    assert result.issue_id == "issue-123"
+    assert result.issue_name == "Missing context in response"
+
+
+def test_assessment_value_validation_with_issue():
+    common_args = {
+        "trace_id": "trace_id",
+        "name": "relevance",
+        "source": AssessmentSource(source_type="LLM_JUDGE", source_id="judge_1"),
+        "create_time_ms": 123456789,
+        "last_update_time_ms": 123456789,
+    }
+
+    # Valid: only issue (IssueValue now contains just a boolean)
+    Assessment(issue=IssueValue(value=True), **common_args)
+
+    # Invalid: issue with expectation
+    with pytest.raises(MlflowException, match=r"Exactly one of"):
+        Assessment(
+            issue=IssueValue(value=True),
+            expectation=ExpectationValue("MLflow"),
+            **common_args,
+        )
+
+    # Invalid: issue with feedback
+    with pytest.raises(MlflowException, match=r"Exactly one of"):
+        Assessment(
+            issue=IssueValue(value=True),
+            feedback=FeedbackValue("This is correct."),
+            **common_args,
+        )
+
+    # Invalid: all three
+    with pytest.raises(MlflowException, match=r"Exactly one of"):
+        Assessment(
+            issue=IssueValue(value=True),
+            expectation=ExpectationValue("MLflow"),
+            feedback=FeedbackValue("This is correct."),
+            **common_args,
+        )
+
+    # Invalid: error with issue
+    with pytest.raises(MlflowException, match=r"Cannot set `error` when `issue` is specified"):
+        Assessment(
+            issue=IssueValue(value=True),
+            error=AssessmentError(error_code="E001"),
+            **common_args,
+        )
+
+
+def test_issue_equality():
+    source = AssessmentSource(source_type="LLM_JUDGE", source_id="judge_1")
+    common_args = {
+        "trace_id": "trace_id",
+        "source": source,
+        "create_time_ms": 123456789,
+        "last_update_time_ms": 123456789,
+    }
+
+    issue_1 = Issue(issue_id="issue-123", issue_name="Test Issue", **common_args)
+    issue_2 = Issue(issue_id="issue-123", issue_name="Test Issue", **common_args)
+    issue_3 = Issue(issue_id="issue-456", issue_name="Test Issue", **common_args)
+    issue_4 = Issue(issue_id="issue-123", issue_name="Different Issue", **common_args)
+
+    assert issue_1 == issue_2  # Same values
+    assert issue_1 != issue_3  # Different issue_id (which is the assessment name)
+    assert issue_1 != issue_4  # Different issue_name (stored in metadata)
