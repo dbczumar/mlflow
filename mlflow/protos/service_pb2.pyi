@@ -50,6 +50,13 @@ class LoggedModelStatus(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     LOGGED_MODEL_PENDING: _ClassVar[LoggedModelStatus]
     LOGGED_MODEL_READY: _ClassVar[LoggedModelStatus]
     LOGGED_MODEL_UPLOAD_FAILED: _ClassVar[LoggedModelStatus]
+
+class IssueState(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    ISSUE_STATE_UNSPECIFIED: _ClassVar[IssueState]
+    DRAFT: _ClassVar[IssueState]
+    OPEN: _ClassVar[IssueState]
+    CLOSED: _ClassVar[IssueState]
 ACTIVE_ONLY: ViewType
 DELETED_ONLY: ViewType
 ALL: ViewType
@@ -71,6 +78,10 @@ LOGGED_MODEL_STATUS_UNSPECIFIED: LoggedModelStatus
 LOGGED_MODEL_PENDING: LoggedModelStatus
 LOGGED_MODEL_READY: LoggedModelStatus
 LOGGED_MODEL_UPLOAD_FAILED: LoggedModelStatus
+ISSUE_STATE_UNSPECIFIED: IssueState
+DRAFT: IssueState
+OPEN: IssueState
+CLOSED: IssueState
 
 class Metric(_message.Message):
     __slots__ = ("key", "value", "timestamp", "step", "dataset_name", "dataset_digest", "model_id", "run_id")
@@ -2067,6 +2078,124 @@ class GetSecretsConfig(_message.Message):
         secrets_available: bool
         def __init__(self, secrets_available: bool = ...) -> None: ...
     def __init__(self) -> None: ...
+
+class Issue(_message.Message):
+    __slots__ = ("issue_id", "experiment_id", "name", "description", "state", "creation_time", "last_update_time", "tags")
+    class TagsEntry(_message.Message):
+        __slots__ = ("key", "value")
+        KEY_FIELD_NUMBER: _ClassVar[int]
+        VALUE_FIELD_NUMBER: _ClassVar[int]
+        key: str
+        value: str
+        def __init__(self, key: _Optional[str] = ..., value: _Optional[str] = ...) -> None: ...
+    ISSUE_ID_FIELD_NUMBER: _ClassVar[int]
+    EXPERIMENT_ID_FIELD_NUMBER: _ClassVar[int]
+    NAME_FIELD_NUMBER: _ClassVar[int]
+    DESCRIPTION_FIELD_NUMBER: _ClassVar[int]
+    STATE_FIELD_NUMBER: _ClassVar[int]
+    CREATION_TIME_FIELD_NUMBER: _ClassVar[int]
+    LAST_UPDATE_TIME_FIELD_NUMBER: _ClassVar[int]
+    TAGS_FIELD_NUMBER: _ClassVar[int]
+    issue_id: str
+    experiment_id: str
+    name: str
+    description: str
+    state: IssueState
+    creation_time: int
+    last_update_time: int
+    tags: _containers.ScalarMap[str, str]
+    def __init__(self, issue_id: _Optional[str] = ..., experiment_id: _Optional[str] = ..., name: _Optional[str] = ..., description: _Optional[str] = ..., state: _Optional[_Union[IssueState, str]] = ..., creation_time: _Optional[int] = ..., last_update_time: _Optional[int] = ..., tags: _Optional[_Mapping[str, str]] = ...) -> None: ...
+
+class CreateIssue(_message.Message):
+    __slots__ = ("experiment_id", "name", "description", "state", "tags")
+    class TagsEntry(_message.Message):
+        __slots__ = ("key", "value")
+        KEY_FIELD_NUMBER: _ClassVar[int]
+        VALUE_FIELD_NUMBER: _ClassVar[int]
+        key: str
+        value: str
+        def __init__(self, key: _Optional[str] = ..., value: _Optional[str] = ...) -> None: ...
+    class Response(_message.Message):
+        __slots__ = ("issue",)
+        ISSUE_FIELD_NUMBER: _ClassVar[int]
+        issue: Issue
+        def __init__(self, issue: _Optional[_Union[Issue, _Mapping]] = ...) -> None: ...
+    EXPERIMENT_ID_FIELD_NUMBER: _ClassVar[int]
+    NAME_FIELD_NUMBER: _ClassVar[int]
+    DESCRIPTION_FIELD_NUMBER: _ClassVar[int]
+    STATE_FIELD_NUMBER: _ClassVar[int]
+    TAGS_FIELD_NUMBER: _ClassVar[int]
+    experiment_id: str
+    name: str
+    description: str
+    state: IssueState
+    tags: _containers.ScalarMap[str, str]
+    def __init__(self, experiment_id: _Optional[str] = ..., name: _Optional[str] = ..., description: _Optional[str] = ..., state: _Optional[_Union[IssueState, str]] = ..., tags: _Optional[_Mapping[str, str]] = ...) -> None: ...
+
+class GetIssue(_message.Message):
+    __slots__ = ("issue_id",)
+    class Response(_message.Message):
+        __slots__ = ("issue",)
+        ISSUE_FIELD_NUMBER: _ClassVar[int]
+        issue: Issue
+        def __init__(self, issue: _Optional[_Union[Issue, _Mapping]] = ...) -> None: ...
+    ISSUE_ID_FIELD_NUMBER: _ClassVar[int]
+    issue_id: str
+    def __init__(self, issue_id: _Optional[str] = ...) -> None: ...
+
+class UpdateIssue(_message.Message):
+    __slots__ = ("issue_id", "name", "description", "state", "tags")
+    class TagsEntry(_message.Message):
+        __slots__ = ("key", "value")
+        KEY_FIELD_NUMBER: _ClassVar[int]
+        VALUE_FIELD_NUMBER: _ClassVar[int]
+        key: str
+        value: str
+        def __init__(self, key: _Optional[str] = ..., value: _Optional[str] = ...) -> None: ...
+    class Response(_message.Message):
+        __slots__ = ("issue",)
+        ISSUE_FIELD_NUMBER: _ClassVar[int]
+        issue: Issue
+        def __init__(self, issue: _Optional[_Union[Issue, _Mapping]] = ...) -> None: ...
+    ISSUE_ID_FIELD_NUMBER: _ClassVar[int]
+    NAME_FIELD_NUMBER: _ClassVar[int]
+    DESCRIPTION_FIELD_NUMBER: _ClassVar[int]
+    STATE_FIELD_NUMBER: _ClassVar[int]
+    TAGS_FIELD_NUMBER: _ClassVar[int]
+    issue_id: str
+    name: str
+    description: str
+    state: IssueState
+    tags: _containers.ScalarMap[str, str]
+    def __init__(self, issue_id: _Optional[str] = ..., name: _Optional[str] = ..., description: _Optional[str] = ..., state: _Optional[_Union[IssueState, str]] = ..., tags: _Optional[_Mapping[str, str]] = ...) -> None: ...
+
+class DeleteIssue(_message.Message):
+    __slots__ = ("issue_id",)
+    class Response(_message.Message):
+        __slots__ = ()
+        def __init__(self) -> None: ...
+    ISSUE_ID_FIELD_NUMBER: _ClassVar[int]
+    issue_id: str
+    def __init__(self, issue_id: _Optional[str] = ...) -> None: ...
+
+class SearchIssues(_message.Message):
+    __slots__ = ("experiment_id", "states", "max_results", "page_token")
+    class Response(_message.Message):
+        __slots__ = ("issues", "next_page_token")
+        ISSUES_FIELD_NUMBER: _ClassVar[int]
+        NEXT_PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
+        issues: _containers.RepeatedCompositeFieldContainer[Issue]
+        next_page_token: str
+        def __init__(self, issues: _Optional[_Iterable[_Union[Issue, _Mapping]]] = ..., next_page_token: _Optional[str] = ...) -> None: ...
+    EXPERIMENT_ID_FIELD_NUMBER: _ClassVar[int]
+    STATES_FIELD_NUMBER: _ClassVar[int]
+    MAX_RESULTS_FIELD_NUMBER: _ClassVar[int]
+    PAGE_TOKEN_FIELD_NUMBER: _ClassVar[int]
+    experiment_id: str
+    states: _containers.RepeatedScalarFieldContainer[IssueState]
+    max_results: int
+    page_token: str
+    def __init__(self, experiment_id: _Optional[str] = ..., states: _Optional[_Iterable[_Union[IssueState, str]]] = ..., max_results: _Optional[int] = ..., page_token: _Optional[str] = ...) -> None: ...
 
 class MlflowService(_service.service): ...
 

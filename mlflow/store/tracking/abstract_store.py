@@ -7,6 +7,7 @@ from mlflow.entities import (
     Assessment,
     DatasetInput,
     DatasetRecord,
+    IssueEntity,
     LoggedModel,
     LoggedModelInput,
     LoggedModelOutput,
@@ -1393,5 +1394,99 @@ class AbstractStore(GatewayStoreMixin):
 
         Raises:
             MlflowException: If scorer is not found.
+        """
+        raise NotImplementedError(self.__class__.__name__)
+
+    # ========== Issue Methods ==========
+
+    def create_issue(self, issue: IssueEntity) -> IssueEntity:
+        """
+        Create a new issue for an experiment.
+
+        Args:
+            issue: The IssueEntity to create.
+
+        Returns:
+            The created IssueEntity with populated issue_id and timestamps.
+
+        Raises:
+            MlflowException: If experiment does not exist.
+        """
+        raise NotImplementedError(self.__class__.__name__)
+
+    def get_issue(self, issue_id: str) -> IssueEntity:
+        """
+        Get an issue by ID.
+
+        Args:
+            issue_id: The unique identifier of the issue.
+
+        Returns:
+            The IssueEntity.
+
+        Raises:
+            MlflowException: If issue is not found.
+        """
+        raise NotImplementedError(self.__class__.__name__)
+
+    def update_issue(
+        self,
+        issue_id: str,
+        name: str | None = None,
+        description: str | None = None,
+        state: str | None = None,
+        tags: dict[str, str] | None = None,
+    ) -> IssueEntity:
+        """
+        Update an existing issue.
+
+        Args:
+            issue_id: The unique identifier of the issue.
+            name: Updated name (optional).
+            description: Updated description (optional).
+            state: Updated state (optional).
+            tags: Tags to merge with existing tags (optional).
+
+        Returns:
+            The updated IssueEntity.
+
+        Raises:
+            MlflowException: If issue is not found.
+        """
+        raise NotImplementedError(self.__class__.__name__)
+
+    def delete_issue(self, issue_id: str) -> None:
+        """
+        Delete an issue by ID.
+
+        Args:
+            issue_id: The unique identifier of the issue.
+
+        Raises:
+            MlflowException: If issue is not found.
+        """
+        raise NotImplementedError(self.__class__.__name__)
+
+    def search_issues(
+        self,
+        experiment_id: str,
+        states: list[str] | None = None,
+        max_results: int = 100,
+        page_token: str | None = None,
+    ) -> PagedList[IssueEntity]:
+        """
+        Search issues for an experiment.
+
+        Args:
+            experiment_id: The experiment ID to search issues in.
+            states: Filter by states (optional, returns all states if empty).
+            max_results: Maximum number of issues to return (default 100).
+            page_token: Pagination token for fetching next page.
+
+        Returns:
+            PagedList of IssueEntity objects.
+
+        Raises:
+            MlflowException: If experiment does not exist.
         """
         raise NotImplementedError(self.__class__.__name__)

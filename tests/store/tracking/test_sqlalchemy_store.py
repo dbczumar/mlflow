@@ -12025,3 +12025,148 @@ def test_log_spans_session_id_handling(store: SqlAlchemyStore) -> None:
 
     trace_info3 = store.get_trace_info(trace_id3)
     assert TraceMetadataKey.TRACE_SESSION not in trace_info3.trace_metadata
+
+
+# =============================================================================
+# Issue Tests
+# =============================================================================
+
+
+def test_create_issue(store: SqlAlchemyStore) -> None:
+    from mlflow.entities.issue import IssueEntity, IssueState
+
+    experiment_id = store.create_experiment("test_issue_experiment")
+    issue = IssueEntity(
+        issue_id=None,
+        experiment_id=experiment_id,
+        name="Test Issue",
+        description="Test description",
+        state=IssueState.DRAFT,
+        tags={"key": "value"},
+    )
+
+    created = store.create_issue(issue)
+
+    assert created.issue_id is not None
+    assert created.experiment_id == experiment_id
+    assert created.name == "Test Issue"
+    assert created.description == "Test description"
+    assert created.state == IssueState.DRAFT
+    assert created.tags == {"key": "value"}
+    assert created.creation_time is not None
+    assert created.last_update_time is not None
+
+
+def test_get_issue(store: SqlAlchemyStore) -> None:
+    from mlflow.entities.issue import IssueEntity
+
+    experiment_id = store.create_experiment("test_get_issue")
+    issue = IssueEntity(
+        issue_id=None,
+        experiment_id=experiment_id,
+        name="Test Issue",
+        description="Test description",
+    )
+    created = store.create_issue(issue)
+
+    retrieved = store.get_issue(created.issue_id)
+
+    assert retrieved.issue_id == created.issue_id
+    assert retrieved.experiment_id == created.experiment_id
+    assert retrieved.name == created.name
+    assert retrieved.description == created.description
+
+
+def test_get_issue_not_found(store: SqlAlchemyStore) -> None:
+    with pytest.raises(MlflowException, match="not found"):
+        store.get_issue("nonexistent-id")
+
+
+def test_update_issue(store: SqlAlchemyStore) -> None:
+    from mlflow.entities.issue import IssueEntity, IssueState
+
+    experiment_id = store.create_experiment("test_update_issue")
+    issue = IssueEntity(
+        issue_id=None,
+        experiment_id=experiment_id,
+        name="Original Name",
+        state=IssueState.DRAFT,
+    )
+    created = store.create_issue(issue)
+
+    updated = store.update_issue(created.issue_id, name="Updated Name", state=IssueState.OPEN)
+
+    assert updated.name == "Updated Name"
+    assert updated.state == IssueState.OPEN
+    assert updated.last_update_time >= created.last_update_time
+
+
+def test_delete_issue(store: SqlAlchemyStore) -> None:
+    from mlflow.entities.issue import IssueEntity
+
+    experiment_id = store.create_experiment("test_delete_issue")
+    issue = IssueEntity(
+        issue_id=None,
+        experiment_id=experiment_id,
+        name="Test Issue",
+    )
+    created = store.create_issue(issue)
+
+    store.delete_issue(created.issue_id)
+
+    with pytest.raises(MlflowException, match="not found"):
+        store.get_issue(created.issue_id)
+
+
+def test_search_issues(store: SqlAlchemyStore) -> None:
+    from mlflow.entities.issue import IssueEntity, IssueState
+
+    experiment_id = store.create_experiment("test_search_issues")
+
+    # Create issues with different states
+    for i, state in enumerate([IssueState.DRAFT, IssueState.OPEN, IssueState.CLOSED]):
+        issue = IssueEntity(
+            issue_id=None,
+            experiment_id=experiment_id,
+            name=f"Issue {i}",
+            state=state,
+        )
+        store.create_issue(issue)
+
+    # Search all
+    all_issues = store.search_issues(experiment_id)
+    assert len(all_issues) == 3
+
+    # Filter by state
+    draft_issues = store.search_issues(experiment_id, states=[IssueState.DRAFT])
+    assert len(draft_issues) == 1
+    assert draft_issues[0].state == IssueState.DRAFT
+
+
+def test_search_issues_pagination(store: SqlAlchemyStore) -> None:
+    from mlflow.entities.issue import IssueEntity
+
+    experiment_id = store.create_experiment("test_search_issues_pagination")
+
+    # Create 5 issues
+    for i in range(5):
+        issue = IssueEntity(
+            issue_id=None,
+            experiment_id=experiment_id,
+            name=f"Issue {i}",
+        )
+        store.create_issue(issue)
+
+    # Get first page
+    page1 = store.search_issues(experiment_id, max_results=2)
+    assert len(page1) == 2
+    assert page1.token is not None
+
+    # Get second page
+    page2 = store.search_issues(experiment_id, max_results=2, page_token=page1.token)
+    assert len(page2) == 2
+
+    # Get third page
+    page3 = store.search_issues(experiment_id, max_results=2, page_token=page2.token)
+    assert len(page3) == 1
+    assert page3.token is None

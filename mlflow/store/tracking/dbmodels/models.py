@@ -59,6 +59,7 @@ from mlflow.entities import (
     ViewType,
 )
 from mlflow.entities.dataset_record import DATASET_RECORD_WRAPPED_OUTPUT_KEY
+from mlflow.entities.issue import IssueEntity, IssueState
 from mlflow.entities.lifecycle_stage import LifecycleStage
 from mlflow.entities.logged_model import LoggedModel
 from mlflow.entities.logged_model_parameter import LoggedModelParameter
@@ -2541,3 +2542,120 @@ class SqlGatewayEndpointTag(Base):
 
     def to_mlflow_entity(self):
         return GatewayEndpointTag(key=self.key, value=self.value)
+
+
+# Valid issue states
+IssueStates = [
+    IssueState.DRAFT,
+    IssueState.OPEN,
+    IssueState.CLOSED,
+]
+
+
+class SqlIssue(Base):
+    """
+    DB model for :py:class:`mlflow.entities.issue.IssueEntity`.
+    These are recorded in the ``issues`` table.
+
+    An issue represents an identified problem from trace analysis.
+    """
+
+    __tablename__ = "issues"
+
+    issue_id = Column(String(36), primary_key=True)
+    """
+    Issue ID: `String` (UUID format, 36 characters). *Primary Key* for ``issues`` table.
+    """
+
+    experiment_id = Column(Integer, ForeignKey("experiments.experiment_id"), nullable=False)
+    """
+    Experiment ID to which this issue belongs: *Foreign Key* into ``experiments`` table.
+    """
+
+    name = Column(String(500), nullable=False)
+    """
+    Human-readable name/title of the issue: `String` (limit 500 characters). *Non null*.
+    """
+
+    description = Column(Text, nullable=True)
+    """
+    Detailed description of the issue: `Text`. Could be *null*.
+    """
+
+    state = Column(String(20), default=IssueState.DRAFT, nullable=False)
+    """
+    Current state of the issue: `String` (limit 20 characters).
+    Can be ``draft`` (default), ``open``, or ``closed``.
+    """
+
+    creation_time = Column(BigInteger(), default=get_current_time_millis, nullable=False)
+    """
+    Creation time of issue in milliseconds since epoch: `BigInteger`.
+    """
+
+    last_update_time = Column(BigInteger(), default=get_current_time_millis, nullable=False)
+    """
+    Last update time of issue in milliseconds since epoch: `BigInteger`.
+    """
+
+    tags = Column(Text, nullable=True)
+    """
+    Additional metadata as JSON-serialized key-value pairs: `Text`. Could be *null*.
+    """
+
+    experiment = relationship("SqlExperiment", backref=backref("issues", cascade="all"))
+    """
+    SQLAlchemy relationship (many:one) with :py:class:`SqlExperiment`.
+    """
+
+    __table_args__ = (
+        CheckConstraint(
+            state.in_(IssueStates),
+            name="issues_state",
+        ),
+        Index("index_issues_experiment_id", "experiment_id"),
+        Index("index_issues_state", "state"),
+    )
+
+    def __repr__(self):
+        return f"<SqlIssue ({self.issue_id}, {self.name}, {self.state})>"
+
+    def to_mlflow_entity(self) -> IssueEntity:
+        """
+        Convert DB model to corresponding MLflow entity.
+
+        Returns:
+            :py:class:`mlflow.entities.issue.IssueEntity`.
+        """
+        return IssueEntity(
+            issue_id=self.issue_id,
+            experiment_id=str(self.experiment_id),
+            name=self.name,
+            description=self.description,
+            state=self.state,
+            creation_time=self.creation_time,
+            last_update_time=self.last_update_time,
+            tags=json.loads(self.tags) if self.tags else None,
+        )
+
+    @classmethod
+    def from_mlflow_entity(cls, issue: IssueEntity) -> "SqlIssue":
+        """
+        Create DB model from corresponding MLflow entity.
+
+        Args:
+            issue: The IssueEntity to convert.
+
+        Returns:
+            SqlIssue instance.
+        """
+        return cls(
+            issue_id=issue.issue_id,
+            experiment_id=int(issue.experiment_id),
+            name=issue.name,
+            description=issue.description,
+            state=issue.state,
+            creation_time=issue.creation_time,
+            last_update_time=issue.last_update_time,
+            tags=json.dumps(issue.tags) if issue.tags else None,
+        )
