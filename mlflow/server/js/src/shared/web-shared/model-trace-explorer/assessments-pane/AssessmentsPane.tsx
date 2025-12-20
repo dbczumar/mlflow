@@ -17,7 +17,7 @@ import { ASSESSMENT_PANE_MIN_WIDTH } from './AssessmentsPane.utils';
 import { ExpectationItem } from './ExpectationItem';
 import { FeedbackGroup } from './FeedbackGroup';
 import { shouldUseTracesV4API } from '../FeatureUtils';
-import type { Assessment, FeedbackAssessment } from '../ModelTrace.types';
+import type { Assessment, ExpectationAssessment, FeedbackAssessment } from '../ModelTrace.types';
 import { useModelTraceExplorerViewState } from '../ModelTraceExplorerViewStateContext';
 import { useTraceCachedActions } from '../hooks/useTraceCachedActions';
 
@@ -78,9 +78,14 @@ export const AssessmentsPane = ({
 
   const { theme } = useDesignSystemTheme();
   const { setAssessmentsPaneExpanded, assessmentsPaneExpanded, isInComparisonView } = useModelTraceExplorerViewState();
-  const [feedbacks, expectations] = useMemo(
+  const [feedbacks, expectationsAndOthers] = useMemo(
     () => partition(allAssessments, (assessment) => 'feedback' in assessment),
     [allAssessments],
+  );
+  const expectations = useMemo(
+    () =>
+      expectationsAndOthers.filter((assessment): assessment is ExpectationAssessment => 'expectation' in assessment),
+    [expectationsAndOthers],
   );
   const groupedFeedbacks = useMemo(() => groupFeedbacks(feedbacks), [feedbacks]);
   const sortedExpectations = expectations.toSorted((left, right) =>

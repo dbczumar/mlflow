@@ -469,4 +469,12 @@ export interface ExpectationAssessment extends AssessmentBase {
   expectation: Expectation;
 }
 
-export type Assessment = FeedbackAssessment | ExpectationAssessment;
+export interface Issue {
+  value: boolean;
+}
+
+export interface IssueAssessment extends AssessmentBase {
+  issue: Issue;
+}
+
+export type Assessment = FeedbackAssessment | ExpectationAssessment | IssueAssessment;
