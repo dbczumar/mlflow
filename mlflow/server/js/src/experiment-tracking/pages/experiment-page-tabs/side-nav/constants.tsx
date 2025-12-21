@@ -8,6 +8,7 @@ import {
   ListIcon,
   ModelsIcon,
   PlusMinusSquareIcon,
+  SparkleIcon,
   SpeechBubbleIcon,
   TextBoxIcon,
   UserGroupIcon,
@@ -206,6 +207,17 @@ export const useExperimentPageSideNavConfig = ({
           icon: <SpeechBubbleIcon />,
           tabName: ExperimentPageTabName.ChatSessions,
           componentId: 'mlflow.experiment-side-nav.genai.chat-sessions',
+        },
+        {
+          label: (
+            <FormattedMessage
+              defaultMessage="Issues"
+              description="Label for the issues tab in the MLflow experiment navbar"
+            />
+          ),
+          icon: <SparkleIcon />,
+          tabName: ExperimentPageTabName.Issues,
+          componentId: 'mlflow.experiment-side-nav.genai.issues',
         },
       ],
       evaluation: enableScorersUI()
