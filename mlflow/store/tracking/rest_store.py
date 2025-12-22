@@ -171,7 +171,13 @@ class RestStore(RestGatewayStoreMixin, AbstractStore):
     _V3_METHOD_TO_INFO = extract_api_info_for_service(MlflowService, _V3_REST_API_PATH_PREFIX)
 
     # Set of v3 APIs - includes Gateway APIs from mixin
-    _V3_APIS = RestGatewayStoreMixin._V3_GATEWAY_APIS
+    _V3_APIS = RestGatewayStoreMixin._V3_GATEWAY_APIS | {
+        CreateIssue,
+        GetIssue,
+        UpdateIssue,
+        DeleteIssue,
+        SearchIssues,
+    }
 
     def __init__(self, get_host_creds):
         super().__init__()
