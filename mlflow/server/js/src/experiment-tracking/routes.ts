@@ -174,6 +174,14 @@ class Routes {
     return `${Routes.getExperimentPageRoute(experimentId)}/traces`;
   }
 
+  static getExperimentPageIssuesTabRoute(experimentId: string, issueId?: string) {
+    const basePath = `${Routes.getExperimentPageRoute(experimentId)}/issues`;
+    if (issueId) {
+      return `${basePath}?issueId=${issueId}`;
+    }
+    return basePath;
+  }
+
   static getExperimentPageTabRoute(experimentId: string, tabName: ExperimentPageTabName) {
     return generatePath(RoutePaths.experimentPageTabbed, { experimentId, tabName });
   }

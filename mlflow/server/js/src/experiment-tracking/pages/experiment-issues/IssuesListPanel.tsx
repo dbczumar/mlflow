@@ -25,15 +25,7 @@ interface IssuesListPanelProps {
   isLoading: boolean;
 }
 
-const StateTab = ({
-  label,
-  isActive,
-  onClick,
-}: {
-  label: React.ReactNode;
-  isActive: boolean;
-  onClick: () => void;
-}) => {
+const StateTab = ({ label, isActive, onClick }: { label: React.ReactNode; isActive: boolean; onClick: () => void }) => {
   const { theme } = useDesignSystemTheme();
 
   return (
@@ -131,12 +123,7 @@ export const IssuesListPanel = ({
           onChange={(e) => onSearchChange(e.target.value)}
           css={{ flex: 1 }}
         />
-        <Button
-          componentId="mlflow.issues.filter-button"
-          icon={<FilterIcon />}
-          type="tertiary"
-          aria-label="Filter"
-        />
+        <Button componentId="mlflow.issues.filter-button" icon={<FilterIcon />} type="tertiary" aria-label="Filter" />
       </div>
 
       {/* Issue list */}

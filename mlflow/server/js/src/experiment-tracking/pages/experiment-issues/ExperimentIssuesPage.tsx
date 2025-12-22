@@ -2,9 +2,9 @@ import { useState, useMemo, useEffect } from 'react';
 import { useDesignSystemTheme, Empty } from '@databricks/design-system';
 import { FormattedMessage } from 'react-intl';
 import { ErrorBoundary } from 'react-error-boundary';
-import { useParams } from '../../../common/utils/RoutingUtils';
+import { useParams, useSearchParams } from '../../../common/utils/RoutingUtils';
 import { useSearchIssues } from './hooks/useIssuesApi';
-import type { IssueState } from './types';
+import type { Issue, IssueState } from './types';
 import { IssuesListPanel } from './IssuesListPanel';
 import { IssueDetailPanel } from './IssueDetailPanel';
 
@@ -45,12 +45,17 @@ const ErrorFallback = ({ error }: { error?: Error }) => {
 
 const ExperimentIssuesPageContent = ({ experimentId }: { experimentId: string }) => {
   const { theme } = useDesignSystemTheme();
+  const [searchParams] = useSearchParams();
   const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
   const [activeStateTab, setActiveStateTab] = useState<IssueState>('open');
   const [searchQuery, setSearchQuery] = useState('');
+  const [urlIssueHandled, setUrlIssueHandled] = useState(false);
 
   // Fetch all issues for the experiment (we'll filter client-side for state tabs)
   const { data: allIssues = [], isLoading, refetch } = useSearchIssues(experimentId);
+
+  // Get issueId from URL query params (e.g., ?issueId=xxx)
+  const issueIdFromUrl = searchParams.get('issueId');
 
   // Filter issues by state and search query
   const filteredIssues = useMemo(() => {
@@ -73,14 +78,37 @@ const ExperimentIssuesPageContent = ({ experimentId }: { experimentId: string })
     return allIssues.find((issue) => issue.issue_id === selectedIssueId) || null;
   }, [allIssues, selectedIssueId]);
 
-  // Auto-select first issue when filtered list changes
+  // Handle initial issue selection from URL query param (runs once when data loads)
   useEffect(() => {
-    if (filteredIssues.length > 0 && !filteredIssues.find((i) => i.issue_id === selectedIssueId)) {
-      setSelectedIssueId(filteredIssues[0].issue_id);
-    } else if (filteredIssues.length === 0) {
+    if (urlIssueHandled || allIssues.length === 0 || !issueIdFromUrl) {
+      return;
+    }
+
+    const targetIssue = allIssues.find((issue: Issue) => issue.issue_id === issueIdFromUrl);
+    if (targetIssue) {
+      setSelectedIssueId(targetIssue.issue_id);
+      setActiveStateTab(targetIssue.state);
+    }
+    setUrlIssueHandled(true);
+  }, [allIssues, issueIdFromUrl, urlIssueHandled]);
+
+  // Auto-select first issue when filtered list changes (only when no URL param or after it's handled)
+  useEffect(() => {
+    // Skip if we're still waiting to handle URL param
+    if (issueIdFromUrl && !urlIssueHandled) {
+      return;
+    }
+
+    if (filteredIssues.length > 0) {
+      // Only auto-select if current selection is not in the filtered list
+      if (!selectedIssueId || !filteredIssues.find((i) => i.issue_id === selectedIssueId)) {
+        setSelectedIssueId(filteredIssues[0].issue_id);
+      }
+    } else if (selectedIssueId !== null) {
+      // No issues in filtered list, clear selection
       setSelectedIssueId(null);
     }
-  }, [filteredIssues, selectedIssueId]);
+  }, [filteredIssues, selectedIssueId, issueIdFromUrl, urlIssueHandled]);
 
   return (
     <div

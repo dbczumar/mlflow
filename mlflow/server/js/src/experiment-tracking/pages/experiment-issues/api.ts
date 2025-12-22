@@ -1,5 +1,12 @@
 import { fetchOrFail, getAjaxUrl } from '../../../common/utils/FetchUtils';
-import type { Issue, IssueState, SearchIssuesResponse, CreateIssueResponse, GetIssueResponse, UpdateIssueResponse } from './types';
+import type {
+  Issue,
+  IssueState,
+  SearchIssuesResponse,
+  CreateIssueResponse,
+  GetIssueResponse,
+  UpdateIssueResponse,
+} from './types';
 
 /**
  * Search issues for an experiment

@@ -100,9 +100,7 @@ const StateSelector = ({
                 }}
               />
               {stateConfig[state].label}
-              {issue.state === state && (
-                <CheckIcon css={{ marginLeft: 'auto', color: theme.colors.textSecondary }} />
-              )}
+              {issue.state === state && <CheckIcon css={{ marginLeft: 'auto', color: theme.colors.textSecondary }} />}
             </div>
           </DropdownMenu.Item>
         ))}
@@ -140,7 +138,12 @@ const DetailHeader = ({
       <div css={{ display: 'flex', alignItems: 'center', gap: theme.spacing.xs }}>
         <Button componentId="mlflow.issues.share-button" icon={<ShareIcon />} type="tertiary" aria-label="Share" />
         <Button componentId="mlflow.issues.copy-button" icon={<CopyIcon />} type="tertiary" aria-label="Copy" />
-        <Button componentId="mlflow.issues.more-button" icon={<OverflowIcon />} type="tertiary" aria-label="More options" />
+        <Button
+          componentId="mlflow.issues.more-button"
+          icon={<OverflowIcon />}
+          type="tertiary"
+          aria-label="More options"
+        />
       </div>
     </div>
   );
