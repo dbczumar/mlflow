@@ -51,7 +51,6 @@ export async function searchIssues(
   }
 
   const data = await res.json();
-  console.log('Issues API response:', data);
   return {
     ...data,
     issues: (data.issues || []).map(normalizeIssue),

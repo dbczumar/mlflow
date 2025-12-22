@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   useDesignSystemTheme,
   Typography,
@@ -16,6 +16,8 @@ import {
 import { FormattedMessage } from 'react-intl';
 import type { Issue, IssueState, IssueDetailTab } from './types';
 import { useUpdateIssueMutation } from './hooks/useIssuesApi';
+import { TracesView } from '../../components/traces/TracesView';
+import { ExperimentViewTracesTableColumns } from '../../components/traces/TracesView.utils';
 
 interface IssueDetailPanelProps {
   issue: Issue | null;
@@ -346,18 +348,19 @@ const MonitorTabContent = () => {
   );
 };
 
-const TracesTabContent = () => {
-  const { theme } = useDesignSystemTheme();
+const TracesTabContent = ({ issue, experimentId }: { issue: Issue; experimentId: string }) => {
+  // Filter traces by issue assessment: issue.<issue_id> = 'true'
+  const issueFilter = useMemo(() => {
+    return `issue.\`${issue.issue_id}\` = 'true'`;
+  }, [issue.issue_id]);
 
   return (
-    <div css={{ padding: theme.spacing.md }}>
-      <Empty
-        description={
-          <FormattedMessage
-            defaultMessage="Linked traces will appear here"
-            description="Placeholder for linked traces section"
-          />
-        }
+    <div css={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <TracesView
+        experimentIds={[experimentId]}
+        fixedFilter={issueFilter}
+        baseComponentId="mlflow.issue_page.traces"
+        disabledColumns={[ExperimentViewTracesTableColumns.runName, ExperimentViewTracesTableColumns.tags]}
       />
     </div>
   );
@@ -396,7 +399,7 @@ const CommentsTabContent = () => {
 
 export const IssueDetailPanel = ({ issue, experimentId, onIssueUpdated, issueNumber }: IssueDetailPanelProps) => {
   const { theme } = useDesignSystemTheme();
-  const [activeTab, setActiveTab] = useState<IssueDetailTab>('monitor');
+  const [activeTab, setActiveTab] = useState<IssueDetailTab>('traces');
 
   if (!issue) {
     return (
@@ -447,11 +450,11 @@ export const IssueDetailPanel = ({ issue, experimentId, onIssueUpdated, issueNum
         onValueChange={(value) => setActiveTab(value as IssueDetailTab)}
       >
         <Tabs.List>
-          <Tabs.Trigger value="monitor">
-            <FormattedMessage defaultMessage="Monitor" description="Tab label for monitor section" />
-          </Tabs.Trigger>
           <Tabs.Trigger value="traces">
             <FormattedMessage defaultMessage="Traces" description="Tab label for traces section" />
+          </Tabs.Trigger>
+          <Tabs.Trigger value="monitor">
+            <FormattedMessage defaultMessage="Monitor" description="Tab label for monitor section" />
           </Tabs.Trigger>
           <Tabs.Trigger value="evaluation-runs">
             <FormattedMessage defaultMessage="Evaluation Runs" description="Tab label for evaluation runs section" />
@@ -460,11 +463,11 @@ export const IssueDetailPanel = ({ issue, experimentId, onIssueUpdated, issueNum
             <FormattedMessage defaultMessage="Comments" description="Tab label for comments section" />
           </Tabs.Trigger>
         </Tabs.List>
+        <Tabs.Content value="traces">
+          <TracesTabContent issue={issue} experimentId={experimentId} />
+        </Tabs.Content>
         <Tabs.Content value="monitor">
           <MonitorTabContent />
-        </Tabs.Content>
-        <Tabs.Content value="traces">
-          <TracesTabContent />
         </Tabs.Content>
         <Tabs.Content value="evaluation-runs">
           <EvaluationRunsTabContent />

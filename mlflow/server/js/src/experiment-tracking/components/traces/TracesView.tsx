@@ -24,6 +24,7 @@ export const TracesView = ({
   loggedModelId,
   disabledColumns,
   baseComponentId = runUuid ? 'mlflow.run.traces' : 'mlflow.experiment_page.traces',
+  fixedFilter,
 }: {
   experimentIds: string[];
   /**
@@ -43,6 +44,11 @@ export const TracesView = ({
    * The base component ID for the traces view. If not provided, will be inferred from the other props.
    */
   baseComponentId?: string;
+  /**
+   * A fixed filter that is always applied in addition to the user's search filter.
+   * Useful for pre-filtering traces (e.g., by issue ID).
+   */
+  fixedFilter?: string;
 }) => {
   const timeoutRef = useRef<number | undefined>(undefined);
   const [filter, setFilter] = useState<string>('');
@@ -52,11 +58,19 @@ export const TracesView = ({
   const [selectedTraceId, setSelectedTraceId] = useActiveExperimentTrace();
   const [selectedSpanId, setSelectedSpanId] = useActiveExperimentSpan();
 
+  // Combine the fixed filter (e.g., issue filter) with the user's search filter
+  const combinedFilter = useMemo(() => {
+    if (fixedFilter && filter) {
+      return `${fixedFilter} AND ${filter}`;
+    }
+    return fixedFilter || filter;
+  }, [fixedFilter, filter]);
+
   const { traces, loading, error, hasNextPage, hasPreviousPage, fetchNextPage, fetchPrevPage, refreshCurrentPage } =
     useExperimentTraces({
       experimentIds,
       sorting,
-      filter,
+      filter: combinedFilter,
       runUuid,
       loggedModelId,
     });
