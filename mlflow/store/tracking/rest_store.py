@@ -32,6 +32,7 @@ from mlflow.exceptions import MlflowNotImplementedException
 _DATABRICKS_DATASET_API_NAME = "Evaluation dataset APIs"
 _DATABRICKS_DATASET_ALTERNATIVE = "Use the databricks-agents library for dataset operations."
 from mlflow.entities.assessment import Assessment, Expectation, Feedback
+from mlflow.entities.issue import IssueEntity, IssueState
 from mlflow.entities.span import Span
 from mlflow.entities.trace import Trace
 from mlflow.entities.trace_data import TraceData
@@ -54,6 +55,7 @@ from mlflow.protos.service_pb2 import (
     CreateAssessment,
     CreateDataset,
     CreateExperiment,
+    CreateIssue,
     CreateLoggedModel,
     CreateRun,
     DeleteAssessment,
@@ -61,6 +63,7 @@ from mlflow.protos.service_pb2 import (
     DeleteDatasetTag,
     DeleteExperiment,
     DeleteExperimentTag,
+    DeleteIssue,
     DeleteLoggedModel,
     DeleteLoggedModelTag,
     DeleteRun,
@@ -76,6 +79,7 @@ from mlflow.protos.service_pb2 import (
     GetDatasetRecords,
     GetExperiment,
     GetExperimentByName,
+    GetIssue,
     GetLoggedModel,
     GetMetricHistory,
     GetRun,
@@ -101,6 +105,7 @@ from mlflow.protos.service_pb2 import (
     RestoreRun,
     SearchEvaluationDatasets,
     SearchExperiments,
+    SearchIssues,
     SearchLoggedModels,
     SearchRuns,
     SearchTraces,
@@ -116,6 +121,7 @@ from mlflow.protos.service_pb2 import (
     TraceTag,
     UpdateAssessment,
     UpdateExperiment,
+    UpdateIssue,
     UpdateRun,
     UpsertDatasetRecords,
 )
@@ -1831,3 +1837,120 @@ class RestStore(RestGatewayStoreMixin, AbstractStore):
             MlflowException: If spans belong to different traces or the OTel API call fails.
         """
         return self.log_spans(location, spans)
+
+    # ========== Issue Methods ==========
+
+    def create_issue(self, issue: IssueEntity) -> IssueEntity:
+        """
+        Create a new issue for an experiment.
+
+        Args:
+            issue: The IssueEntity to create.
+
+        Returns:
+            The created IssueEntity with populated issue_id and timestamps.
+        """
+        req_body = message_to_json(
+            CreateIssue(
+                experiment_id=issue.experiment_id,
+                name=issue.name,
+                description=issue.description,
+                state=IssueState.to_proto(issue.state) if issue.state else None,
+                tags=issue.tags or {},
+            )
+        )
+        response_proto = self._call_endpoint(CreateIssue, req_body)
+        return IssueEntity.from_proto(response_proto.issue)
+
+    def get_issue(self, issue_id: str) -> IssueEntity:
+        """
+        Get an issue by ID.
+
+        Args:
+            issue_id: The unique identifier of the issue.
+
+        Returns:
+            The IssueEntity.
+        """
+        req_body = message_to_json(GetIssue(issue_id=issue_id))
+        response_proto = self._call_endpoint(GetIssue, req_body)
+        return IssueEntity.from_proto(response_proto.issue)
+
+    def update_issue(
+        self,
+        issue_id: str,
+        name: str | None = None,
+        description: str | None = None,
+        state: str | None = None,
+        tags: dict[str, str] | None = None,
+    ) -> IssueEntity:
+        """
+        Update an existing issue.
+
+        Args:
+            issue_id: The unique identifier of the issue.
+            name: Updated name (optional).
+            description: Updated description (optional).
+            state: Updated state (optional).
+            tags: Tags to merge with existing tags (optional).
+
+        Returns:
+            The updated IssueEntity.
+        """
+        update_request = UpdateIssue(issue_id=issue_id)
+        if name is not None:
+            update_request.name = name
+        if description is not None:
+            update_request.description = description
+        if state is not None:
+            update_request.state = IssueState.to_proto(state)
+        if tags is not None:
+            update_request.tags.update(tags)
+
+        req_body = message_to_json(update_request)
+        response_proto = self._call_endpoint(UpdateIssue, req_body)
+        return IssueEntity.from_proto(response_proto.issue)
+
+    def delete_issue(self, issue_id: str) -> None:
+        """
+        Delete an issue by ID.
+
+        Args:
+            issue_id: The unique identifier of the issue.
+        """
+        req_body = message_to_json(DeleteIssue(issue_id=issue_id))
+        self._call_endpoint(DeleteIssue, req_body)
+
+    def search_issues(
+        self,
+        experiment_id: str,
+        states: list[str] | None = None,
+        max_results: int = 100,
+        page_token: str | None = None,
+    ) -> PagedList[IssueEntity]:
+        """
+        Search issues for an experiment.
+
+        Args:
+            experiment_id: The experiment ID to search issues in.
+            states: Filter by states (optional, returns all states if empty).
+            max_results: Maximum number of issues to return (default 100).
+            page_token: Pagination token for fetching next page.
+
+        Returns:
+            PagedList of IssueEntity objects.
+        """
+        proto_states = (
+            [IssueState.to_proto(s) for s in states] if states else []
+        )
+        req_body = message_to_json(
+            SearchIssues(
+                experiment_id=experiment_id,
+                states=proto_states,
+                max_results=max_results,
+                page_token=page_token,
+            )
+        )
+        response_proto = self._call_endpoint(SearchIssues, req_body)
+        issues = [IssueEntity.from_proto(i) for i in response_proto.issues]
+        return PagedList(issues, response_proto.next_page_token or None)
