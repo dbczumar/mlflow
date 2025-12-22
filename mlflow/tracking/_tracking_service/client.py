@@ -29,6 +29,7 @@ from mlflow.entities import (
 if TYPE_CHECKING:
     from mlflow.entities import EvaluationDataset
 from mlflow.entities.dataset_input import DatasetInput
+from mlflow.entities.issue import IssueEntity
 from mlflow.environment_variables import MLFLOW_SUPPRESS_PRINTING_URL_TO_STDOUT
 from mlflow.exceptions import MlflowException
 from mlflow.protos.databricks_pb2 import (
@@ -1119,3 +1120,93 @@ class TrackingServiceClient:
             raise MlflowException.invalid_parameter_value("run_id cannot be empty")
 
         return self.store.unlink_traces_from_run(trace_ids, run_id)
+
+    # ========== Issue Methods ==========
+
+    def create_issue(self, issue: IssueEntity) -> IssueEntity:
+        """
+        Create a new issue for an experiment.
+
+        Args:
+            issue: The IssueEntity to create.
+
+        Returns:
+            The created IssueEntity with populated issue_id and timestamps.
+        """
+        return self.store.create_issue(issue)
+
+    def get_issue(self, issue_id: str) -> IssueEntity:
+        """
+        Get an issue by ID.
+
+        Args:
+            issue_id: The unique identifier of the issue.
+
+        Returns:
+            The IssueEntity.
+        """
+        return self.store.get_issue(issue_id)
+
+    def update_issue(
+        self,
+        issue_id: str,
+        name: str | None = None,
+        description: str | None = None,
+        state: str | None = None,
+        tags: dict[str, str] | None = None,
+    ) -> IssueEntity:
+        """
+        Update an existing issue.
+
+        Args:
+            issue_id: The unique identifier of the issue.
+            name: Updated name (optional).
+            description: Updated description (optional).
+            state: Updated state (optional).
+            tags: Tags to merge with existing tags (optional).
+
+        Returns:
+            The updated IssueEntity.
+        """
+        return self.store.update_issue(
+            issue_id=issue_id,
+            name=name,
+            description=description,
+            state=state,
+            tags=tags,
+        )
+
+    def delete_issue(self, issue_id: str) -> None:
+        """
+        Delete an issue by ID.
+
+        Args:
+            issue_id: The unique identifier of the issue.
+        """
+        self.store.delete_issue(issue_id)
+
+    def search_issues(
+        self,
+        experiment_id: str,
+        states: list[str] | None = None,
+        max_results: int = 100,
+        page_token: str | None = None,
+    ) -> PagedList[IssueEntity]:
+        """
+        Search issues for an experiment.
+
+        Args:
+            experiment_id: The experiment ID to search issues in.
+            states: Filter by states (optional, returns all states if empty).
+            max_results: Maximum number of issues to return (default 100).
+            page_token: Pagination token for fetching next page.
+
+        Returns:
+            PagedList of IssueEntity objects.
+        """
+        return self.store.search_issues(
+            experiment_id=experiment_id,
+            states=states,
+            max_results=max_results,
+            page_token=page_token,
+        )

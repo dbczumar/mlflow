@@ -44,6 +44,7 @@ from mlflow.entities import (
     Trace,
     ViewType,
 )
+from mlflow.entities.issue import IssueEntity
 from mlflow.entities.model_registry import ModelVersion, Prompt, PromptVersion, RegisteredModel
 from mlflow.entities.model_registry.model_version_stages import ALL_STAGES
 from mlflow.entities.model_registry.prompt_version import PromptModelConfig
@@ -6557,3 +6558,175 @@ class MlflowClient:
             WebhookTestResult indicating success/failure and response details.
         """
         return self._get_registry_client().test_webhook(webhook_id, event)
+
+    # ========== Issue Methods ==========
+
+    def create_issue(
+        self,
+        experiment_id: str,
+        name: str,
+        description: str | None = None,
+        state: str | None = None,
+        tags: dict[str, str] | None = None,
+    ) -> IssueEntity:
+        """
+        Create a new issue for an experiment.
+
+        Args:
+            experiment_id: The experiment ID to create the issue in.
+            name: Name/title of the issue.
+            description: Detailed description of the issue.
+            state: Initial state (defaults to "draft" if not specified).
+                Valid values: "draft", "open", "closed".
+            tags: Additional metadata tags as key-value pairs.
+
+        Returns:
+            The created IssueEntity with populated issue_id and timestamps.
+
+        Example:
+            .. code-block:: python
+
+                from mlflow import MlflowClient
+
+                client = MlflowClient()
+                issue = client.create_issue(
+                    experiment_id="1",
+                    name="Model accuracy degradation",
+                    description="Observed 10% drop in accuracy on recent traces",
+                    state="open",
+                    tags={"priority": "high"},
+                )
+                print(f"Created issue: {issue.issue_id}")
+        """
+        from mlflow.entities.issue import IssueState
+
+        issue = IssueEntity(
+            issue_id="",  # Will be assigned by the server
+            experiment_id=experiment_id,
+            name=name,
+            description=description,
+            state=state or IssueState.DRAFT,
+            tags=tags,
+        )
+        return self._tracking_client.create_issue(issue)
+
+    def get_issue(self, issue_id: str) -> IssueEntity:
+        """
+        Get an issue by ID.
+
+        Args:
+            issue_id: The unique identifier of the issue.
+
+        Returns:
+            The IssueEntity.
+
+        Example:
+            .. code-block:: python
+
+                from mlflow import MlflowClient
+
+                client = MlflowClient()
+                issue = client.get_issue("issue-uuid-here")
+                print(f"Issue: {issue.name} - State: {issue.state}")
+        """
+        return self._tracking_client.get_issue(issue_id)
+
+    def update_issue(
+        self,
+        issue_id: str,
+        name: str | None = None,
+        description: str | None = None,
+        state: str | None = None,
+        tags: dict[str, str] | None = None,
+    ) -> IssueEntity:
+        """
+        Update an existing issue.
+
+        Args:
+            issue_id: The unique identifier of the issue.
+            name: Updated name (optional).
+            description: Updated description (optional).
+            state: Updated state (optional). Valid values: "draft", "open", "closed".
+            tags: Tags to merge with existing tags (optional).
+
+        Returns:
+            The updated IssueEntity.
+
+        Example:
+            .. code-block:: python
+
+                from mlflow import MlflowClient
+
+                client = MlflowClient()
+                issue = client.update_issue(
+                    issue_id="issue-uuid-here",
+                    state="closed",
+                    tags={"resolution": "fixed"},
+                )
+                print(f"Updated issue state: {issue.state}")
+        """
+        return self._tracking_client.update_issue(
+            issue_id=issue_id,
+            name=name,
+            description=description,
+            state=state,
+            tags=tags,
+        )
+
+    def delete_issue(self, issue_id: str) -> None:
+        """
+        Delete an issue by ID.
+
+        Args:
+            issue_id: The unique identifier of the issue.
+
+        Example:
+            .. code-block:: python
+
+                from mlflow import MlflowClient
+
+                client = MlflowClient()
+                client.delete_issue("issue-uuid-here")
+        """
+        self._tracking_client.delete_issue(issue_id)
+
+    def search_issues(
+        self,
+        experiment_id: str,
+        states: list[str] | None = None,
+        max_results: int = 100,
+        page_token: str | None = None,
+    ) -> PagedList[IssueEntity]:
+        """
+        Search issues for an experiment.
+
+        Args:
+            experiment_id: The experiment ID to search issues in.
+            states: Filter by states (optional, returns all states if empty).
+                Valid values: "draft", "open", "closed".
+            max_results: Maximum number of issues to return (default 100).
+            page_token: Pagination token for fetching next page.
+
+        Returns:
+            PagedList of IssueEntity objects.
+
+        Example:
+            .. code-block:: python
+
+                from mlflow import MlflowClient
+
+                client = MlflowClient()
+                # Get all open issues
+                issues = client.search_issues(
+                    experiment_id="1",
+                    states=["open"],
+                )
+                for issue in issues:
+                    print(f"Issue: {issue.name}")
+        """
+        return self._tracking_client.search_issues(
+            experiment_id=experiment_id,
+            states=states,
+            max_results=max_results,
+            page_token=page_token,
+        )
