@@ -30,10 +30,11 @@ export interface IssuesSectionProps {
 export const IssuesSection = ({ traceId, experimentId, assessments, activeSpanId, onClose }: IssuesSectionProps) => {
   const { theme } = useDesignSystemTheme();
 
-  // Filter to only valid issue assessments
+  // Filter to only valid issue assessments with value=true
   const issueAssessments = useMemo(() => {
     return assessments.filter(
-      (assessment): assessment is IssueAssessment => isIssueAssessment(assessment) && assessment.valid !== false,
+      (assessment): assessment is IssueAssessment =>
+        isIssueAssessment(assessment) && assessment.valid !== false && assessment.issue?.value !== false,
     );
   }, [assessments]);
 

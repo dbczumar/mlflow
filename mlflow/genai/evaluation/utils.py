@@ -4,7 +4,7 @@ import math
 from typing import TYPE_CHECKING, Any, Collection
 
 from mlflow.entities import Assessment, Trace, TraceData
-from mlflow.entities.assessment import DEFAULT_FEEDBACK_NAME, Feedback
+from mlflow.entities.assessment import DEFAULT_FEEDBACK_NAME, Feedback, Issue
 from mlflow.entities.assessment_source import AssessmentSource, AssessmentSourceType
 from mlflow.entities.evaluation_dataset import EvaluationDataset as EntityEvaluationDataset
 from mlflow.exceptions import MlflowException
@@ -328,16 +328,17 @@ def _convert_scorer_to_legacy_metric(scorer: Scorer) -> EvaluationMetric:
     return metric_instance
 
 
-def standardize_scorer_value(scorer_name: str, value: Any) -> list[Feedback]:
+def standardize_scorer_value(scorer_name: str, value: Any) -> list[Feedback | Issue]:
     """
-    Convert the scorer return value to a list of MLflow Assessment (Feedback) objects.
+    Convert the scorer return value to a list of MLflow Assessment objects.
 
     Scorer can return:
     - A number, boolean, or string, a list of them.
-    - An Feedback object
+    - A Feedback object
+    - An Issue object
     - A list of Feedback objects
 
-    All of the above will be converted to a list of Feedback objects.
+    All of the above will be converted to a list of Assessment objects.
     """
     # None is a valid metric value, return an empty list
     if value is None:
@@ -355,6 +356,9 @@ def standardize_scorer_value(scorer_name: str, value: Any) -> list[Feedback]:
 
     if isinstance(value, Feedback):
         value.name = _get_custom_assessment_name(value, scorer_name)
+        return [value]
+
+    if isinstance(value, Issue):
         return [value]
 
     if isinstance(value, Collection):
@@ -379,7 +383,7 @@ def standardize_scorer_value(scorer_name: str, value: Any) -> list[Feedback]:
     raise MlflowException.invalid_parameter_value(
         f"Got unsupported result from scorer '{scorer_name}'. "
         f"Expected the metric value to be a number, or a boolean, or a string, "
-        "or an Feedback, or a list of Feedbacks. "
+        "or a Feedback, or an Issue, or a list of Feedbacks/Issues. "
         f"Got {value}.",
     )
 

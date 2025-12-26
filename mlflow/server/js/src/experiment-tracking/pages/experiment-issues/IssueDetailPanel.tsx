@@ -6,6 +6,7 @@ import {
   Tabs,
   Empty,
   DropdownMenu,
+  Tooltip,
   PencilIcon,
   ShareIcon,
   CopyIcon,
@@ -23,7 +24,6 @@ interface IssueDetailPanelProps {
   issue: Issue | null;
   experimentId: string;
   onIssueUpdated: () => void;
-  issueNumber?: number;
 }
 
 const useStateConfig = () => {
@@ -111,14 +111,53 @@ const StateSelector = ({
   );
 };
 
+const IssueIdPill = ({ issueId }: { issueId: string }) => {
+  const { theme } = useDesignSystemTheme();
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(issueId);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <Tooltip
+      componentId="mlflow.issues.id-pill-tooltip"
+      content={copied ? 'Copied!' : `Click to copy: ${issueId}`}
+    >
+      <button
+        onClick={handleCopy}
+        css={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: theme.spacing.xs,
+          padding: `2px ${theme.spacing.sm}px`,
+          borderRadius: theme.borders.borderRadiusMd,
+          backgroundColor: theme.colors.tagDefault,
+          color: theme.colors.textSecondary,
+          fontSize: theme.typography.fontSizeSm,
+          fontFamily: 'monospace',
+          border: 'none',
+          cursor: 'pointer',
+          '&:hover': {
+            backgroundColor: theme.colors.tagHover,
+          },
+        }}
+      >
+        {copied ? <CheckIcon css={{ width: 12, height: 12 }} /> : <CopyIcon css={{ width: 12, height: 12 }} />}
+        {issueId.slice(0, 8)}
+      </button>
+    </Tooltip>
+  );
+};
+
 const DetailHeader = ({
   issue,
-  issueNumber,
   experimentId,
   onIssueUpdated,
 }: {
   issue: Issue;
-  issueNumber: number;
   experimentId: string;
   onIssueUpdated: () => void;
 }) => {
@@ -134,12 +173,11 @@ const DetailHeader = ({
       }}
     >
       <div css={{ display: 'flex', alignItems: 'center', gap: theme.spacing.sm }}>
-        <Typography.Text color="secondary">Issue #{issueNumber}</Typography.Text>
+        <IssueIdPill issueId={issue.issue_id} />
         <StateSelector issue={issue} experimentId={experimentId} onIssueUpdated={onIssueUpdated} />
       </div>
       <div css={{ display: 'flex', alignItems: 'center', gap: theme.spacing.xs }}>
         <Button componentId="mlflow.issues.share-button" icon={<ShareIcon />} type="tertiary" aria-label="Share" />
-        <Button componentId="mlflow.issues.copy-button" icon={<CopyIcon />} type="tertiary" aria-label="Copy" />
         <Button
           componentId="mlflow.issues.more-button"
           icon={<OverflowIcon />}
@@ -397,7 +435,7 @@ const CommentsTabContent = () => {
   );
 };
 
-export const IssueDetailPanel = ({ issue, experimentId, onIssueUpdated, issueNumber }: IssueDetailPanelProps) => {
+export const IssueDetailPanel = ({ issue, experimentId, onIssueUpdated }: IssueDetailPanelProps) => {
   const { theme } = useDesignSystemTheme();
   const [activeTab, setActiveTab] = useState<IssueDetailTab>('traces');
 
@@ -435,12 +473,7 @@ export const IssueDetailPanel = ({ issue, experimentId, onIssueUpdated, issueNum
         overflow: 'auto',
       }}
     >
-      <DetailHeader
-        issue={issue}
-        issueNumber={issueNumber || 1}
-        experimentId={experimentId}
-        onIssueUpdated={onIssueUpdated}
-      />
+      <DetailHeader issue={issue} experimentId={experimentId} onIssueUpdated={onIssueUpdated} />
       <DetailTitle issue={issue} experimentId={experimentId} onIssueUpdated={onIssueUpdated} />
       <DetailDescription issue={issue} experimentId={experimentId} onIssueUpdated={onIssueUpdated} />
 

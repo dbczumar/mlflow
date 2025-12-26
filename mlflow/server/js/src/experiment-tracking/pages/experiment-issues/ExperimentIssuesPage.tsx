@@ -129,12 +129,7 @@ const ExperimentIssuesPageContent = ({ experimentId }: { experimentId: string })
         onSearchChange={setSearchQuery}
         isLoading={isLoading}
       />
-      <IssueDetailPanel
-        issue={selectedIssue}
-        experimentId={experimentId}
-        onIssueUpdated={refetch}
-        issueNumber={selectedIssue ? allIssues.findIndex((i) => i.issue_id === selectedIssue.issue_id) + 1 : undefined}
-      />
+      <IssueDetailPanel issue={selectedIssue} experimentId={experimentId} onIssueUpdated={refetch} />
     </div>
   );
 };

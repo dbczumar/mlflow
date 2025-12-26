@@ -65,7 +65,8 @@ const getIssueAssessments = (traceInfo?: ModelTraceInfoV3): IssueAssessment[] =>
     return [];
   }
   return traceInfo.assessments.filter(
-    (assessment): assessment is IssueAssessment => isIssueAssessment(assessment) && assessment.valid !== false,
+    (assessment): assessment is IssueAssessment =>
+      isIssueAssessment(assessment) && assessment.valid !== false && assessment.issue?.value !== false,
   );
 };
 
