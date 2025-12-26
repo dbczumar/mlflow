@@ -2197,6 +2197,17 @@ class SearchIssues(_message.Message):
     page_token: str
     def __init__(self, experiment_id: _Optional[str] = ..., states: _Optional[_Iterable[_Union[IssueState, str]]] = ..., max_results: _Optional[int] = ..., page_token: _Optional[str] = ...) -> None: ...
 
+class CreateJudgeFromIssue(_message.Message):
+    __slots__ = ("issue_id",)
+    class Response(_message.Message):
+        __slots__ = ("scorer",)
+        SCORER_FIELD_NUMBER: _ClassVar[int]
+        scorer: Scorer
+        def __init__(self, scorer: _Optional[_Union[Scorer, _Mapping]] = ...) -> None: ...
+    ISSUE_ID_FIELD_NUMBER: _ClassVar[int]
+    issue_id: str
+    def __init__(self, issue_id: _Optional[str] = ...) -> None: ...
+
 class MlflowService(_service.service): ...
 
 class MlflowService_Stub(MlflowService): ...

@@ -2082,6 +2082,24 @@ service MlflowService {
       rpc_doc_title: "Search Issues"
     };
   }
+
+  // Create an LLM judge from an issue for detecting that issue in traces
+  rpc createJudgeFromIssue(CreateJudgeFromIssue) returns (CreateJudgeFromIssue.Response) {
+    option (rpc) = {
+      endpoints: [
+        {
+          method: "POST"
+          path: "/mlflow/issues/create-judge"
+          since: {
+            major: 3
+            minor: 0
+          }
+        }
+      ]
+      visibility: PUBLIC
+      rpc_doc_title: "Create Judge From Issue"
+    };
+  }
 }
 
 // View type for ListExperiments query.
@@ -4662,5 +4680,17 @@ message SearchIssues {
 
     // Token for fetching next page (empty if no more results)
     optional string next_page_token = 2;
+  }
+}
+
+message CreateJudgeFromIssue {
+  option (scalapb.message).extends = "com.databricks.rpc.RPC[$this.Response]";
+
+  // ID of the issue to create a judge for
+  optional string issue_id = 1 [(validate_required) = true];
+
+  message Response {
+    // The registered scorer information
+    optional Scorer scorer = 1;
   }
 }

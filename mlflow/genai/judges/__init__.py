@@ -12,15 +12,19 @@ from mlflow.genai.judges.builtin import (
     meets_guidelines,
 )
 from mlflow.genai.judges.custom_prompt_judge import custom_prompt_judge
+from mlflow.genai.judges.issue_judge import IssueJudge, make_judge_from_issue
 from mlflow.genai.judges.make_judge import make_judge
 from mlflow.genai.judges.utils import CategoricalRating
 
 __all__ = [
     # Core Judge class
     "Judge",
-    # Judge factory
+    # Judge factories
     "make_judge",
+    "make_judge_from_issue",
     "AlignmentOptimizer",
+    # Issue Judge
+    "IssueJudge",
     # Existing builtin judges
     "CategoricalRating",
     "is_grounded",

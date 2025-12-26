@@ -86,7 +86,7 @@ def invoke_llm_agent(
                 return message.content
 
             messages.append(message)
-            tool_response_messages = _process_tool_calls(tool_calls=message.tool_calls, trace=None)
+            tool_response_messages = _process_tool_calls(tool_calls=message.tool_calls, trace_id=None)
             messages.extend(tool_response_messages)
 
         except MlflowException:

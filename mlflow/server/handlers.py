@@ -111,6 +111,7 @@ from mlflow.protos.service_pb2 import (
     CreateExperiment,
     CreateGatewayEndpoint,
     CreateIssue,
+    CreateJudgeFromIssue,
     CreateGatewayEndpointBinding,
     CreateGatewayModelDefinition,
     CreateGatewaySecret,
@@ -182,6 +183,7 @@ from mlflow.protos.service_pb2 import (
     SearchDatasets,
     SearchEvaluationDatasets,
     SearchExperiments,
+    Scorer,
     SearchIssues,
     SearchLoggedModels,
     SearchRuns,
@@ -3997,6 +3999,41 @@ def _search_issues():
     return _wrap_response(response_message)
 
 
+@catch_mlflow_exception
+@_disable_if_artifacts_only
+def _create_judge_from_issue():
+    request_message = _get_request_message(
+        CreateJudgeFromIssue(),
+        schema={
+            "issue_id": [_assert_required, _assert_string],
+        },
+    )
+
+    from mlflow.genai.judges.issue_judge import make_judge_from_issue
+    from mlflow.genai.scorers.registry import _get_scorer_store
+
+    # Create the issue judge
+    judge = make_judge_from_issue(issue_id=request_message.issue_id)
+
+    # Get the issue to find the experiment_id
+    issue = _get_tracking_store().get_issue(request_message.issue_id)
+
+    # Register the judge as a scorer
+    store = _get_scorer_store()
+    version = store.register_scorer(issue.experiment_id, judge)
+
+    # Build the response with the registered scorer info
+    response_message = CreateJudgeFromIssue.Response()
+    scorer_proto = Scorer()
+    scorer_proto.experiment_id = int(issue.experiment_id)
+    scorer_proto.scorer_name = judge.name
+    scorer_proto.scorer_version = version if version else 1
+    scorer_proto.serialized_scorer = json.dumps(judge.model_dump())
+    scorer_proto.creation_time = int(time.time() * 1000)
+    response_message.scorer.CopyFrom(scorer_proto)
+    return _wrap_response(response_message)
+
+
 # =============================================================================
 # Secrets Management Handlers
 # =============================================================================
@@ -5062,4 +5099,5 @@ HANDLERS = {
     UpdateIssue: _update_issue,
     DeleteIssue: _delete_issue,
     SearchIssues: _search_issues,
+    CreateJudgeFromIssue: _create_judge_from_issue,
 }

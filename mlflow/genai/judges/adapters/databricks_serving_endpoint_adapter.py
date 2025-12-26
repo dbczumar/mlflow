@@ -369,7 +369,7 @@ class DatabricksServingEndpointAdapter(BaseJudgeAdapter):
             # Set trace_id if trace was provided
             feedback = output.feedback
             if input_params.trace is not None:
-                feedback.trace_id = input_params.trace.info.trace_id
+                feedback.trace_id = input_params.trace_id
 
             try:
                 provider = "databricks" if model_provider == "endpoints" else model_provider

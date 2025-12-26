@@ -276,11 +276,50 @@ class Scorer(BaseModel):
         elif serialized.call_source and serialized.call_signature and serialized.original_func_name:
             return cls._reconstruct_decorator_scorer(serialized)
 
-        # Handle InstructionsJudge scorers
+        # Handle InstructionsJudge and IssueJudge scorers
         elif serialized.instructions_judge_pydantic_data is not None:
-            from mlflow.genai.judges.instructions_judge import InstructionsJudge
-
             data = serialized.instructions_judge_pydantic_data
+
+            # Check if this is an IssueJudge
+            if data.get("is_issue_judge"):
+                from mlflow.genai.judges.issue_judge import IssueJudge
+
+                issue_field_specs = {
+                    "issue_id": str,
+                    "issue_name": str,
+                    "system_prompt": str,
+                }
+
+                errors = []
+                for field, expected_type in issue_field_specs.items():
+                    if field not in data:
+                        errors.append(f"missing required field '{field}'")
+                    elif not isinstance(data[field], expected_type):
+                        actual_type = type(data[field]).__name__
+                        errors.append(
+                            f"field '{field}' must be {expected_type.__name__}, got {actual_type}"
+                        )
+
+                if errors:
+                    raise MlflowException.invalid_parameter_value(
+                        f"Failed to deserialize IssueJudge scorer '{serialized.name}': "
+                        f"{'; '.join(errors)}"
+                    )
+
+                try:
+                    return IssueJudge(
+                        issue_id=data["issue_id"],
+                        issue_name=data["issue_name"],
+                        system_prompt=data["system_prompt"],
+                        model=data.get("model"),
+                    )
+                except Exception as e:
+                    raise MlflowException.invalid_parameter_value(
+                        f"Failed to create IssueJudge scorer '{serialized.name}': {e}"
+                    )
+
+            # Handle regular InstructionsJudge
+            from mlflow.genai.judges.instructions_judge import InstructionsJudge
 
             field_specs = {
                 "instructions": str,

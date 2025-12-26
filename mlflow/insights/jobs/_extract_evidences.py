@@ -51,7 +51,7 @@ def extract_trace_evidences(
             provider=provider,
             model_name=model_name,
             messages=messages,
-            trace=trace,
+            trace_id=trace.info.trace_id,
             num_retries=3,
             response_format=Response,
         )

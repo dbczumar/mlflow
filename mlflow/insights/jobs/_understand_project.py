@@ -59,7 +59,7 @@ def _understand_project(
         model_name=model_name,
         messages=messages,
         response_format=ProjectSummary,
-        trace=mlflow.get_trace(trace_ids[0]),  # TODO: We should sample multiple traces
+        trace_id=trace_ids[0],  # TODO: We should sample multiple traces
         num_retries=1,
     )
     return ProjectSummary.model_validate_json(response)

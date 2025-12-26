@@ -124,7 +124,7 @@ def call_chat_completions(
 def _parse_databricks_judge_response(
     llm_output: str | None,
     assessment_name: str,
-    trace: "Trace | None" = None,
+    trace_id: str | None = None,
 ) -> Feedback:
     """
     Parse the response from Databricks judge into a Feedback object.
@@ -132,7 +132,7 @@ def _parse_databricks_judge_response(
     Args:
         llm_output: Raw output from the LLM, or None if no response.
         assessment_name: Name of the assessment.
-        trace: Optional trace object to associate with the feedback.
+        trace_id: Optional trace ID to associate with the feedback.
 
     Returns:
         Feedback object with parsed results or error.
@@ -140,7 +140,6 @@ def _parse_databricks_judge_response(
     source = AssessmentSource(
         source_type=AssessmentSourceType.LLM_JUDGE, source_id=_DATABRICKS_DEFAULT_JUDGE_MODEL
     )
-    trace_id = trace.info.trace_id if trace else None
 
     if not llm_output:
         return Feedback(
@@ -270,19 +269,19 @@ def _serialize_messages_to_databricks_prompts(
 def _invoke_databricks_default_judge(
     prompt: str | list["ChatMessage"],
     assessment_name: str,
-    trace: "Trace | None" = None,
+    trace_id: str | None = None,
     use_case: str | None = None,
 ) -> Feedback:
     """
     Invoke the Databricks default judge with agentic tool calling support.
 
-    When a trace is provided, enables an agentic loop where the judge can iteratively
+    When a trace ID is provided, enables an agentic loop where the judge can iteratively
     call tools to analyze the trace data before producing a final assessment.
 
     Args:
         prompt: The formatted prompt with template variables filled in.
         assessment_name: The name of the assessment.
-        trace: Optional trace object for tool-based analysis.
+        trace_id: Optional trace ID for tool-based analysis.
         use_case: The use case for the chat completion. Only used if supported by the
             installed databricks-agents version.
 
@@ -301,10 +300,10 @@ def _invoke_databricks_default_judge(
         else:
             messages = [litellm.Message(role=msg.role, content=msg.content) for msg in prompt]
 
-        # Enable tool calling if trace is provided
+        # Enable tool calling if trace_id is provided
         tools = None
         model = None
-        if trace is not None:
+        if trace_id is not None:
             from mlflow.genai.judges.tools import list_judge_tools
 
             tools = [tool.get_definition() for tool in list_judge_tools()]
@@ -345,7 +344,7 @@ def _invoke_databricks_default_judge(
                             source_type=AssessmentSourceType.LLM_JUDGE,
                             source_id=_DATABRICKS_DEFAULT_JUDGE_MODEL,
                         ),
-                        trace_id=trace.info.trace_id if trace else None,
+                        trace_id=trace_id,
                     )
 
                 parsed_json = (
@@ -363,19 +362,16 @@ def _invoke_databricks_default_judge(
                             source_type=AssessmentSourceType.LLM_JUDGE,
                             source_id=_DATABRICKS_DEFAULT_JUDGE_MODEL,
                         ),
-                        trace_id=trace.info.trace_id if trace else None,
+                        trace_id=trace_id,
                     )
 
                 # No tool calls means final answer - parse and return
                 if not message.tool_calls:
-                    return _parse_databricks_judge_response(message.content, assessment_name, trace)
+                    return _parse_databricks_judge_response(message.content, assessment_name, trace_id)
 
                 # Append assistant message and process tool calls (same pattern as litellm)
                 messages.append(message)
-                tool_response_messages = _process_tool_calls(
-                    tool_calls=message.tool_calls,
-                    trace=trace,
-                )
+                tool_response_messages = _process_tool_calls(tool_calls=message.tool_calls)
                 messages.extend(tool_response_messages)
 
             except Exception as e:
@@ -393,7 +389,7 @@ def _invoke_databricks_default_judge(
                 source_type=AssessmentSourceType.LLM_JUDGE,
                 source_id=_DATABRICKS_DEFAULT_JUDGE_MODEL,
             ),
-            trace_id=trace.info.trace_id if trace else None,
+            trace_id=trace_id,
         )
 
 
@@ -412,7 +408,7 @@ class DatabricksManagedJudgeAdapter(BaseJudgeAdapter):
         feedback = _invoke_databricks_default_judge(
             prompt=input_params.prompt,
             assessment_name=input_params.assessment_name,
-            trace=input_params.trace,
+            trace_id=input_params.trace_id,
             use_case=input_params.use_case,
         )
         return AdapterInvocationOutput(feedback=feedback)
