@@ -138,8 +138,15 @@ export const getColumnConfig = (
     onTraceTagsEdit?: (trace: ModelTraceInfoV3) => void;
   },
 ): ColumnDef<EvalTraceComparisonEntry> => {
+  // Render header with gray text for empty state columns
+  const headerContent = col.isEmptyState ? (
+    <span style={{ color: theme.colors.textSecondary, fontWeight: 'normal' }}>{col.label}</span>
+  ) : (
+    col.label
+  );
+
   const baseColConfig: ColumnDef<EvalTraceComparisonEntry> = {
-    header: col.label,
+    header: () => headerContent,
     id: col.id,
     accessorFn: (originalRow) => originalRow,
   };

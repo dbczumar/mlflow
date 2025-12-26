@@ -17,7 +17,14 @@ import { GenAiTracesTableHeader } from './GenAiTracesTableHeader';
 import { HeaderCellRenderer } from './cellRenderers/HeaderCellRenderer';
 import { GenAiEvaluationTracesReviewModal } from './components/GenAiEvaluationTracesReviewModal';
 import type { GetTraceFunction } from './hooks/useGetTrace';
-import { REQUEST_TIME_COLUMN_ID, SESSION_COLUMN_ID, SERVER_SORTABLE_INFO_COLUMNS } from './hooks/useTableColumns';
+import {
+  REQUEST_TIME_COLUMN_ID,
+  SESSION_COLUMN_ID,
+  SERVER_SORTABLE_INFO_COLUMNS,
+  ISSUES_COLUMN_ID,
+  getUniqueIssueNames,
+  generateIssueColumns,
+} from './hooks/useTableColumns';
 import {
   type EvaluationsOverviewTableSort,
   TracesTableColumnType,
@@ -62,6 +69,7 @@ export const GenAiTracesTableBody = React.memo(
     enableGrouping = false,
     allColumns,
     displayLoadingOverlay,
+    defaultIssuesExpanded = false,
   }: {
     experimentId: string;
     selectedColumns: TracesTableColumn[];
@@ -96,19 +104,72 @@ export const GenAiTracesTableBody = React.memo(
     enableGrouping?: boolean;
     allColumns: TracesTableColumn[];
     displayLoadingOverlay?: boolean;
+    /** Whether to show issues in expanded view by default */
+    defaultIssuesExpanded?: boolean;
   }) => {
     const intl = useIntl();
     const { theme } = useDesignSystemTheme();
     const [collapsedHeader, setCollapsedHeader] = useState(false);
+    const [issuesExpanded, setIssuesExpanded] = useState(defaultIssuesExpanded);
 
     const isComparing = !isNil(compareToRunUuid);
 
     const evaluationInputs = selectedColumns.filter((col) => col.type === TracesTableColumnType.INPUT);
 
-    const { columns } = useMemo(() => {
+    // Get unique issue names from evaluations for expanded view
+    const uniqueIssueNames = useMemo(() => {
+      const allResults = evaluations.flatMap((e) => [e.currentRunValue, e.otherRunValue].filter(Boolean));
+      return getUniqueIssueNames(allResults as any[]);
+    }, [evaluations]);
+
+    // Generate issue columns for expanded view
+    const issueColumns = useMemo(() => generateIssueColumns(uniqueIssueNames), [uniqueIssueNames]);
+
+    // Toggle handler for issues expanded state
+    const onToggleIssuesExpanded = React.useCallback(() => {
+      setIssuesExpanded((prev) => !prev);
+    }, []);
+
+    const { columns, columnsToRender } = useMemo(() => {
+      // When issuesExpanded is true, we need to replace the ISSUES_COLUMN_ID with individual issue columns
+      // or add an ISSUE group with individual columns in grouped mode
+      const getColumnsForRendering = (): TracesTableColumn[] => {
+        // Replace the single Issues column with individual issue columns
+        const result: TracesTableColumn[] = [];
+        for (const col of selectedColumns) {
+          if (col.id === ISSUES_COLUMN_ID) {
+            if (!issuesExpanded) {
+              // In compact mode, hide the second row label (use empty string)
+              result.push({
+                ...col,
+                label: '',
+              });
+            } else if (issueColumns.length > 0) {
+              // Replace with individual issue columns
+              result.push(...issueColumns);
+            } else {
+              // Show "No Issues" column when no issues exist
+              result.push({
+                ...col,
+                label: intl.formatMessage({
+                  defaultMessage: 'No Issues',
+                  description: 'Column label shown when no issues are logged in expanded view',
+                }),
+                isEmptyState: true,
+              });
+            }
+          } else {
+            result.push(col);
+          }
+        }
+        return result;
+      };
+
+      const columnsToRender = getColumnsForRendering();
+
       if (!enableGrouping) {
         // Return flat columns without grouping
-        const columnsList = selectedColumns.map((col) =>
+        const columnsList = columnsToRender.map((col) =>
           getColumnConfig(col, {
             evaluationInputs,
             isComparing,
@@ -120,12 +181,12 @@ export const GenAiTracesTableBody = React.memo(
           }),
         );
 
-        return { columns: sortColumns(columnsList, selectedColumns) };
+        return { columns: sortColumns(columnsList, columnsToRender), columnsToRender };
       }
 
       // Create a map of group IDs to their column arrays
       const groupColumns = new Map<TracesTableColumnGroup, ColumnDef<EvalTraceComparisonEntry>[]>();
-      const sortedGroupedColumns = sortGroupedColumns(selectedColumns, isComparing);
+      const sortedGroupedColumns = sortGroupedColumns(columnsToRender, isComparing);
 
       sortedGroupedColumns.forEach((col) => {
         // Get the group for this column, defaulting to 'Info' if not specified
@@ -152,20 +213,36 @@ export const GenAiTracesTableBody = React.memo(
 
       // Convert the map to an array of column groups and sort columns within each group
       const topLevelColumns: ColumnDef<EvalTraceComparisonEntry>[] = Array.from(groupColumns.entries()).map(
-        ([groupId, columns]) => ({
-          header: HeaderCellRenderer,
-          meta: {
-            groupId,
-            visibleCount: columns.length,
-            totalCount: allColumns.filter((col) => col.group === groupId).length,
-            enableGrouping,
-          },
-          id: `${groupId}-group`,
-          columns,
-        }),
+        ([groupId, columns]) => {
+          // Calculate totalCount - for ISSUE group, always show the actual number of unique issues
+          let totalCount: number;
+          if (groupId === TracesTableColumnGroup.ISSUE) {
+            // Always show the actual number of unique issues
+            totalCount = uniqueIssueNames.length;
+          } else {
+            totalCount = allColumns.filter((col) => col.group === groupId).length;
+          }
+
+          return {
+            header: HeaderCellRenderer,
+            meta: {
+              groupId,
+              visibleCount: columns.length,
+              totalCount,
+              enableGrouping,
+              // Pass issues toggle state and handler for the ISSUE group
+              ...(groupId === TracesTableColumnGroup.ISSUE && {
+                issuesExpanded,
+                onToggleIssuesExpanded,
+              }),
+            },
+            id: `${groupId}-group`,
+            columns,
+          };
+        },
       );
 
-      return { columns: topLevelColumns };
+      return { columns: topLevelColumns, columnsToRender };
     }, [
       selectedColumns,
       evaluationInputs,
@@ -177,6 +254,10 @@ export const GenAiTracesTableBody = React.memo(
       onTraceTagsEdit,
       enableGrouping,
       allColumns,
+      issuesExpanded,
+      issueColumns,
+      onToggleIssuesExpanded,
+      uniqueIssueNames,
     ]);
 
     const { setTable, setSelectedRowIds } = React.useContext(GenAITracesTableContext);
@@ -364,7 +445,7 @@ export const GenAiTracesTableBody = React.memo(
               virtualizerTotalSize={rowVirtualizer.getTotalSize()}
               virtualizerMeasureElement={rowVirtualizer.measureElement}
               rowSelectionState={rowSelection}
-              selectedColumns={selectedColumns}
+              selectedColumns={columnsToRender}
             />
           </Table>
         </div>

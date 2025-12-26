@@ -56,6 +56,11 @@ interface GenAITracesTableBodyContainerProps {
    * Whether to display a loading overlay over the table
    */
   displayLoadingOverlay?: boolean;
+
+  /**
+   * Whether to show issues in expanded view by default
+   */
+  defaultIssuesExpanded?: boolean;
 }
 
 const GenAITracesTableBodyContainerImpl: React.FC<React.PropsWithChildren<GenAITracesTableBodyContainerProps>> =
@@ -79,6 +84,7 @@ const GenAITracesTableBodyContainerImpl: React.FC<React.PropsWithChildren<GenAIT
       getRunColor,
       enableRowSelection = true,
       displayLoadingOverlay = false,
+      defaultIssuesExpanded = false,
     } = props;
     const { theme } = useDesignSystemTheme();
 
@@ -245,6 +251,7 @@ const GenAITracesTableBodyContainerImpl: React.FC<React.PropsWithChildren<GenAIT
                 onTraceTagsEdit={onTraceTagsEdit}
                 enableGrouping={shouldEnableTagGrouping()}
                 displayLoadingOverlay={displayLoadingOverlay}
+                defaultIssuesExpanded={defaultIssuesExpanded}
               />
             </AssessmentSchemaContextProvider>
           </div>
