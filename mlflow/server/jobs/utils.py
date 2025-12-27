@@ -278,6 +278,7 @@ def _exec_job(
 class HueyInstance:
     instance: "huey.SqliteHuey"
     submit_task: Callable[..., Any]
+    submit_task_exclusive: Callable[..., Any]
 
 
 # Each job function has an individual execution pool, each execution pool

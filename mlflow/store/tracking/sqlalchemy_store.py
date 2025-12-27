@@ -46,6 +46,7 @@ from mlflow.entities import (
     ViewType,
     _DatasetSummary,
 )
+from mlflow.entities._scorer_online_config import ScorerOnlineConfig, ScorerOnlineConfigEntry
 from mlflow.entities.assessment import ExpectationValue, FeedbackValue
 from mlflow.entities.entity_type import EntityAssociationType
 from mlflow.entities.lifecycle_stage import LifecycleStage
@@ -114,6 +115,7 @@ from mlflow.store.tracking.dbmodels.models import (
     SqlParam,
     SqlRun,
     SqlScorer,
+    SqlScorerOnlineConfig,
     SqlScorerVersion,
     SqlSpan,
     SqlTag,
@@ -2414,6 +2416,133 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
                     creation_time=sv.creation_time,
                 )
                 for i, sv in enumerate(sql_scorer_versions)
+            ]
+
+    def get_active_scorer_online_configs(self) -> list[ScorerOnlineConfig]:
+        """
+        Get all active scorer online configs across all experiments.
+
+        Active configs are those with a sample_rate greater than zero.
+        This method returns all active configs with their associated scorer information,
+        including the experiment ID, scorer name, and the latest serialized scorer.
+
+        Returns:
+            List of ScorerOnlineConfig entities with full scorer information.
+        """
+        with self.ManagedSessionMaker() as session:
+            # Get all online configs with sample_rate > 0, with their associated scorer
+            # and latest scorer version. We need to join with scorer versions to get
+            # the serialized_scorer.
+            results = (
+                session.query(
+                    SqlScorerOnlineConfig,
+                    SqlScorer,
+                    SqlScorerVersion,
+                )
+                .filter(SqlScorerOnlineConfig.sample_rate > 0)
+                .join(SqlScorer, SqlScorerOnlineConfig.scorer_id == SqlScorer.scorer_id)
+                .join(SqlScorerVersion, SqlScorer.scorer_id == SqlScorerVersion.scorer_id)
+                .all()
+            )
+
+            if not results:
+                return []
+
+            # Group by config to find the latest version for each
+            config_to_latest: dict[
+                str, tuple[SqlScorerOnlineConfig, SqlScorer, SqlScorerVersion]
+            ] = {}
+            for config, scorer, version in results:
+                config_id = config.scorer_online_config_id
+                if config_id not in config_to_latest:
+                    config_to_latest[config_id] = (config, scorer, version)
+                else:
+                    _, _, existing_version = config_to_latest[config_id]
+                    if version.scorer_version > existing_version.scorer_version:
+                        config_to_latest[config_id] = (config, scorer, version)
+
+            # Convert to entities with full information
+            return [
+                ScorerOnlineConfig(
+                    scorer_online_config_id=config.scorer_online_config_id,
+                    scorer_id=config.scorer_id,
+                    sample_rate=config.sample_rate,
+                    filter_string=config.filter_string,
+                    experiment_id=str(scorer.experiment_id),
+                    scorer_name=scorer.scorer_name,
+                    serialized_scorer=version.serialized_scorer,
+                )
+                for config, scorer, version in config_to_latest.values()
+            ]
+
+    def update_scorer_online_config(
+        self, experiment_id: str, name: str, entries: list[ScorerOnlineConfigEntry]
+    ) -> list[ScorerOnlineConfig]:
+        """
+        Update online configuration for a scorer.
+
+        This method overwrites the existing online configs for the scorer with the new entries.
+
+        Args:
+            experiment_id: The experiment ID.
+            name: The scorer name.
+            entries: List of config entries, each with 'sample_rate' and optional 'filter_string'.
+
+        Returns:
+            List of ScorerOnlineConfig entities.
+
+        Raises:
+            MlflowException: If scorer is not found.
+        """
+        with self.ManagedSessionMaker() as session:
+            # Validate experiment exists and is active
+            experiment = self.get_experiment(experiment_id)
+            self._check_experiment_is_active(experiment)
+
+            # Get the scorer record
+            scorer = (
+                session.query(SqlScorer)
+                .filter(
+                    SqlScorer.experiment_id == experiment.experiment_id,
+                    SqlScorer.scorer_name == name,
+                )
+                .first()
+            )
+
+            if scorer is None:
+                raise MlflowException(
+                    f"Scorer with name '{name}' not found for experiment {experiment_id}.",
+                    RESOURCE_DOES_NOT_EXIST,
+                )
+
+            # Delete existing online configs for this scorer
+            session.query(SqlScorerOnlineConfig).filter(
+                SqlScorerOnlineConfig.scorer_id == scorer.scorer_id
+            ).delete()
+
+            # Create new online configs
+            new_configs = []
+            for entry in entries:
+                config = SqlScorerOnlineConfig(
+                    scorer_online_config_id=uuid.uuid4().hex,
+                    scorer_id=scorer.scorer_id,
+                    sample_rate=entry.get("sample_rate", 0.0),
+                    filter_string=entry.get("filter_string"),
+                )
+                session.add(config)
+                new_configs.append(config)
+
+            session.flush()
+
+            # Convert to entities
+            return [
+                ScorerOnlineConfig(
+                    scorer_online_config_id=config.scorer_online_config_id,
+                    scorer_id=config.scorer_id,
+                    sample_rate=config.sample_rate,
+                    filter_string=config.filter_string,
+                )
+                for config in new_configs
             ]
 
     def _apply_order_by_search_logged_models(

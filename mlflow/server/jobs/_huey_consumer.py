@@ -33,3 +33,8 @@ threading.Thread(
 ).start()
 
 huey_instance = _get_or_init_huey_instance(os.environ[MLFLOW_HUEY_INSTANCE_KEY]).instance
+
+# Register periodic tasks that run directly in the huey consumer process
+from mlflow.server.jobs._periodic_tasks import register_periodic_tasks
+
+register_periodic_tasks(huey_instance)

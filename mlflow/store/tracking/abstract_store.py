@@ -16,6 +16,7 @@ from mlflow.entities import (
     ScorerVersion,
     ViewType,
 )
+from mlflow.entities._scorer_online_config import ScorerOnlineConfig, ScorerOnlineConfigEntry
 from mlflow.entities.model_registry import PromptVersion
 from mlflow.entities.trace_metrics import (
     MetricAggregation,
@@ -1428,6 +1429,25 @@ class AbstractStore(GatewayStoreMixin):
             experiment_id: The experiment ID.
             name: The scorer name.
             version: The scorer version. If None, delete all versions.
+
+        Raises:
+            MlflowException: If scorer is not found.
+        """
+        raise NotImplementedError(self.__class__.__name__)
+
+    def update_scorer_online_config(
+        self, experiment_id: str, name: str, entries: list[ScorerOnlineConfigEntry]
+    ) -> list[ScorerOnlineConfig]:
+        """
+        Update online configuration for a scorer.
+
+        Args:
+            experiment_id: The experiment ID.
+            name: The scorer name.
+            entries: List of config entries, each with 'sample_rate' and optional 'filter_string'.
+
+        Returns:
+            List of ScorerOnlineConfig objects.
 
         Raises:
             MlflowException: If scorer is not found.

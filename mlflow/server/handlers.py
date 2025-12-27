@@ -3937,6 +3937,30 @@ def _delete_scorer():
     return response
 
 
+@catch_mlflow_exception
+@_disable_if_artifacts_only
+def _update_scorer_online_config():
+    request_json = _get_request_json()
+    experiment_id = request_json.get("experiment_id")
+    name = request_json.get("name")
+    entries = request_json.get("entries", [])
+
+    if not experiment_id:
+        raise MlflowException("Missing required parameter: experiment_id")
+    if not name:
+        raise MlflowException("Missing required parameter: name")
+
+    configs = _get_tracking_store().update_scorer_online_config(
+        experiment_id=experiment_id,
+        name=name,
+        entries=entries,
+    )
+
+    response = Response(mimetype="application/json")
+    response.set_data(json.dumps({"configs": [c.to_dict() for c in configs]}))
+    return response
+
+
 # =============================================================================
 # Secrets Management Handlers
 # =============================================================================
@@ -4614,6 +4638,14 @@ def get_endpoints(get_handler=get_handler):
     """
     return (
         get_service_endpoints(MlflowService, get_handler)
+        + [
+            # Non-proto scorer endpoints
+            (
+                _get_ajax_path("/mlflow/scorers/online-config", version=3),
+                _update_scorer_online_config,
+                ["PUT"],
+            ),
+        ]
         + get_service_endpoints(ModelRegistryService, get_handler)
         + get_service_endpoints(MlflowArtifactsService, get_handler)
         + get_service_endpoints(WebhookService, get_handler)

@@ -8,6 +8,7 @@ The job runner will:
   it means a new Huey queue is created, then the job runner
   launches an individual Huey consumer process for each Huey queue.
   See module `mlflow/server/jobs/_huey_consumer.py` for details of Huey consumer.
+* Register periodic tasks that run directly in the huey consumer process.
 """
 
 import logging

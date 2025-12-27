@@ -1629,6 +1629,76 @@ def test_delete_scorer_without_version(mock_get_request_message, mock_tracking_s
     assert response_data == {}
 
 
+def test_update_scorer_online_config_smoke(mock_tracking_store):
+    from mlflow.entities._scorer_online_config import ScorerOnlineConfig
+
+    mock_config = ScorerOnlineConfig(
+        scorer_online_config_id="cfg-1",
+        scorer_id="scorer-1",
+        sample_rate=0.1,
+        filter_string="status = 'OK'",
+    )
+    mock_tracking_store.update_scorer_online_config.return_value = [mock_config]
+
+    with app.test_client() as c:
+        # First update
+        resp = c.put(
+            "/ajax-api/3.0/mlflow/scorers/online-config",
+            json={
+                "experiment_id": "123",
+                "name": "my_scorer",
+                "entries": [{"sample_rate": 0.1, "filter_string": "status = 'OK'"}],
+            },
+        )
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert len(data["configs"]) == 1
+        assert data["configs"][0]["sample_rate"] == 0.1
+
+        # Second update (overwrite)
+        mock_config2 = ScorerOnlineConfig(
+            scorer_online_config_id="cfg-2",
+            scorer_id="scorer-1",
+            sample_rate=0.5,
+        )
+        mock_tracking_store.update_scorer_online_config.return_value = [mock_config2]
+
+        resp = c.put(
+            "/ajax-api/3.0/mlflow/scorers/online-config",
+            json={
+                "experiment_id": "123",
+                "name": "my_scorer",
+                "entries": [{"sample_rate": 0.5}],
+            },
+        )
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert len(data["configs"]) == 1
+        assert data["configs"][0]["sample_rate"] == 0.5
+
+
+def test_update_scorer_online_config_nonexistent_scorer(mock_tracking_store):
+    from mlflow.exceptions import MlflowException
+    from mlflow.protos.databricks_pb2 import RESOURCE_DOES_NOT_EXIST
+
+    mock_tracking_store.update_scorer_online_config.side_effect = MlflowException(
+        "Scorer not found", error_code=RESOURCE_DOES_NOT_EXIST
+    )
+
+    with app.test_client() as c:
+        resp = c.put(
+            "/ajax-api/3.0/mlflow/scorers/online-config",
+            json={
+                "experiment_id": "123",
+                "name": "nonexistent",
+                "entries": [{"sample_rate": 0.1}],
+            },
+        )
+        assert resp.status_code == 404
+        data = resp.get_json()
+        assert "Scorer not found" in data["message"]
+
+
 def test_calculate_trace_filter_correlation(mock_get_request_message, mock_tracking_store):
     experiment_ids = ["123", "456"]
     filter_string1 = "span.type = 'LLM'"

@@ -10685,6 +10685,133 @@ def test_scorer_operations(store: SqlAlchemyStore):
         store.list_scorer_versions(experiment_id, "non_existent_scorer")
 
 
+def test_update_scorer_online_config_creates_configs(store: SqlAlchemyStore):
+    experiment_id = store.create_experiment("test_online_config_create")
+    store.register_scorer(experiment_id, "scorer", '{"data": "test"}')
+
+    configs = store.update_scorer_online_config(
+        experiment_id=experiment_id,
+        name="scorer",
+        entries=[{"sample_rate": 0.1, "filter_string": "status = 'OK'"}],
+    )
+
+    assert len(configs) == 1
+    assert configs[0].sample_rate == 0.1
+    assert configs[0].filter_string == "status = 'OK'"
+    assert configs[0].scorer_online_config_id is not None
+
+
+def test_update_scorer_online_config_overwrites(store: SqlAlchemyStore):
+    experiment_id = store.create_experiment("test_online_config_overwrite")
+    store.register_scorer(experiment_id, "scorer", '{"data": "test"}')
+
+    # Create initial config
+    store.update_scorer_online_config(
+        experiment_id=experiment_id,
+        name="scorer",
+        entries=[{"sample_rate": 0.1}, {"sample_rate": 0.2}],
+    )
+
+    # Overwrite with new config
+    new_configs = store.update_scorer_online_config(
+        experiment_id=experiment_id,
+        name="scorer",
+        entries=[{"sample_rate": 0.5}],
+    )
+
+    assert len(new_configs) == 1
+    assert new_configs[0].sample_rate == 0.5
+
+
+def test_update_scorer_online_config_nonexistent_scorer(store: SqlAlchemyStore):
+    experiment_id = store.create_experiment("test_online_config_error")
+
+    with pytest.raises(MlflowException, match="not found"):
+        store.update_scorer_online_config(
+            experiment_id=experiment_id,
+            name="nonexistent",
+            entries=[{"sample_rate": 0.1}],
+        )
+
+
+def test_get_active_scorer_online_configs_filters_by_sample_rate(store: SqlAlchemyStore):
+    experiment_id = store.create_experiment("test_active_configs")
+    store.register_scorer(experiment_id, "active", '{"name": "active"}')
+    store.register_scorer(experiment_id, "inactive", '{"name": "inactive"}')
+
+    store.update_scorer_online_config(
+        experiment_id=experiment_id,
+        name="active",
+        entries=[{"sample_rate": 0.1}],
+    )
+    store.update_scorer_online_config(
+        experiment_id=experiment_id,
+        name="inactive",
+        entries=[{"sample_rate": 0.0}],
+    )
+
+    active_configs = store.get_active_scorer_online_configs()
+    test_configs = [c for c in active_configs if c.experiment_id == experiment_id]
+
+    assert len(test_configs) == 1
+    assert test_configs[0].scorer_name == "active"
+
+
+def test_get_active_scorer_online_configs_includes_scorer_info(store: SqlAlchemyStore):
+    experiment_id = store.create_experiment("test_active_configs_info")
+    store.register_scorer(experiment_id, "scorer", '{"name": "test"}')
+
+    store.update_scorer_online_config(
+        experiment_id=experiment_id,
+        name="scorer",
+        entries=[{"sample_rate": 0.5, "filter_string": "env = 'prod'"}],
+    )
+
+    active_configs = store.get_active_scorer_online_configs()
+    config = next(c for c in active_configs if c.experiment_id == experiment_id)
+
+    assert config.scorer_name == "scorer"
+    assert config.scorer_id is not None
+    assert config.serialized_scorer == '{"name": "test"}'
+    assert config.filter_string == "env = 'prod'"
+
+
+def test_scorer_deletion_cascades_to_online_configs(store: SqlAlchemyStore):
+    from mlflow.store.tracking.dbmodels.models import SqlScorerOnlineConfig
+
+    experiment_id = store.create_experiment("test_cascade_delete")
+    store.register_scorer(experiment_id, "scorer", '{"name": "test"}')
+
+    # Create online config
+    configs = store.update_scorer_online_config(
+        experiment_id=experiment_id,
+        name="scorer",
+        entries=[{"sample_rate": 0.5}],
+    )
+    config_id = configs[0].scorer_online_config_id
+
+    # Verify config exists
+    with store.ManagedSessionMaker() as session:
+        assert (
+            session.query(SqlScorerOnlineConfig)
+            .filter_by(scorer_online_config_id=config_id)
+            .count()
+            == 1
+        )
+
+    # Delete scorer
+    store.delete_scorer(experiment_id, "scorer")
+
+    # Verify online config is also deleted (cascade)
+    with store.ManagedSessionMaker() as session:
+        assert (
+            session.query(SqlScorerOnlineConfig)
+            .filter_by(scorer_online_config_id=config_id)
+            .count()
+            == 0
+        )
+
+
 def test_dataset_experiment_associations(store):
     with mock.patch("mlflow.tracking._tracking_service.utils._get_store", return_value=store):
         exp_ids = _create_experiments(
