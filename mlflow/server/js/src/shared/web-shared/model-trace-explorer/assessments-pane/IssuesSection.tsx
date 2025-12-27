@@ -15,8 +15,23 @@ const isIssueAssessment = (assessment: Assessment): assessment is IssueAssessmen
   return 'issue' in assessment && assessment.issue !== undefined;
 };
 
+/**
+ * Converts a value to boolean, handling both boolean and string types.
+ * This is needed because the backend may return "true"/"false" strings.
+ */
+const toBoolean = (value: unknown): boolean => {
+  if (typeof value === 'boolean') {
+    return value;
+  }
+  if (typeof value === 'string') {
+    return value.toLowerCase() === 'true';
+  }
+  return Boolean(value);
+};
+
 const getIssueIdFromAssessment = (assessment: IssueAssessment): string | undefined => {
-  return assessment.metadata?.[ISSUE_ID_METADATA_KEY];
+  // Try metadata first, fall back to assessment_name (issue_id is stored as assessment_name in the backend)
+  return assessment.metadata?.[ISSUE_ID_METADATA_KEY] || assessment.assessment_name;
 };
 
 export interface IssuesSectionProps {
@@ -36,7 +51,7 @@ export const IssuesSection = ({ traceId, experimentId, assessments, activeSpanId
   const issueAssessments = useMemo(() => {
     const validIssueAssessments = assessments.filter(
       (assessment): assessment is IssueAssessment =>
-        isIssueAssessment(assessment) && assessment.valid !== false && assessment.issue?.value !== false,
+        isIssueAssessment(assessment) && assessment.valid !== false && toBoolean(assessment.issue?.value),
     );
 
     // Group assessments by issue ID (assessment_name) and keep only the latest one for each issue

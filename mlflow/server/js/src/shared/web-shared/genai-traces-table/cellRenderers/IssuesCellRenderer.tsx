@@ -28,6 +28,20 @@ const getIssueName = (assessment: IssueAssessment): string => {
   return assessment.metadata?.[ISSUE_NAME_METADATA_KEY] || assessment.assessment_name;
 };
 
+/**
+ * Converts a value to boolean, handling both boolean and string types.
+ * This is needed because the backend may return "true"/"false" strings.
+ */
+const toBoolean = (value: unknown): boolean => {
+  if (typeof value === 'boolean') {
+    return value;
+  }
+  if (typeof value === 'string') {
+    return value.toLowerCase() === 'true';
+  }
+  return Boolean(value);
+};
+
 interface IssueBadgeProps {
   name: string;
 }
@@ -72,7 +86,7 @@ const getIssueAssessments = (traceInfo?: ModelTraceInfoV3): IssueAssessment[] =>
 
   const validIssueAssessments = traceInfo.assessments.filter(
     (assessment): assessment is IssueAssessment =>
-      isIssueAssessment(assessment) && assessment.valid !== false && assessment.issue?.value !== false,
+      isIssueAssessment(assessment) && assessment.valid !== false && toBoolean(assessment.issue?.value),
   );
 
   // Deduplicate by issue ID (assessment_name), keeping only the latest assessment for each issue
@@ -149,20 +163,6 @@ export const IssuesCellRenderer = ({ currentTraceInfo, otherTraceInfo, isCompari
       second={isComparing && <IssuesBadgeList traceInfo={otherTraceInfo} isComparing={isComparing} />}
     />
   );
-};
-
-/**
- * Converts a value to boolean, handling both boolean and string types.
- * This is needed because the backend may return "true"/"false" strings.
- */
-const toBoolean = (value: unknown): boolean => {
-  if (typeof value === 'boolean') {
-    return value;
-  }
-  if (typeof value === 'string') {
-    return value.toLowerCase() === 'true';
-  }
-  return Boolean(value);
 };
 
 /**

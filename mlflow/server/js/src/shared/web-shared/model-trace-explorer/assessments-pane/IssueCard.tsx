@@ -15,6 +15,9 @@ import { FormattedMessage } from '@databricks/i18n';
 import type { IssueAssessment } from '../ModelTrace.types';
 import type { Issue } from '../../../../experiment-tracking/pages/experiment-issues/types';
 import { useUnlinkIssueFromTrace } from '../hooks/useUnlinkIssueFromTrace';
+import { getSourceIcon } from './utils';
+import { AssessmentSourceName } from './AssessmentSourceName';
+import { timeSinceStr } from './AssessmentsPane.utils';
 
 const RAINBOW_GRADIENT = 'linear-gradient(90deg, #64B5F6, #BA68C8, #E57373)';
 const ISSUE_NAME_METADATA_KEY = 'mlflow.issue.name';
@@ -23,7 +26,7 @@ const getIssueName = (assessment: IssueAssessment): string => {
   return assessment.metadata?.[ISSUE_NAME_METADATA_KEY] || assessment.assessment_name;
 };
 
-const truncateDescription = (description: string | undefined, maxLength = 80): string => {
+const truncateDescription = (description: string | undefined, maxLength = 100): string => {
   if (!description) {
     return '';
   }
@@ -53,7 +56,13 @@ export const IssueCard = ({ issueAssessment, issueDetails, experimentId, onUnlin
 
   const issueName = getIssueName(issueAssessment);
   const description = issueDetails?.description;
+  const rationale = issueAssessment.rationale;
   const hasDescription = Boolean(description);
+  const hasRationale = Boolean(rationale);
+  // Card is expandable if there's description or rationale to show
+  const isExpandable = hasDescription || hasRationale;
+
+  const SourceIcon = getSourceIcon(issueAssessment.source);
 
   const handleOpenInNewTab = () => {
     // Navigate to issue detail page in new tab
@@ -106,11 +115,11 @@ export const IssueCard = ({ issueAssessment, issueDetails, experimentId, onUnlin
               gap: theme.spacing.xs,
               flex: 1,
               minWidth: 0,
-              cursor: hasDescription ? 'pointer' : 'default',
+              cursor: isExpandable ? 'pointer' : 'default',
             }}
-            onClick={() => hasDescription && setIsExpanded(!isExpanded)}
+            onClick={() => isExpandable && setIsExpanded(!isExpanded)}
           >
-            {hasDescription && (
+            {isExpandable && (
               <span css={{ flexShrink: 0, display: 'flex', alignItems: 'center' }}>
                 {isExpanded ? (
                   <ChevronDownIcon css={{ fontSize: 12, color: theme.colors.textSecondary }} />
@@ -162,21 +171,89 @@ export const IssueCard = ({ issueAssessment, issueDetails, experimentId, onUnlin
           </div>
         </div>
 
-        {/* Description - truncated or full */}
-        {hasDescription && (
+        {/* Collapsed view: truncated description */}
+        {!isExpanded && hasDescription && (
           <Typography.Text
             color="secondary"
             css={{
               marginTop: theme.spacing.xs,
               fontSize: theme.typography.fontSizeSm,
               overflow: 'hidden',
-              ...(isExpanded
-                ? { whiteSpace: 'pre-wrap' }
-                : { whiteSpace: 'nowrap', textOverflow: 'ellipsis', maxWidth: '100%' }),
+              whiteSpace: 'nowrap',
+              textOverflow: 'ellipsis',
+              maxWidth: '100%',
             }}
           >
-            {isExpanded ? description : truncateDescription(description)}
+            {truncateDescription(description)}
           </Typography.Text>
+        )}
+
+        {/* Expanded view: full details */}
+        {isExpanded && (
+          <div css={{ display: 'flex', flexDirection: 'column', gap: theme.spacing.sm, marginTop: theme.spacing.sm }}>
+            {/* Description */}
+            {hasDescription && (
+              <div>
+                <Typography.Text color="secondary" size="sm" bold>
+                  <FormattedMessage
+                    defaultMessage="Description"
+                    description="Label for issue description in expanded issue card"
+                  />
+                </Typography.Text>
+                <Typography.Text
+                  color="secondary"
+                  size="sm"
+                  css={{ display: 'block', marginTop: theme.spacing.xs, whiteSpace: 'pre-wrap' }}
+                >
+                  {description}
+                </Typography.Text>
+              </div>
+            )}
+
+            {/* Rationale */}
+            {hasRationale && (
+              <div>
+                <Typography.Text color="secondary" size="sm" bold>
+                  <FormattedMessage
+                    defaultMessage="Rationale"
+                    description="Label for rationale explaining why issue was linked to trace"
+                  />
+                </Typography.Text>
+                <Typography.Text
+                  color="secondary"
+                  size="sm"
+                  css={{ display: 'block', marginTop: theme.spacing.xs, whiteSpace: 'pre-wrap' }}
+                >
+                  {rationale}
+                </Typography.Text>
+              </div>
+            )}
+
+            {/* Source and timestamp - matching AssessmentItemHeader style */}
+            <div css={{ display: 'flex', flexDirection: 'row', alignItems: 'center' }}>
+              <SourceIcon
+                size={theme.typography.fontSizeSm}
+                css={{
+                  padding: 2,
+                  backgroundColor: theme.colors.actionIconBackgroundHover,
+                  borderRadius: theme.borders.borderRadiusFull,
+                }}
+              />
+              <AssessmentSourceName source={issueAssessment.source} />
+              <Typography.Text
+                color="secondary"
+                size="sm"
+                css={{
+                  marginLeft: 'auto',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  textWrap: 'nowrap',
+                }}
+              >
+                {timeSinceStr(new Date(issueAssessment.create_time))}
+              </Typography.Text>
+            </div>
+          </div>
         )}
       </div>
     </div>
