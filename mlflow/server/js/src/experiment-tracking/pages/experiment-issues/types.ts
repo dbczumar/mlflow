@@ -87,3 +87,44 @@ export interface GetIssueLinkedRunsResponse {
   runs: LinkedRunInfo[];
   linked_runs?: LinkedEvaluationRun[];
 }
+
+/**
+ * Issue comment entity
+ */
+export interface IssueComment {
+  comment_id: string;
+  issue_id: string;
+  content: string;
+  author?: string;
+  creation_time?: number;
+  last_update_time?: number;
+}
+
+/**
+ * Response from searchIssueComments API
+ */
+export interface SearchIssueCommentsResponse {
+  comments: IssueComment[];
+  next_page_token?: string;
+}
+
+/**
+ * Response from createIssueComment API
+ */
+export interface CreateIssueCommentResponse {
+  comment: IssueComment;
+}
+
+/**
+ * Response from getIssueComment API
+ */
+export interface GetIssueCommentResponse {
+  comment: IssueComment;
+}
+
+/**
+ * Response from updateIssueComment API
+ */
+export interface UpdateIssueCommentResponse {
+  comment: IssueComment;
+}

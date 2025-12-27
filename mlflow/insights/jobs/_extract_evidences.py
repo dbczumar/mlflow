@@ -47,7 +47,7 @@ def extract_trace_evidences(
         ]
 
         # TODO: Record cost and trace in some way
-        response, _ = mlflow.trace(_invoke_litellm_and_handle_tools)(
+        response, _ = _invoke_litellm_and_handle_tools(
             provider=provider,
             model_name=model_name,
             messages=messages,

@@ -30,6 +30,7 @@ if TYPE_CHECKING:
     from mlflow.entities import EvaluationDataset
 from mlflow.entities.dataset_input import DatasetInput
 from mlflow.entities.issue import IssueEntity
+from mlflow.entities.issue_comment import IssueCommentEntity
 from mlflow.environment_variables import MLFLOW_SUPPRESS_PRINTING_URL_TO_STDOUT
 from mlflow.exceptions import MlflowException
 from mlflow.protos.databricks_pb2 import (
@@ -1207,6 +1208,86 @@ class TrackingServiceClient:
         return self.store.search_issues(
             experiment_id=experiment_id,
             states=states,
+            max_results=max_results,
+            page_token=page_token,
+        )
+
+    def create_issue_comment(
+        self,
+        issue_id: str,
+        content: str,
+        author: str | None = None,
+    ) -> IssueCommentEntity:
+        """
+        Create a new comment on an issue.
+
+        Args:
+            issue_id: The ID of the issue to add a comment to.
+            content: The comment text content.
+            author: Optional author name or identifier.
+
+        Returns:
+            The created IssueCommentEntity with populated comment_id and timestamps.
+        """
+        return self.store.create_issue_comment(
+            issue_id=issue_id,
+            content=content,
+            author=author,
+        )
+
+    def get_issue_comment(self, comment_id: str) -> IssueCommentEntity:
+        """
+        Get a comment by ID.
+
+        Args:
+            comment_id: The unique identifier of the comment.
+
+        Returns:
+            The IssueCommentEntity.
+        """
+        return self.store.get_issue_comment(comment_id)
+
+    def update_issue_comment(self, comment_id: str, content: str) -> IssueCommentEntity:
+        """
+        Update an existing comment.
+
+        Args:
+            comment_id: The unique identifier of the comment.
+            content: The updated content.
+
+        Returns:
+            The updated IssueCommentEntity.
+        """
+        return self.store.update_issue_comment(comment_id=comment_id, content=content)
+
+    def delete_issue_comment(self, comment_id: str) -> None:
+        """
+        Delete a comment.
+
+        Args:
+            comment_id: The unique identifier of the comment.
+        """
+        self.store.delete_issue_comment(comment_id)
+
+    def search_issue_comments(
+        self,
+        issue_id: str,
+        max_results: int = 100,
+        page_token: str | None = None,
+    ) -> PagedList[IssueCommentEntity]:
+        """
+        Search comments for an issue.
+
+        Args:
+            issue_id: The issue ID to search comments for.
+            max_results: Maximum number of comments to return (default 100).
+            page_token: Pagination token for fetching next page.
+
+        Returns:
+            PagedList of IssueCommentEntity objects.
+        """
+        return self.store.search_issue_comments(
+            issue_id=issue_id,
             max_results=max_results,
             page_token=page_token,
         )

@@ -2660,3 +2660,76 @@ class SqlIssue(Base):
             last_update_time=issue.last_update_time,
             tags=json.dumps(issue.tags) if issue.tags else None,
         )
+
+
+class SqlIssueComment(Base):
+    """
+    DB model for :py:class:`mlflow.entities.issue_comment.IssueCommentEntity`.
+    These are recorded in the ``issue_comments`` table.
+
+    A comment belongs to an issue and contains text content with author and timestamps.
+    """
+
+    __tablename__ = "issue_comments"
+
+    comment_id = Column(String(36), primary_key=True)
+    """
+    Comment ID: `String` (UUID format, 36 characters). *Primary Key* for ``issue_comments`` table.
+    """
+
+    issue_id = Column(String(36), ForeignKey("issues.issue_id", ondelete="CASCADE"), nullable=False)
+    """
+    Issue ID to which this comment belongs: *Foreign Key* into ``issues`` table.
+    Comments are deleted when the parent issue is deleted (CASCADE).
+    """
+
+    content = Column(Text, nullable=False)
+    """
+    Comment text content: `Text`. *Non null*.
+    """
+
+    author = Column(String(255), nullable=True)
+    """
+    Author name or identifier: `String` (limit 255 characters). Could be *null*.
+    """
+
+    creation_time = Column(BigInteger(), default=get_current_time_millis, nullable=False)
+    """
+    Creation time of comment in milliseconds since epoch: `BigInteger`.
+    """
+
+    last_update_time = Column(BigInteger(), default=get_current_time_millis, nullable=False)
+    """
+    Last update time of comment in milliseconds since epoch: `BigInteger`.
+    """
+
+    issue = relationship("SqlIssue", backref=backref("comments", cascade="all, delete-orphan"))
+    """
+    SQLAlchemy relationship (many:one) with :py:class:`SqlIssue`.
+    """
+
+    __table_args__ = (
+        Index("index_issue_comments_issue_id", "issue_id"),
+        Index("index_issue_comments_creation_time", "creation_time"),
+    )
+
+    def __repr__(self):
+        return f"<SqlIssueComment ({self.comment_id}, issue={self.issue_id})>"
+
+    def to_mlflow_entity(self):
+        """
+        Convert DB model to corresponding MLflow entity.
+
+        Returns:
+            :py:class:`mlflow.entities.issue_comment.IssueCommentEntity`.
+        """
+        from mlflow.entities.issue_comment import IssueCommentEntity
+
+        return IssueCommentEntity(
+            comment_id=self.comment_id,
+            issue_id=self.issue_id,
+            content=self.content,
+            author=self.author,
+            creation_time=self.creation_time,
+            last_update_time=self.last_update_time,
+        )

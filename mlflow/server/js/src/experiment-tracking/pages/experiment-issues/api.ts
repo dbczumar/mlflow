@@ -2,11 +2,16 @@ import { fetchOrFail, getAjaxUrl } from '../../../common/utils/FetchUtils';
 import type {
   Issue,
   IssueState,
+  IssueComment,
   SearchIssuesResponse,
   CreateIssueResponse,
   GetIssueResponse,
   UpdateIssueResponse,
   GetIssueLinkedRunsResponse,
+  SearchIssueCommentsResponse,
+  CreateIssueCommentResponse,
+  GetIssueCommentResponse,
+  UpdateIssueCommentResponse,
 } from './types';
 
 /**
@@ -98,6 +103,9 @@ export async function createIssue(
 
   const res = await fetchOrFail(getAjaxUrl('ajax-api/3.0/mlflow/issues/create'), {
     method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
     body: JSON.stringify(body),
   });
   const data = await res.json();
@@ -136,6 +144,9 @@ export async function updateIssue(
 
   const res = await fetchOrFail(getAjaxUrl('ajax-api/3.0/mlflow/issues/update'), {
     method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+    },
     body: JSON.stringify(body),
   });
   const data = await res.json();
@@ -150,6 +161,9 @@ export async function updateIssue(
 export async function deleteIssue(issueId: string): Promise<void> {
   const res = await fetchOrFail(getAjaxUrl('ajax-api/3.0/mlflow/issues/delete'), {
     method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+    },
     body: JSON.stringify({
       issue_id: issueId,
     }),
@@ -180,4 +194,135 @@ export async function getIssueLinkedRuns(issueId: string): Promise<GetIssueLinke
     runs: data.runs || [],
     linked_runs: data.linked_runs || [],
   };
+}
+
+// ========== Issue Comments API ==========
+
+/**
+ * Search comments for an issue
+ */
+export async function searchIssueComments(
+  issueId: string,
+  maxResults?: number,
+  pageToken?: string,
+): Promise<SearchIssueCommentsResponse> {
+  const body: { [key: string]: unknown } = {
+    issue_id: issueId,
+  };
+  if (maxResults) {
+    body['max_results'] = maxResults;
+  }
+  if (pageToken) {
+    body['page_token'] = pageToken;
+  }
+
+  const res = await fetch(getAjaxUrl('ajax-api/3.0/mlflow/issues/comments/search'), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+
+  // Handle 404 as empty result (API not implemented)
+  if (res.status === 404) {
+    console.warn('Issue comments API returned 404 - endpoint may not be implemented');
+    return { comments: [] };
+  }
+
+  if (!res.ok) {
+    const errorText = await res.text();
+    console.error('Issue comments API error:', res.status, errorText);
+    throw new Error(`Failed to search issue comments: ${res.status}`);
+  }
+
+  const data = await res.json();
+  return {
+    ...data,
+    comments: data.comments || [],
+  };
+}
+
+/**
+ * Get a single comment by ID
+ */
+export async function getIssueComment(commentId: string): Promise<GetIssueCommentResponse> {
+  const params = new URLSearchParams();
+  params.append('comment_id', commentId);
+
+  const res = await fetchOrFail(getAjaxUrl(`ajax-api/3.0/mlflow/issues/comments/get?${params.toString()}`));
+  const data = await res.json();
+  return {
+    comment: data.comment,
+  };
+}
+
+/**
+ * Create a new comment
+ */
+export async function createIssueComment(
+  issueId: string,
+  content: string,
+  author?: string,
+): Promise<CreateIssueCommentResponse> {
+  const body: { [key: string]: unknown } = {
+    issue_id: issueId,
+    content,
+  };
+  if (author) {
+    body['author'] = author;
+  }
+
+  const res = await fetchOrFail(getAjaxUrl('ajax-api/3.0/mlflow/issues/comments/create'), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json();
+  return {
+    comment: data.comment,
+  };
+}
+
+/**
+ * Update an existing comment
+ */
+export async function updateIssueComment(
+  commentId: string,
+  content: string,
+): Promise<UpdateIssueCommentResponse> {
+  const body: { [key: string]: unknown } = {
+    comment_id: commentId,
+    content,
+  };
+
+  const res = await fetchOrFail(getAjaxUrl('ajax-api/3.0/mlflow/issues/comments/update'), {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json();
+  return {
+    comment: data.comment,
+  };
+}
+
+/**
+ * Delete a comment
+ */
+export async function deleteIssueComment(commentId: string): Promise<void> {
+  const res = await fetchOrFail(getAjaxUrl('ajax-api/3.0/mlflow/issues/comments/delete'), {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      comment_id: commentId,
+    }),
+  });
+  await res.json();
 }

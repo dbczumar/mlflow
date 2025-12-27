@@ -1529,3 +1529,92 @@ class AbstractStore(GatewayStoreMixin):
             MlflowException: If experiment does not exist.
         """
         raise NotImplementedError(self.__class__.__name__)
+
+    # ========== Issue Comments ==========
+
+    def create_issue_comment(
+        self,
+        issue_id: str,
+        content: str,
+        author: str | None = None,
+    ):
+        """
+        Create a new comment on an issue.
+
+        Args:
+            issue_id: The ID of the issue to add a comment to.
+            content: The comment text content.
+            author: Optional author name or identifier.
+
+        Returns:
+            The created IssueCommentEntity with populated comment_id and timestamps.
+
+        Raises:
+            MlflowException: If issue does not exist.
+        """
+        raise NotImplementedError(self.__class__.__name__)
+
+    def get_issue_comment(self, comment_id: str):
+        """
+        Get a comment by ID.
+
+        Args:
+            comment_id: The unique identifier of the comment.
+
+        Returns:
+            The IssueCommentEntity.
+
+        Raises:
+            MlflowException: If comment is not found.
+        """
+        raise NotImplementedError(self.__class__.__name__)
+
+    def update_issue_comment(self, comment_id: str, content: str):
+        """
+        Update an existing comment.
+
+        Args:
+            comment_id: The unique identifier of the comment.
+            content: The updated content.
+
+        Returns:
+            The updated IssueCommentEntity.
+
+        Raises:
+            MlflowException: If comment is not found.
+        """
+        raise NotImplementedError(self.__class__.__name__)
+
+    def delete_issue_comment(self, comment_id: str) -> None:
+        """
+        Delete a comment.
+
+        Args:
+            comment_id: The unique identifier of the comment.
+
+        Raises:
+            MlflowException: If comment is not found.
+        """
+        raise NotImplementedError(self.__class__.__name__)
+
+    def search_issue_comments(
+        self,
+        issue_id: str,
+        max_results: int = 100,
+        page_token: str | None = None,
+    ):
+        """
+        Search comments for an issue.
+
+        Args:
+            issue_id: The issue ID to search comments for.
+            max_results: Maximum number of comments to return (default 100).
+            page_token: Pagination token for fetching next page.
+
+        Returns:
+            PagedList of IssueCommentEntity objects.
+
+        Raises:
+            MlflowException: If issue does not exist.
+        """
+        raise NotImplementedError(self.__class__.__name__)

@@ -2551,6 +2551,192 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
             issues = [sql_issue.to_mlflow_entity() for sql_issue in sql_issues]
             return PagedList(issues, next_page_token)
 
+    # ========== Issue Comments ==========
+
+    def create_issue_comment(
+        self,
+        issue_id: str,
+        content: str,
+        author: str | None = None,
+    ):
+        """
+        Create a new comment on an issue.
+
+        Args:
+            issue_id: The ID of the issue to add a comment to.
+            content: The comment text content.
+            author: Optional author name or identifier.
+
+        Returns:
+            The created IssueCommentEntity with populated comment_id and timestamps.
+
+        Raises:
+            MlflowException: If issue does not exist.
+        """
+        from mlflow.entities.issue_comment import IssueCommentEntity
+        from mlflow.store.tracking.dbmodels.models import SqlIssueComment
+
+        with self.ManagedSessionMaker() as session:
+            # Validate issue exists
+            sql_issue = session.query(SqlIssue).filter(SqlIssue.issue_id == issue_id).first()
+            if sql_issue is None:
+                raise MlflowException(
+                    f"Issue with ID '{issue_id}' not found.",
+                    RESOURCE_DOES_NOT_EXIST,
+                )
+
+            comment_id = uuid.uuid4().hex
+            current_time = get_current_time_millis()
+
+            sql_comment = SqlIssueComment(
+                comment_id=comment_id,
+                issue_id=issue_id,
+                content=content,
+                author=author,
+                creation_time=current_time,
+                last_update_time=current_time,
+            )
+            session.add(sql_comment)
+            session.flush()
+            return sql_comment.to_mlflow_entity()
+
+    def get_issue_comment(self, comment_id: str):
+        """
+        Get a comment by ID.
+
+        Args:
+            comment_id: The unique identifier of the comment.
+
+        Returns:
+            The IssueCommentEntity.
+
+        Raises:
+            MlflowException: If comment is not found.
+        """
+        from mlflow.store.tracking.dbmodels.models import SqlIssueComment
+
+        with self.ManagedSessionMaker() as session:
+            sql_comment = (
+                session.query(SqlIssueComment).filter(SqlIssueComment.comment_id == comment_id).first()
+            )
+            if sql_comment is None:
+                raise MlflowException(
+                    f"Comment with ID '{comment_id}' not found.",
+                    RESOURCE_DOES_NOT_EXIST,
+                )
+            return sql_comment.to_mlflow_entity()
+
+    def update_issue_comment(self, comment_id: str, content: str):
+        """
+        Update an existing comment.
+
+        Args:
+            comment_id: The unique identifier of the comment.
+            content: The updated content.
+
+        Returns:
+            The updated IssueCommentEntity.
+
+        Raises:
+            MlflowException: If comment is not found.
+        """
+        from mlflow.store.tracking.dbmodels.models import SqlIssueComment
+
+        with self.ManagedSessionMaker() as session:
+            sql_comment = (
+                session.query(SqlIssueComment).filter(SqlIssueComment.comment_id == comment_id).first()
+            )
+            if sql_comment is None:
+                raise MlflowException(
+                    f"Comment with ID '{comment_id}' not found.",
+                    RESOURCE_DOES_NOT_EXIST,
+                )
+
+            sql_comment.content = content
+            sql_comment.last_update_time = get_current_time_millis()
+            session.flush()
+            return sql_comment.to_mlflow_entity()
+
+    def delete_issue_comment(self, comment_id: str) -> None:
+        """
+        Delete a comment.
+
+        Args:
+            comment_id: The unique identifier of the comment.
+
+        Raises:
+            MlflowException: If comment is not found.
+        """
+        from mlflow.store.tracking.dbmodels.models import SqlIssueComment
+
+        with self.ManagedSessionMaker() as session:
+            sql_comment = (
+                session.query(SqlIssueComment).filter(SqlIssueComment.comment_id == comment_id).first()
+            )
+            if sql_comment is None:
+                raise MlflowException(
+                    f"Comment with ID '{comment_id}' not found.",
+                    RESOURCE_DOES_NOT_EXIST,
+                )
+            session.delete(sql_comment)
+            session.flush()
+
+    def search_issue_comments(
+        self,
+        issue_id: str,
+        max_results: int = 100,
+        page_token: str | None = None,
+    ):
+        """
+        Search comments for an issue.
+
+        Args:
+            issue_id: The issue ID to search comments for.
+            max_results: Maximum number of comments to return (default 100).
+            page_token: Pagination token for fetching next page.
+
+        Returns:
+            PagedList of IssueCommentEntity objects.
+
+        Raises:
+            MlflowException: If issue does not exist.
+        """
+        from mlflow.store.tracking.dbmodels.models import SqlIssueComment
+
+        with self.ManagedSessionMaker() as session:
+            # Validate issue exists
+            sql_issue = session.query(SqlIssue).filter(SqlIssue.issue_id == issue_id).first()
+            if sql_issue is None:
+                raise MlflowException(
+                    f"Issue with ID '{issue_id}' not found.",
+                    RESOURCE_DOES_NOT_EXIST,
+                )
+
+            # Build query - order by creation time descending (newest first)
+            query = (
+                session.query(SqlIssueComment)
+                .filter(SqlIssueComment.issue_id == issue_id)
+                .order_by(SqlIssueComment.creation_time.desc())
+            )
+
+            # Handle pagination
+            offset = 0
+            if page_token:
+                offset = int(base64.b64decode(page_token).decode("utf-8"))
+
+            # Get one extra to check if there are more results
+            sql_comments = query.offset(offset).limit(max_results + 1).all()
+
+            # Determine if there's a next page
+            next_page_token = None
+            if len(sql_comments) > max_results:
+                sql_comments = sql_comments[:max_results]
+                next_offset = offset + max_results
+                next_page_token = base64.b64encode(str(next_offset).encode("utf-8")).decode("utf-8")
+
+            comments = [sql_comment.to_mlflow_entity() for sql_comment in sql_comments]
+            return PagedList(comments, next_page_token)
+
     def _apply_order_by_search_logged_models(
         self,
         models: sqlalchemy.orm.Query,

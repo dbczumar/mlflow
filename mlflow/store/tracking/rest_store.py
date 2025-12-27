@@ -33,6 +33,7 @@ _DATABRICKS_DATASET_API_NAME = "Evaluation dataset APIs"
 _DATABRICKS_DATASET_ALTERNATIVE = "Use the databricks-agents library for dataset operations."
 from mlflow.entities.assessment import Assessment, Expectation, Feedback
 from mlflow.entities.issue import IssueEntity, IssueState
+from mlflow.entities.issue_comment import IssueCommentEntity
 from mlflow.entities.span import Span
 from mlflow.entities.trace import Trace
 from mlflow.entities.trace_data import TraceData
@@ -56,6 +57,7 @@ from mlflow.protos.service_pb2 import (
     CreateDataset,
     CreateExperiment,
     CreateIssue,
+    CreateIssueComment,
     CreateLoggedModel,
     CreateRun,
     DeleteAssessment,
@@ -64,6 +66,7 @@ from mlflow.protos.service_pb2 import (
     DeleteExperiment,
     DeleteExperimentTag,
     DeleteIssue,
+    DeleteIssueComment,
     DeleteLoggedModel,
     DeleteLoggedModelTag,
     DeleteRun,
@@ -80,6 +83,7 @@ from mlflow.protos.service_pb2 import (
     GetExperiment,
     GetExperimentByName,
     GetIssue,
+    GetIssueComment,
     GetLoggedModel,
     GetMetricHistory,
     GetRun,
@@ -106,6 +110,7 @@ from mlflow.protos.service_pb2 import (
     RestoreRun,
     SearchEvaluationDatasets,
     SearchExperiments,
+    SearchIssueComments,
     SearchIssues,
     SearchLoggedModels,
     SearchRuns,
@@ -123,6 +128,7 @@ from mlflow.protos.service_pb2 import (
     UpdateAssessment,
     UpdateExperiment,
     UpdateIssue,
+    UpdateIssueComment,
     UpdateRun,
     UpsertDatasetRecords,
 )
@@ -178,6 +184,11 @@ class RestStore(RestGatewayStoreMixin, AbstractStore):
         UpdateIssue,
         DeleteIssue,
         SearchIssues,
+        CreateIssueComment,
+        GetIssueComment,
+        UpdateIssueComment,
+        DeleteIssueComment,
+        SearchIssueComments,
     }
 
     def __init__(self, get_host_creds):
@@ -1981,3 +1992,102 @@ class RestStore(RestGatewayStoreMixin, AbstractStore):
         response_proto = self._call_endpoint(SearchIssues, req_body)
         issues = [IssueEntity.from_proto(i) for i in response_proto.issues]
         return PagedList(issues, response_proto.next_page_token or None)
+
+    def create_issue_comment(
+        self,
+        issue_id: str,
+        content: str,
+        author: str | None = None,
+    ) -> IssueCommentEntity:
+        """
+        Create a new comment on an issue.
+
+        Args:
+            issue_id: The ID of the issue to add a comment to.
+            content: The comment text content.
+            author: Optional author name or identifier.
+
+        Returns:
+            The created IssueCommentEntity with populated comment_id and timestamps.
+        """
+        req_body = message_to_json(
+            CreateIssueComment(
+                issue_id=issue_id,
+                content=content,
+                author=author,
+            )
+        )
+        response_proto = self._call_endpoint(CreateIssueComment, req_body)
+        return IssueCommentEntity.from_proto(response_proto.comment)
+
+    def get_issue_comment(self, comment_id: str) -> IssueCommentEntity:
+        """
+        Get a comment by ID.
+
+        Args:
+            comment_id: The unique identifier of the comment.
+
+        Returns:
+            The IssueCommentEntity.
+        """
+        req_body = message_to_json(GetIssueComment(comment_id=comment_id))
+        response_proto = self._call_endpoint(GetIssueComment, req_body)
+        return IssueCommentEntity.from_proto(response_proto.comment)
+
+    def update_issue_comment(self, comment_id: str, content: str) -> IssueCommentEntity:
+        """
+        Update an existing comment.
+
+        Args:
+            comment_id: The unique identifier of the comment.
+            content: The updated content.
+
+        Returns:
+            The updated IssueCommentEntity.
+        """
+        req_body = message_to_json(
+            UpdateIssueComment(
+                comment_id=comment_id,
+                content=content,
+            )
+        )
+        response_proto = self._call_endpoint(UpdateIssueComment, req_body)
+        return IssueCommentEntity.from_proto(response_proto.comment)
+
+    def delete_issue_comment(self, comment_id: str) -> None:
+        """
+        Delete a comment.
+
+        Args:
+            comment_id: The unique identifier of the comment.
+        """
+        req_body = message_to_json(DeleteIssueComment(comment_id=comment_id))
+        self._call_endpoint(DeleteIssueComment, req_body)
+
+    def search_issue_comments(
+        self,
+        issue_id: str,
+        max_results: int = 100,
+        page_token: str | None = None,
+    ) -> PagedList[IssueCommentEntity]:
+        """
+        Search comments for an issue.
+
+        Args:
+            issue_id: The issue ID to search comments for.
+            max_results: Maximum number of comments to return (default 100).
+            page_token: Pagination token for fetching next page.
+
+        Returns:
+            PagedList of IssueCommentEntity objects.
+        """
+        req_body = message_to_json(
+            SearchIssueComments(
+                issue_id=issue_id,
+                max_results=max_results,
+                page_token=page_token,
+            )
+        )
+        response_proto = self._call_endpoint(SearchIssueComments, req_body)
+        comments = [IssueCommentEntity.from_proto(c) for c in response_proto.comments]
+        return PagedList(comments, response_proto.next_page_token or None)

@@ -112,6 +112,7 @@ from mlflow.protos.service_pb2 import (
     CreateGatewayEndpoint,
     CreateIssue,
     CreateJudgeFromIssue,
+    CreateIssueComment,
     CreateGatewayEndpointBinding,
     CreateGatewayModelDefinition,
     CreateGatewaySecret,
@@ -123,6 +124,7 @@ from mlflow.protos.service_pb2 import (
     DeleteExperiment,
     DeleteExperimentTag,
     DeleteIssue,
+    DeleteIssueComment,
     DeleteGatewayEndpoint,
     DeleteGatewayEndpointBinding,
     DeleteGatewayEndpointTag,
@@ -153,6 +155,7 @@ from mlflow.protos.service_pb2 import (
     GetIssueLinkedRuns,
     LinkedEvaluationRun,
     LinkRunToIssues,
+    GetIssueComment,
     GetLoggedModel,
     Metric as ProtoMetric,
     GetMetricHistory,
@@ -189,6 +192,7 @@ from mlflow.protos.service_pb2 import (
     SearchExperiments,
     Scorer,
     SearchIssues,
+    SearchIssueComments,
     SearchLoggedModels,
     SearchRuns,
     SearchTraces,
@@ -208,6 +212,7 @@ from mlflow.protos.service_pb2 import (
     UpdateGatewayModelDefinition,
     UpdateGatewaySecret,
     UpdateIssue,
+    UpdateIssueComment,
     UpdateRun,
     UpsertDatasetRecords,
 )
@@ -4107,6 +4112,115 @@ def _link_run_to_issues():
 
 
 # =============================================================================
+# Issue Comment Handlers
+# =============================================================================
+
+
+@catch_mlflow_exception
+@_disable_if_artifacts_only
+def _create_issue_comment():
+    request_message = _get_request_message(
+        CreateIssueComment(),
+        schema={
+            "issue_id": [_assert_required, _assert_string],
+            "content": [_assert_required, _assert_string],
+            "author": [_assert_string],
+        },
+    )
+
+    comment = _get_tracking_store().create_issue_comment(
+        issue_id=request_message.issue_id,
+        content=request_message.content,
+        author=request_message.author if request_message.HasField("author") else None,
+    )
+
+    response_message = CreateIssueComment.Response()
+    response_message.comment.CopyFrom(comment.to_proto())
+    return _wrap_response(response_message)
+
+
+@catch_mlflow_exception
+@_disable_if_artifacts_only
+def _get_issue_comment():
+    request_message = _get_request_message(
+        GetIssueComment(),
+        schema={
+            "comment_id": [_assert_required, _assert_string],
+        },
+    )
+
+    comment = _get_tracking_store().get_issue_comment(request_message.comment_id)
+    response_message = GetIssueComment.Response()
+    response_message.comment.CopyFrom(comment.to_proto())
+    return _wrap_response(response_message)
+
+
+@catch_mlflow_exception
+@_disable_if_artifacts_only
+def _update_issue_comment():
+    request_message = _get_request_message(
+        UpdateIssueComment(),
+        schema={
+            "comment_id": [_assert_required, _assert_string],
+            "content": [_assert_required, _assert_string],
+        },
+    )
+
+    comment = _get_tracking_store().update_issue_comment(
+        comment_id=request_message.comment_id,
+        content=request_message.content,
+    )
+
+    response_message = UpdateIssueComment.Response()
+    response_message.comment.CopyFrom(comment.to_proto())
+    return _wrap_response(response_message)
+
+
+@catch_mlflow_exception
+@_disable_if_artifacts_only
+def _delete_issue_comment():
+    request_message = _get_request_message(
+        DeleteIssueComment(),
+        schema={
+            "comment_id": [_assert_required, _assert_string],
+        },
+    )
+
+    _get_tracking_store().delete_issue_comment(request_message.comment_id)
+    response_message = DeleteIssueComment.Response()
+    return _wrap_response(response_message)
+
+
+@catch_mlflow_exception
+@_disable_if_artifacts_only
+def _search_issue_comments():
+    request_message = _get_request_message(
+        SearchIssueComments(),
+        schema={
+            "issue_id": [_assert_required, _assert_string],
+            "max_results": [_assert_intlike],
+            "page_token": [_assert_string],
+        },
+    )
+
+    max_results = request_message.max_results if request_message.HasField("max_results") else 100
+    page_token = request_message.page_token if request_message.HasField("page_token") else None
+
+    comments = _get_tracking_store().search_issue_comments(
+        issue_id=request_message.issue_id,
+        max_results=max_results,
+        page_token=page_token,
+    )
+
+    response_message = SearchIssueComments.Response()
+    for comment in comments:
+        response_message.comments.append(comment.to_proto())
+    if comments.token:
+        response_message.next_page_token = comments.token
+    return _wrap_response(response_message)
+
+
+# =============================================================================
 # Secrets Management Handlers
 # =============================================================================
 
@@ -5174,4 +5288,9 @@ HANDLERS = {
     CreateJudgeFromIssue: _create_judge_from_issue,
     GetIssueLinkedRuns: _get_issue_linked_runs,
     LinkRunToIssues: _link_run_to_issues,
+    CreateIssueComment: _create_issue_comment,
+    GetIssueComment: _get_issue_comment,
+    UpdateIssueComment: _update_issue_comment,
+    DeleteIssueComment: _delete_issue_comment,
+    SearchIssueComments: _search_issue_comments,
 }

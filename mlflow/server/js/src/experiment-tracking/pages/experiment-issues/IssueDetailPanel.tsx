@@ -13,7 +13,9 @@ import {
   OverflowIcon,
   ChartLineIcon,
   CheckIcon,
+  CloseIcon,
   Spinner,
+  TrashIcon,
   NewWindowIcon,
   Tag,
   Table,
@@ -22,12 +24,18 @@ import {
   TableHeader,
 } from '@databricks/design-system';
 import { FormattedMessage } from 'react-intl';
-import { Link } from '../../../common/utils/RoutingUtils';
-import Routes from '../../routes';
-import type { Issue, IssueState, IssueDetailTab } from './types';
+import type { Issue, IssueState, IssueDetailTab, IssueComment } from './types';
 import { useUpdateIssueMutation, useGetLinkedEvaluationRuns } from './hooks/useIssuesApi';
+import {
+  useSearchIssueComments,
+  useCreateIssueCommentMutation,
+  useUpdateIssueCommentMutation,
+  useDeleteIssueCommentMutation,
+} from './hooks/useIssueCommentsApi';
+import Routes from '../../routes';
 import { TracesView } from '../../components/traces/TracesView';
 import { ExperimentViewTracesTableColumns } from '../../components/traces/TracesView.utils';
+import { Link } from '../../../common/utils/RoutingUtils';
 import Utils from '../../../common/utils/Utils';
 
 interface IssueDetailPanelProps {
@@ -673,16 +681,256 @@ const EvaluationRunsTabContent = ({ issue, experimentId }: { issue: Issue; exper
   );
 };
 
-const CommentsTabContent = () => {
+const formatRelativeTime = (timestamp?: number): string => {
+  if (!timestamp) return '';
+  const now = Date.now();
+  const diff = now - timestamp;
+  const seconds = Math.floor(diff / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+
+  if (days > 0) return `${days} day${days > 1 ? 's' : ''} ago`;
+  if (hours > 0) return `${hours} hour${hours > 1 ? 's' : ''} ago`;
+  if (minutes > 0) return `${minutes} minute${minutes > 1 ? 's' : ''} ago`;
+  return 'just now';
+};
+
+const CommentItem = ({
+  comment,
+  issueId,
+  onUpdated,
+}: {
+  comment: IssueComment;
+  issueId: string;
+  onUpdated: () => void;
+}) => {
   const { theme } = useDesignSystemTheme();
+  const [isEditing, setIsEditing] = useState(false);
+  const [editContent, setEditContent] = useState(comment.content);
+  const updateMutation = useUpdateIssueCommentMutation();
+  const deleteMutation = useDeleteIssueCommentMutation();
+
+  const handleSave = async () => {
+    if (editContent.trim() && editContent !== comment.content) {
+      await updateMutation.mutateAsync({
+        commentId: comment.comment_id,
+        issueId,
+        content: editContent.trim(),
+      });
+      onUpdated();
+    }
+    setIsEditing(false);
+  };
+
+  const handleDelete = async () => {
+    await deleteMutation.mutateAsync({
+      commentId: comment.comment_id,
+      issueId,
+    });
+    onUpdated();
+  };
+
+  return (
+    <div
+      css={{
+        padding: theme.spacing.md,
+        borderBottom: `1px solid ${theme.colors.border}`,
+        '&:last-child': { borderBottom: 'none' },
+      }}
+    >
+      <div
+        css={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: theme.spacing.xs,
+        }}
+      >
+        <div css={{ display: 'flex', alignItems: 'center', gap: theme.spacing.sm }}>
+          <Typography.Text bold>{comment.author || 'User'}</Typography.Text>
+          <Typography.Text color="secondary" size="sm">
+            {formatRelativeTime(comment.creation_time)}
+          </Typography.Text>
+          {comment.last_update_time && comment.last_update_time !== comment.creation_time && (
+            <Typography.Text color="secondary" size="sm">
+              (edited)
+            </Typography.Text>
+          )}
+        </div>
+        {!isEditing && (
+          <div css={{ display: 'flex', alignItems: 'center', gap: theme.spacing.xs }}>
+            <Button
+              componentId="mlflow.issues.edit-comment-button"
+              icon={<PencilIcon />}
+              type="tertiary"
+              size="small"
+              onClick={() => {
+                setEditContent(comment.content);
+                setIsEditing(true);
+              }}
+              aria-label="Edit comment"
+            />
+            <Button
+              componentId="mlflow.issues.delete-comment-button"
+              icon={<TrashIcon />}
+              type="tertiary"
+              size="small"
+              onClick={handleDelete}
+              loading={deleteMutation.isLoading}
+              aria-label="Delete comment"
+            />
+          </div>
+        )}
+      </div>
+      {isEditing ? (
+        <div>
+          <textarea
+            value={editContent}
+            onChange={(e) => setEditContent(e.target.value)}
+            css={{
+              width: '100%',
+              minHeight: 60,
+              border: `1px solid ${theme.colors.actionPrimaryBackgroundDefault}`,
+              borderRadius: theme.borders.borderRadiusMd,
+              padding: theme.spacing.sm,
+              fontSize: theme.typography.fontSizeBase,
+              resize: 'vertical',
+              marginBottom: theme.spacing.sm,
+            }}
+          />
+          <div css={{ display: 'flex', gap: theme.spacing.sm }}>
+            <Button
+              componentId="mlflow.issues.save-comment-button"
+              type="primary"
+              size="small"
+              onClick={handleSave}
+              loading={updateMutation.isLoading}
+            >
+              <FormattedMessage defaultMessage="Save" description="Save button label" />
+            </Button>
+            <Button
+              componentId="mlflow.issues.cancel-edit-comment-button"
+              type="tertiary"
+              size="small"
+              onClick={() => setIsEditing(false)}
+            >
+              <FormattedMessage defaultMessage="Cancel" description="Cancel button label" />
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <Typography.Text css={{ whiteSpace: 'pre-wrap' }}>{comment.content}</Typography.Text>
+      )}
+    </div>
+  );
+};
+
+const CommentsTabContent = ({ issue }: { issue: Issue }) => {
+  const { theme } = useDesignSystemTheme();
+  const [newComment, setNewComment] = useState('');
+  const { data: comments, isLoading, refetch } = useSearchIssueComments(issue.issue_id);
+  const createMutation = useCreateIssueCommentMutation();
+
+  const handleAddComment = async () => {
+    if (newComment.trim()) {
+      await createMutation.mutateAsync({
+        issueId: issue.issue_id,
+        content: newComment.trim(),
+      });
+      setNewComment('');
+      refetch();
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div
+        css={{
+          padding: theme.spacing.lg,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <Spinner />
+      </div>
+    );
+  }
 
   return (
     <div css={{ padding: theme.spacing.md }}>
-      <Empty
-        description={
-          <FormattedMessage defaultMessage="Comments coming soon" description="Placeholder for comments section" />
-        }
-      />
+      {/* New comment input */}
+      <div css={{ marginBottom: theme.spacing.lg }}>
+        <Typography.Text bold css={{ marginBottom: theme.spacing.xs, display: 'block' }}>
+          <FormattedMessage defaultMessage="Add a comment" description="Label for new comment input" />
+        </Typography.Text>
+        <textarea
+          value={newComment}
+          onChange={(e) => setNewComment(e.target.value)}
+          placeholder="Write a comment..."
+          css={{
+            width: '100%',
+            minHeight: 80,
+            border: `1px solid ${theme.colors.border}`,
+            borderRadius: theme.borders.borderRadiusMd,
+            padding: theme.spacing.sm,
+            fontSize: theme.typography.fontSizeBase,
+            resize: 'vertical',
+            marginBottom: theme.spacing.sm,
+            '&:focus': {
+              borderColor: theme.colors.actionPrimaryBackgroundDefault,
+              outline: 'none',
+            },
+          }}
+        />
+        <Button
+          componentId="mlflow.issues.add-comment-button"
+          type="primary"
+          onClick={handleAddComment}
+          disabled={!newComment.trim()}
+          loading={createMutation.isLoading}
+        >
+          <FormattedMessage defaultMessage="Add Comment" description="Button to add a new comment" />
+        </Button>
+      </div>
+
+      {/* Comments list */}
+      <div>
+        <Typography.Text bold css={{ marginBottom: theme.spacing.sm, display: 'block' }}>
+          <FormattedMessage
+            defaultMessage="Comments ({count})"
+            description="Comments section header with count"
+            values={{ count: comments?.length || 0 }}
+          />
+        </Typography.Text>
+        {comments && comments.length > 0 ? (
+          <div
+            css={{
+              border: `1px solid ${theme.colors.border}`,
+              borderRadius: theme.borders.borderRadiusMd,
+            }}
+          >
+            {comments.map((comment) => (
+              <CommentItem
+                key={comment.comment_id}
+                comment={comment}
+                issueId={issue.issue_id}
+                onUpdated={() => refetch()}
+              />
+            ))}
+          </div>
+        ) : (
+          <Empty
+            description={
+              <FormattedMessage
+                defaultMessage="No comments yet. Be the first to add one!"
+                description="Empty state for comments"
+              />
+            }
+          />
+        )}
+      </div>
     </div>
   );
 };
@@ -758,7 +1006,7 @@ export const IssueDetailPanel = ({ issue, experimentId, onIssueUpdated }: IssueD
           <EvaluationRunsTabContent issue={issue} experimentId={experimentId} />
         </Tabs.Content>
         <Tabs.Content value="comments">
-          <CommentsTabContent />
+          <CommentsTabContent issue={issue} />
         </Tabs.Content>
       </Tabs.Root>
     </div>

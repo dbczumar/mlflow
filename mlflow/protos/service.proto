@@ -2136,6 +2136,104 @@ service MlflowService {
       rpc_doc_title: "Link Run to Issues"
     };
   }
+
+  // Create a new comment on an issue
+  rpc createIssueComment(CreateIssueComment) returns (CreateIssueComment.Response) {
+    option (rpc) = {
+      endpoints: [
+        {
+          method: "POST"
+          path: "/mlflow/issues/comments/create"
+          since: {
+            major: 3
+            minor: 0
+          }
+        }
+      ]
+      visibility: PUBLIC
+      rpc_doc_title: "Create Issue Comment"
+    };
+  }
+
+  // Get a comment by ID
+  rpc getIssueComment(GetIssueComment) returns (GetIssueComment.Response) {
+    option (rpc) = {
+      endpoints: [
+        {
+          method: "GET"
+          path: "/mlflow/issues/comments/get"
+          since: {
+            major: 3
+            minor: 0
+          }
+        }
+      ]
+      visibility: PUBLIC
+      rpc_doc_title: "Get Issue Comment"
+    };
+  }
+
+  // Update a comment
+  rpc updateIssueComment(UpdateIssueComment) returns (UpdateIssueComment.Response) {
+    option (rpc) = {
+      endpoints: [
+        {
+          method: "PATCH"
+          path: "/mlflow/issues/comments/update"
+          since: {
+            major: 3
+            minor: 0
+          }
+        }
+      ]
+      visibility: PUBLIC
+      rpc_doc_title: "Update Issue Comment"
+    };
+  }
+
+  // Delete a comment
+  rpc deleteIssueComment(DeleteIssueComment) returns (DeleteIssueComment.Response) {
+    option (rpc) = {
+      endpoints: [
+        {
+          method: "DELETE"
+          path: "/mlflow/issues/comments/delete"
+          since: {
+            major: 3
+            minor: 0
+          }
+        }
+      ]
+      visibility: PUBLIC
+      rpc_doc_title: "Delete Issue Comment"
+    };
+  }
+
+  // Search comments for an issue
+  rpc searchIssueComments(SearchIssueComments) returns (SearchIssueComments.Response) {
+    option (rpc) = {
+      endpoints: [
+        {
+          method: "GET"
+          path: "/mlflow/issues/comments/search"
+          since: {
+            major: 3
+            minor: 0
+          }
+        },
+        {
+          method: "POST"
+          path: "/mlflow/issues/comments/search"
+          since: {
+            major: 3
+            minor: 0
+          }
+        }
+      ]
+      visibility: PUBLIC
+      rpc_doc_title: "Search Issue Comments"
+    };
+  }
 }
 
 // View type for ListExperiments query.
@@ -4765,4 +4863,101 @@ message LinkRunToIssues {
   repeated string issue_ids = 2;
 
   message Response {}
+}
+
+// ========== Issue Comments ==========
+
+message IssueComment {
+  // Unique identifier for the comment (UUID)
+  optional string comment_id = 1;
+
+  // ID of the issue this comment belongs to
+  optional string issue_id = 2;
+
+  // Comment content/text
+  optional string content = 3;
+
+  // Author name or identifier (optional)
+  optional string author = 4;
+
+  // Creation time in milliseconds since epoch
+  optional int64 creation_time = 5;
+
+  // Last update time in milliseconds since epoch
+  optional int64 last_update_time = 6;
+}
+
+message CreateIssueComment {
+  option (scalapb.message).extends = "com.databricks.rpc.RPC[$this.Response]";
+
+  // ID of the issue to add a comment to
+  optional string issue_id = 1 [(validate_required) = true];
+
+  // Comment content/text
+  optional string content = 2 [(validate_required) = true];
+
+  // Author name or identifier (optional)
+  optional string author = 3;
+
+  message Response {
+    // The created comment
+    optional IssueComment comment = 1;
+  }
+}
+
+message GetIssueComment {
+  option (scalapb.message).extends = "com.databricks.rpc.RPC[$this.Response]";
+
+  // ID of the comment to retrieve
+  optional string comment_id = 1 [(validate_required) = true];
+
+  message Response {
+    // The requested comment
+    optional IssueComment comment = 1;
+  }
+}
+
+message UpdateIssueComment {
+  option (scalapb.message).extends = "com.databricks.rpc.RPC[$this.Response]";
+
+  // ID of the comment to update
+  optional string comment_id = 1 [(validate_required) = true];
+
+  // Updated content (required)
+  optional string content = 2 [(validate_required) = true];
+
+  message Response {
+    // The updated comment
+    optional IssueComment comment = 1;
+  }
+}
+
+message DeleteIssueComment {
+  option (scalapb.message).extends = "com.databricks.rpc.RPC[$this.Response]";
+
+  // ID of the comment to delete
+  optional string comment_id = 1 [(validate_required) = true];
+
+  message Response {}
+}
+
+message SearchIssueComments {
+  option (scalapb.message).extends = "com.databricks.rpc.RPC[$this.Response]";
+
+  // ID of the issue to search comments for
+  optional string issue_id = 1 [(validate_required) = true];
+
+  // Maximum number of comments to return (default 100)
+  optional int32 max_results = 2;
+
+  // Pagination token for fetching next page
+  optional string page_token = 3;
+
+  message Response {
+    // List of comments
+    repeated IssueComment comments = 1;
+
+    // Token for fetching next page (empty if no more results)
+    optional string next_page_token = 2;
+  }
 }
