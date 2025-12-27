@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient, type UseQueryResult } from '@databricks/web-shared/query-client';
 import { UnknownError, type PredefinedError } from '@databricks/web-shared/errors';
-import type { Issue, IssueState, SearchIssuesResponse } from '../types';
-import { searchIssues, getIssue, createIssue, updateIssue, deleteIssue } from '../api';
+import type { Issue, IssueState, SearchIssuesResponse, LinkedEvaluationRun } from '../types';
+import { searchIssues, getIssue, createIssue, updateIssue, deleteIssue, getIssueLinkedRuns } from '../api';
 
 const ISSUES_QUERY_KEY = 'mlflow.issues';
 
@@ -136,5 +136,45 @@ export function useDeleteIssueMutation() {
         queryKey: [ISSUES_QUERY_KEY, 'search', variables.experimentId],
       });
     },
+  });
+}
+
+/**
+ * Hook to get evaluation runs linked to an issue
+ */
+export function useGetLinkedEvaluationRuns(
+  issueId?: string,
+): UseQueryResult<LinkedEvaluationRun[], PredefinedError> {
+  return useQuery<LinkedEvaluationRun[], PredefinedError>({
+    queryKey: [ISSUES_QUERY_KEY, 'linked-runs', issueId],
+    queryFn: async () => {
+      if (!issueId) {
+        throw new UnknownError('Issue ID is required');
+      }
+      const response = await getIssueLinkedRuns(issueId);
+
+      // Use 'runs' for run info (always available) and extract metrics from 'linked_runs'
+      const runs = response.runs || [];
+      const linkedRuns = response.linked_runs || [];
+
+      // Create a map of run_id to metrics from linked_runs
+      const metricsMap = new Map<string, { key: string; value: number }[]>();
+      for (const linkedRun of linkedRuns) {
+        // Handle both snake_case and camelCase field names from proto serialization
+        const runId = linkedRun.info?.run_id || (linkedRun.info as any)?.runId;
+        const metrics = linkedRun.metrics || [];
+        if (runId) {
+          metricsMap.set(runId, metrics);
+        }
+      }
+
+      // Combine run info with metrics
+      return runs.map((run) => ({
+        info: run,
+        metrics: metricsMap.get(run.run_id) || [],
+      }));
+    },
+    enabled: !!issueId,
+    staleTime: 60 * 1000, // 1 minute
   });
 }

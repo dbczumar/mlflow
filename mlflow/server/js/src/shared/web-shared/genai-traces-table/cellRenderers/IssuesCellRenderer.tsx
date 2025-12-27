@@ -128,6 +128,20 @@ export const IssuesCellRenderer = ({ currentTraceInfo, otherTraceInfo, isCompari
 };
 
 /**
+ * Converts a value to boolean, handling both boolean and string types.
+ * This is needed because the backend may return "true"/"false" strings.
+ */
+const toBoolean = (value: unknown): boolean => {
+  if (typeof value === 'boolean') {
+    return value;
+  }
+  if (typeof value === 'string') {
+    return value.toLowerCase() === 'true';
+  }
+  return Boolean(value);
+};
+
+/**
  * Finds a specific issue assessment by name in the trace info.
  * Returns the issue value (true = detected, false = not detected) or undefined if not found.
  */
@@ -141,7 +155,9 @@ const findIssueByName = (traceInfo: ModelTraceInfoV3 | undefined, issueName: str
       const name = getIssueName(assessment);
       if (name === issueName) {
         // Return the actual boolean value (true = issue detected, false = no issue)
-        return assessment.issue?.value;
+        // Handle both boolean and string values from the backend
+        const value = assessment.issue?.value;
+        return value !== undefined ? toBoolean(value) : undefined;
       }
     }
   }

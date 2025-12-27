@@ -2100,6 +2100,42 @@ service MlflowService {
       rpc_doc_title: "Create Judge From Issue"
     };
   }
+
+  // Get evaluation runs linked to an issue
+  rpc getIssueLinkedRuns(GetIssueLinkedRuns) returns (GetIssueLinkedRuns.Response) {
+    option (rpc) = {
+      endpoints: [
+        {
+          method: "GET"
+          path: "/mlflow/issues/linked-runs"
+          since: {
+            major: 3
+            minor: 0
+          }
+        }
+      ]
+      visibility: PUBLIC
+      rpc_doc_title: "Get Issue Linked Runs"
+    };
+  }
+
+  // Link an evaluation run to issues
+  rpc linkRunToIssues(LinkRunToIssues) returns (LinkRunToIssues.Response) {
+    option (rpc) = {
+      endpoints: [
+        {
+          method: "POST"
+          path: "/mlflow/issues/link-run"
+          since: {
+            major: 3
+            minor: 0
+          }
+        }
+      ]
+      visibility: PUBLIC_UNDOCUMENTED
+      rpc_doc_title: "Link Run to Issues"
+    };
+  }
 }
 
 // View type for ListExperiments query.
@@ -4693,4 +4729,40 @@ message CreateJudgeFromIssue {
     // The registered scorer information
     optional Scorer scorer = 1;
   }
+}
+
+// Information about a linked evaluation run including metrics
+message LinkedEvaluationRun {
+  // Run information
+  optional RunInfo info = 1;
+
+  // Metrics associated with this run (e.g., pass_rate, pass_count, fail_count)
+  repeated Metric metrics = 2;
+}
+
+message GetIssueLinkedRuns {
+  option (scalapb.message).extends = "com.databricks.rpc.RPC[$this.Response]";
+
+  // ID of the issue to get linked evaluation runs for
+  optional string issue_id = 1 [(validate_required) = true];
+
+  message Response {
+    // List of runs linked to this issue (deprecated, use linked_runs instead)
+    repeated RunInfo runs = 1;
+
+    // List of linked evaluation runs with metrics
+    repeated LinkedEvaluationRun linked_runs = 2;
+  }
+}
+
+message LinkRunToIssues {
+  option (scalapb.message).extends = "com.databricks.rpc.RPC[$this.Response]";
+
+  // ID of the evaluation run to link
+  optional string run_id = 1 [(validate_required) = true];
+
+  // List of issue IDs to link the run to
+  repeated string issue_ids = 2;
+
+  message Response {}
 }

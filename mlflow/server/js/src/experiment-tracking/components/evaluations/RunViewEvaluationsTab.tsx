@@ -29,6 +29,7 @@ import {
   TOKENS_COLUMN_ID,
   invalidateMlflowSearchTracesCache,
   TRACE_ID_COLUMN_ID,
+  ISSUES_COLUMN_ID,
   shouldUseTracesV4API,
   createTraceLocationForExperiment,
   createTraceLocationForUCSchema,
@@ -129,7 +130,7 @@ const RunViewEvaluationsTabInner = ({
           (responseHasContent && col.type === TracesTableColumnType.TRACE_INFO && col.id === RESPONSE_COLUMN_ID) ||
           (tokensHasContent && col.type === TracesTableColumnType.TRACE_INFO && col.id === TOKENS_COLUMN_ID) ||
           (col.type === TracesTableColumnType.TRACE_INFO &&
-            [TRACE_ID_COLUMN_ID, EXECUTION_DURATION_COLUMN_ID, STATE_COLUMN_ID].includes(col.id)),
+            [TRACE_ID_COLUMN_ID, EXECUTION_DURATION_COLUMN_ID, STATE_COLUMN_ID, ISSUES_COLUMN_ID].includes(col.id)),
       );
     },
     [evaluatedTraces, otherEvaluatedTraces],
@@ -307,6 +308,7 @@ const RunViewEvaluationsTabInner = ({
                 compareToTraceInfoV3={compareToRunData}
                 onTraceTagsEdit={showEditTagsModalForTrace}
                 displayLoadingOverlay={displayLoadingOverlay}
+                defaultIssuesExpanded
               />
             </ContextProviders>
           )}

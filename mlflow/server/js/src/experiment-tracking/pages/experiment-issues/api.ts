@@ -6,6 +6,7 @@ import type {
   CreateIssueResponse,
   GetIssueResponse,
   UpdateIssueResponse,
+  GetIssueLinkedRunsResponse,
 } from './types';
 
 /**
@@ -163,5 +164,20 @@ function normalizeIssue(issue: Issue & { state?: string }): Issue {
   return {
     ...issue,
     state: (issue.state?.toLowerCase() || 'draft') as IssueState,
+  };
+}
+
+/**
+ * Get evaluation runs linked to an issue
+ */
+export async function getIssueLinkedRuns(issueId: string): Promise<GetIssueLinkedRunsResponse> {
+  const params = new URLSearchParams();
+  params.append('issue_id', issueId);
+
+  const res = await fetchOrFail(getAjaxUrl(`ajax-api/3.0/mlflow/issues/linked-runs?${params.toString()}`));
+  const data = await res.json();
+  return {
+    runs: data.runs || [],
+    linked_runs: data.linked_runs || [],
   };
 }

@@ -625,6 +625,7 @@ class Issue(Assessment):
     Args:
         issue_id: The unique identifier of the Issue entity. Used as the assessment name.
         issue_name: A human-readable name of the issue. Stored in metadata.
+        value: Whether the issue exists or not in the trace. Default is True.
         source: The source of the assessment. If not provided, the default source is LLM_JUDGE.
         trace_id: The ID of the trace associated with the assessment.
         rationale: The rationale / justification for linking this trace to the issue.
@@ -657,6 +658,7 @@ class Issue(Assessment):
         self,
         issue_id: str,
         issue_name: str,
+        value: bool = True,
         source: AssessmentSource | None = None,
         trace_id: str | None = None,
         rationale: str | None = None,
@@ -691,7 +693,7 @@ class Issue(Assessment):
             span_id=span_id,
             create_time_ms=create_time_ms,
             last_update_time_ms=last_update_time_ms,
-            issue=IssueValue(value=True),
+            issue=IssueValue(value=value),
         )
 
     @property
@@ -701,6 +703,10 @@ class Issue(Assessment):
     @property
     def issue_name(self) -> str:
         return self.metadata.get(ISSUE_NAME_METADATA_KEY, "") if self.metadata else ""
+
+    @property
+    def value(self) -> bool:
+        return self.issue.value
 
     @classmethod
     def from_proto(cls, proto) -> "Issue":
@@ -714,6 +720,7 @@ class Issue(Assessment):
             trace_id=get_trace_id_from_assessment_proto(proto),
             issue_id=proto.assessment_name,  # issue_id is stored as assessment name
             issue_name=issue_name,
+            value=proto.issue.value,
             source=AssessmentSource.from_proto(proto.source),
             create_time_ms=proto.create_time.ToMilliseconds(),
             last_update_time_ms=proto.last_update_time.ToMilliseconds(),
@@ -741,6 +748,7 @@ class Issue(Assessment):
             trace_id=d.get("trace_id"),
             issue_id=d["assessment_name"],  # issue_id is stored as assessment name
             issue_name=issue_name,
+            value=issue_value.get("value", True),
             source=AssessmentSource.from_dictionary(d["source"]),
             create_time_ms=proto_timestamp_to_milliseconds(d["create_time"]),
             last_update_time_ms=proto_timestamp_to_milliseconds(d["last_update_time"]),

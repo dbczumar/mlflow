@@ -13,12 +13,22 @@ import {
   OverflowIcon,
   ChartLineIcon,
   CheckIcon,
+  Spinner,
+  NewWindowIcon,
+  Tag,
+  Table,
+  TableRow,
+  TableCell,
+  TableHeader,
 } from '@databricks/design-system';
 import { FormattedMessage } from 'react-intl';
+import { Link } from '../../../common/utils/RoutingUtils';
+import Routes from '../../routes';
 import type { Issue, IssueState, IssueDetailTab } from './types';
-import { useUpdateIssueMutation } from './hooks/useIssuesApi';
+import { useUpdateIssueMutation, useGetLinkedEvaluationRuns } from './hooks/useIssuesApi';
 import { TracesView } from '../../components/traces/TracesView';
 import { ExperimentViewTracesTableColumns } from '../../components/traces/TracesView.utils';
+import Utils from '../../../common/utils/Utils';
 
 interface IssueDetailPanelProps {
   issue: Issue | null;
@@ -404,19 +414,261 @@ const TracesTabContent = ({ issue, experimentId }: { issue: Issue; experimentId:
   );
 };
 
-const EvaluationRunsTabContent = () => {
+const formatTime = (timestamp?: number): string => {
+  if (!timestamp) return '-';
+  return new Date(timestamp).toLocaleString();
+};
+
+/**
+ * Get pass rate from run metrics for display
+ */
+const getPassRateDisplay = (
+  metrics: { key: string; value: number }[] | undefined,
+  issueId: string,
+): { passCount: number; failCount: number; passRate: number } | null => {
+  if (!metrics || metrics.length === 0) {
+    return null;
+  }
+
+  // Metrics are named: {issue_id}/pass_count, {issue_id}/fail_count, etc.
+  const passCountMetric = metrics.find((m) => m.key === `${issueId}/pass_count`);
+  const failCountMetric = metrics.find((m) => m.key === `${issueId}/fail_count`);
+
+  if (passCountMetric === undefined || failCountMetric === undefined) {
+    return null;
+  }
+
+  const passCount = passCountMetric.value;
+  const failCount = failCountMetric.value;
+  const total = passCount + failCount;
+  const passRate = total > 0 ? passCount / total : 0;
+
+  return { passCount, failCount, passRate };
+};
+
+const PassRateBadge = ({
+  passCount,
+  failCount,
+}: {
+  passCount: number;
+  failCount: number;
+}) => {
   const { theme } = useDesignSystemTheme();
+  const total = passCount + failCount;
+  const passRate = total > 0 ? passCount / total : 0;
+  const passPercentage = Math.round(passRate * 100);
+
+  return (
+    <div css={{ display: 'flex', alignItems: 'center', gap: theme.spacing.sm }}>
+      {/* Bar chart */}
+      <div
+        css={{
+          display: 'flex',
+          width: 120,
+          height: 8,
+          borderRadius: 4,
+          overflow: 'hidden',
+          backgroundColor: theme.colors.grey200,
+        }}
+      >
+        {/* Green (pass) portion */}
+        <div
+          css={{
+            width: `${passRate * 100}%`,
+            backgroundColor: theme.colors.green400,
+          }}
+        />
+        {/* Red (fail) portion */}
+        <div
+          css={{
+            width: `${(1 - passRate) * 100}%`,
+            backgroundColor: theme.colors.red400,
+          }}
+        />
+      </div>
+      {/* Count text with percentage */}
+      <span css={{ color: theme.colors.textSecondary, fontSize: theme.typography.fontSizeSm }}>
+        {passCount} / {total} ({passPercentage}%)
+      </span>
+    </div>
+  );
+};
+
+type SortColumn = 'name' | 'created' | 'passRate';
+type SortDirection = 'asc' | 'desc';
+
+const EvaluationRunsTabContent = ({ issue, experimentId }: { issue: Issue; experimentId: string }) => {
+  const { theme } = useDesignSystemTheme();
+  const { data: runs, isLoading, error } = useGetLinkedEvaluationRuns(issue.issue_id);
+
+  // Default sort by created date, newest first
+  const [sortColumn, setSortColumn] = useState<SortColumn>('created');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+
+  const handleToggleSort = (column: SortColumn) => {
+    if (sortColumn === column) {
+      // Toggle direction if same column
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      // New column, default to descending
+      setSortColumn(column);
+      setSortDirection('desc');
+    }
+  };
+
+  const getSortDirection = (column: SortColumn): 'asc' | 'desc' | undefined => {
+    return sortColumn === column ? sortDirection : undefined;
+  };
+
+  // Sort runs based on current sort state
+  const sortedRuns = useMemo(() => {
+    if (!runs) return [];
+
+    return [...runs].sort((a, b) => {
+      let comparison = 0;
+
+      switch (sortColumn) {
+        case 'name': {
+          const nameA = a.info.run_name || a.info.run_id;
+          const nameB = b.info.run_name || b.info.run_id;
+          comparison = nameA.localeCompare(nameB);
+          break;
+        }
+        case 'created': {
+          const timeA = a.info.start_time || 0;
+          const timeB = b.info.start_time || 0;
+          comparison = timeA - timeB;
+          break;
+        }
+        case 'passRate': {
+          const passRateA = getPassRateDisplay(a.metrics, issue.issue_id)?.passRate ?? -1;
+          const passRateB = getPassRateDisplay(b.metrics, issue.issue_id)?.passRate ?? -1;
+          comparison = passRateA - passRateB;
+          break;
+        }
+      }
+
+      return sortDirection === 'asc' ? comparison : -comparison;
+    });
+  }, [runs, sortColumn, sortDirection, issue.issue_id]);
+
+  if (isLoading) {
+    return (
+      <div css={{ padding: theme.spacing.md, display: 'flex', justifyContent: 'center' }}>
+        <Spinner />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div css={{ padding: theme.spacing.md }}>
+        <Empty
+          description={
+            <FormattedMessage
+              defaultMessage="Failed to load evaluation runs"
+              description="Error message when loading evaluation runs fails"
+            />
+          }
+        />
+      </div>
+    );
+  }
+
+  if (!runs || runs.length === 0) {
+    return (
+      <div css={{ padding: theme.spacing.md }}>
+        <Empty
+          description={
+            <FormattedMessage
+              defaultMessage="No evaluation runs have been linked to this issue yet"
+              description="Empty state when no evaluation runs are linked"
+            />
+          }
+        />
+      </div>
+    );
+  }
 
   return (
     <div css={{ padding: theme.spacing.md }}>
-      <Empty
-        description={
-          <FormattedMessage
-            defaultMessage="Linked evaluation runs will appear here"
-            description="Placeholder for linked evaluation runs section"
-          />
-        }
-      />
+      <Table>
+        <TableRow isHeader>
+          <TableHeader
+            componentId="mlflow.issues.linked-runs.header.name"
+            sortable
+            sortDirection={getSortDirection('name')}
+            onToggleSort={() => handleToggleSort('name')}
+            css={{ cursor: 'pointer' }}
+          >
+            <FormattedMessage defaultMessage="Run Name" description="Column header for run name" />
+          </TableHeader>
+          <TableHeader
+            componentId="mlflow.issues.linked-runs.header.created"
+            sortable
+            sortDirection={getSortDirection('created')}
+            onToggleSort={() => handleToggleSort('created')}
+            css={{ cursor: 'pointer' }}
+          >
+            <FormattedMessage defaultMessage="Created" description="Column header for creation time" />
+          </TableHeader>
+          <TableHeader componentId="mlflow.issues.linked-runs.header.dataset">
+            <FormattedMessage defaultMessage="Dataset" description="Column header for dataset" />
+          </TableHeader>
+          <TableHeader
+            componentId="mlflow.issues.linked-runs.header.pass-rate"
+            sortable
+            sortDirection={getSortDirection('passRate')}
+            onToggleSort={() => handleToggleSort('passRate')}
+            css={{ cursor: 'pointer' }}
+          >
+            <FormattedMessage defaultMessage="Pass Rate" description="Column header for pass rate" />
+          </TableHeader>
+        </TableRow>
+        {sortedRuns.map((run) => {
+          const passRateData = getPassRateDisplay(run.metrics, issue.issue_id);
+          // Link to Evaluation Runs tab with this run selected
+          const evalRunsUrl = `${Routes.getExperimentPageRoute(experimentId)}/evaluation-runs?selectedRunUuid=${run.info.run_id}`;
+
+          return (
+            <TableRow key={run.info.run_id}>
+              <TableCell>
+                <Link
+                  to={evalRunsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  css={{ display: 'inline-flex', alignItems: 'center', gap: theme.spacing.xs }}
+                >
+                  {run.info.run_name || run.info.run_id.slice(0, 8)}
+                  <NewWindowIcon css={{ fontSize: 12 }} />
+                </Link>
+              </TableCell>
+              <TableCell>
+                {run.info.start_time ? (
+                  <Tooltip
+                    componentId="mlflow.issues.linked-runs.created-tooltip"
+                    content={formatTime(run.info.start_time)}
+                  >
+                    <span>{Utils.timeSinceStr(new Date(run.info.start_time))}</span>
+                  </Tooltip>
+                ) : (
+                  '-'
+                )}
+              </TableCell>
+              <TableCell>
+                <span css={{ color: theme.colors.textSecondary }}>-</span>
+              </TableCell>
+              <TableCell>
+                {passRateData ? (
+                  <PassRateBadge passCount={passRateData.passCount} failCount={passRateData.failCount} />
+                ) : (
+                  '-'
+                )}
+              </TableCell>
+            </TableRow>
+          );
+        })}
+      </Table>
     </div>
   );
 };
@@ -503,7 +755,7 @@ export const IssueDetailPanel = ({ issue, experimentId, onIssueUpdated }: IssueD
           <MonitorTabContent />
         </Tabs.Content>
         <Tabs.Content value="evaluation-runs">
-          <EvaluationRunsTabContent />
+          <EvaluationRunsTabContent issue={issue} experimentId={experimentId} />
         </Tabs.Content>
         <Tabs.Content value="comments">
           <CommentsTabContent />

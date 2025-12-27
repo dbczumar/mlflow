@@ -3431,6 +3431,68 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
                 for prompt_id in prompt_ids_to_add
             )
 
+    def link_run_to_issues(self, run_id: str, issue_ids: list[str]) -> None:
+        """
+        Link an evaluation run to issues by creating entity associations.
+
+        This is called when an evaluation run uses IssueJudge scorers to evaluate
+        traces for specific issues. The association allows tracking which runs
+        have evaluated which issues.
+
+        Args:
+            run_id: ID of the evaluation run.
+            issue_ids: List of issue IDs to link to the run.
+        """
+        if not issue_ids:
+            return
+
+        with self.ManagedSessionMaker() as session:
+            # Check for existing associations to avoid duplicates
+            existing_associations = (
+                session.query(SqlEntityAssociation)
+                .filter(
+                    SqlEntityAssociation.source_type == EntityAssociationType.RUN,
+                    SqlEntityAssociation.source_id == run_id,
+                    SqlEntityAssociation.destination_type == EntityAssociationType.ISSUE,
+                    SqlEntityAssociation.destination_id.in_(issue_ids),
+                )
+                .all()
+            )
+            existing_issue_ids = {a.destination_id for a in existing_associations}
+
+            # Add new associations
+            session.add_all(
+                SqlEntityAssociation(
+                    association_id=uuid.uuid4().hex,
+                    source_type=EntityAssociationType.RUN,
+                    source_id=run_id,
+                    destination_type=EntityAssociationType.ISSUE,
+                    destination_id=issue_id,
+                )
+                for issue_id in issue_ids
+                if issue_id not in existing_issue_ids
+            )
+
+    def get_runs_for_issue(self, issue_id: str) -> list[str]:
+        """
+        Get run IDs that are linked to an issue via entity associations.
+
+        This returns IDs of evaluation runs that have evaluated the specified issue
+        using IssueJudge scorers.
+
+        Args:
+            issue_id: The ID of the issue to find linked runs for.
+
+        Returns:
+            List of run IDs linked to the issue.
+        """
+        run_ids = self.search_entities_by_destination(
+            destination_ids=issue_id,
+            destination_type=EntityAssociationType.ISSUE,
+            source_type=EntityAssociationType.RUN,
+        )
+        return run_ids.to_list()
+
     def calculate_trace_filter_correlation(
         self,
         experiment_ids: list[str],

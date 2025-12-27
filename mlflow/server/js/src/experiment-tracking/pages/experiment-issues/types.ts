@@ -50,3 +50,40 @@ export interface UpdateIssueResponse {
  * Tab names for the issue detail panel
  */
 export type IssueDetailTab = 'monitor' | 'traces' | 'evaluation-runs' | 'comments';
+
+/**
+ * Metric associated with a run
+ */
+export interface RunMetric {
+  key: string;
+  value: number;
+}
+
+/**
+ * RunInfo matching backend proto RunInfo message (subset of fields we use)
+ */
+export interface LinkedRunInfo {
+  run_id: string;
+  run_name?: string;
+  experiment_id: string;
+  start_time?: number;
+  end_time?: number;
+  status?: string;
+  lifecycle_stage?: string;
+}
+
+/**
+ * Linked evaluation run with metrics
+ */
+export interface LinkedEvaluationRun {
+  info: LinkedRunInfo;
+  metrics: RunMetric[];
+}
+
+/**
+ * Response from getIssueLinkedRuns API
+ */
+export interface GetIssueLinkedRunsResponse {
+  runs: LinkedRunInfo[];
+  linked_runs?: LinkedEvaluationRun[];
+}

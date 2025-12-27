@@ -2208,6 +2208,38 @@ class CreateJudgeFromIssue(_message.Message):
     issue_id: str
     def __init__(self, issue_id: _Optional[str] = ...) -> None: ...
 
+class LinkedEvaluationRun(_message.Message):
+    __slots__ = ("info", "metrics")
+    INFO_FIELD_NUMBER: _ClassVar[int]
+    METRICS_FIELD_NUMBER: _ClassVar[int]
+    info: RunInfo
+    metrics: _containers.RepeatedCompositeFieldContainer[Metric]
+    def __init__(self, info: _Optional[_Union[RunInfo, _Mapping]] = ..., metrics: _Optional[_Iterable[_Union[Metric, _Mapping]]] = ...) -> None: ...
+
+class GetIssueLinkedRuns(_message.Message):
+    __slots__ = ("issue_id",)
+    class Response(_message.Message):
+        __slots__ = ("runs", "linked_runs")
+        RUNS_FIELD_NUMBER: _ClassVar[int]
+        LINKED_RUNS_FIELD_NUMBER: _ClassVar[int]
+        runs: _containers.RepeatedCompositeFieldContainer[RunInfo]
+        linked_runs: _containers.RepeatedCompositeFieldContainer[LinkedEvaluationRun]
+        def __init__(self, runs: _Optional[_Iterable[_Union[RunInfo, _Mapping]]] = ..., linked_runs: _Optional[_Iterable[_Union[LinkedEvaluationRun, _Mapping]]] = ...) -> None: ...
+    ISSUE_ID_FIELD_NUMBER: _ClassVar[int]
+    issue_id: str
+    def __init__(self, issue_id: _Optional[str] = ...) -> None: ...
+
+class LinkRunToIssues(_message.Message):
+    __slots__ = ("run_id", "issue_ids")
+    class Response(_message.Message):
+        __slots__ = ()
+        def __init__(self) -> None: ...
+    RUN_ID_FIELD_NUMBER: _ClassVar[int]
+    ISSUE_IDS_FIELD_NUMBER: _ClassVar[int]
+    run_id: str
+    issue_ids: _containers.RepeatedScalarFieldContainer[str]
+    def __init__(self, run_id: _Optional[str] = ..., issue_ids: _Optional[_Iterable[str]] = ...) -> None: ...
+
 class MlflowService(_service.service): ...
 
 class MlflowService_Stub(MlflowService): ...

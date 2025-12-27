@@ -248,20 +248,17 @@ class IssueJudge(Judge):
         has_issue = bool(feedback.value) if feedback.value is not None else False
         rationale = feedback.rationale or ""
 
-        # Only return an Issue assessment if the issue was detected
-        if has_issue:
-            return IssueAssessment(
-                issue_id=self._issue_id,
-                issue_name=self._issue_name,
-                trace_id=trace.info.trace_id if trace.info else None,
-                rationale=rationale,
-                source=AssessmentSource(
-                    source_type=AssessmentSourceType.LLM_JUDGE,
-                    source_id=self.name,
-                ),
-            )
-
-        return None
+        return IssueAssessment(
+            issue_id=self._issue_id,
+            issue_name=self._issue_name,
+            value=has_issue,
+            trace_id=trace.info.trace_id if trace.info else None,
+            rationale=rationale,
+            source=AssessmentSource(
+                source_type=AssessmentSourceType.LLM_JUDGE,
+                source_id=self.name,
+            ),
+        )
 
     def _create_response_format_model(self) -> type[pydantic.BaseModel]:
         """Create a Pydantic model for structured output."""

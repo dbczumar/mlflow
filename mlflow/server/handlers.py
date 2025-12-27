@@ -150,7 +150,11 @@ from mlflow.protos.service_pb2 import (
     GetGatewayModelDefinition,
     GetGatewaySecretInfo,
     GetIssue,
+    GetIssueLinkedRuns,
+    LinkedEvaluationRun,
+    LinkRunToIssues,
     GetLoggedModel,
+    Metric as ProtoMetric,
     GetMetricHistory,
     GetMetricHistoryBulkInterval,
     GetRun,
@@ -4034,6 +4038,74 @@ def _create_judge_from_issue():
     return _wrap_response(response_message)
 
 
+@catch_mlflow_exception
+@_disable_if_artifacts_only
+def _get_issue_linked_runs():
+    request_message = _get_request_message(
+        GetIssueLinkedRuns(),
+        schema={
+            "issue_id": [_assert_required, _assert_string],
+        },
+    )
+
+    issue_id = request_message.issue_id
+
+    # Get run IDs linked to the issue
+    run_ids = _get_tracking_store().get_runs_for_issue(issue_id)
+
+    # Fetch RunInfo and metrics for each run
+    response_message = GetIssueLinkedRuns.Response()
+    for run_id in run_ids:
+        try:
+            run = _get_tracking_store().get_run(run_id)
+
+            # Skip deleted runs
+            if run.info.lifecycle_stage == "deleted":
+                continue
+
+            # For backward compatibility, still populate runs field
+            response_message.runs.append(run.info.to_proto())
+
+            # Create a LinkedEvaluationRun with metrics
+            linked_run = LinkedEvaluationRun()
+            linked_run.info.CopyFrom(run.info.to_proto())
+
+            # Add pass/fail metrics for this issue if available
+            # Metrics are named like: {issue_id}/pass_count, {issue_id}/fail_count, etc.
+            issue_prefix = f"{issue_id}/"
+            for key, value in (run.data.metrics or {}).items():
+                if key.startswith(issue_prefix):
+                    proto_metric = ProtoMetric()
+                    proto_metric.key = key
+                    proto_metric.value = value
+                    linked_run.metrics.append(proto_metric)
+
+            response_message.linked_runs.append(linked_run)
+        except Exception:
+            # Skip runs that can't be found (may have been deleted)
+            continue
+
+    return _wrap_response(response_message)
+
+
+@catch_mlflow_exception
+@_disable_if_artifacts_only
+def _link_run_to_issues():
+    request_message = _get_request_message(
+        LinkRunToIssues(),
+        schema={
+            "run_id": [_assert_required, _assert_string],
+            "issue_ids": [_assert_array],
+        },
+    )
+
+    issue_ids = list(request_message.issue_ids)
+    if issue_ids:
+        _get_tracking_store().link_run_to_issues(request_message.run_id, issue_ids)
+
+    return _wrap_response(LinkRunToIssues.Response())
+
+
 # =============================================================================
 # Secrets Management Handlers
 # =============================================================================
@@ -5100,4 +5172,6 @@ HANDLERS = {
     DeleteIssue: _delete_issue,
     SearchIssues: _search_issues,
     CreateJudgeFromIssue: _create_judge_from_issue,
+    GetIssueLinkedRuns: _get_issue_linked_runs,
+    LinkRunToIssues: _link_run_to_issues,
 }

@@ -88,6 +88,7 @@ from mlflow.protos.service_pb2 import (
     GetTraceInfo,
     GetTraceInfoV3,
     LinkPromptsToTrace,
+    LinkRunToIssues,
     LinkTracesToRun,
     ListScorers,
     ListScorerVersions,
@@ -1722,6 +1723,26 @@ class RestStore(RestGatewayStoreMixin, AbstractStore):
             )
         )
         self._call_endpoint(LinkPromptsToTrace, req_body)
+
+    def link_run_to_issues(self, run_id: str, issue_ids: list[str]) -> None:
+        """
+        Link an evaluation run to issues by creating entity associations.
+
+        Args:
+            run_id: ID of the evaluation run.
+            issue_ids: List of issue IDs to link to the run.
+        """
+        if not issue_ids:
+            return
+
+        req_body = message_to_json(
+            LinkRunToIssues(
+                run_id=run_id,
+                issue_ids=issue_ids,
+            )
+        )
+        # Issue APIs are v3.0 endpoints
+        self._call_endpoint(LinkRunToIssues, req_body, endpoint="/api/3.0/mlflow/issues/link-run")
 
     def add_dataset_to_experiments(
         self, dataset_id: str, experiment_ids: list[str]

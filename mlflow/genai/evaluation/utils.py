@@ -341,6 +341,7 @@ def standardize_scorer_value(scorer_name: str, value: Any) -> list[Feedback | Is
     All of the above will be converted to a list of Assessment objects.
     """
     # None is a valid metric value, return an empty list
+    print(f"1. {value}")
     if value is None:
         return []
 

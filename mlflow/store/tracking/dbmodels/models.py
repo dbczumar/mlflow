@@ -991,6 +991,7 @@ class SqlAssessments(Base):
             assessment = Issue(
                 issue_id=self.name,
                 issue_name=issue_name,
+                value=parsed_value,
                 source=source,
                 trace_id=self.trace_id,
                 rationale=self.rationale,

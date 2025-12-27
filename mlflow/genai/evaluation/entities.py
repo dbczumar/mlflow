@@ -7,7 +7,7 @@ from typing import Any
 
 import pandas as pd
 
-from mlflow.entities.assessment import Expectation, Feedback
+from mlflow.entities.assessment import Expectation, Feedback, Issue
 from mlflow.entities.assessment_source import AssessmentSource, AssessmentSourceType
 from mlflow.entities.dataset_record_source import DatasetRecordSource
 from mlflow.entities.trace import Trace
@@ -144,7 +144,7 @@ class EvalResult:
 
     eval_item: EvalItem
     """A collection of assessments from scorers."""
-    assessments: list[Feedback] = field(default_factory=list)
+    assessments: list[Feedback | Issue] = field(default_factory=list)
     """Error message encountered in processing the eval item."""
     eval_error: str | None = None
 

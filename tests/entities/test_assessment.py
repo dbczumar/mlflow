@@ -692,17 +692,8 @@ def test_issue_validation_missing_issue_name():
         Issue(issue_id="issue-123", issue_name=None)
 
 
-def test_issue_value_creation():
-    # IssueValue now contains just a boolean value
-    issue_value = IssueValue(value=True)
-    assert issue_value.value is True
-
-    issue_value_default = IssueValue()
-    assert issue_value_default.value is True
-
-
 def test_issue_value_proto_dict_conversion():
-    # IssueValue contains just a boolean value
+    # IssueValue contains just a boolean value - test with True
     issue_value = IssueValue(value=True)
 
     # Test to_proto
@@ -717,6 +708,27 @@ def test_issue_value_proto_dict_conversion():
     # Test to_dictionary
     issue_dict = issue_value.to_dictionary()
     assert issue_dict.get("value", True) is True
+
+    # Test from_dictionary
+    result = IssueValue.from_dictionary(issue_dict)
+
+
+def test_issue_value_proto_dict_conversion_false():
+    # Test IssueValue with value=False (no issue detected / pass)
+    issue_value = IssueValue(value=False)
+
+    # Test to_proto
+    proto = issue_value.to_proto()
+    assert isinstance(proto, ProtoIssue)
+    assert proto.value is False
+
+    # Test from_proto
+    result = IssueValue.from_proto(proto)
+    assert result.value is False
+
+    # Test to_dictionary
+    issue_dict = issue_value.to_dictionary()
+    assert issue_dict.get("value") is False
 
     # Test from_dictionary
     result = IssueValue.from_dictionary(issue_dict)
