@@ -2482,18 +2482,28 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
         Update online configuration for a scorer.
 
         This method overwrites the existing online configs for the scorer with the new entries.
+        Currently only a single entry is allowed.
 
         Args:
             experiment_id: The experiment ID.
             name: The scorer name.
-            entries: List of config entries, each with 'sample_rate' and optional 'filter_string'.
+            entries: List with at most one config entry containing 'sample_rate' and
+                optional 'filter_string'.
 
         Returns:
             List of ScorerOnlineConfig entities.
 
         Raises:
-            MlflowException: If scorer is not found.
+            MlflowException: If scorer is not found, multiple entries provided, or scorer
+                does not use a gateway model.
         """
+        # Validate only a single entry is provided
+        if len(entries) > 1:
+            raise MlflowException(
+                "Only a single online config entry is allowed per scorer.",
+                INVALID_PARAMETER_VALUE,
+            )
+
         with self.ManagedSessionMaker() as session:
             # Validate experiment exists and is active
             experiment = self.get_experiment(experiment_id)
@@ -2514,6 +2524,24 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
                     f"Scorer with name '{name}' not found for experiment {experiment_id}.",
                     RESOURCE_DOES_NOT_EXIST,
                 )
+
+            # Get the latest scorer version to validate it uses a gateway model
+            latest_version = (
+                session.query(SqlScorerVersion)
+                .filter(SqlScorerVersion.scorer_id == scorer.scorer_id)
+                .order_by(SqlScorerVersion.scorer_version.desc())
+                .first()
+            )
+
+            if latest_version is not None and entries:
+                serialized_data = json.loads(latest_version.serialized_scorer)
+                model = extract_model_from_serialized_scorer(serialized_data)
+                if not is_gateway_model(model):
+                    raise MlflowException(
+                        f"Scorer '{name}' does not use a gateway model. "
+                        "Online scoring is only supported for scorers that use gateway models.",
+                        INVALID_PARAMETER_VALUE,
+                    )
 
             # Delete existing online configs for this scorer
             session.query(SqlScorerOnlineConfig).filter(

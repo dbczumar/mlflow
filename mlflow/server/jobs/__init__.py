@@ -202,8 +202,13 @@ def submit_job(
     serialized_params = json.dumps(params)
     job = job_store.create_job(fn_meta.name, serialized_params, timeout)
 
-    # enqueue job
-    _get_or_init_huey_instance(fn_meta.name).submit_task(
+    # enqueue job (use exclusive task if exclusive=True)
+    huey_instance = _get_or_init_huey_instance(fn_meta.name)
+    if fn_meta.exclusive:
+        submit_fn = huey_instance.submit_task_exclusive
+    else:
+        submit_fn = huey_instance.submit_task
+    submit_fn(
         job.job_id,
         fn_meta.name,
         params,

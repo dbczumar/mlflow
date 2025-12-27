@@ -328,9 +328,14 @@ def _get_or_init_huey_instance(instance_key: str):
                 serializer=JsonSerializer(),
             )
             huey_submit_task_fn = huey_instance.task(retries=0)(_exec_job)
+            # Create exclusive (locked) version of the task
+            huey_submit_task_exclusive_fn = huey_instance.task(retries=0)(
+                huey_instance.lock_task(instance_key)(_exec_job)
+            )
             _huey_instance_map[instance_key] = HueyInstance(
                 instance=huey_instance,
                 submit_task=huey_submit_task_fn,
+                submit_task_exclusive=huey_submit_task_exclusive_fn,
             )
         return _huey_instance_map[instance_key]
 
