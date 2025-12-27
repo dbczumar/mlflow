@@ -64,14 +64,38 @@ const IssueBadge = ({ name }: IssueBadgeProps) => {
   );
 };
 
+// Note: issue_id is stored as assessment_name in the backend
 const getIssueAssessments = (traceInfo?: ModelTraceInfoV3): IssueAssessment[] => {
   if (!traceInfo?.assessments) {
     return [];
   }
-  return traceInfo.assessments.filter(
+
+  const validIssueAssessments = traceInfo.assessments.filter(
     (assessment): assessment is IssueAssessment =>
       isIssueAssessment(assessment) && assessment.valid !== false && assessment.issue?.value !== false,
   );
+
+  // Deduplicate by issue ID (assessment_name), keeping only the latest assessment for each issue
+  const issueAssessmentsByIssueId = new Map<string, IssueAssessment>();
+
+  validIssueAssessments.forEach((assessment) => {
+    // issue_id is stored as assessment_name
+    const issueId = assessment.assessment_name;
+
+    const existing = issueAssessmentsByIssueId.get(issueId);
+    if (!existing) {
+      issueAssessmentsByIssueId.set(issueId, assessment);
+    } else {
+      // Keep the one with the later last_update_time (or create_time as fallback)
+      const existingTime = new Date(existing.last_update_time || existing.create_time).getTime();
+      const newTime = new Date(assessment.last_update_time || assessment.create_time).getTime();
+      if (newTime > existingTime) {
+        issueAssessmentsByIssueId.set(issueId, assessment);
+      }
+    }
+  });
+
+  return Array.from(issueAssessmentsByIssueId.values());
 };
 
 interface IssuesBadgeListProps {
@@ -144,25 +168,33 @@ const toBoolean = (value: unknown): boolean => {
 /**
  * Finds a specific issue assessment by name in the trace info.
  * Returns the issue value (true = detected, false = not detected) or undefined if not found.
+ * When multiple assessments have the same name, returns the value from the latest one.
  */
 const findIssueByName = (traceInfo: ModelTraceInfoV3 | undefined, issueName: string): boolean | undefined => {
   if (!traceInfo?.assessments) {
     return undefined;
   }
 
+  let latestAssessment: IssueAssessment | undefined;
+  let latestTime = 0;
+
   for (const assessment of traceInfo.assessments) {
-    if (isIssueAssessment(assessment)) {
+    if (isIssueAssessment(assessment) && assessment.valid !== false) {
       const name = getIssueName(assessment);
       if (name === issueName) {
-        // Return the actual boolean value (true = issue detected, false = no issue)
-        // Handle both boolean and string values from the backend
-        const value = assessment.issue?.value;
-        return value !== undefined ? toBoolean(value) : undefined;
+        const assessmentTime = new Date(assessment.last_update_time || assessment.create_time).getTime();
+        if (!latestAssessment || assessmentTime > latestTime) {
+          latestAssessment = assessment;
+          latestTime = assessmentTime;
+        }
       }
     }
   }
 
-  return undefined;
+  // Return the actual boolean value (true = issue detected, false = no issue)
+  // Handle both boolean and string values from the backend
+  const value = latestAssessment?.issue?.value;
+  return value !== undefined ? toBoolean(value) : undefined;
 };
 
 interface SingleIssueValueProps {

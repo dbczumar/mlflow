@@ -30,12 +30,36 @@ export interface IssuesSectionProps {
 export const IssuesSection = ({ traceId, experimentId, assessments, activeSpanId, onClose }: IssuesSectionProps) => {
   const { theme } = useDesignSystemTheme();
 
-  // Filter to only valid issue assessments with value=true
+  // Filter to only valid issue assessments with value=true,
+  // then deduplicate by issue ID (keeping only the latest assessment for each issue ID)
+  // Note: issue_id is stored as assessment_name in the backend
   const issueAssessments = useMemo(() => {
-    return assessments.filter(
+    const validIssueAssessments = assessments.filter(
       (assessment): assessment is IssueAssessment =>
         isIssueAssessment(assessment) && assessment.valid !== false && assessment.issue?.value !== false,
     );
+
+    // Group assessments by issue ID (assessment_name) and keep only the latest one for each issue
+    const issueAssessmentsByIssueId = new Map<string, IssueAssessment>();
+
+    validIssueAssessments.forEach((assessment) => {
+      // issue_id is stored as assessment_name
+      const issueId = assessment.assessment_name;
+
+      const existing = issueAssessmentsByIssueId.get(issueId);
+      if (!existing) {
+        issueAssessmentsByIssueId.set(issueId, assessment);
+      } else {
+        // Keep the one with the later last_update_time (or create_time as fallback)
+        const existingTime = new Date(existing.last_update_time || existing.create_time).getTime();
+        const newTime = new Date(assessment.last_update_time || assessment.create_time).getTime();
+        if (newTime > existingTime) {
+          issueAssessmentsByIssueId.set(issueId, assessment);
+        }
+      }
+    });
+
+    return Array.from(issueAssessmentsByIssueId.values());
   }, [assessments]);
 
   // Get linked issue IDs for filtering in the selector
