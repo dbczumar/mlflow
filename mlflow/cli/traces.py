@@ -177,6 +177,7 @@ Examples:
 - Filter by timestamp: "timestamp_ms > 1700000000000"
 - Filter by metadata: "metadata.`mlflow.modelId` = 'model123'"
 - Filter by tags: "tags.environment = 'production'"
+- Filter by issue: "issues.`issue_id` = 'true'"
 - Multiple conditions: "run_id = '123' AND status = 'OK'"
 
 Available fields:
