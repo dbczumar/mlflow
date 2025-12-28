@@ -4,7 +4,6 @@ import logging
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
-from typing import Any
 
 from mlflow.entities import Trace, TraceInfo
 from mlflow.environment_variables import MLFLOW_GENAI_EVAL_MAX_WORKERS
@@ -69,7 +68,7 @@ class OnlineScoringProcessor:
     def create(
         cls,
         experiment_id: str,
-        scorer_configs: list[dict[str, Any]],
+        online_scorers: list[OnlineScorer],
         tracking_store: AbstractStore,
     ) -> "OnlineScoringProcessor":
         """
@@ -77,17 +76,16 @@ class OnlineScoringProcessor:
 
         Args:
             experiment_id: The experiment ID to process traces from.
-            scorer_configs: List of OnlineScorerConfig dicts.
+            online_scorers: List of OnlineScorer instances.
             tracking_store: The tracking store instance.
 
         Returns:
             Configured OnlineScoringProcessor instance.
         """
-        configs = [OnlineScorer(**c) for c in scorer_configs]
         return cls(
             trace_loader=TraceLoader(tracking_store),
             checkpoint_manager=OnlineCheckpointManager(tracking_store, experiment_id),
-            sampler=OnlineScorerSampler(configs),
+            sampler=OnlineScorerSampler(online_scorers),
             experiment_id=experiment_id,
         )
 
