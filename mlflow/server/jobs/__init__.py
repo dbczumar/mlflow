@@ -127,27 +127,6 @@ def job(
     return decorator
 
 
-def _serialize_params(params: dict[str, Any]) -> dict[str, Any]:
-    """
-    Serialize job parameters, converting Pydantic models to dicts.
-
-    Recursively processes the params dict to convert any Pydantic BaseModel
-    instances to their dict representation for JSON serialization.
-    """
-    from pydantic import BaseModel
-
-    def _serialize_value(value: Any) -> Any:
-        if isinstance(value, BaseModel):
-            return value.model_dump()
-        elif isinstance(value, list):
-            return [_serialize_value(item) for item in value]
-        elif isinstance(value, dict):
-            return {k: _serialize_value(v) for k, v in value.items()}
-        return value
-
-    return {key: _serialize_value(value) for key, value in params.items()}
-
-
 def submit_job(
     function: Callable[..., Any],
     params: dict[str, Any],
@@ -220,9 +199,6 @@ def submit_job(
         )
     # Validate that required parameters are provided
     _validate_function_parameters(function, params)
-
-    # Convert Pydantic models to dicts for JSON serialization
-    params = _serialize_params(params)
 
     job_store = _get_job_store()
     serialized_params = json.dumps(params)

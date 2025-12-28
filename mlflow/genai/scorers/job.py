@@ -25,7 +25,7 @@ from mlflow.genai.evaluation.session_utils import (
     evaluate_session_level_scorers,
     get_first_trace_in_session,
 )
-from mlflow.genai.scorers.base import BaseModel, Scorer
+from mlflow.genai.scorers.base import Scorer
 from mlflow.server.jobs import job
 from mlflow.store.tracking.abstract_store import AbstractStore
 from mlflow.tracing.constant import TraceMetadataKey
@@ -43,7 +43,8 @@ class TraceResult:
     failures: list[ScorerFailure] = field(default_factory=list)
 
 
-class OnlineScorerConfig(BaseModel):
+@dataclass
+class OnlineScorerConfig:
     """Configuration for an online scorer to run against traces."""
 
     serialized_scorer: str
@@ -72,7 +73,7 @@ def _extract_failures_from_feedbacks(feedbacks: list[Any]) -> list[ScorerFailure
 )
 def run_online_scorer_job(
     experiment_id: str,
-    scorer_configs: list[OnlineScorerConfig],
+    scorer_configs: list[dict[str, Any]],
 ) -> None:
     """
     Job that fetches samples of traces and runs scorers on them.
@@ -82,12 +83,9 @@ def run_online_scorer_job(
 
     Args:
         experiment_id: The experiment ID to fetch traces from.
-        scorer_configs: List of OnlineScorerConfig objects specifying which scorers to run.
+        scorer_configs: List of OnlineScorerConfig dicts specifying which scorers to run.
     """
-    # Deserialize if passed as dicts (from JSON serialization)
-    configs = [
-        OnlineScorerConfig.model_validate(c) if isinstance(c, dict) else c for c in scorer_configs
-    ]
+    configs = [OnlineScorerConfig(**c) for c in scorer_configs]
     # TODO: Implement trace fetching, sampling, and scoring
     for config in configs:
         _logger.debug(

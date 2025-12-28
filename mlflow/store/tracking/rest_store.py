@@ -1362,6 +1362,41 @@ class RestStore(RestGatewayStoreMixin, AbstractStore):
             endpoint="/api/3.0/mlflow/scorers/delete",
         )
 
+    def update_scorer_online_config(
+        self,
+        experiment_id: str,
+        name: str,
+        entries: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        """
+        Update the online scoring configuration for a registered scorer.
+
+        Args:
+            experiment_id: String ID of the experiment.
+            name: String name of the scorer.
+            entries: List of config entry dictionaries with sample_rate and optional filter_string.
+
+        Returns:
+            List of updated config entries.
+        """
+        request_body = json.dumps(
+            {
+                "experiment_id": experiment_id,
+                "name": name,
+                "entries": entries,
+            }
+        )
+
+        response = http_request(
+            host_creds=self.get_host_creds(),
+            endpoint="/api/3.0/mlflow/scorers/online-config",
+            method="PUT",
+            json=json.loads(request_body),
+        )
+
+        verify_rest_response(response, "/api/3.0/mlflow/scorers/online-config")
+        return response.json().get("configs", [])
+
     ############################################################################################
     # Deprecated MLflow Tracing APIs. Kept for backward compatibility but do not use.
     ############################################################################################

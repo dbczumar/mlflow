@@ -4639,9 +4639,14 @@ def get_endpoints(get_handler=get_handler):
     return (
         get_service_endpoints(MlflowService, get_handler)
         + [
-            # Non-proto scorer endpoints
+            # Non-proto scorer endpoints (both ajax and non-ajax paths)
             (
                 _get_ajax_path("/mlflow/scorers/online-config", version=3),
+                _update_scorer_online_config,
+                ["PUT"],
+            ),
+            (
+                _get_rest_path("/mlflow/scorers/online-config", version=3),
                 _update_scorer_online_config,
                 ["PUT"],
             ),
