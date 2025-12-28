@@ -2025,7 +2025,7 @@ class SqlScorerOnlineConfig(Base):
 
     __table_args__ = (
         PrimaryKeyConstraint("scorer_online_config_id", name="scorer_online_config_pk"),
-        Index(f"index_{__tablename__}_scorer_id", "scorer_id"),
+        UniqueConstraint("scorer_id", name="unique_scorer_online_config_scorer_id"),
     )
 
     def __repr__(self):

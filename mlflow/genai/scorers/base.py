@@ -724,13 +724,6 @@ class Scorer(BaseModel):
 
         self._check_can_be_registered()
 
-        if self._registered_backend is None:
-            raise MlflowException.invalid_parameter_value(
-                "Cannot start a scorer that is not registered. "
-                "Please call register() first before calling start(), "
-                "or use get_scorer() to load a registered scorer."
-            )
-
         if sampling_config.sample_rate is not None and sampling_config.sample_rate <= 0:
             raise MlflowException.invalid_parameter_value(
                 "When starting a scorer, provided sample rate must be greater than 0"
@@ -816,13 +809,6 @@ class Scorer(BaseModel):
 
         self._check_can_be_registered()
 
-        if self._registered_backend is None:
-            raise MlflowException.invalid_parameter_value(
-                "Cannot update a scorer that is not registered. "
-                "Please call register() first before calling update(), "
-                "or use get_scorer() to load a registered scorer."
-            )
-
         scorer_name = name or self.name
         store = _get_scorer_store()
 
@@ -884,13 +870,6 @@ class Scorer(BaseModel):
                 )
         """
         self._check_can_be_registered()
-
-        if self._registered_backend is None:
-            raise MlflowException.invalid_parameter_value(
-                "Cannot stop a scorer that is not registered. "
-                "Please call register() first before calling stop(), "
-                "or use get_scorer() to load a registered scorer."
-            )
 
         scorer_name = name or self.name
         return self.update(

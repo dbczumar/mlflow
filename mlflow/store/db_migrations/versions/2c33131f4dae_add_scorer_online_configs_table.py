@@ -30,14 +30,8 @@ def upgrade():
             ondelete="CASCADE",
         ),
         sa.PrimaryKeyConstraint("scorer_online_config_id", name="scorer_online_config_pk"),
+        sa.UniqueConstraint("scorer_id", name="unique_scorer_online_config_scorer_id"),
     )
-
-    with op.batch_alter_table(SqlScorerOnlineConfig.__tablename__, schema=None) as batch_op:
-        batch_op.create_index(
-            f"index_{SqlScorerOnlineConfig.__tablename__}_scorer_id",
-            ["scorer_id"],
-            unique=False,
-        )
 
 
 def downgrade():

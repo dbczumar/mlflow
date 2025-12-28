@@ -266,7 +266,17 @@ class MlflowTrackingStore(AbstractScorerStore):
 
         Returns:
             A copy of the scorer with updated sampling configuration.
+
+        Raises:
+            MlflowException: If the scorer is not registered.
         """
+        if scorer._registered_backend is None:
+            raise MlflowException.invalid_parameter_value(
+                "Cannot start/update a scorer that is not registered. "
+                "Please call register() first before calling start()/update(), "
+                "or use get_scorer() to load a registered scorer."
+            )
+
         experiment_id = experiment_id or _get_experiment_id()
 
         # Determine the effective sample rate
