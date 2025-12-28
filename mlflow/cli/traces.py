@@ -807,8 +807,23 @@ def delete_assessment(trace_id: str, assessment_id: str) -> None:
 @click.option(
     "--trace-ids",
     type=click.STRING,
-    required=True,
-    help="Comma-separated list of trace IDs to evaluate.",
+    required=False,
+    help="Comma-separated list of trace IDs to evaluate. "
+    "Either --trace-ids or --filter-string must be provided.",
+)
+@click.option(
+    "--filter-string",
+    type=click.STRING,
+    required=False,
+    help="Filter string to search traces for evaluation. "
+    "Either --trace-ids or --filter-string must be provided. "
+    "Examples: \"status = 'OK'\", \"timestamp_ms > 1700000000000\".",
+)
+@click.option(
+    "--max-results",
+    type=click.INT,
+    default=100,
+    help="Maximum number of traces to evaluate when using --filter-string (default: 100).",
 )
 @click.option(
     "--scorers",
@@ -826,7 +841,9 @@ def delete_assessment(trace_id: str, assessment_id: str) -> None:
 )
 def evaluate_traces(
     experiment_id: str,
-    trace_ids: str,
+    trace_ids: str | None,
+    filter_string: str | None,
+    max_results: int,
     scorers: str,
     output_format: Literal["table", "json"] = "table",
 ) -> None:
@@ -836,25 +853,39 @@ def evaluate_traces(
     This command runs MLflow's genai.evaluate() on specified traces, applying the
     specified scorers and displaying the evaluation results in table or JSON format.
 
+    Traces can be specified either by explicit IDs (--trace-ids) or by a filter
+    query (--filter-string). When using --filter-string, use --max-results to
+    limit the number of traces evaluated.
+
     \b
     Examples:
     # Evaluate a single trace with built-in scorers
-    mlflow traces evaluate --trace-ids tr-abc123 --scorers Correctness,Safety
+    mlflow traces evaluate --trace-ids tr-abc123 --scorers Correctness,Safety -x 123
 
     \b
     # Evaluate multiple traces
     mlflow traces evaluate --trace-ids tr-abc123,tr-def456,tr-ghi789 \\
-        --scorers RelevanceToQuery
+        --scorers RelevanceToQuery -x 123
+
+    \b
+    # Evaluate traces using a filter
+    mlflow traces evaluate --filter-string "status = 'OK'" \\
+        --scorers Correctness -x 123
+
+    \b
+    # Evaluate recent traces with max results
+    mlflow traces evaluate --filter-string "timestamp_ms > 1700000000000" \\
+        --max-results 50 --scorers Safety -x 123
 
     \b
     # Evaluate with JSON output
     mlflow traces evaluate --trace-ids tr-abc123 \\
-        --scorers Correctness --output json
+        --scorers Correctness --output json -x 123
 
     \b
     # Evaluate with custom registered scorer
     mlflow traces evaluate --trace-ids tr-abc123,tr-def456 \\
-        --scorers my_custom_scorer,Correctness
+        --scorers my_custom_scorer,Correctness -x 123
 
     \b
     Available built-in scorers (use either PascalCase or snake_case):
@@ -869,6 +900,24 @@ def evaluate_traces(
     - RetrievalGroundedness / retrieval_groundedness: Assesses response alignment with
       retrieved context
     """
+    # Validate that either trace_ids or filter_string is provided
+    if not trace_ids and not filter_string:
+        raise click.UsageError(
+            "Must specify either --trace-ids or --filter-string to select traces for evaluation."
+        )
+
+    if trace_ids and filter_string:
+        raise click.UsageError(
+            "Cannot specify both --trace-ids and --filter-string. Use one or the other."
+        )
+
     from mlflow.cli.eval import evaluate_traces as run_evaluation
 
-    run_evaluation(experiment_id, trace_ids, scorers, output_format)
+    run_evaluation(
+        experiment_id=experiment_id,
+        trace_ids=trace_ids,
+        filter_string=filter_string,
+        max_results=max_results,
+        scorers=scorers,
+        output_format=output_format,
+    )
