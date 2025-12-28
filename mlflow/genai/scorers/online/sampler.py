@@ -18,12 +18,14 @@ class OnlineScorerSampler:
 
     def __init__(self, configs: list[OnlineScorerConfig]):
         self.configs = configs
-        self._sample_rates: dict[str, float] = {c.serialized_scorer: c.sample_rate for c in configs}
+        # Map scorer name -> sample rate and scorer name -> Scorer
+        self._sample_rates: dict[str, float] = {}
         self._scorers: dict[str, Scorer] = {}
         for config in configs:
-            if config.serialized_scorer not in self._scorers:
-                scorer_dict = json.loads(config.serialized_scorer)
-                self._scorers[config.serialized_scorer] = Scorer.model_validate(scorer_dict)
+            scorer_dict = json.loads(config.serialized_scorer)
+            scorer = Scorer.model_validate(scorer_dict)
+            self._sample_rates[scorer.name] = config.sample_rate
+            self._scorers[scorer.name] = scorer
 
     def get_filter_strings(self) -> set[str | None]:
         """Get all unique filter strings from configs."""
@@ -33,12 +35,17 @@ class OnlineScorerSampler:
         self, filter_string: str | None, session_level: bool
     ) -> list[Scorer]:
         """Get scorers matching the filter string and session level."""
-        return [
-            self._scorers[c.serialized_scorer]
-            for c in self.configs
-            if c.filter_string == filter_string
-            and self._scorers[c.serialized_scorer].is_session_level_scorer == session_level
-        ]
+        result = []
+        for config in self.configs:
+            scorer_dict = json.loads(config.serialized_scorer)
+            scorer = self._scorers.get(scorer_dict.get("name"))
+            if (
+                scorer
+                and config.filter_string == filter_string
+                and scorer.is_session_level_scorer == session_level
+            ):
+                result.append(scorer)
+        return result
 
     def sample(self, entity_id: str, scorers: list[Scorer]) -> list[Scorer]:
         """
@@ -57,7 +64,7 @@ class OnlineScorerSampler:
         # Sort by sample rate descending
         sorted_scorers = sorted(
             scorers,
-            key=lambda s: self._sample_rates.get(s.model_dump_json(), 1.0),
+            key=lambda s: self._sample_rates.get(s.name, 1.0),
             reverse=True,
         )
 
@@ -65,11 +72,11 @@ class OnlineScorerSampler:
         prev_rate = 1.0
 
         for scorer in sorted_scorers:
-            rate = self._sample_rates.get(scorer.model_dump_json(), 1.0)
+            rate = self._sample_rates.get(scorer.name, 1.0)
             conditional_rate = rate / prev_rate if prev_rate > 0 else 0
 
-            # Hash entity_id + scorer to get deterministic value in [0, 1]
-            hash_input = f"{entity_id}:{scorer.model_dump_json()}"
+            # Hash entity_id + scorer name to get deterministic value in [0, 1]
+            hash_input = f"{entity_id}:{scorer.name}"
             hash_value = int(hashlib.sha256(hash_input.encode()).hexdigest(), 16) / (2**256)
 
             if hash_value > conditional_rate:
