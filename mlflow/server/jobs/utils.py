@@ -252,12 +252,15 @@ def _exec_job(
     # If exclusive, acquire lock based on job_name + hash(params)
     # If lock is already held, TaskLockedException is raised and job is skipped
     if exclusive:
+        from huey.exceptions import TaskLockedException
+
         huey_instance = _get_or_init_huey_instance(job_name).instance
         lock_key = _compute_exclusive_lock_key(job_name, params)
         lock = huey_instance.lock_task(lock_key)
-        if not lock.acquire(blocking=False):
+        try:
+            lock.acquire()
+        except TaskLockedException:
             _logger.info(f"Skipping job {job_id} - exclusive lock {lock_key} already held")
-            # Mark job as skipped/canceled since we're not running it
             job_store.cancel_job(job_id)
             return
     else:

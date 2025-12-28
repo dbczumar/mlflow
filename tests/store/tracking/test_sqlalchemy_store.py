@@ -10775,7 +10775,7 @@ def test_get_active_scorer_online_configs_filters_by_sample_rate(store: SqlAlche
         store.register_scorer(experiment_id, "active", _gateway_model_scorer_json())
         store.register_scorer(experiment_id, "inactive", _gateway_model_scorer_json())
 
-    store.update_scorer_online_config(
+    active_config = store.update_scorer_online_config(
         experiment_id=experiment_id,
         name="active",
         sample_rate=0.1,
@@ -10787,19 +10787,20 @@ def test_get_active_scorer_online_configs_filters_by_sample_rate(store: SqlAlche
     )
 
     active_configs = store.get_active_scorer_online_configs()
-    test_configs = [c for c in active_configs if c.experiment_id == experiment_id]
+    # Filter to only configs we created in this test using scorer_id
+    test_configs = [c for c in active_configs if c.scorer_id == active_config.scorer_id]
 
     assert len(test_configs) == 1
-    assert test_configs[0].scorer_name == "active"
+    assert test_configs[0].sample_rate == 0.1
 
 
-def test_get_active_scorer_online_configs_includes_scorer_info(store: SqlAlchemyStore):
+def test_get_active_scorer_online_configs_returns_config_fields(store: SqlAlchemyStore):
     experiment_id = store.create_experiment("test_active_configs_info")
     scorer_json = _gateway_model_scorer_json()
     with mock.patch.object(store, "get_gateway_endpoint", return_value=_mock_gateway_endpoint()):
         store.register_scorer(experiment_id, "scorer", scorer_json)
 
-    store.update_scorer_online_config(
+    config = store.update_scorer_online_config(
         experiment_id=experiment_id,
         name="scorer",
         sample_rate=0.5,
@@ -10807,12 +10808,12 @@ def test_get_active_scorer_online_configs_includes_scorer_info(store: SqlAlchemy
     )
 
     active_configs = store.get_active_scorer_online_configs()
-    config = next(c for c in active_configs if c.experiment_id == experiment_id)
+    active_config = next(c for c in active_configs if c.scorer_id == config.scorer_id)
 
-    assert config.scorer_name == "scorer"
-    assert config.scorer_id is not None
-    # Note: serialized_scorer is modified by register_scorer to use endpoint_id instead of name
-    assert config.filter_string == "env = 'prod'"
+    assert active_config.scorer_online_config_id is not None
+    assert active_config.scorer_id is not None
+    assert active_config.sample_rate == 0.5
+    assert active_config.filter_string == "env = 'prod'"
 
 
 def test_scorer_deletion_cascades_to_online_configs(store: SqlAlchemyStore):

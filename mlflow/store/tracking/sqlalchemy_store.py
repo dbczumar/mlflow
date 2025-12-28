@@ -2423,56 +2423,25 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
         Get all active scorer online configs across all experiments.
 
         Active configs are those with a sample_rate greater than zero.
-        This method returns all active configs with their associated scorer information,
-        including the experiment ID, scorer name, and the latest serialized scorer.
 
         Returns:
-            List of ScorerOnlineConfig entities with full scorer information.
+            List of ScorerOnlineConfig entities.
         """
         with self.ManagedSessionMaker() as session:
-            # Get all online configs with sample_rate > 0, with their associated scorer
-            # and latest scorer version. We need to join with scorer versions to get
-            # the serialized_scorer.
             results = (
-                session.query(
-                    SqlScorerOnlineConfig,
-                    SqlScorer,
-                    SqlScorerVersion,
-                )
+                session.query(SqlScorerOnlineConfig)
                 .filter(SqlScorerOnlineConfig.sample_rate > 0)
-                .join(SqlScorer, SqlScorerOnlineConfig.scorer_id == SqlScorer.scorer_id)
-                .join(SqlScorerVersion, SqlScorer.scorer_id == SqlScorerVersion.scorer_id)
                 .all()
             )
 
-            if not results:
-                return []
-
-            # Group by config to find the latest version for each
-            config_to_latest: dict[
-                str, tuple[SqlScorerOnlineConfig, SqlScorer, SqlScorerVersion]
-            ] = {}
-            for config, scorer, version in results:
-                config_id = config.scorer_online_config_id
-                if config_id not in config_to_latest:
-                    config_to_latest[config_id] = (config, scorer, version)
-                else:
-                    _, _, existing_version = config_to_latest[config_id]
-                    if version.scorer_version > existing_version.scorer_version:
-                        config_to_latest[config_id] = (config, scorer, version)
-
-            # Convert to entities with full information
             return [
                 ScorerOnlineConfig(
                     scorer_online_config_id=config.scorer_online_config_id,
                     scorer_id=config.scorer_id,
                     sample_rate=config.sample_rate,
                     filter_string=config.filter_string,
-                    experiment_id=str(scorer.experiment_id),
-                    scorer_name=scorer.scorer_name,
-                    serialized_scorer=version.serialized_scorer,
                 )
-                for config, scorer, version in config_to_latest.values()
+                for config in results
             ]
 
     def update_scorer_online_config(

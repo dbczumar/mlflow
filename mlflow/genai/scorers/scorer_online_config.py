@@ -20,17 +20,11 @@ class ScorerOnlineConfig:
         scorer_id: str,
         sample_rate: float,
         filter_string: str | None = None,
-        experiment_id: str | None = None,
-        scorer_name: str | None = None,
-        serialized_scorer: str | None = None,
     ):
         self._scorer_online_config_id = scorer_online_config_id
         self._scorer_id = scorer_id
         self._sample_rate = sample_rate
         self._filter_string = filter_string
-        self._experiment_id = experiment_id
-        self._scorer_name = scorer_name
-        self._serialized_scorer = serialized_scorer
 
     @property
     def scorer_online_config_id(self) -> str:
@@ -51,21 +45,6 @@ class ScorerOnlineConfig:
     def filter_string(self) -> str | None:
         """Optional filter expression to select which traces should be scored."""
         return self._filter_string
-
-    @property
-    def experiment_id(self) -> str | None:
-        """The ID of the experiment the scorer belongs to."""
-        return self._experiment_id
-
-    @property
-    def scorer_name(self) -> str | None:
-        """The name of the scorer."""
-        return self._scorer_name
-
-    @property
-    def serialized_scorer(self) -> str | None:
-        """The JSON-serialized scorer string."""
-        return self._serialized_scorer
 
     def __repr__(self):
         return (

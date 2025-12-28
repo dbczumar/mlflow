@@ -814,7 +814,6 @@ class Scorer(BaseModel):
         """
         from mlflow.genai.scorers.registry import (
             DatabricksStore,
-            MlflowTrackingStore,
             _get_scorer_store,
         )
 
@@ -839,22 +838,18 @@ class Scorer(BaseModel):
                 filter_string=sampling_config.filter_string,
                 experiment_id=experiment_id,
             )
-        elif isinstance(store, MlflowTrackingStore):
-            # Use OSS tracking store
-            updated_config = store.update_scorer_online_config(
-                experiment_id=experiment_id,
-                name=scorer_name,
-                sample_rate=sampling_config.sample_rate,
-                filter_string=sampling_config.filter_string,
-            )
-            # Create a copy with updated sampling config
-            new_scorer = self._create_copy()
-            new_scorer._sampling_config = updated_config
-            return new_scorer
-        else:
-            raise MlflowException(
-                f"Scorer scheduling is not supported for store type: {type(store).__name__}"
-            )
+
+        # MlflowTrackingStore - use OSS tracking store
+        updated_config = store.update_scorer_online_config(
+            experiment_id=experiment_id,
+            name=scorer_name,
+            sample_rate=sampling_config.sample_rate,
+            filter_string=sampling_config.filter_string,
+        )
+        # Create a copy with updated sampling config
+        new_scorer = self._create_copy()
+        new_scorer._sampling_config = updated_config
+        return new_scorer
 
     def stop(self, *, name: str | None = None, experiment_id: str | None = None) -> "Scorer":
         """
