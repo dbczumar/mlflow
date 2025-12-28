@@ -2510,6 +2510,10 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
                         INVALID_PARAMETER_VALUE,
                     )
 
+            if filter_string:
+                # Parse to validate syntax - raises MlflowException if invalid
+                SearchTraceUtils.parse_search_filter_for_search_traces(filter_string)
+
             # Delete existing online configs for this scorer
             session.query(SqlScorerOnlineConfig).filter(
                 SqlScorerOnlineConfig.scorer_id == scorer.scorer_id

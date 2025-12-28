@@ -10767,6 +10767,30 @@ def test_update_scorer_online_config_nonexistent_scorer(store: SqlAlchemyStore):
         )
 
 
+def test_update_scorer_online_config_validates_filter_string(store: SqlAlchemyStore):
+    experiment_id = store.create_experiment("test_filter_validation")
+    with mock.patch.object(store, "get_gateway_endpoint", return_value=_mock_gateway_endpoint()):
+        store.register_scorer(experiment_id, "test_scorer", _gateway_model_scorer_json())
+
+    # Valid filter string should work
+    config = store.update_scorer_online_config(
+        experiment_id=experiment_id,
+        name="test_scorer",
+        sample_rate=0.5,
+        filter_string="status = 'OK'",
+    )
+    assert config.filter_string == "status = 'OK'"
+
+    # Invalid filter string should raise
+    with pytest.raises(MlflowException, match="Invalid"):
+        store.update_scorer_online_config(
+            experiment_id=experiment_id,
+            name="test_scorer",
+            sample_rate=0.5,
+            filter_string="this is not a valid filter !!@@##",
+        )
+
+
 def test_get_active_scorer_online_configs_filters_by_sample_rate(store: SqlAlchemyStore):
     experiment_id = store.create_experiment("test_active_configs")
     with mock.patch.object(store, "get_gateway_endpoint", return_value=_mock_gateway_endpoint()):

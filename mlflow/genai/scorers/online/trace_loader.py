@@ -1,9 +1,8 @@
 """Trace loading utilities for online scoring."""
 
 import logging
-from typing import Any
 
-from mlflow.entities import Trace
+from mlflow.entities import Trace, TraceInfo
 from mlflow.store.tracking.abstract_store import AbstractStore
 
 _logger = logging.getLogger(__name__)
@@ -42,7 +41,7 @@ class TraceLoader:
         filter_string: str | None = None,
         max_traces: int = 500,
         page_size: int = 100,
-    ) -> list[Any]:
+    ) -> list[TraceInfo]:
         """
         Fetch trace infos within a time window, optionally filtered.
 
