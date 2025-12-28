@@ -254,7 +254,7 @@ def _exec_job(
         params: Parameters to pass to the job function.
         timeout: Maximum execution time in seconds, or None for no timeout.
         exclusive: If True, only one instance of this job with the same params can run
-            at a time. If another instance is already running, this job is skipped.
+            at a time.
     """
     from mlflow.server.handlers import _get_job_store
 
