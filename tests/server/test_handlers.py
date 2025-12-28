@@ -1699,6 +1699,62 @@ def test_update_scorer_online_config_nonexistent_scorer(mock_tracking_store):
         assert "Scorer not found" in data["message"]
 
 
+def test_get_scorer_online_configs_batch(mock_tracking_store):
+    from mlflow.genai.scorers.online.scorer_online_config import ScorerOnlineConfig
+
+    mock_configs = {
+        "scorer-1": ScorerOnlineConfig(
+            scorer_online_config_id="cfg-1",
+            scorer_id="scorer-1",
+            sample_rate=0.5,
+            filter_string="status = 'OK'",
+        ),
+        "scorer-2": ScorerOnlineConfig(
+            scorer_online_config_id="cfg-2",
+            scorer_id="scorer-2",
+            sample_rate=0.8,
+        ),
+    }
+    mock_tracking_store.get_scorer_online_configs.return_value = mock_configs
+
+    with app.test_client() as c:
+        resp = c.post(
+            "/ajax-api/3.0/mlflow/scorers/online-configs",
+            json={"scorer_ids": ["scorer-1", "scorer-2"]},
+        )
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert "configs" in data
+        assert data["configs"]["scorer-1"]["sample_rate"] == 0.5
+        assert data["configs"]["scorer-1"]["filter_string"] == "status = 'OK'"
+        assert data["configs"]["scorer-2"]["sample_rate"] == 0.8
+        assert data["configs"]["scorer-2"].get("filter_string") is None
+
+    mock_tracking_store.get_scorer_online_configs.assert_called_once_with(["scorer-1", "scorer-2"])
+
+
+def test_get_scorer_online_configs_empty_list(mock_tracking_store):
+    mock_tracking_store.get_scorer_online_configs.return_value = {}
+
+    with app.test_client() as c:
+        resp = c.post(
+            "/ajax-api/3.0/mlflow/scorers/online-configs",
+            json={"scorer_ids": []},
+        )
+        assert resp.status_code == 400
+
+
+def test_get_scorer_online_configs_missing_param(mock_tracking_store):
+    with app.test_client() as c:
+        resp = c.post(
+            "/ajax-api/3.0/mlflow/scorers/online-configs",
+            json={},
+        )
+        assert resp.status_code == 400
+        data = resp.get_json()
+        assert "scorer_ids" in data["message"]
+
+
 def test_calculate_trace_filter_correlation(mock_get_request_message, mock_tracking_store):
     experiment_ids = ["123", "456"]
     filter_string1 = "span.type = 'LLM'"

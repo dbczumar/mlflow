@@ -2,12 +2,15 @@
 
 import hashlib
 import json
+import logging
 from typing import TYPE_CHECKING
 
 from mlflow.genai.scorers.base import Scorer
 
 if TYPE_CHECKING:
     from mlflow.genai.scorers.online.processor import OnlineScorer
+
+_logger = logging.getLogger(__name__)
 
 
 class OnlineScorerSampler:
@@ -88,4 +91,20 @@ class OnlineScorerSampler:
             selected.append(scorer)
             prev_rate = rate
 
+        _logger.debug(
+            f"Sampled {len(selected)}/{len(scorers)} scorers for entity {entity_id[:8]}..."
+        )
         return selected
+
+    def log_sampling_stats(self, sampled_counts: dict[str, int], total_entities: int) -> None:
+        """
+        Log sampling statistics.
+
+        Args:
+            sampled_counts: Dict mapping scorer name to count of entities sampled.
+            total_entities: Total number of entities (traces/sessions) considered.
+        """
+        _logger.info(f"Sampling stats for {total_entities} entities:")
+        for scorer_name, count in sampled_counts.items():
+            rate = count / total_entities if total_entities > 0 else 0
+            _logger.info(f"  {scorer_name}: {count}/{total_entities} ({rate:.1%})")

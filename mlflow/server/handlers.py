@@ -3972,9 +3972,13 @@ def _get_scorer_online_configs():
     scorer_ids = request_json.get("scorer_ids")
 
     if not scorer_ids:
-        raise MlflowException("Missing required parameter: scorer_ids")
+        raise MlflowException(
+            "Missing required parameter: scorer_ids", error_code=INVALID_PARAMETER_VALUE
+        )
     if not isinstance(scorer_ids, list):
-        raise MlflowException("Parameter scorer_ids must be a list")
+        raise MlflowException(
+            "Parameter scorer_ids must be a list", error_code=INVALID_PARAMETER_VALUE
+        )
 
     configs = _get_tracking_store().get_scorer_online_configs(scorer_ids)
 

@@ -158,22 +158,36 @@ def test_databricks_backend_scorer_operations():
         mock_delete.assert_called_once_with("exp_123", "test_databricks_scorer")
 
 
+def _mock_gateway_endpoint():
+    """Returns a mock GatewayEndpoint for testing."""
+    from mlflow.entities.gateway_endpoint import GatewayEndpoint
+
+    return GatewayEndpoint(
+        endpoint_id="test-endpoint-id",
+        name="test-endpoint",
+        created_at=0,
+        last_updated_at=0,
+    )
+
+
 def test_mlflow_backend_scorer_online_config_operations():
-    with (
-        patch("mlflow.genai.scorers.base.is_in_databricks_runtime", return_value=True),
-        patch("mlflow.genai.scorers.base.is_databricks_uri", return_value=True),
+    from mlflow.genai.scorers import Guidelines
+
+    experiment_id = mlflow.create_experiment("test_scorer_online_config_experiment")
+    mlflow.set_experiment(experiment_id=experiment_id)
+
+    test_scorer = Guidelines(
+        name="test_online_config_scorer",
+        guidelines=["Be helpful"],
+        model="gateway:/test-endpoint",
+    )
+
+    with patch(
+        "mlflow.store.tracking.sqlalchemy_store.SqlAlchemyStore.get_gateway_endpoint",
+        return_value=_mock_gateway_endpoint(),
     ):
-        experiment_id = mlflow.create_experiment("test_scorer_online_config_experiment")
-        mlflow.set_experiment(experiment_id=experiment_id)
-
-        @scorer
-        def test_online_config_scorer(outputs) -> bool:
-            return len(outputs) > 0
-
         # Register the scorer
-        registered_scorer = test_online_config_scorer.register(
-            experiment_id=experiment_id, name="test_online_config_scorer"
-        )
+        registered_scorer = test_scorer.register(experiment_id=experiment_id)
 
         # Initially sample_rate and filter_string should be None
         assert registered_scorer.sample_rate is None
@@ -214,27 +228,24 @@ def test_mlflow_backend_scorer_online_config_operations():
         assert scorer_from_versions.filter_string == "status = 'OK'"
         assert version == 1
 
-        # Clean up
-        delete_scorer(name="test_online_config_scorer", experiment_id=experiment_id, version=1)
-        mlflow.delete_experiment(experiment_id)
 
+def test_mlflow_backend_scorer_online_config_chained_update():
+    from mlflow.genai.scorers import Guidelines
 
-def test_mlflow_backend_scorer_chained_update():
-    with (
-        patch("mlflow.genai.scorers.base.is_in_databricks_runtime", return_value=True),
-        patch("mlflow.genai.scorers.base.is_databricks_uri", return_value=True),
+    with patch(
+        "mlflow.store.tracking.sqlalchemy_store.SqlAlchemyStore.get_gateway_endpoint",
+        return_value=_mock_gateway_endpoint(),
     ):
         experiment_id = mlflow.create_experiment("test_scorer_chained_update_experiment")
         mlflow.set_experiment(experiment_id=experiment_id)
 
-        @scorer
-        def test_chained_scorer(outputs) -> bool:
-            return len(outputs) > 0
-
-        # Register and start the scorer
-        registered_scorer = test_chained_scorer.register(
-            experiment_id=experiment_id, name="test_chained_scorer"
+        test_scorer = Guidelines(
+            name="test_chained_scorer",
+            guidelines=["Be helpful"],
+            model="gateway:/test-endpoint",
         )
+
+        registered_scorer = test_scorer.register(experiment_id=experiment_id)
         started_scorer = registered_scorer.start(
             experiment_id=experiment_id,
             sampling_config=ScorerSamplingConfig(sample_rate=0.5),
@@ -288,7 +299,3 @@ def test_mlflow_backend_scorer_chained_update():
         )
         assert retrieved_after_restart.sample_rate == 0.3
         assert retrieved_after_restart.status == ScorerStatus.STARTED
-
-        # Clean up
-        delete_scorer(name="test_chained_scorer", experiment_id=experiment_id, version=1)
-        mlflow.delete_experiment(experiment_id)

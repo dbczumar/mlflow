@@ -1,6 +1,7 @@
 """Trace loading utilities for online scoring."""
 
 import logging
+from typing import Any
 
 from mlflow.entities import Trace
 from mlflow.store.tracking.abstract_store import AbstractStore
@@ -40,9 +41,10 @@ class TraceLoader:
         end_time_ms: int,
         filter_string: str | None = None,
         max_traces: int = 500,
-    ) -> list[Trace]:
+        page_size: int = 100,
+    ) -> list[Any]:
         """
-        Fetch traces within a time window, optionally filtered.
+        Fetch trace infos within a time window, optionally filtered.
 
         Args:
             experiment_id: The experiment ID to search.
@@ -50,24 +52,56 @@ class TraceLoader:
             end_time_ms: End of time window (inclusive).
             filter_string: Optional additional filter criteria.
             max_traces: Maximum number of traces to return.
+            page_size: Number of traces to fetch per API call.
 
         Returns:
-            List of Trace objects matching the criteria.
+            List of TraceInfo objects matching the criteria.
         """
+        # Build time filter
         time_filter = (
             f"trace.timestamp_ms > {start_time_ms} AND trace.timestamp_ms <= {end_time_ms}"
         )
-        combined_filter = f"({time_filter}) AND ({filter_string})" if filter_string else time_filter
 
-        trace_infos, _ = self._tracking_store.search_traces(
-            experiment_ids=[experiment_id],
-            filter_string=combined_filter,
-            max_results=max_traces,
-            order_by=["timestamp_ms ASC"],
+        # Exclude traces from MLflow runs (training traces)
+        combined_filter = f"{time_filter} AND request_metadata.mlflow.sourceRun is null"
+
+        # Add user filter if provided
+        if filter_string:
+            combined_filter = f"{combined_filter} AND {filter_string}"
+
+        _logger.info(f"Fetching traces with filter: {combined_filter}")
+
+        all_trace_infos = []
+        page_token = None
+        has_more = True
+
+        # Paginate through results
+        while has_more and len(all_trace_infos) < max_traces:
+            batch_size = min(page_size, max_traces - len(all_trace_infos))
+
+            trace_batch, token = self._tracking_store.search_traces(
+                experiment_ids=[experiment_id],
+                filter_string=combined_filter,
+                max_results=batch_size,
+                order_by=["timestamp_ms ASC"],
+                page_token=page_token,
+            )
+
+            if trace_batch:
+                remaining = max_traces - len(all_trace_infos)
+                all_trace_infos.extend(trace_batch[:remaining])
+                _logger.debug(
+                    f"Fetched batch of {len(trace_batch)} traces, total: {len(all_trace_infos)}"
+                )
+                page_token = token
+                if not page_token:
+                    has_more = False
+            else:
+                has_more = False
+
+        _logger.info(
+            f"Fetched {len(all_trace_infos)} trace infos between {start_time_ms} and {end_time_ms}"
         )
 
-        if not trace_infos:
-            return []
-
-        trace_ids = [info.trace_id for info in trace_infos]
-        return self.fetch_traces(trace_ids)
+        # Return TraceInfo objects, not full Traces
+        return [t.info for t in all_trace_infos]
