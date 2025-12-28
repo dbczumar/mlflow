@@ -34,7 +34,7 @@ from mlflow.utils.annotations import experimental
 _logger = logging.getLogger(__name__)
 
 # Fixed model for issue judges - no configuration needed
-_ISSUE_JUDGE_MODEL = "openai:/databricks-gpt-5"
+_ISSUE_JUDGE_MODEL = "openai:/gpt-5"
 _DEFAULT_MAX_REFERENCE_TRACES = 5
 
 # Meta-prompt for generating the issue judge prompt
@@ -384,6 +384,7 @@ def _generate_prompt_with_llm(
     issue_name: str,
     issue_description: str,
     trace_ids: list[str],
+    model: str | None = None,
 ) -> str:
     """
     Use LLM with tools to generate the issue detection prompt.
@@ -393,6 +394,8 @@ def _generate_prompt_with_llm(
         issue_name: The issue name
         issue_description: The issue description
         trace_ids: List of reference trace IDs
+        model: The model URI to use for prompt generation (e.g., "openai:/gpt-4").
+               If not provided, uses the default issue judge model.
 
     Returns:
         The generated prompt string
@@ -400,7 +403,12 @@ def _generate_prompt_with_llm(
     import json
 
     from mlflow.genai.judges.adapters.litellm_adapter import _invoke_litellm_and_handle_tools
+    from mlflow.metrics.genai.model_utils import _parse_model_uri
     from mlflow.types.llm import ChatMessage
+
+    # Parse the model URI to get provider and model name
+    model_uri = model or _ISSUE_JUDGE_MODEL
+    provider, model_name = _parse_model_uri(model_uri)
 
     # Build the user message with trace IDs
     trace_ids_formatted = "\n".join(f"- {tid}" for tid in trace_ids)
@@ -422,8 +430,8 @@ def _generate_prompt_with_llm(
 
     # Invoke LLM with tool access to inspect traces
     response, _ = _invoke_litellm_and_handle_tools(
-        provider="openai",  # Will be parsed from model URI
-        model_name="databricks-gpt-5",
+        provider=provider,
+        model_name=model_name,
         messages=messages,
         trace_id=first_trace_id,
         num_retries=3,
@@ -466,6 +474,8 @@ You must respond with:
 def make_judge_from_issue(
     issue_id: str,
     max_reference_traces: int = _DEFAULT_MAX_REFERENCE_TRACES,
+    model: str | None = None,
+    prompt_writer_model: str | None = None,
 ) -> IssueJudge:
     """
     Create an LLM judge that detects whether traces contain a specific issue.
@@ -485,6 +495,13 @@ def make_judge_from_issue(
         issue_id: The ID of the issue to detect
         max_reference_traces: Maximum number of reference traces to include
             in the prompt for few-shot learning (default: 5)
+        model: The model identifier to use for issue detection evaluation
+            (e.g., "openai:/gpt-4"). If not provided, uses the default model.
+        prompt_writer_model: The model identifier to use for generating the
+            issue detection prompt. If not provided, defaults to the value of
+            ``model``. This allows using a different (potentially more capable)
+            model for authoring the judge prompt while using a faster/cheaper
+            model for the actual issue detection.
 
     Returns:
         An IssueJudge instance configured to detect the specified issue
@@ -500,6 +517,19 @@ def make_judge_from_issue(
 
             # Create a judge from an existing issue
             judge = make_judge_from_issue(issue_id="issue-123")
+
+            # Create a judge with a custom model
+            judge = make_judge_from_issue(
+                issue_id="issue-123",
+                model="openai:/gpt-4",
+            )
+
+            # Use different models for prompt generation vs detection
+            judge = make_judge_from_issue(
+                issue_id="issue-123",
+                model="openai:/gpt-4.1-mini",  # Faster model for detection
+                prompt_writer_model="openai:/gpt-4",  # Better model for prompt authoring
+            )
 
             # Evaluate traces for this issue
             traces = mlflow.search_traces(experiment_ids=["1"], return_type="list")
@@ -538,20 +568,28 @@ def make_judge_from_issue(
     except Exception as e:
         _logger.warning(f"Could not fetch reference traces for issue {issue_id}: {e}")
 
+    # Determine the model for prompt generation
+    # If prompt_writer_model is specified, use it; otherwise fall back to model or default
+    writer_model = prompt_writer_model or model
+
     # Generate the prompt using LLM with tool access
     system_prompt = _generate_prompt_with_llm(
         issue_id=issue.issue_id,
         issue_name=issue.name,
         issue_description=issue.description or "",
         trace_ids=trace_ids,
+        model=writer_model,
     )
+
+    # Determine the model for the judge
+    judge_model = model or _ISSUE_JUDGE_MODEL
 
     # Create and return the IssueJudge
     return IssueJudge(
         issue_id=issue.issue_id,
         issue_name=issue.name,
         system_prompt=system_prompt,
-        model=_ISSUE_JUDGE_MODEL,
+        model=judge_model,
     )
 
 
