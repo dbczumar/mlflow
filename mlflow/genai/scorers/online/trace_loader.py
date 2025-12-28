@@ -11,9 +11,8 @@ _logger = logging.getLogger(__name__)
 class TraceLoader:
     """Loads traces from the tracking store."""
 
-    def __init__(self, tracking_store: AbstractStore, max_workers: int = 4):
+    def __init__(self, tracking_store: AbstractStore):
         self._tracking_store = tracking_store
-        self._max_workers = max_workers
 
     def fetch_traces(self, trace_ids: list[str]) -> list[Trace]:
         """
