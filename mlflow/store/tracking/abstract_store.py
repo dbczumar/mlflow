@@ -25,7 +25,7 @@ from mlflow.entities.trace_metrics import (
 
 if TYPE_CHECKING:
     from mlflow.entities import EvaluationDataset
-    from mlflow.genai.scorers.scorer_online_config import ScorerOnlineConfig
+    from mlflow.genai.scorers.online.scorer_online_config import ScorerOnlineConfig
 from mlflow.entities.metric import MetricWithRunId
 from mlflow.entities.trace import Span, Trace
 from mlflow.entities.trace_info import TraceInfo

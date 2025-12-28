@@ -7,7 +7,7 @@ from mlflow.entities.model_registry.prompt_version import PromptVersion
 
 if TYPE_CHECKING:
     from mlflow.entities import DatasetRecord, EvaluationDataset
-    from mlflow.genai.scorers.scorer_online_config import ScorerOnlineConfig
+    from mlflow.genai.scorers.online.scorer_online_config import ScorerOnlineConfig
 
 from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import ExportTraceServiceRequest
 from packaging.version import Version
@@ -1382,7 +1382,7 @@ class RestStore(RestGatewayStoreMixin, AbstractStore):
         Returns:
             The updated ScorerOnlineConfig object.
         """
-        from mlflow.genai.scorers.scorer_online_config import ScorerOnlineConfig
+        from mlflow.genai.scorers.online.scorer_online_config import ScorerOnlineConfig
 
         request_body = {
             "experiment_id": experiment_id,
