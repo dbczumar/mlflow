@@ -245,6 +245,18 @@ def _exec_job(
     timeout: float | None,
     exclusive: bool = False,
 ) -> None:
+    """
+    Execute a job in a subprocess.
+
+    Args:
+        job_id: Unique identifier for the job.
+        job_name: Name of the job function to execute.
+        params: Parameters to pass to the job function.
+        timeout: Maximum execution time in seconds, or None for no timeout.
+        exclusive: If True, only one instance of this job with the same params can run
+            at a time. Uses a huey task lock keyed by job_name + hash(params). If the
+            lock is already held, the job is skipped and marked as canceled.
+    """
     from mlflow.server.handlers import _get_job_store
 
     job_store = _get_job_store()

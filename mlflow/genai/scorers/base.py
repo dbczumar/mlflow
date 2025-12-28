@@ -750,9 +750,10 @@ class Scorer(BaseModel):
             )
 
         # MlflowTrackingStore - use OSS tracking store
-        store.update_scorer_online_config(
+        return store.update_scorer_online_config(
             experiment_id=experiment_id,
             name=scorer_name,
+            scorer=self,
             sample_rate=sampling_config.sample_rate,
             filter_string=sampling_config.filter_string,
         )
@@ -836,9 +837,10 @@ class Scorer(BaseModel):
             )
 
         # MlflowTrackingStore - use OSS tracking store
-        store.update_scorer_online_config(
+        return store.update_scorer_online_config(
             experiment_id=experiment_id,
             name=scorer_name,
+            scorer=self,
             sample_rate=sampling_config.sample_rate,
             filter_string=sampling_config.filter_string,
         )

@@ -250,20 +250,22 @@ class MlflowTrackingStore(AbstractScorerStore):
         self,
         experiment_id: str | None,
         name: str,
+        scorer: Scorer,
         sample_rate: float | None,
         filter_string: str | None,
-    ) -> ScorerSamplingConfig:
+    ) -> Scorer:
         """
         Update the online scoring configuration for a registered scorer.
 
         Args:
             experiment_id: The experiment ID. If None, uses the active experiment.
             name: The scorer name.
-            sample_rate: The sampling rate (0.0 to 1.0). If None, keeps existing value.
-            filter_string: Optional filter string. If None, keeps existing value.
+            scorer: The scorer instance to update.
+            sample_rate: The sampling rate (0.0 to 1.0). If None, defaults to 0.0.
+            filter_string: Optional filter string.
 
         Returns:
-            The updated ScorerSamplingConfig.
+            A copy of the scorer with updated sampling configuration.
         """
         experiment_id = experiment_id or _get_experiment_id()
 
@@ -278,11 +280,13 @@ class MlflowTrackingStore(AbstractScorerStore):
             filter_string=filter_string,
         )
 
-        # Return the updated sampling config (caller will apply to their scorer)
-        return ScorerSamplingConfig(
+        # Create a copy with updated sampling config
+        new_scorer = scorer._create_copy()
+        new_scorer._sampling_config = ScorerSamplingConfig(
             sample_rate=effective_sample_rate,
             filter_string=filter_string,
         )
+        return new_scorer
 
 
 class DatabricksStore(AbstractScorerStore):
