@@ -246,6 +246,53 @@ class MlflowTrackingStore(AbstractScorerStore):
         experiment_id = experiment_id or _get_experiment_id()
         return self._tracking_store.delete_scorer(experiment_id, name, version)
 
+    def update_scorer_online_config(
+        self,
+        experiment_id: str | None,
+        name: str,
+        sample_rate: float | None,
+        filter_string: str | None,
+    ) -> ScorerSamplingConfig:
+        """
+        Update the online scoring configuration for a registered scorer.
+
+        Args:
+            experiment_id: The experiment ID. If None, uses the active experiment.
+            name: The scorer name.
+            sample_rate: The sampling rate (0.0 to 1.0). If None, keeps existing value.
+            filter_string: Optional filter string. If None, keeps existing value.
+
+        Returns:
+            The updated ScorerSamplingConfig.
+        """
+        experiment_id = experiment_id or _get_experiment_id()
+
+        # Build entries list based on sample_rate
+        if sample_rate is not None and sample_rate > 0:
+            entries = [{"sample_rate": sample_rate}]
+            if filter_string is not None:
+                entries[0]["filter_string"] = filter_string
+        elif sample_rate in {0, 0.0}:
+            # Setting sample_rate to 0 means stop - clear all configs
+            entries = []
+        else:
+            # sample_rate is None - this shouldn't happen for start/stop
+            # but handle it gracefully
+            entries = []
+
+        # Call the tracking store method
+        self._tracking_store.update_scorer_online_config(
+            experiment_id=experiment_id,
+            name=name,
+            entries=entries,
+        )
+
+        # Return the updated sampling config (caller will apply to their scorer)
+        return ScorerSamplingConfig(
+            sample_rate=sample_rate if sample_rate is not None else 0.0,
+            filter_string=filter_string,
+        )
+
 
 class DatabricksStore(AbstractScorerStore):
     """

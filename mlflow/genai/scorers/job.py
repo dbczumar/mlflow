@@ -1,11 +1,15 @@
 """
-Huey job function for async scorer invocation.
+Huey job functions for async scorer invocation.
 
-This module provides the job function for invoking scorers on traces asynchronously.
+This module provides:
+1. The job function for invoking scorers on traces asynchronously.
+2. The periodic scheduler that fetches active scorer configs and submits scoring jobs.
+
 It reuses the core scoring and logging logic from the evaluation harness for consistency.
 """
 
 import json
+import logging
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
@@ -21,7 +25,7 @@ from mlflow.genai.evaluation.session_utils import (
     evaluate_session_level_scorers,
     get_first_trace_in_session,
 )
-from mlflow.genai.scorers.base import Scorer
+from mlflow.genai.scorers.base import BaseModel, Scorer
 from mlflow.server.jobs import job
 from mlflow.store.tracking.abstract_store import AbstractStore
 from mlflow.tracing.constant import TraceMetadataKey
@@ -39,6 +43,17 @@ class TraceResult:
     failures: list[ScorerFailure] = field(default_factory=list)
 
 
+class OnlineScorerConfig(BaseModel):
+    """Configuration for an online scorer to run against traces."""
+
+    serialized_scorer: str
+    sample_rate: float
+    filter_string: str | None = None
+
+
+_logger = logging.getLogger(__name__)
+
+
 def _extract_failures_from_feedbacks(feedbacks: list[Any]) -> list[ScorerFailure]:
     return [
         ScorerFailure(
@@ -48,6 +63,37 @@ def _extract_failures_from_feedbacks(feedbacks: list[Any]) -> list[ScorerFailure
         for feedback in feedbacks
         if feedback.error
     ]
+
+
+@job(
+    name="run_online_scorer",
+    max_workers=MLFLOW_SERVER_JUDGE_INVOKE_MAX_WORKERS.get(),
+    exclusive=True,
+)
+def run_online_scorer_job(
+    experiment_id: str,
+    scorer_configs: list[OnlineScorerConfig],
+) -> None:
+    """
+    Job that fetches samples of traces and runs scorers on them.
+
+    This job is exclusive per (experiment_id, scorer_configs) combination to prevent
+    duplicate scoring of the same traces.
+
+    Args:
+        experiment_id: The experiment ID to fetch traces from.
+        scorer_configs: List of OnlineScorerConfig objects specifying which scorers to run.
+    """
+    # Deserialize if passed as dicts (from JSON serialization)
+    configs = [
+        OnlineScorerConfig.model_validate(c) if isinstance(c, dict) else c for c in scorer_configs
+    ]
+    # TODO: Implement trace fetching, sampling, and scoring
+    for config in configs:
+        _logger.debug(
+            f"Processing scorer config with sample_rate={config.sample_rate}, "
+            f"filter_string={config.filter_string}"
+        )
 
 
 @job(name="invoke_scorer", max_workers=MLFLOW_SERVER_JUDGE_INVOKE_MAX_WORKERS.get())
@@ -317,3 +363,25 @@ def get_trace_batches_for_scorer(
         # For single-turn judges, batch traces into fixed-size batches
         batch_size = MLFLOW_SERVER_SCORER_INVOKE_BATCH_SIZE.get()
         return [trace_ids[i : i + batch_size] for i in range(0, len(trace_ids), batch_size)]
+
+
+def run_online_scoring_scheduler() -> None:
+    """
+    Periodic task that fetches active scorer online configs and submits scoring jobs.
+
+    This function runs directly in the huey consumer process (not in a subprocess),
+    allowing it to call submit_job to enqueue scorer jobs.
+    """
+    from mlflow.server.handlers import _get_tracking_store
+
+    tracking_store = _get_tracking_store()
+    active_configs = tracking_store.get_active_scorer_online_configs()
+
+    _logger.info(f"Online scoring scheduler found {len(active_configs)} active configs")
+
+    # TODO: For each config, fetch traces and submit invoke_scorer_job
+    for config in active_configs:
+        _logger.debug(
+            f"Processing config {config.scorer_online_config_id} "
+            f"for scorer {config.scorer_id} with sample_rate {config.sample_rate}"
+        )
