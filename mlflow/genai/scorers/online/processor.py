@@ -17,7 +17,7 @@ from mlflow.genai.scorers.online.config import (
     SessionScoringTask,
     TraceScoringTask,
 )
-from mlflow.genai.scorers.online.sampler import ScorerSampler
+from mlflow.genai.scorers.online.sampler import OnlineScorerSampler
 from mlflow.genai.scorers.online.trace_loader import TraceLoader
 from mlflow.store.tracking.abstract_store import AbstractStore
 from mlflow.tracing.constant import TraceMetadataKey
@@ -35,7 +35,7 @@ class OnlineScoringProcessor:
         self,
         trace_loader: TraceLoader,
         checkpoint_manager: OnlineCheckpointManager,
-        sampler: ScorerSampler,
+        sampler: OnlineScorerSampler,
         experiment_id: str,
     ):
         self._trace_loader = trace_loader
@@ -65,7 +65,7 @@ class OnlineScoringProcessor:
         return cls(
             trace_loader=TraceLoader(tracking_store),
             checkpoint_manager=OnlineCheckpointManager(tracking_store, experiment_id),
-            sampler=ScorerSampler(configs),
+            sampler=OnlineScorerSampler(configs),
             experiment_id=experiment_id,
         )
 
@@ -139,16 +139,17 @@ class OnlineScoringProcessor:
 
             # Sample single-turn scorers per trace
             for trace in traces:
-                if selected := self._sampler.sample(single_turn_scorers):
+                trace_id = trace.info.trace_id
+                if selected := self._sampler.sample(trace_id, single_turn_scorers):
                     single_turn_tasks.setdefault(
-                        trace.info.trace_id, TraceScoringTask(trace=trace, scorers=[])
+                        trace_id, TraceScoringTask(trace=trace, scorers=[])
                     ).scorers.extend(selected)
 
             # Sample session-level scorers per session
             if session_scorers:
                 session_groups = self._group_traces_by_session(traces)
                 for session_id, session_traces in session_groups.items():
-                    if selected := self._sampler.sample(session_scorers):
+                    if selected := self._sampler.sample(session_id, session_scorers):
                         session_tasks.setdefault(
                             session_id,
                             SessionScoringTask(traces=session_traces, scorers=[]),

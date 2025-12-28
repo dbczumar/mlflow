@@ -8,7 +8,7 @@ from mlflow.genai.scorers.online.config import (
     TraceScoringTask,
 )
 from mlflow.genai.scorers.online.processor import OnlineScoringProcessor
-from mlflow.genai.scorers.online.sampler import ScorerSampler
+from mlflow.genai.scorers.online.sampler import OnlineScorerSampler
 from mlflow.genai.scorers.online.trace_loader import TraceLoader
 
 __all__ = [
@@ -17,7 +17,7 @@ __all__ = [
     "OnlineScoringProcessor",
     "TraceScoringTask",
     "SessionScoringTask",
-    "ScorerSampler",
+    "OnlineScorerSampler",
     "TraceLoader",
     "ONLINE_SCORING_CHECKPOINT_TAG",
 ]

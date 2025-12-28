@@ -1,13 +1,13 @@
 """Dense sampling strategy for online scoring."""
 
+import hashlib
 import json
-import random
 
 from mlflow.genai.scorers.base import Scorer
 from mlflow.genai.scorers.online.config import OnlineScorerConfig
 
 
-class ScorerSampler:
+class OnlineScorerSampler:
     """
     Samples scorers for traces using dense sampling strategy.
 
@@ -40,11 +40,16 @@ class ScorerSampler:
             and self._scorers[c.serialized_scorer].is_session_level_scorer == session_level
         ]
 
-    def sample(self, scorers: list[Scorer]) -> list[Scorer]:
+    def sample(self, entity_id: str, scorers: list[Scorer]) -> list[Scorer]:
         """
-        Apply dense sampling to select scorers.
+        Apply dense sampling to select scorers for an entity.
 
-        Returns a subset of scorers selected via conditional probability waterfall.
+        Args:
+            entity_id: The trace ID or session ID to sample for.
+            scorers: List of scorers to sample from.
+
+        Returns:
+            A subset of scorers selected via conditional probability waterfall.
         """
         if not scorers:
             return []
@@ -63,7 +68,11 @@ class ScorerSampler:
             rate = self._sample_rates.get(scorer.model_dump_json(), 1.0)
             conditional_rate = rate / prev_rate if prev_rate > 0 else 0
 
-            if random.random() > conditional_rate:
+            # Hash entity_id + scorer to get deterministic value in [0, 1]
+            hash_input = f"{entity_id}:{scorer.model_dump_json()}"
+            hash_value = int(hashlib.sha256(hash_input.encode()).hexdigest(), 16) / (2**256)
+
+            if hash_value > conditional_rate:
                 break
 
             selected.append(scorer)
