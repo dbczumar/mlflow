@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { GenAIMarkdownRenderer } from '../../../shared/web-shared/genai-markdown-renderer';
 import {
   useDesignSystemTheme,
   Typography,
@@ -731,97 +732,125 @@ const CommentItem = ({
     onUpdated();
   };
 
+  // Avatar size is 24px, we use a fixed width for the avatar column to ensure consistent alignment
+  const avatarColumnWidth = 32;
+
   return (
     <div
       css={{
+        display: 'flex',
         padding: theme.spacing.md,
         borderBottom: `1px solid ${theme.colors.border}`,
         '&:last-child': { borderBottom: 'none' },
       }}
     >
+      {/* Avatar column - fixed width for alignment */}
       <div
         css={{
+          width: 24,
+          height: 24,
+          borderRadius: '50%',
+          backgroundColor: theme.colors.grey200,
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'space-between',
-          marginBottom: theme.spacing.xs,
+          justifyContent: 'center',
+          color: theme.colors.grey500,
+          fontSize: 12,
+          fontWeight: 500,
+          marginRight: theme.spacing.sm,
         }}
       >
-        <div css={{ display: 'flex', alignItems: 'center', gap: theme.spacing.sm }}>
-          <Typography.Text bold>{comment.author || 'User'}</Typography.Text>
-          <Typography.Text color="secondary" size="sm">
-            {formatRelativeTime(comment.creation_time)}
-          </Typography.Text>
-          {comment.last_update_time && comment.last_update_time !== comment.creation_time && (
+        {(comment.author || 'U').charAt(0).toUpperCase()}
+      </div>
+
+      {/* Content column */}
+      <div css={{ flex: 1, minWidth: 0 }}>
+        <div
+          css={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: theme.spacing.md,
+          }}
+        >
+          <div css={{ display: 'flex', alignItems: 'center', gap: theme.spacing.sm }}>
+            <Typography.Text bold>{comment.author || 'User'}</Typography.Text>
             <Typography.Text color="secondary" size="sm">
-              (edited)
+              {formatRelativeTime(comment.creation_time)}
             </Typography.Text>
+            {comment.last_update_time && comment.last_update_time !== comment.creation_time && (
+              <Typography.Text color="secondary" size="sm">
+                (edited)
+              </Typography.Text>
+            )}
+          </div>
+          {!isEditing && (
+            <div css={{ display: 'flex', alignItems: 'center', gap: theme.spacing.xs }}>
+              <Button
+                componentId="mlflow.issues.edit-comment-button"
+                icon={<PencilIcon />}
+                type="tertiary"
+                size="small"
+                onClick={() => {
+                  setEditContent(comment.content);
+                  setIsEditing(true);
+                }}
+                aria-label="Edit comment"
+              />
+              <Button
+                componentId="mlflow.issues.delete-comment-button"
+                icon={<TrashIcon />}
+                type="tertiary"
+                size="small"
+                onClick={handleDelete}
+                loading={deleteMutation.isLoading}
+                aria-label="Delete comment"
+              />
+            </div>
           )}
         </div>
-        {!isEditing && (
-          <div css={{ display: 'flex', alignItems: 'center', gap: theme.spacing.xs }}>
-            <Button
-              componentId="mlflow.issues.edit-comment-button"
-              icon={<PencilIcon />}
-              type="tertiary"
-              size="small"
-              onClick={() => {
-                setEditContent(comment.content);
-                setIsEditing(true);
+        {isEditing ? (
+          <div>
+            <textarea
+              value={editContent}
+              onChange={(e) => setEditContent(e.target.value)}
+              css={{
+                width: '100%',
+                minHeight: 60,
+                border: `1px solid ${theme.colors.actionPrimaryBackgroundDefault}`,
+                borderRadius: theme.borders.borderRadiusMd,
+                padding: theme.spacing.sm,
+                fontSize: theme.typography.fontSizeBase,
+                resize: 'vertical',
+                marginBottom: theme.spacing.sm,
               }}
-              aria-label="Edit comment"
             />
-            <Button
-              componentId="mlflow.issues.delete-comment-button"
-              icon={<TrashIcon />}
-              type="tertiary"
-              size="small"
-              onClick={handleDelete}
-              loading={deleteMutation.isLoading}
-              aria-label="Delete comment"
-            />
+            <div css={{ display: 'flex', gap: theme.spacing.sm }}>
+              <Button
+                componentId="mlflow.issues.save-comment-button"
+                type="primary"
+                size="small"
+                onClick={handleSave}
+                loading={updateMutation.isLoading}
+              >
+                <FormattedMessage defaultMessage="Save" description="Save button label" />
+              </Button>
+              <Button
+                componentId="mlflow.issues.cancel-edit-comment-button"
+                type="tertiary"
+                size="small"
+                onClick={() => setIsEditing(false)}
+              >
+                <FormattedMessage defaultMessage="Cancel" description="Cancel button label" />
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div>
+            <GenAIMarkdownRenderer>{comment.content}</GenAIMarkdownRenderer>
           </div>
         )}
       </div>
-      {isEditing ? (
-        <div>
-          <textarea
-            value={editContent}
-            onChange={(e) => setEditContent(e.target.value)}
-            css={{
-              width: '100%',
-              minHeight: 60,
-              border: `1px solid ${theme.colors.actionPrimaryBackgroundDefault}`,
-              borderRadius: theme.borders.borderRadiusMd,
-              padding: theme.spacing.sm,
-              fontSize: theme.typography.fontSizeBase,
-              resize: 'vertical',
-              marginBottom: theme.spacing.sm,
-            }}
-          />
-          <div css={{ display: 'flex', gap: theme.spacing.sm }}>
-            <Button
-              componentId="mlflow.issues.save-comment-button"
-              type="primary"
-              size="small"
-              onClick={handleSave}
-              loading={updateMutation.isLoading}
-            >
-              <FormattedMessage defaultMessage="Save" description="Save button label" />
-            </Button>
-            <Button
-              componentId="mlflow.issues.cancel-edit-comment-button"
-              type="tertiary"
-              size="small"
-              onClick={() => setIsEditing(false)}
-            >
-              <FormattedMessage defaultMessage="Cancel" description="Cancel button label" />
-            </Button>
-          </div>
-        </div>
-      ) : (
-        <Typography.Text css={{ whiteSpace: 'pre-wrap' }}>{comment.content}</Typography.Text>
-      )}
     </div>
   );
 };
@@ -905,12 +934,7 @@ const CommentsTabContent = ({ issue }: { issue: Issue }) => {
           />
         </Typography.Text>
         {comments && comments.length > 0 ? (
-          <div
-            css={{
-              border: `1px solid ${theme.colors.border}`,
-              borderRadius: theme.borders.borderRadiusMd,
-            }}
-          >
+          <div>
             {comments.map((comment) => (
               <CommentItem
                 key={comment.comment_id}

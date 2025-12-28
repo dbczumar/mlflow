@@ -546,20 +546,15 @@ def search_issue_comments(
     else:
         # Table output
         headers = ["comment_id", "author", "content", "creation_time"]
-        table = []
-        for comment in comments:
-            content = comment.content or ""
-            # Truncate long content for table display
-            if len(content) > 50:
-                content = content[:47] + "..."
-            table.append(
-                [
-                    comment.comment_id,
-                    comment.author or "",
-                    content,
-                    str(comment.creation_time) if comment.creation_time else "",
-                ]
-            )
+        table = [
+            [
+                comment.comment_id,
+                comment.author or "",
+                comment.content or "",
+                str(comment.creation_time) if comment.creation_time else "",
+            ]
+            for comment in comments
+        ]
 
         click.echo(_create_table(table, headers=headers))
 
