@@ -68,10 +68,7 @@ from mlflow.entities.trace_metrics import (
 from mlflow.entities.trace_state import TraceState
 from mlflow.entities.trace_status import TraceStatus
 from mlflow.exceptions import MlflowException, MlflowTracingException
-from mlflow.genai.scorers.scorer_online_config import (
-    ScorerOnlineConfig,
-    ScorerOnlineConfigEntry,
-)
+from mlflow.genai.scorers.scorer_online_config import ScorerOnlineConfig
 from mlflow.genai.scorers.scorer_utils import (
     build_gateway_model,
     extract_endpoint_ref,
@@ -2479,34 +2476,27 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
             ]
 
     def update_scorer_online_config(
-        self, experiment_id: str, name: str, entries: list[ScorerOnlineConfigEntry]
-    ) -> list[ScorerOnlineConfig]:
+        self,
+        experiment_id: str,
+        name: str,
+        sample_rate: float,
+        filter_string: str | None = None,
+    ) -> ScorerOnlineConfig:
         """
         Update online configuration for a scorer.
-
-        This method overwrites the existing online configs for the scorer with the new entries.
-        Currently only a single entry is allowed.
 
         Args:
             experiment_id: The experiment ID.
             name: The scorer name.
-            entries: List with at most one config entry containing 'sample_rate' and
-                optional 'filter_string'.
+            sample_rate: The sampling rate (0.0 to 1.0).
+            filter_string: Optional filter expression for trace selection.
 
         Returns:
-            List of ScorerOnlineConfig entities.
+            The updated ScorerOnlineConfig entity.
 
         Raises:
-            MlflowException: If scorer is not found, multiple entries provided, or scorer
-                does not use a gateway model.
+            MlflowException: If scorer is not found or does not use a gateway model.
         """
-        # Validate only a single entry is provided
-        if len(entries) > 1:
-            raise MlflowException(
-                "Only a single online config entry is allowed per scorer.",
-                INVALID_PARAMETER_VALUE,
-            )
-
         with self.ManagedSessionMaker() as session:
             # Validate experiment exists and is active
             experiment = self.get_experiment(experiment_id)
@@ -2536,7 +2526,7 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
                 .first()
             )
 
-            if latest_version is not None and entries:
+            if latest_version is not None and sample_rate > 0:
                 serialized_data = json.loads(latest_version.serialized_scorer)
                 model = extract_model_from_serialized_scorer(serialized_data)
                 if not is_gateway_model(model):
@@ -2551,30 +2541,22 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
                 SqlScorerOnlineConfig.scorer_id == scorer.scorer_id
             ).delete()
 
-            # Create new online configs
-            new_configs = []
-            for entry in entries:
-                config = SqlScorerOnlineConfig(
-                    scorer_online_config_id=uuid.uuid4().hex,
-                    scorer_id=scorer.scorer_id,
-                    sample_rate=entry.get("sample_rate", 0.0),
-                    filter_string=entry.get("filter_string"),
-                )
-                session.add(config)
-                new_configs.append(config)
-
+            # Create new online config
+            config = SqlScorerOnlineConfig(
+                scorer_online_config_id=uuid.uuid4().hex,
+                scorer_id=scorer.scorer_id,
+                sample_rate=sample_rate,
+                filter_string=filter_string,
+            )
+            session.add(config)
             session.flush()
 
-            # Convert to entities
-            return [
-                ScorerOnlineConfig(
-                    scorer_online_config_id=config.scorer_online_config_id,
-                    scorer_id=config.scorer_id,
-                    sample_rate=config.sample_rate,
-                    filter_string=config.filter_string,
-                )
-                for config in new_configs
-            ]
+            return ScorerOnlineConfig(
+                scorer_online_config_id=config.scorer_online_config_id,
+                scorer_id=config.scorer_id,
+                sample_rate=config.sample_rate,
+                filter_string=config.filter_string,
+            )
 
     def _apply_order_by_search_logged_models(
         self,

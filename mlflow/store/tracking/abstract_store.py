@@ -22,13 +22,10 @@ from mlflow.entities.trace_metrics import (
     MetricDataPoint,
     MetricViewType,
 )
-from mlflow.genai.scorers.scorer_online_config import (
-    ScorerOnlineConfig,
-    ScorerOnlineConfigEntry,
-)
 
 if TYPE_CHECKING:
     from mlflow.entities import EvaluationDataset
+    from mlflow.genai.scorers.scorer_online_config import ScorerOnlineConfig
 from mlflow.entities.metric import MetricWithRunId
 from mlflow.entities.trace import Span, Trace
 from mlflow.entities.trace_info import TraceInfo
@@ -1439,18 +1436,23 @@ class AbstractStore(GatewayStoreMixin):
         raise NotImplementedError(self.__class__.__name__)
 
     def update_scorer_online_config(
-        self, experiment_id: str, name: str, entries: list[ScorerOnlineConfigEntry]
-    ) -> list[ScorerOnlineConfig]:
+        self,
+        experiment_id: str,
+        name: str,
+        sample_rate: float,
+        filter_string: str | None = None,
+    ) -> "ScorerOnlineConfig":
         """
         Update online configuration for a scorer.
 
         Args:
             experiment_id: The experiment ID.
             name: The scorer name.
-            entries: List of config entries, each with 'sample_rate' and optional 'filter_string'.
+            sample_rate: The sampling rate (0.0 to 1.0).
+            filter_string: Optional filter expression for trace selection.
 
         Returns:
-            List of ScorerOnlineConfig objects.
+            The updated ScorerOnlineConfig object.
 
         Raises:
             MlflowException: If scorer is not found.

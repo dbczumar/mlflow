@@ -10,6 +10,7 @@ It reuses the core scoring and logging logic from the evaluation harness for con
 
 import json
 import logging
+import random
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
@@ -26,9 +27,12 @@ from mlflow.genai.evaluation.session_utils import (
     get_first_trace_in_session,
 )
 from mlflow.genai.scorers.base import Scorer
+from mlflow.genai.scorers.online import execute_online_scoring
 from mlflow.server.jobs import job
 from mlflow.store.tracking.abstract_store import AbstractStore
 from mlflow.tracing.constant import TraceMetadataKey
+
+_logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -41,18 +45,6 @@ class ScorerFailure:
 class TraceResult:
     assessments: list[Any] = field(default_factory=list)
     failures: list[ScorerFailure] = field(default_factory=list)
-
-
-@dataclass
-class OnlineScorerConfig:
-    """Configuration for an online scorer to run against traces."""
-
-    serialized_scorer: str
-    sample_rate: float
-    filter_string: str | None = None
-
-
-_logger = logging.getLogger(__name__)
 
 
 def _extract_failures_from_feedbacks(feedbacks: list[Any]) -> list[ScorerFailure]:
@@ -85,13 +77,10 @@ def run_online_scorer_job(
         experiment_id: The experiment ID to fetch traces from.
         scorer_configs: List of OnlineScorerConfig dicts specifying which scorers to run.
     """
-    configs = [OnlineScorerConfig(**c) for c in scorer_configs]
-    # TODO: Implement trace fetching, sampling, and scoring
-    for config in configs:
-        _logger.debug(
-            f"Processing scorer config with sample_rate={config.sample_rate}, "
-            f"filter_string={config.filter_string}"
-        )
+    from mlflow.server.handlers import _get_tracking_store
+
+    tracking_store = _get_tracking_store()
+    execute_online_scoring(experiment_id, scorer_configs, tracking_store)
 
 
 @job(name="invoke_scorer", max_workers=MLFLOW_SERVER_JUDGE_INVOKE_MAX_WORKERS.get())
@@ -374,6 +363,10 @@ def run_online_scoring_scheduler() -> None:
 
     tracking_store = _get_tracking_store()
     active_configs = tracking_store.get_active_scorer_online_configs()
+
+    # Shuffle configs randomly to prevent scorer starvation when there are
+    # limited job runners available
+    random.shuffle(active_configs)
 
     _logger.info(f"Online scoring scheduler found {len(active_configs)} active configs")
 

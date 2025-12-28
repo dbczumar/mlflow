@@ -3943,21 +3943,25 @@ def _update_scorer_online_config():
     request_json = _get_request_json()
     experiment_id = request_json.get("experiment_id")
     name = request_json.get("name")
-    entries = request_json.get("entries", [])
+    sample_rate = request_json.get("sample_rate")
+    filter_string = request_json.get("filter_string")
 
     if not experiment_id:
         raise MlflowException("Missing required parameter: experiment_id")
     if not name:
         raise MlflowException("Missing required parameter: name")
+    if sample_rate is None:
+        raise MlflowException("Missing required parameter: sample_rate")
 
-    configs = _get_tracking_store().update_scorer_online_config(
+    config = _get_tracking_store().update_scorer_online_config(
         experiment_id=experiment_id,
         name=name,
-        entries=entries,
+        sample_rate=sample_rate,
+        filter_string=filter_string,
     )
 
     response = Response(mimetype="application/json")
-    response.set_data(json.dumps({"configs": [c.to_dict() for c in configs]}))
+    response.set_data(json.dumps({"config": config.to_dict()}))
     return response
 
 

@@ -4,15 +4,6 @@ Internal entity for scorer online configuration.
 This is an internal entity used by the store layer and is not part of the public API.
 """
 
-from typing import TypedDict
-
-
-class ScorerOnlineConfigEntry(TypedDict, total=False):
-    """Input entry for creating/updating scorer online configuration."""
-
-    sample_rate: float
-    filter_string: str | None
-
 
 class ScorerOnlineConfig:
     """

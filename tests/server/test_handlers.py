@@ -1638,7 +1638,7 @@ def test_update_scorer_online_config_smoke(mock_tracking_store):
         sample_rate=0.1,
         filter_string="status = 'OK'",
     )
-    mock_tracking_store.update_scorer_online_config.return_value = [mock_config]
+    mock_tracking_store.update_scorer_online_config.return_value = mock_config
 
     with app.test_client() as c:
         # First update
@@ -1647,13 +1647,14 @@ def test_update_scorer_online_config_smoke(mock_tracking_store):
             json={
                 "experiment_id": "123",
                 "name": "my_scorer",
-                "entries": [{"sample_rate": 0.1, "filter_string": "status = 'OK'"}],
+                "sample_rate": 0.1,
+                "filter_string": "status = 'OK'",
             },
         )
         assert resp.status_code == 200
         data = resp.get_json()
-        assert len(data["configs"]) == 1
-        assert data["configs"][0]["sample_rate"] == 0.1
+        assert data["config"]["sample_rate"] == 0.1
+        assert data["config"]["filter_string"] == "status = 'OK'"
 
         # Second update (overwrite)
         mock_config2 = ScorerOnlineConfig(
@@ -1661,20 +1662,19 @@ def test_update_scorer_online_config_smoke(mock_tracking_store):
             scorer_id="scorer-1",
             sample_rate=0.5,
         )
-        mock_tracking_store.update_scorer_online_config.return_value = [mock_config2]
+        mock_tracking_store.update_scorer_online_config.return_value = mock_config2
 
         resp = c.put(
             "/ajax-api/3.0/mlflow/scorers/online-config",
             json={
                 "experiment_id": "123",
                 "name": "my_scorer",
-                "entries": [{"sample_rate": 0.5}],
+                "sample_rate": 0.5,
             },
         )
         assert resp.status_code == 200
         data = resp.get_json()
-        assert len(data["configs"]) == 1
-        assert data["configs"][0]["sample_rate"] == 0.5
+        assert data["config"]["sample_rate"] == 0.5
 
 
 def test_update_scorer_online_config_nonexistent_scorer(mock_tracking_store):
@@ -1691,7 +1691,7 @@ def test_update_scorer_online_config_nonexistent_scorer(mock_tracking_store):
             json={
                 "experiment_id": "123",
                 "name": "nonexistent",
-                "entries": [{"sample_rate": 0.1}],
+                "sample_rate": 0.1,
             },
         )
         assert resp.status_code == 404

@@ -267,29 +267,20 @@ class MlflowTrackingStore(AbstractScorerStore):
         """
         experiment_id = experiment_id or _get_experiment_id()
 
-        # Build entries list based on sample_rate
-        if sample_rate is not None and sample_rate > 0:
-            entries = [{"sample_rate": sample_rate}]
-            if filter_string is not None:
-                entries[0]["filter_string"] = filter_string
-        elif sample_rate in {0, 0.0}:
-            # Setting sample_rate to 0 means stop - clear all configs
-            entries = []
-        else:
-            # sample_rate is None - this shouldn't happen for start/stop
-            # but handle it gracefully
-            entries = []
+        # Determine the effective sample rate
+        effective_sample_rate = sample_rate if sample_rate is not None else 0.0
 
-        # Call the tracking store method
+        # Call the tracking store method with direct parameters
         self._tracking_store.update_scorer_online_config(
             experiment_id=experiment_id,
             name=name,
-            entries=entries,
+            sample_rate=effective_sample_rate,
+            filter_string=filter_string,
         )
 
         # Return the updated sampling config (caller will apply to their scorer)
         return ScorerSamplingConfig(
-            sample_rate=sample_rate if sample_rate is not None else 0.0,
+            sample_rate=effective_sample_rate,
             filter_string=filter_string,
         )
 

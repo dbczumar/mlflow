@@ -10707,21 +10707,21 @@ def _non_gateway_scorer_json():
     return json.dumps({"instructions_judge_pydantic_data": {"model": "openai:/gpt-4"}})
 
 
-def test_update_scorer_online_config_creates_configs(store: SqlAlchemyStore):
+def test_update_scorer_online_config_creates_config(store: SqlAlchemyStore):
     experiment_id = store.create_experiment("test_online_config_create")
     with mock.patch.object(store, "get_gateway_endpoint", return_value=_mock_gateway_endpoint()):
         store.register_scorer(experiment_id, "scorer", _gateway_model_scorer_json())
 
-    configs = store.update_scorer_online_config(
+    config = store.update_scorer_online_config(
         experiment_id=experiment_id,
         name="scorer",
-        entries=[{"sample_rate": 0.1, "filter_string": "status = 'OK'"}],
+        sample_rate=0.1,
+        filter_string="status = 'OK'",
     )
 
-    assert len(configs) == 1
-    assert configs[0].sample_rate == 0.1
-    assert configs[0].filter_string == "status = 'OK'"
-    assert configs[0].scorer_online_config_id is not None
+    assert config.sample_rate == 0.1
+    assert config.filter_string == "status = 'OK'"
+    assert config.scorer_online_config_id is not None
 
 
 def test_update_scorer_online_config_overwrites(store: SqlAlchemyStore):
@@ -10733,63 +10733,17 @@ def test_update_scorer_online_config_overwrites(store: SqlAlchemyStore):
     store.update_scorer_online_config(
         experiment_id=experiment_id,
         name="scorer",
-        entries=[{"sample_rate": 0.1}],
+        sample_rate=0.1,
     )
 
     # Overwrite with new config
-    new_configs = store.update_scorer_online_config(
+    new_config = store.update_scorer_online_config(
         experiment_id=experiment_id,
         name="scorer",
-        entries=[{"sample_rate": 0.5}],
+        sample_rate=0.5,
     )
 
-    assert len(new_configs) == 1
-    assert new_configs[0].sample_rate == 0.5
-
-
-def test_update_scorer_online_config_clears_with_empty_entries(store: SqlAlchemyStore):
-    from mlflow.store.tracking.dbmodels.models import SqlScorerOnlineConfig
-
-    experiment_id = store.create_experiment("test_online_config_clear")
-    with mock.patch.object(store, "get_gateway_endpoint", return_value=_mock_gateway_endpoint()):
-        store.register_scorer(experiment_id, "scorer", _gateway_model_scorer_json())
-
-    # Create initial config
-    configs = store.update_scorer_online_config(
-        experiment_id=experiment_id,
-        name="scorer",
-        entries=[{"sample_rate": 0.5}],
-    )
-    assert len(configs) == 1
-
-    # Get scorer_id to query database directly
-    scorer = store.get_scorer(experiment_id, "scorer")
-
-    # Clear config by passing empty list
-    cleared_configs = store.update_scorer_online_config(
-        experiment_id=experiment_id,
-        name="scorer",
-        entries=[],
-    )
-    assert len(cleared_configs) == 0
-
-    # Verify database has no entries for this scorer
-    with store.ManagedSessionMaker() as session:
-        count = session.query(SqlScorerOnlineConfig).filter_by(scorer_id=scorer.scorer_id).count()
-        assert count == 0
-
-
-def test_update_scorer_online_config_rejects_multiple_entries(store: SqlAlchemyStore):
-    experiment_id = store.create_experiment("test_online_config_multiple")
-    with mock.patch.object(store, "get_gateway_endpoint", return_value=_mock_gateway_endpoint()):
-        store.register_scorer(experiment_id, "scorer", _gateway_model_scorer_json())
-
-    with pytest.raises(MlflowException, match="single online config entry"):
-        store.update_scorer_online_config(
-            experiment_id=experiment_id,
-            name="scorer",
-            entries=[{"sample_rate": 0.1}, {"sample_rate": 0.2}],
-        )
+    assert new_config.sample_rate == 0.5
 
 
 def test_update_scorer_online_config_rejects_non_gateway_model(store: SqlAlchemyStore):
@@ -10800,7 +10754,7 @@ def test_update_scorer_online_config_rejects_non_gateway_model(store: SqlAlchemy
         store.update_scorer_online_config(
             experiment_id=experiment_id,
             name="scorer",
-            entries=[{"sample_rate": 0.1}],
+            sample_rate=0.1,
         )
 
 
@@ -10811,7 +10765,7 @@ def test_update_scorer_online_config_nonexistent_scorer(store: SqlAlchemyStore):
         store.update_scorer_online_config(
             experiment_id=experiment_id,
             name="nonexistent",
-            entries=[{"sample_rate": 0.1}],
+            sample_rate=0.1,
         )
 
 
@@ -10824,12 +10778,12 @@ def test_get_active_scorer_online_configs_filters_by_sample_rate(store: SqlAlche
     store.update_scorer_online_config(
         experiment_id=experiment_id,
         name="active",
-        entries=[{"sample_rate": 0.1}],
+        sample_rate=0.1,
     )
     store.update_scorer_online_config(
         experiment_id=experiment_id,
         name="inactive",
-        entries=[{"sample_rate": 0.0}],
+        sample_rate=0.0,
     )
 
     active_configs = store.get_active_scorer_online_configs()
@@ -10848,7 +10802,8 @@ def test_get_active_scorer_online_configs_includes_scorer_info(store: SqlAlchemy
     store.update_scorer_online_config(
         experiment_id=experiment_id,
         name="scorer",
-        entries=[{"sample_rate": 0.5, "filter_string": "env = 'prod'"}],
+        sample_rate=0.5,
+        filter_string="env = 'prod'",
     )
 
     active_configs = store.get_active_scorer_online_configs()
@@ -10868,12 +10823,12 @@ def test_scorer_deletion_cascades_to_online_configs(store: SqlAlchemyStore):
         store.register_scorer(experiment_id, "scorer", _gateway_model_scorer_json())
 
     # Create online config
-    configs = store.update_scorer_online_config(
+    config = store.update_scorer_online_config(
         experiment_id=experiment_id,
         name="scorer",
-        entries=[{"sample_rate": 0.5}],
+        sample_rate=0.5,
     )
-    config_id = configs[0].scorer_online_config_id
+    config_id = config.scorer_online_config_id
 
     # Verify config exists
     with store.ManagedSessionMaker() as session:

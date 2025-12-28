@@ -7,6 +7,7 @@ from mlflow.entities.model_registry.prompt_version import PromptVersion
 
 if TYPE_CHECKING:
     from mlflow.entities import DatasetRecord, EvaluationDataset
+    from mlflow.genai.scorers.scorer_online_config import ScorerOnlineConfig
 
 from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import ExportTraceServiceRequest
 from packaging.version import Version
@@ -1366,36 +1367,46 @@ class RestStore(RestGatewayStoreMixin, AbstractStore):
         self,
         experiment_id: str,
         name: str,
-        entries: list[dict[str, Any]],
-    ) -> list[dict[str, Any]]:
+        sample_rate: float,
+        filter_string: str | None = None,
+    ) -> "ScorerOnlineConfig":
         """
         Update the online scoring configuration for a registered scorer.
 
         Args:
             experiment_id: String ID of the experiment.
             name: String name of the scorer.
-            entries: List of config entry dictionaries with sample_rate and optional filter_string.
+            sample_rate: The sampling rate (0.0 to 1.0).
+            filter_string: Optional filter expression for trace selection.
 
         Returns:
-            List of updated config entries.
+            The updated ScorerOnlineConfig object.
         """
-        request_body = json.dumps(
-            {
-                "experiment_id": experiment_id,
-                "name": name,
-                "entries": entries,
-            }
-        )
+        from mlflow.genai.scorers.scorer_online_config import ScorerOnlineConfig
+
+        request_body = {
+            "experiment_id": experiment_id,
+            "name": name,
+            "sample_rate": sample_rate,
+        }
+        if filter_string is not None:
+            request_body["filter_string"] = filter_string
 
         response = http_request(
             host_creds=self.get_host_creds(),
             endpoint="/api/3.0/mlflow/scorers/online-config",
             method="PUT",
-            json=json.loads(request_body),
+            json=request_body,
         )
 
         verify_rest_response(response, "/api/3.0/mlflow/scorers/online-config")
-        return response.json().get("configs", [])
+        config_dict = response.json().get("config", {})
+        return ScorerOnlineConfig(
+            scorer_online_config_id=config_dict.get("scorer_online_config_id", ""),
+            scorer_id=config_dict.get("scorer_id", ""),
+            sample_rate=config_dict.get("sample_rate", 0.0),
+            filter_string=config_dict.get("filter_string"),
+        )
 
     ############################################################################################
     # Deprecated MLflow Tracing APIs. Kept for backward compatibility but do not use.
