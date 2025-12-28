@@ -156,3 +156,139 @@ def test_databricks_backend_scorer_operations():
         # Test delete operation
         delete_scorer(name="test_databricks_scorer", experiment_id="exp_123")
         mock_delete.assert_called_once_with("exp_123", "test_databricks_scorer")
+
+
+def test_mlflow_backend_scorer_online_config_operations():
+    with (
+        patch("mlflow.genai.scorers.base.is_in_databricks_runtime", return_value=True),
+        patch("mlflow.genai.scorers.base.is_databricks_uri", return_value=True),
+    ):
+        experiment_id = mlflow.create_experiment("test_scorer_online_config_experiment")
+        mlflow.set_experiment(experiment_id=experiment_id)
+
+        @scorer
+        def test_online_config_scorer(outputs) -> bool:
+            return len(outputs) > 0
+
+        # Register the scorer
+        registered_scorer = test_online_config_scorer.register(
+            experiment_id=experiment_id, name="test_online_config_scorer"
+        )
+
+        # Initially sample_rate and filter_string should be None
+        assert registered_scorer.sample_rate is None
+        assert registered_scorer.filter_string is None
+        assert registered_scorer.status == ScorerStatus.STOPPED
+
+        # Start the scorer with a sampling config
+        started_scorer = registered_scorer.start(
+            experiment_id=experiment_id,
+            sampling_config=ScorerSamplingConfig(sample_rate=0.75, filter_string="status = 'OK'"),
+        )
+
+        # Verify the started scorer has the correct config
+        assert started_scorer.sample_rate == 0.75
+        assert started_scorer.filter_string == "status = 'OK'"
+        assert started_scorer.status == ScorerStatus.STARTED
+
+        # Verify get_scorer returns scorer with correct sample_rate and filter_string
+        retrieved_scorer = get_scorer(name="test_online_config_scorer", experiment_id=experiment_id)
+        assert retrieved_scorer.sample_rate == 0.75
+        assert retrieved_scorer.filter_string == "status = 'OK'"
+        assert retrieved_scorer.status == ScorerStatus.STARTED
+
+        # Verify list_scorers returns scorers with correct sample_rate and filter_string
+        scorers = list_scorers(experiment_id=experiment_id)
+        assert len(scorers) == 1
+        assert scorers[0].sample_rate == 0.75
+        assert scorers[0].filter_string == "status = 'OK'"
+        assert scorers[0].status == ScorerStatus.STARTED
+
+        # Verify list_scorer_versions returns scorers with correct sample_rate and filter_string
+        scorer_versions = list_scorer_versions(
+            name="test_online_config_scorer", experiment_id=experiment_id
+        )
+        assert len(scorer_versions) == 1
+        scorer_from_versions, version = scorer_versions[0]
+        assert scorer_from_versions.sample_rate == 0.75
+        assert scorer_from_versions.filter_string == "status = 'OK'"
+        assert version == 1
+
+        # Clean up
+        delete_scorer(name="test_online_config_scorer", experiment_id=experiment_id, version=1)
+        mlflow.delete_experiment(experiment_id)
+
+
+def test_mlflow_backend_scorer_chained_update():
+    with (
+        patch("mlflow.genai.scorers.base.is_in_databricks_runtime", return_value=True),
+        patch("mlflow.genai.scorers.base.is_databricks_uri", return_value=True),
+    ):
+        experiment_id = mlflow.create_experiment("test_scorer_chained_update_experiment")
+        mlflow.set_experiment(experiment_id=experiment_id)
+
+        @scorer
+        def test_chained_scorer(outputs) -> bool:
+            return len(outputs) > 0
+
+        # Register and start the scorer
+        registered_scorer = test_chained_scorer.register(
+            experiment_id=experiment_id, name="test_chained_scorer"
+        )
+        started_scorer = registered_scorer.start(
+            experiment_id=experiment_id,
+            sampling_config=ScorerSamplingConfig(sample_rate=0.5),
+        )
+        assert started_scorer.sample_rate == 0.5
+        assert started_scorer.filter_string is None
+
+        # Chain: get_scorer().update() should work
+        updated_scorer = get_scorer(name="test_chained_scorer", experiment_id=experiment_id).update(
+            experiment_id=experiment_id,
+            sampling_config=ScorerSamplingConfig(sample_rate=0.8, filter_string="new_filter"),
+        )
+
+        # Verify the update worked
+        assert updated_scorer.sample_rate == 0.8
+        assert updated_scorer.filter_string == "new_filter"
+        assert updated_scorer.status == ScorerStatus.STARTED
+
+        # Verify the update is persisted
+        retrieved_scorer = get_scorer(name="test_chained_scorer", experiment_id=experiment_id)
+        assert retrieved_scorer.sample_rate == 0.8
+        assert retrieved_scorer.filter_string == "new_filter"
+
+        # Chain: get_scorer().stop() should work
+        stopped_scorer = get_scorer(name="test_chained_scorer", experiment_id=experiment_id).stop(
+            experiment_id=experiment_id
+        )
+
+        assert stopped_scorer.sample_rate == 0.0
+        assert stopped_scorer.status == ScorerStatus.STOPPED
+
+        # Verify the stop is persisted
+        retrieved_after_stop = get_scorer(name="test_chained_scorer", experiment_id=experiment_id)
+        assert retrieved_after_stop.sample_rate == 0.0
+        assert retrieved_after_stop.status == ScorerStatus.STOPPED
+
+        # Chain: get_scorer().start() should work to restart
+        restarted_scorer = get_scorer(
+            name="test_chained_scorer", experiment_id=experiment_id
+        ).start(
+            experiment_id=experiment_id,
+            sampling_config=ScorerSamplingConfig(sample_rate=0.3),
+        )
+
+        assert restarted_scorer.sample_rate == 0.3
+        assert restarted_scorer.status == ScorerStatus.STARTED
+
+        # Verify the restart is persisted
+        retrieved_after_restart = get_scorer(
+            name="test_chained_scorer", experiment_id=experiment_id
+        )
+        assert retrieved_after_restart.sample_rate == 0.3
+        assert retrieved_after_restart.status == ScorerStatus.STARTED
+
+        # Clean up
+        delete_scorer(name="test_chained_scorer", experiment_id=experiment_id, version=1)
+        mlflow.delete_experiment(experiment_id)

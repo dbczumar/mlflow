@@ -1458,3 +1458,16 @@ class AbstractStore(GatewayStoreMixin):
             MlflowException: If scorer is not found.
         """
         raise NotImplementedError(self.__class__.__name__)
+
+    def get_scorer_online_configs(self, scorer_ids: list[str]) -> dict[str, "ScorerOnlineConfig"]:
+        """
+        Get online configurations for multiple scorers by their IDs.
+
+        Args:
+            scorer_ids: List of scorer IDs to fetch configurations for.
+
+        Returns:
+            A dictionary mapping scorer_id to ScorerOnlineConfig for scorers that
+            have configurations. Scorers without configurations are not included.
+        """
+        raise NotImplementedError(self.__class__.__name__)

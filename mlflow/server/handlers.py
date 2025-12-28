@@ -3965,6 +3965,24 @@ def _update_scorer_online_config():
     return response
 
 
+@catch_mlflow_exception
+@_disable_if_artifacts_only
+def _get_scorer_online_configs():
+    request_json = _get_request_json()
+    scorer_ids = request_json.get("scorer_ids")
+
+    if not scorer_ids:
+        raise MlflowException("Missing required parameter: scorer_ids")
+    if not isinstance(scorer_ids, list):
+        raise MlflowException("Parameter scorer_ids must be a list")
+
+    configs = _get_tracking_store().get_scorer_online_configs(scorer_ids)
+
+    response = Response(mimetype="application/json")
+    response.set_data(json.dumps({"configs": {k: v.to_dict() for k, v in configs.items()}}))
+    return response
+
+
 # =============================================================================
 # Secrets Management Handlers
 # =============================================================================
@@ -4653,6 +4671,17 @@ def get_endpoints(get_handler=get_handler):
                 _get_rest_path("/mlflow/scorers/online-config", version=3),
                 _update_scorer_online_config,
                 ["PUT"],
+            ),
+            # Batch get scorer online configs endpoint
+            (
+                _get_ajax_path("/mlflow/scorers/online-configs", version=3),
+                _get_scorer_online_configs,
+                ["POST"],
+            ),
+            (
+                _get_rest_path("/mlflow/scorers/online-configs", version=3),
+                _get_scorer_online_configs,
+                ["POST"],
             ),
         ]
         + get_service_endpoints(ModelRegistryService, get_handler)

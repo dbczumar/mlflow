@@ -10851,6 +10851,48 @@ def test_scorer_deletion_cascades_to_online_configs(store: SqlAlchemyStore):
         )
 
 
+def test_get_scorer_online_configs_batch(store: SqlAlchemyStore):
+    experiment_id = store.create_experiment("test_batch_configs")
+    with mock.patch.object(store, "get_gateway_endpoint", return_value=_mock_gateway_endpoint()):
+        store.register_scorer(experiment_id, "scorer1", _gateway_model_scorer_json())
+        store.register_scorer(experiment_id, "scorer2", _gateway_model_scorer_json())
+        store.register_scorer(experiment_id, "scorer3", _gateway_model_scorer_json())
+
+    # Create configs for scorer1 and scorer2
+    config1 = store.update_scorer_online_config(
+        experiment_id=experiment_id,
+        name="scorer1",
+        sample_rate=0.1,
+        filter_string="env = 'prod'",
+    )
+    config2 = store.update_scorer_online_config(
+        experiment_id=experiment_id,
+        name="scorer2",
+        sample_rate=0.5,
+    )
+    # scorer3 has no config
+
+    # Get configs for all three scorers
+    scorer_ids = [config1.scorer_id, config2.scorer_id]
+    configs = store.get_scorer_online_configs(scorer_ids)
+
+    assert len(configs) == 2
+    assert configs[config1.scorer_id].sample_rate == 0.1
+    assert configs[config1.scorer_id].filter_string == "env = 'prod'"
+    assert configs[config2.scorer_id].sample_rate == 0.5
+    assert configs[config2.scorer_id].filter_string is None
+
+
+def test_get_scorer_online_configs_empty_list(store: SqlAlchemyStore):
+    configs = store.get_scorer_online_configs([])
+    assert configs == {}
+
+
+def test_get_scorer_online_configs_nonexistent_ids(store: SqlAlchemyStore):
+    configs = store.get_scorer_online_configs(["nonexistent_id_1", "nonexistent_id_2"])
+    assert configs == {}
+
+
 def test_dataset_experiment_associations(store):
     with mock.patch("mlflow.tracking._tracking_service.utils._get_store", return_value=store):
         exp_ids = _create_experiments(

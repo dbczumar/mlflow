@@ -196,22 +196,20 @@ class MlflowTrackingStore(AbstractScorerStore):
     def _populate_scorer_from_backend(
         self,
         scorer: Scorer,
-        sample_rate: float | None,
-        filter_string: str | None,
+        online_config=None,
     ) -> None:
         """
         Populate a scorer with sampling config and registered backend from the tracking store.
 
         Args:
             scorer: The scorer to populate.
-            sample_rate: The sample rate from the ScorerVersion entity.
-            filter_string: The filter string from the ScorerVersion entity.
+            online_config: Optional ScorerOnlineConfig from the tracking store.
         """
         scorer._registered_backend = "tracking"
-        if sample_rate is not None:
+        if online_config is not None:
             scorer._sampling_config = ScorerSamplingConfig(
-                sample_rate=sample_rate,
-                filter_string=filter_string,
+                sample_rate=online_config.sample_rate,
+                filter_string=online_config.filter_string,
             )
 
     def list_scorers(self, experiment_id) -> list["Scorer"]:
@@ -222,13 +220,20 @@ class MlflowTrackingStore(AbstractScorerStore):
         # Get ScorerVersion entities from tracking store
         scorer_versions = self._tracking_store.list_scorers(experiment_id)
 
+        # Collect scorer IDs for batch config fetch
+        scorer_ids = [sv.scorer_id for sv in scorer_versions if sv.scorer_id]
+
+        # Batch fetch online configs
+        online_configs = (
+            self._tracking_store.get_scorer_online_configs(scorer_ids) if scorer_ids else {}
+        )
+
         # Convert to Scorer objects and populate with backend info
         scorers = []
         for scorer_version in scorer_versions:
             scorer = Scorer.model_validate(scorer_version.serialized_scorer)
-            self._populate_scorer_from_backend(
-                scorer, scorer_version.sample_rate, scorer_version.filter_string
-            )
+            online_config = online_configs.get(scorer_version.scorer_id)
+            self._populate_scorer_from_backend(scorer, online_config)
             scorers.append(scorer)
         return scorers
 
@@ -240,11 +245,17 @@ class MlflowTrackingStore(AbstractScorerStore):
         # Get ScorerVersion entity from tracking store
         scorer_version = self._tracking_store.get_scorer(experiment_id, name, version)
 
+        # Fetch online config for this scorer
+        online_config = None
+        if scorer_version.scorer_id:
+            online_configs = self._tracking_store.get_scorer_online_configs(
+                [scorer_version.scorer_id]
+            )
+            online_config = online_configs.get(scorer_version.scorer_id)
+
         # Convert to Scorer object and populate with backend info
         scorer = Scorer.model_validate(scorer_version.serialized_scorer)
-        self._populate_scorer_from_backend(
-            scorer, scorer_version.sample_rate, scorer_version.filter_string
-        )
+        self._populate_scorer_from_backend(scorer, online_config)
         return scorer
 
     def list_scorer_versions(self, experiment_id, name) -> list[tuple[Scorer, int]]:
@@ -255,13 +266,20 @@ class MlflowTrackingStore(AbstractScorerStore):
         # Get ScorerVersion entities from tracking store
         scorer_versions = self._tracking_store.list_scorer_versions(experiment_id, name)
 
+        # Collect scorer IDs for batch config fetch
+        scorer_ids = [sv.scorer_id for sv in scorer_versions if sv.scorer_id]
+
+        # Batch fetch online configs
+        online_configs = (
+            self._tracking_store.get_scorer_online_configs(scorer_ids) if scorer_ids else {}
+        )
+
         # Convert to Scorer objects and populate with backend info
         scorers = []
         for scorer_version in scorer_versions:
             scorer = Scorer.model_validate(scorer_version.serialized_scorer)
-            self._populate_scorer_from_backend(
-                scorer, scorer_version.sample_rate, scorer_version.filter_string
-            )
+            online_config = online_configs.get(scorer_version.scorer_id)
+            self._populate_scorer_from_backend(scorer, online_config)
             scorers.append((scorer, scorer_version.scorer_version))
 
         return scorers

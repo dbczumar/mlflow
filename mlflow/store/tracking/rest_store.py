@@ -1408,6 +1408,43 @@ class RestStore(RestGatewayStoreMixin, AbstractStore):
             filter_string=config_dict.get("filter_string"),
         )
 
+    def get_scorer_online_configs(self, scorer_ids: list[str]) -> dict[str, "ScorerOnlineConfig"]:
+        """
+        Get online configurations for multiple scorers by their IDs.
+
+        Args:
+            scorer_ids: List of scorer IDs to fetch configurations for.
+
+        Returns:
+            A dictionary mapping scorer_id to ScorerOnlineConfig for scorers that
+            have configurations. Scorers without configurations are not included.
+        """
+        from mlflow.genai.scorers.online.scorer_online_config import ScorerOnlineConfig
+
+        if not scorer_ids:
+            return {}
+
+        request_body = {"scorer_ids": scorer_ids}
+
+        response = http_request(
+            host_creds=self.get_host_creds(),
+            endpoint="/api/3.0/mlflow/scorers/online-configs",
+            method="POST",
+            json=request_body,
+        )
+
+        verify_rest_response(response, "/api/3.0/mlflow/scorers/online-configs")
+        configs_dict = response.json()["configs"]
+        return {
+            scorer_id: ScorerOnlineConfig(
+                scorer_online_config_id=config["scorer_online_config_id"],
+                scorer_id=config["scorer_id"],
+                sample_rate=config["sample_rate"],
+                filter_string=config.get("filter_string"),
+            )
+            for scorer_id, config in configs_dict.items()
+        }
+
     ############################################################################################
     # Deprecated MLflow Tracing APIs. Kept for backward compatibility but do not use.
     ############################################################################################

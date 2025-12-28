@@ -16,6 +16,7 @@ from mlflow.exceptions import MlflowException
 from mlflow.telemetry.events import ScorerCallEvent
 from mlflow.telemetry.track import record_usage_event
 from mlflow.tracking import get_tracking_uri
+from mlflow.utils.annotations import experimental
 from mlflow.utils.databricks_utils import is_in_databricks_runtime
 from mlflow.utils.uri import is_databricks_uri
 
@@ -190,11 +191,13 @@ class Scorer(BaseModel):
         """
         return False
 
+    @experimental(version="3.0.0")
     @property
     def sample_rate(self) -> float | None:
         """Get the sample rate for this scorer. Available when registered for monitoring."""
         return self._sampling_config.sample_rate if self._sampling_config else None
 
+    @experimental(version="3.0.0")
     @property
     def filter_string(self) -> str | None:
         """Get the filter string for this scorer."""
@@ -672,6 +675,7 @@ class Scorer(BaseModel):
             new_scorer._registered_backend = "tracking"
         return new_scorer
 
+    @experimental(version="3.0.0")
     def start(
         self,
         *,
@@ -751,6 +755,7 @@ class Scorer(BaseModel):
             filter_string=sampling_config.filter_string,
         )
 
+    @experimental(version="3.0.0")
     def update(
         self,
         *,
@@ -831,6 +836,7 @@ class Scorer(BaseModel):
             filter_string=sampling_config.filter_string,
         )
 
+    @experimental(version="3.0.0")
     def stop(self, *, name: str | None = None, experiment_id: str | None = None) -> "Scorer":
         """
         Stop registered scoring by setting sample rate to 0.
