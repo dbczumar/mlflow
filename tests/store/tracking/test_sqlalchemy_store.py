@@ -10702,11 +10702,6 @@ def _mock_gateway_endpoint():
     )
 
 
-def _non_gateway_scorer_json():
-    """Returns a serialized scorer JSON that does NOT use a gateway model."""
-    return json.dumps({"instructions_judge_pydantic_data": {"model": "openai:/gpt-4"}})
-
-
 def test_update_scorer_online_config_creates_config(store: SqlAlchemyStore):
     experiment_id = store.create_experiment("test_online_config_create")
     with mock.patch.object(store, "get_gateway_endpoint", return_value=_mock_gateway_endpoint()):
@@ -10748,7 +10743,10 @@ def test_update_scorer_online_config_overwrites(store: SqlAlchemyStore):
 
 def test_update_scorer_online_config_rejects_non_gateway_model(store: SqlAlchemyStore):
     experiment_id = store.create_experiment("test_online_config_non_gateway")
-    store.register_scorer(experiment_id, "scorer", _non_gateway_scorer_json())
+    non_gateway_scorer = json.dumps(
+        {"instructions_judge_pydantic_data": {"model": "openai:/gpt-4"}}
+    )
+    store.register_scorer(experiment_id, "scorer", non_gateway_scorer)
 
     with pytest.raises(MlflowException, match="does not use a gateway model"):
         store.update_scorer_online_config(

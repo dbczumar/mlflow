@@ -19,7 +19,7 @@ from mlflow.genai.evaluation.session_utils import (
     get_first_trace_in_session,
 )
 from mlflow.genai.scorers.base import Scorer
-from mlflow.genai.scorers.online import execute_online_scoring
+from mlflow.genai.scorers.online import OnlineScoringProcessor
 from mlflow.server.jobs import job
 from mlflow.store.tracking.abstract_store import AbstractStore
 from mlflow.tracing.constant import TraceMetadataKey
@@ -72,7 +72,8 @@ def run_online_scorer_job(
     from mlflow.server.handlers import _get_tracking_store
 
     tracking_store = _get_tracking_store()
-    execute_online_scoring(experiment_id, scorer_configs, tracking_store)
+    processor = OnlineScoringProcessor.create(experiment_id, scorer_configs, tracking_store)
+    processor.process_traces()
 
 
 @job(name="invoke_scorer", max_workers=MLFLOW_SERVER_JUDGE_INVOKE_MAX_WORKERS.get())

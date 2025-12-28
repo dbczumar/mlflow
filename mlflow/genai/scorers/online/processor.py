@@ -169,7 +169,7 @@ class OnlineScoringProcessor:
         for session_id in session_groups:
             session_groups[session_id] = sorted(
                 session_groups[session_id],
-                key=lambda t: t.info.timestamp_ms or float("inf"),
+                key=lambda t: t.info.timestamp_ms,
             )
 
         return dict(session_groups)
