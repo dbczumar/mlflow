@@ -2,9 +2,12 @@
 
 import hashlib
 import json
+from typing import TYPE_CHECKING
 
 from mlflow.genai.scorers.base import Scorer
-from mlflow.genai.scorers.online.config import OnlineScorer
+
+if TYPE_CHECKING:
+    from mlflow.genai.scorers.online.processor import OnlineScorer
 
 
 class OnlineScorerSampler:
@@ -16,7 +19,7 @@ class OnlineScorerSampler:
     - Use conditional probability: if a scorer is rejected, skip all lower-rate scorers
     """
 
-    def __init__(self, configs: list[OnlineScorer]):
+    def __init__(self, configs: list["OnlineScorer"]):
         self.configs = configs
         # Map scorer name -> sample rate and scorer name -> Scorer
         self._sample_rates: dict[str, float] = {}

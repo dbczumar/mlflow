@@ -4,6 +4,7 @@ import logging
 import threading
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass
 from typing import Any, Callable
 
 from mlflow.entities import Trace
@@ -11,12 +12,8 @@ from mlflow.environment_variables import MLFLOW_GENAI_EVAL_MAX_WORKERS
 from mlflow.genai.evaluation.entities import EvalItem
 from mlflow.genai.evaluation.harness import _compute_eval_scores, _log_assessments
 from mlflow.genai.evaluation.session_utils import evaluate_session_level_scorers
+from mlflow.genai.scorers.base import Scorer
 from mlflow.genai.scorers.online.checkpoint import OnlineCheckpointManager
-from mlflow.genai.scorers.online.config import (
-    OnlineScorer,
-    SessionScoringTask,
-    TraceScoringTask,
-)
 from mlflow.genai.scorers.online.sampler import OnlineScorerSampler
 from mlflow.genai.scorers.online.trace_loader import TraceLoader
 from mlflow.store.tracking.abstract_store import AbstractStore
@@ -26,6 +23,31 @@ _logger = logging.getLogger(__name__)
 
 # Maximum traces to process per job run
 _MAX_TRACES_PER_JOB = 500
+
+
+@dataclass
+class OnlineScorer:
+    """An online scorer with sampling configuration."""
+
+    serialized_scorer: str
+    sample_rate: float
+    filter_string: str | None = None
+
+
+@dataclass
+class TraceScoringTask:
+    """A task to score a single trace with multiple scorers."""
+
+    trace: Trace
+    scorers: list[Scorer]
+
+
+@dataclass
+class SessionScoringTask:
+    """A task to score a session (multiple traces) with multiple scorers."""
+
+    traces: list[Trace]
+    scorers: list[Scorer]
 
 
 class OnlineScoringProcessor:
