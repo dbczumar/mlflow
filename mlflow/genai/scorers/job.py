@@ -1,12 +1,4 @@
-"""
-Huey job functions for async scorer invocation.
-
-This module provides:
-1. The job function for invoking scorers on traces asynchronously.
-2. The periodic scheduler that fetches active scorer configs and submits scoring jobs.
-
-It reuses the core scoring and logging logic from the evaluation harness for consistency.
-"""
+"""Huey job functions for async scorer invocation."""
 
 import json
 import logging
