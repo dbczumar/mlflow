@@ -10747,6 +10747,38 @@ def test_update_scorer_online_config_overwrites(store: SqlAlchemyStore):
     assert new_configs[0].sample_rate == 0.5
 
 
+def test_update_scorer_online_config_clears_with_empty_entries(store: SqlAlchemyStore):
+    from mlflow.store.tracking.dbmodels.models import SqlScorerOnlineConfig
+
+    experiment_id = store.create_experiment("test_online_config_clear")
+    with mock.patch.object(store, "get_gateway_endpoint", return_value=_mock_gateway_endpoint()):
+        store.register_scorer(experiment_id, "scorer", _gateway_model_scorer_json())
+
+    # Create initial config
+    configs = store.update_scorer_online_config(
+        experiment_id=experiment_id,
+        name="scorer",
+        entries=[{"sample_rate": 0.5}],
+    )
+    assert len(configs) == 1
+
+    # Get scorer_id to query database directly
+    scorer = store.get_scorer(experiment_id, "scorer")
+
+    # Clear config by passing empty list
+    cleared_configs = store.update_scorer_online_config(
+        experiment_id=experiment_id,
+        name="scorer",
+        entries=[],
+    )
+    assert len(cleared_configs) == 0
+
+    # Verify database has no entries for this scorer
+    with store.ManagedSessionMaker() as session:
+        count = session.query(SqlScorerOnlineConfig).filter_by(scorer_id=scorer.scorer_id).count()
+        assert count == 0
+
+
 def test_update_scorer_online_config_rejects_multiple_entries(store: SqlAlchemyStore):
     experiment_id = store.create_experiment("test_online_config_multiple")
     with mock.patch.object(store, "get_gateway_endpoint", return_value=_mock_gateway_endpoint()):
