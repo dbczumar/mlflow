@@ -193,6 +193,27 @@ class MlflowTrackingStore(AbstractScorerStore):
         experiment_id = experiment_id or _get_experiment_id()
         return self._tracking_store.register_scorer(experiment_id, scorer.name, serialized_scorer)
 
+    def _populate_scorer_from_backend(
+        self,
+        scorer: Scorer,
+        sample_rate: float | None,
+        filter_string: str | None,
+    ) -> None:
+        """
+        Populate a scorer with sampling config and registered backend from the tracking store.
+
+        Args:
+            scorer: The scorer to populate.
+            sample_rate: The sample rate from the ScorerVersion entity.
+            filter_string: The filter string from the ScorerVersion entity.
+        """
+        scorer._registered_backend = "tracking"
+        if sample_rate is not None:
+            scorer._sampling_config = ScorerSamplingConfig(
+                sample_rate=sample_rate,
+                filter_string=filter_string,
+            )
+
     def list_scorers(self, experiment_id) -> list["Scorer"]:
         from mlflow.genai.scorers import Scorer
 
@@ -201,11 +222,15 @@ class MlflowTrackingStore(AbstractScorerStore):
         # Get ScorerVersion entities from tracking store
         scorer_versions = self._tracking_store.list_scorers(experiment_id)
 
-        # Convert to Scorer objects
-        return [
-            Scorer.model_validate(scorer_version.serialized_scorer)
-            for scorer_version in scorer_versions
-        ]
+        # Convert to Scorer objects and populate with backend info
+        scorers = []
+        for scorer_version in scorer_versions:
+            scorer = Scorer.model_validate(scorer_version.serialized_scorer)
+            self._populate_scorer_from_backend(
+                scorer, scorer_version.sample_rate, scorer_version.filter_string
+            )
+            scorers.append(scorer)
+        return scorers
 
     def get_scorer(self, experiment_id, name, version=None) -> "Scorer":
         from mlflow.genai.scorers import Scorer
@@ -215,8 +240,12 @@ class MlflowTrackingStore(AbstractScorerStore):
         # Get ScorerVersion entity from tracking store
         scorer_version = self._tracking_store.get_scorer(experiment_id, name, version)
 
-        # Convert to Scorer object
-        return Scorer.model_validate(scorer_version.serialized_scorer)
+        # Convert to Scorer object and populate with backend info
+        scorer = Scorer.model_validate(scorer_version.serialized_scorer)
+        self._populate_scorer_from_backend(
+            scorer, scorer_version.sample_rate, scorer_version.filter_string
+        )
+        return scorer
 
     def list_scorer_versions(self, experiment_id, name) -> list[tuple[Scorer, int]]:
         from mlflow.genai.scorers import Scorer
@@ -226,12 +255,14 @@ class MlflowTrackingStore(AbstractScorerStore):
         # Get ScorerVersion entities from tracking store
         scorer_versions = self._tracking_store.list_scorer_versions(experiment_id, name)
 
-        # Convert to Scorer objects
+        # Convert to Scorer objects and populate with backend info
         scorers = []
         for scorer_version in scorer_versions:
             scorer = Scorer.model_validate(scorer_version.serialized_scorer)
-            version = scorer_version.scorer_version
-            scorers.append((scorer, version))
+            self._populate_scorer_from_backend(
+                scorer, scorer_version.sample_rate, scorer_version.filter_string
+            )
+            scorers.append((scorer, scorer_version.scorer_version))
 
         return scorers
 
@@ -311,6 +342,7 @@ class DatabricksStore(AbstractScorerStore):
     @staticmethod
     def _scheduled_scorer_to_scorer(scheduled_scorer: ScorerScheduleConfig) -> Scorer:
         scorer = scheduled_scorer.scorer
+        scorer._registered_backend = "databricks"
         scorer._sampling_config = ScorerSamplingConfig(
             sample_rate=scheduled_scorer.sample_rate,
             filter_string=scheduled_scorer.filter_string,

@@ -7,8 +7,8 @@ from mlflow.genai.scorers.base import Scorer
 
 
 @dataclass
-class OnlineScorerConfig:
-    """Configuration for an online scorer to run against traces."""
+class OnlineScorer:
+    """An online scorer with sampling configuration."""
 
     serialized_scorer: str
     sample_rate: float

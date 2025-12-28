@@ -2406,6 +2406,14 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
             resolved_scorers = self._batch_resolve_endpoint_in_serialized_scorers(
                 [sv.serialized_scorer for sv in sql_scorer_versions]
             )
+
+            # Query online config for this scorer (all versions share the same scorer_id)
+            online_config = (
+                session.query(SqlScorerOnlineConfig)
+                .filter(SqlScorerOnlineConfig.scorer_id == scorer.scorer_id)
+                .first()
+            )
+
             return [
                 ScorerVersion(
                     experiment_id=str(sv.scorer.experiment_id),
@@ -2414,6 +2422,8 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
                     scorer_name=sv.scorer.scorer_name,
                     serialized_scorer=resolved_scorers[i],
                     creation_time=sv.creation_time,
+                    sample_rate=online_config.sample_rate if online_config else None,
+                    filter_string=online_config.filter_string if online_config else None,
                 )
                 for i, sv in enumerate(sql_scorer_versions)
             ]
@@ -2443,6 +2453,31 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
                 )
                 for config in results
             ]
+
+    def get_scorer_online_config(self, scorer_id: str) -> ScorerOnlineConfig | None:
+        """
+        Get online configuration for a scorer by scorer ID.
+
+        Args:
+            scorer_id: The scorer ID.
+
+        Returns:
+            The ScorerOnlineConfig entity if it exists, None otherwise.
+        """
+        with self.ManagedSessionMaker() as session:
+            config = (
+                session.query(SqlScorerOnlineConfig)
+                .filter(SqlScorerOnlineConfig.scorer_id == scorer_id)
+                .first()
+            )
+            if config is None:
+                return None
+            return ScorerOnlineConfig(
+                scorer_online_config_id=config.scorer_online_config_id,
+                scorer_id=config.scorer_id,
+                sample_rate=config.sample_rate,
+                filter_string=config.filter_string,
+            )
 
     def update_scorer_online_config(
         self,

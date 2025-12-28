@@ -3,7 +3,7 @@
 from mlflow.genai.scorers.online.checkpoint import CHECKPOINT_TAG as ONLINE_SCORING_CHECKPOINT_TAG
 from mlflow.genai.scorers.online.checkpoint import OnlineCheckpointManager
 from mlflow.genai.scorers.online.config import (
-    OnlineScorerConfig,
+    OnlineScorer,
     SessionScoringTask,
     TraceScoringTask,
 )
@@ -13,7 +13,7 @@ from mlflow.genai.scorers.online.trace_loader import TraceLoader
 
 __all__ = [
     "OnlineCheckpointManager",
-    "OnlineScorerConfig",
+    "OnlineScorer",
     "OnlineScoringProcessor",
     "TraceScoringTask",
     "SessionScoringTask",

@@ -13,7 +13,7 @@ from mlflow.genai.evaluation.harness import _compute_eval_scores, _log_assessmen
 from mlflow.genai.evaluation.session_utils import evaluate_session_level_scorers
 from mlflow.genai.scorers.online.checkpoint import OnlineCheckpointManager
 from mlflow.genai.scorers.online.config import (
-    OnlineScorerConfig,
+    OnlineScorer,
     SessionScoringTask,
     TraceScoringTask,
 )
@@ -61,7 +61,7 @@ class OnlineScoringProcessor:
         Returns:
             Configured OnlineScoringProcessor instance.
         """
-        configs = [OnlineScorerConfig(**c) for c in scorer_configs]
+        configs = [OnlineScorer(**c) for c in scorer_configs]
         return cls(
             trace_loader=TraceLoader(tracking_store),
             checkpoint_manager=OnlineCheckpointManager(tracking_store, experiment_id),
