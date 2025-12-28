@@ -750,16 +750,12 @@ class Scorer(BaseModel):
             )
 
         # MlflowTrackingStore - use OSS tracking store
-        updated_config = store.update_scorer_online_config(
+        store.update_scorer_online_config(
             experiment_id=experiment_id,
             name=scorer_name,
             sample_rate=sampling_config.sample_rate,
             filter_string=sampling_config.filter_string,
         )
-        # Create a copy with updated sampling config
-        new_scorer = self._create_copy()
-        new_scorer._sampling_config = updated_config
-        return new_scorer
 
     def update(
         self,
@@ -840,16 +836,12 @@ class Scorer(BaseModel):
             )
 
         # MlflowTrackingStore - use OSS tracking store
-        updated_config = store.update_scorer_online_config(
+        store.update_scorer_online_config(
             experiment_id=experiment_id,
             name=scorer_name,
             sample_rate=sampling_config.sample_rate,
             filter_string=sampling_config.filter_string,
         )
-        # Create a copy with updated sampling config
-        new_scorer = self._create_copy()
-        new_scorer._sampling_config = updated_config
-        return new_scorer
 
     def stop(self, *, name: str | None = None, experiment_id: str | None = None) -> "Scorer":
         """
