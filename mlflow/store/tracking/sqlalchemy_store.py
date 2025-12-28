@@ -46,7 +46,6 @@ from mlflow.entities import (
     ViewType,
     _DatasetSummary,
 )
-from mlflow.entities._scorer_online_config import ScorerOnlineConfig, ScorerOnlineConfigEntry
 from mlflow.entities.assessment import ExpectationValue, FeedbackValue
 from mlflow.entities.entity_type import EntityAssociationType
 from mlflow.entities.lifecycle_stage import LifecycleStage
@@ -69,6 +68,10 @@ from mlflow.entities.trace_metrics import (
 from mlflow.entities.trace_state import TraceState
 from mlflow.entities.trace_status import TraceStatus
 from mlflow.exceptions import MlflowException, MlflowTracingException
+from mlflow.genai.scorers.scorer_online_config import (
+    ScorerOnlineConfig,
+    ScorerOnlineConfigEntry,
+)
 from mlflow.genai.scorers.scorer_utils import (
     build_gateway_model,
     extract_endpoint_ref,

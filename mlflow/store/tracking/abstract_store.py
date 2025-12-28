@@ -16,12 +16,15 @@ from mlflow.entities import (
     ScorerVersion,
     ViewType,
 )
-from mlflow.entities._scorer_online_config import ScorerOnlineConfig, ScorerOnlineConfigEntry
 from mlflow.entities.model_registry import PromptVersion
 from mlflow.entities.trace_metrics import (
     MetricAggregation,
     MetricDataPoint,
     MetricViewType,
+)
+from mlflow.genai.scorers.scorer_online_config import (
+    ScorerOnlineConfig,
+    ScorerOnlineConfigEntry,
 )
 
 if TYPE_CHECKING:

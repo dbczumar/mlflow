@@ -1630,7 +1630,7 @@ def test_delete_scorer_without_version(mock_get_request_message, mock_tracking_s
 
 
 def test_update_scorer_online_config_smoke(mock_tracking_store):
-    from mlflow.entities._scorer_online_config import ScorerOnlineConfig
+    from mlflow.genai.scorers.scorer_online_config import ScorerOnlineConfig
 
     mock_config = ScorerOnlineConfig(
         scorer_online_config_id="cfg-1",
