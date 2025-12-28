@@ -55,6 +55,7 @@ class JobFunctionMetadata:
     max_workers: int
     transient_error_classes: list[type[Exception]] | None = None
     python_env: _PythonEnv | None = None
+    exclusive: bool = False
 
 
 def job(
@@ -63,6 +64,7 @@ def job(
     transient_error_classes: list[type[Exception]] | None = None,
     python_version: str | None = None,
     pip_requirements: list[str] | None = None,
+    exclusive: bool = False,
 ) -> Callable[[Callable[P, R]], Callable[P, R]]:
     """
     The decorator for the custom job function for setting max parallel workers that
@@ -78,6 +80,8 @@ def job(
         python_version: (optional) The required python version to run the job function.
         pip_requirements: (optional) The required pip requirements to run the job function,
             relative file references such as "-r requirements.txt" are not supported.
+        exclusive: (optional) If True, only one instance of this job with the same params
+            can run at a time. Default is False.
     """
     from mlflow.utils import PYTHON_VERSION
     from mlflow.utils.requirements_utils import _parse_requirements
@@ -114,6 +118,7 @@ def job(
             max_workers=max_workers,
             transient_error_classes=transient_error_classes,
             python_env=python_env,
+            exclusive=exclusive,
         )
         return fn
 
@@ -124,7 +129,6 @@ def submit_job(
     function: Callable[..., Any],
     params: dict[str, Any],
     timeout: float | None = None,
-    exclusive: bool = False,
 ) -> JobEntity:
     """
     Submit a job to the job queue. The job is executed at most once.
@@ -149,8 +153,6 @@ def submit_job(
             The function must be decorated by `mlflow.server.jobs.job_function` decorator.
         params: The params to be passed to the job function.
         timeout: (optional) The job execution timeout, default None (no timeout)
-        exclusive: (optional) If True, only one instance of this job can run at a time.
-            Uses huey's lock_task to prevent overlapping executions. Default is False.
 
     Returns:
         The job entity. You can call `get_job` API by the job id to get
@@ -207,7 +209,7 @@ def submit_job(
         fn_meta.name,
         params,
         timeout,
-        exclusive,
+        fn_meta.exclusive,
     )
 
     return job

@@ -458,9 +458,11 @@ def _enqueue_unfinished_jobs(server_launching_timestamp: int) -> None:
 
         params = json.loads(job.params)
         timeout = job.timeout
-        # enqueue job (exclusive=False for re-enqueued jobs after server restart)
+        # Look up exclusive flag from function metadata
+        fn_fullname = get_job_fn_fullname(job.job_name)
+        fn_metadata = _load_function(fn_fullname)._job_fn_metadata
         _get_or_init_huey_instance(job.job_name).submit_task(
-            job.job_id, job.job_name, params, timeout, False
+            job.job_id, job.job_name, params, timeout, fn_metadata.exclusive
         )
 
 
