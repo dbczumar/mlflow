@@ -6,7 +6,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from typing import Any
 
-from mlflow.entities import Trace
+from mlflow.entities import Trace, TraceInfo
 from mlflow.environment_variables import MLFLOW_GENAI_EVAL_MAX_WORKERS
 from mlflow.genai.evaluation.entities import EvalItem
 from mlflow.genai.evaluation.harness import _compute_eval_scores, _log_assessments
@@ -47,7 +47,7 @@ class SessionScoringTask:
 
     traces: list[Trace]
     scorers: list[Scorer]
-    trace_infos: list[Any] | None = None  # Used temporarily during fetching
+    trace_infos: list[TraceInfo] | None = None  # Used temporarily during fetching
 
 
 class OnlineScoringProcessor:
