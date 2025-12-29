@@ -7,7 +7,7 @@ from mlflow.entities.model_registry.prompt_version import PromptVersion
 
 if TYPE_CHECKING:
     from mlflow.entities import DatasetRecord, EvaluationDataset
-    from mlflow.genai.scorers.online.online_scorer import OnlineScoringConfig
+    from mlflow.genai.scorers.online.online_scorer import CompletedSession, OnlineScoringConfig
 
 from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import ExportTraceServiceRequest
 from packaging.version import Version
@@ -1444,6 +1444,50 @@ class RestStore(RestGatewayStoreMixin, AbstractStore):
             )
             for scorer_id, config in configs_dict.items()
         }
+
+    def find_completed_sessions(
+        self,
+        experiment_id: str,
+        min_start_timestamp_ms: int,
+        max_last_activity_timestamp_ms: int,
+    ) -> list["CompletedSession"]:
+        """
+        Find sessions that started after a timestamp and have no activity after another timestamp.
+
+        Args:
+            experiment_id: The experiment to search.
+            min_start_timestamp_ms: Only consider sessions with first trace after this time.
+            max_last_activity_timestamp_ms: Sessions are complete if no traces after this time.
+
+        Returns:
+            List of CompletedSession objects sorted by trace_count DESC.
+        """
+        from mlflow.genai.scorers.online.online_scorer import CompletedSession
+
+        request_body = {
+            "experiment_id": experiment_id,
+            "min_start_timestamp_ms": min_start_timestamp_ms,
+            "max_last_activity_timestamp_ms": max_last_activity_timestamp_ms,
+        }
+
+        response = http_request(
+            host_creds=self.get_host_creds(),
+            endpoint="/api/3.0/mlflow/traces/find-completed-sessions",
+            method="POST",
+            json=request_body,
+        )
+
+        verify_rest_response(response, "/api/3.0/mlflow/traces/find-completed-sessions")
+        sessions_list = response.json()["sessions"]
+        return [
+            CompletedSession(
+                session_id=session["session_id"],
+                trace_count=session["trace_count"],
+                first_trace_timestamp_ms=session["first_trace_timestamp_ms"],
+                last_trace_timestamp_ms=session["last_trace_timestamp_ms"],
+            )
+            for session in sessions_list
+        ]
 
     ############################################################################################
     # Deprecated MLflow Tracing APIs. Kept for backward compatibility but do not use.

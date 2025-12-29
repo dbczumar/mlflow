@@ -3051,8 +3051,8 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
     def find_completed_sessions(
         self,
         experiment_id: str,
-        session_start_after_ms: int,
-        no_activity_after_ms: int,
+        min_start_timestamp_ms: int,
+        max_last_activity_timestamp_ms: int,
     ) -> list[CompletedSession]:
         """Find sessions that started after X and have no activity after Y."""
         with self.ManagedSessionMaker() as session:
@@ -3069,8 +3069,8 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
                 .filter(
                     SqlTraceInfo.experiment_id == experiment_id,
                     SqlTraceInfo.request_metadata["mlflow.trace.session"].astext.isnot(None),
-                    SqlTraceInfo.timestamp_ms > session_start_after_ms,
-                    SqlTraceInfo.timestamp_ms <= no_activity_after_ms,
+                    SqlTraceInfo.timestamp_ms > min_start_timestamp_ms,
+                    SqlTraceInfo.timestamp_ms <= max_last_activity_timestamp_ms,
                 )
                 .group_by(SqlTraceInfo.request_metadata["mlflow.trace.session"].astext)
                 .subquery()
@@ -3084,7 +3084,7 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
                 .filter(
                     SqlTraceInfo.experiment_id == experiment_id,
                     SqlTraceInfo.request_metadata["mlflow.trace.session"].astext.isnot(None),
-                    SqlTraceInfo.timestamp_ms > no_activity_after_ms,
+                    SqlTraceInfo.timestamp_ms > max_last_activity_timestamp_ms,
                 )
                 .distinct()
                 .subquery()

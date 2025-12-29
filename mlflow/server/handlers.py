@@ -3156,6 +3156,56 @@ def _calculate_trace_filter_correlation():
     return _wrap_response(result.to_proto())
 
 
+def _find_completed_sessions():
+    """
+    Internal API handler for finding completed sessions.
+    Returns sessions that started after a timestamp and have no activity after another timestamp.
+    """
+    request_json = _get_request_json()
+    experiment_id = request_json.get("experiment_id")
+    min_start_timestamp_ms = request_json.get("min_start_timestamp_ms")
+    max_last_activity_timestamp_ms = request_json.get("max_last_activity_timestamp_ms")
+
+    if not experiment_id:
+        raise MlflowException(
+            "Missing required parameter: experiment_id", error_code=INVALID_PARAMETER_VALUE
+        )
+    if min_start_timestamp_ms is None:
+        raise MlflowException(
+            "Missing required parameter: min_start_timestamp_ms",
+            error_code=INVALID_PARAMETER_VALUE,
+        )
+    if max_last_activity_timestamp_ms is None:
+        raise MlflowException(
+            "Missing required parameter: max_last_activity_timestamp_ms",
+            error_code=INVALID_PARAMETER_VALUE,
+        )
+
+    completed_sessions = _get_tracking_store().find_completed_sessions(
+        experiment_id=experiment_id,
+        min_start_timestamp_ms=int(min_start_timestamp_ms),
+        max_last_activity_timestamp_ms=int(max_last_activity_timestamp_ms),
+    )
+
+    response = Response(mimetype="application/json")
+    response.set_data(
+        json.dumps(
+            {
+                "sessions": [
+                    {
+                        "session_id": s.session_id,
+                        "trace_count": s.trace_count,
+                        "first_trace_timestamp_ms": s.first_trace_timestamp_ms,
+                        "last_trace_timestamp_ms": s.last_trace_timestamp_ms,
+                    }
+                    for s in completed_sessions
+                ]
+            }
+        )
+    )
+    return response
+
+
 @catch_mlflow_exception
 @_disable_if_artifacts_only
 def _set_trace_tag(request_id):
@@ -3939,34 +3989,6 @@ def _delete_scorer():
 
 @catch_mlflow_exception
 @_disable_if_artifacts_only
-def _update_online_scoring_config():
-    request_json = _get_request_json()
-    experiment_id = request_json.get("experiment_id")
-    name = request_json.get("name")
-    sample_rate = request_json.get("sample_rate")
-    filter_string = request_json.get("filter_string")
-
-    if not experiment_id:
-        raise MlflowException("Missing required parameter: experiment_id")
-    if not name:
-        raise MlflowException("Missing required parameter: name")
-    if sample_rate is None:
-        raise MlflowException("Missing required parameter: sample_rate")
-
-    config = _get_tracking_store().update_online_scoring_config(
-        experiment_id=experiment_id,
-        name=name,
-        sample_rate=sample_rate,
-        filter_string=filter_string,
-    )
-
-    response = Response(mimetype="application/json")
-    response.set_data(json.dumps({"config": config.to_dict()}))
-    return response
-
-
-@catch_mlflow_exception
-@_disable_if_artifacts_only
 def _get_online_scoring_configs():
     request_json = _get_request_json()
     scorer_ids = request_json.get("scorer_ids")
@@ -4665,17 +4687,6 @@ def get_endpoints(get_handler=get_handler):
     return (
         get_service_endpoints(MlflowService, get_handler)
         + [
-            # Non-proto scorer endpoints (both ajax and non-ajax paths)
-            (
-                _get_ajax_path("/mlflow/scorers/online-config", version=3),
-                _update_online_scoring_config,
-                ["PUT"],
-            ),
-            (
-                _get_rest_path("/mlflow/scorers/online-config", version=3),
-                _update_online_scoring_config,
-                ["PUT"],
-            ),
             # Batch get online scoring configs endpoint
             (
                 _get_ajax_path("/mlflow/scorers/online-configs", version=3),
@@ -4685,6 +4696,12 @@ def get_endpoints(get_handler=get_handler):
             (
                 _get_rest_path("/mlflow/scorers/online-configs", version=3),
                 _get_online_scoring_configs,
+                ["POST"],
+            ),
+            # Find completed sessions endpoint (internal API)
+            (
+                _get_rest_path("/mlflow/traces/find-completed-sessions", version=3),
+                _find_completed_sessions,
                 ["POST"],
             ),
         ]

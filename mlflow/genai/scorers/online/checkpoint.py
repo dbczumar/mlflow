@@ -2,36 +2,65 @@
 
 import logging
 import time
+from enum import Enum
 
 from mlflow.entities.experiment_tag import ExperimentTag
 from mlflow.store.tracking.abstract_store import AbstractStore
 
 _logger = logging.getLogger(__name__)
 
-# Checkpoint tag for tracking last processed trace timestamp
-CHECKPOINT_TAG = "mlflow.latestOnlineScoringTimestampMs"
+
+class CheckpointType(Enum):
+    """Type of checkpoint for online scoring."""
+
+    TRACE = "trace"
+    SESSION = "session"
+
+
+# Checkpoint tag prefix for tracking last processed timestamp
+_CHECKPOINT_TAG_PREFIX = "mlflow.latestOnlineScoring"
 
 # Default lookback period when no checkpoint exists (1 hour)
 _DEFAULT_LOOKBACK_MS = 60 * 60 * 1000
 
 
+def _get_checkpoint_tag(checkpoint_type: CheckpointType) -> str:
+    """
+    Get the checkpoint tag name for a given checkpoint type.
+
+    Args:
+        checkpoint_type: The type of checkpoint (TRACE or SESSION).
+
+    Returns:
+        The full checkpoint tag name.
+    """
+    return f"{_CHECKPOINT_TAG_PREFIX}.{checkpoint_type.value}.timestampMs"
+
+
 class OnlineCheckpointManager:
     """Manages checkpoint timestamps for online scoring progress tracking."""
 
-    def __init__(self, tracking_store: AbstractStore, experiment_id: str):
+    def __init__(
+        self,
+        tracking_store: AbstractStore,
+        experiment_id: str,
+        checkpoint_type: CheckpointType = CheckpointType.TRACE,
+    ):
         self._tracking_store = tracking_store
         self._experiment_id = experiment_id
+        self._checkpoint_type = checkpoint_type
+        self._checkpoint_tag = _get_checkpoint_tag(checkpoint_type)
 
     def get_checkpoint_timestamp(self) -> int | None:
         """
-        Get the last processed trace timestamp from the experiment checkpoint tag.
+        Get the last processed timestamp from the experiment checkpoint tag.
 
         Returns:
             The checkpoint timestamp in milliseconds, or None if no checkpoint exists.
         """
         try:
             experiment = self._tracking_store.get_experiment(self._experiment_id)
-            if checkpoint := experiment.tags.get(CHECKPOINT_TAG):
+            if checkpoint := experiment.tags.get(self._checkpoint_tag):
                 return int(checkpoint)
         except (TypeError, ValueError):
             pass
@@ -46,7 +75,7 @@ class OnlineCheckpointManager:
         """
         self._tracking_store.set_experiment_tag(
             self._experiment_id,
-            ExperimentTag(CHECKPOINT_TAG, str(timestamp_ms)),
+            ExperimentTag(self._checkpoint_tag, str(timestamp_ms)),
         )
 
     def calculate_time_window(self) -> tuple[int, int, int | None]:

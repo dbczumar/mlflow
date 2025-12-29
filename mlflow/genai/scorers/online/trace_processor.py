@@ -41,8 +41,8 @@ class SessionScoringTask:
     trace_infos: list[TraceInfo] | None = None  # Used temporarily during fetching
 
 
-class OnlineScoringProcessor:
-    """Orchestrates online scoring of traces."""
+class TraceScoringProcessor:
+    """Orchestrates online scoring of individual traces."""
 
     def __init__(
         self,
@@ -62,9 +62,9 @@ class OnlineScoringProcessor:
         experiment_id: str,
         online_scorers: list[OnlineScorer],
         tracking_store: AbstractStore,
-    ) -> "OnlineScoringProcessor":
+    ) -> "TraceScoringProcessor":
         """
-        Factory method to create an OnlineScoringProcessor with dependencies.
+        Factory method to create a TraceScoringProcessor with dependencies.
 
         Args:
             experiment_id: The experiment ID to process traces from.
@@ -72,7 +72,7 @@ class OnlineScoringProcessor:
             tracking_store: The tracking store instance.
 
         Returns:
-            Configured OnlineScoringProcessor instance.
+            Configured TraceScoringProcessor instance.
         """
         return cls(
             trace_loader=TraceLoader(tracking_store),
