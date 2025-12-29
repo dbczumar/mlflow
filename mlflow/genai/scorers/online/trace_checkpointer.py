@@ -2,6 +2,7 @@
 
 import logging
 import time
+from dataclasses import dataclass
 
 from mlflow.entities.experiment_tag import ExperimentTag
 from mlflow.store.tracking.abstract_store import AbstractStore
@@ -13,6 +14,14 @@ TRACE_CHECKPOINT_TAG = "mlflow.latestOnlineScoring.trace.timestampMs"
 
 # Default lookback period when no checkpoint exists (1 hour)
 _DEFAULT_LOOKBACK_MS = 60 * 60 * 1000
+
+
+@dataclass
+class OnlineTraceScoringTimeWindow:
+    """Time window for trace-level online scoring."""
+
+    min_trace_timestamp_ms: int
+    max_trace_timestamp_ms: int
 
 
 class OnlineTraceCheckpointManager:
@@ -49,21 +58,24 @@ class OnlineTraceCheckpointManager:
             ExperimentTag(TRACE_CHECKPOINT_TAG, str(timestamp_ms)),
         )
 
-    def calculate_time_window(self) -> tuple[int, int, int | None]:
+    def calculate_time_window(self) -> OnlineTraceScoringTimeWindow:
         """
-        Calculate the time window for trace fetching.
+        Calculate the time window for trace scoring.
 
         Returns:
-            Tuple of (start_timestamp_ms, end_timestamp_ms, current_checkpoint).
-            start_timestamp_ms is the checkpoint if it exists, otherwise now - 1 hour.
-            end_timestamp_ms is the current time.
+            OnlineTraceScoringTimeWindow with min and max trace timestamps.
+            min_trace_timestamp_ms is the checkpoint if it exists, otherwise now - 1 hour.
+            max_trace_timestamp_ms is the current time.
         """
         current_time_ms = int(time.time() * 1000)
         current_checkpoint = self.get_checkpoint_timestamp()
 
         if current_checkpoint is not None:
-            start_time_ms = current_checkpoint
+            min_trace_timestamp_ms = current_checkpoint
         else:
-            start_time_ms = current_time_ms - _DEFAULT_LOOKBACK_MS
+            min_trace_timestamp_ms = current_time_ms - _DEFAULT_LOOKBACK_MS
 
-        return start_time_ms, current_time_ms, current_checkpoint
+        return OnlineTraceScoringTimeWindow(
+            min_trace_timestamp_ms=min_trace_timestamp_ms,
+            max_trace_timestamp_ms=current_time_ms,
+        )

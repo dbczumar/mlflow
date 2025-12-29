@@ -1,22 +1,19 @@
 """Online scoring processor for executing scorers on traces."""
 
 import logging
-from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 
-from mlflow.entities import Trace, TraceInfo
+from mlflow.entities import Trace
 from mlflow.environment_variables import MLFLOW_GENAI_EVAL_MAX_WORKERS
 from mlflow.genai.evaluation.entities import EvalItem
 from mlflow.genai.evaluation.harness import _compute_eval_scores, _log_assessments
-from mlflow.genai.evaluation.session_utils import evaluate_session_level_scorers
 from mlflow.genai.scorers.base import Scorer
 from mlflow.genai.scorers.online.online_scorer import OnlineScorer
 from mlflow.genai.scorers.online.sampler import OnlineScorerSampler
 from mlflow.genai.scorers.online.trace_checkpointer import OnlineTraceCheckpointManager
 from mlflow.genai.scorers.online.trace_loader import OnlineTraceLoader
 from mlflow.store.tracking.abstract_store import AbstractStore
-from mlflow.tracing.constant import TraceMetadataKey
 
 _logger = logging.getLogger(__name__)
 
@@ -30,15 +27,6 @@ class TraceScoringTask:
 
     trace: Trace
     scorers: list[Scorer]
-
-
-@dataclass
-class SessionScoringTask:
-    """A task to score a session (multiple traces) with multiple scorers."""
-
-    traces: list[Trace]
-    scorers: list[Scorer]
-    trace_infos: list[TraceInfo] | None = None  # Used temporarily during fetching
 
 
 class OnlineTraceScoringProcessor:
@@ -93,51 +81,39 @@ class OnlineTraceScoringProcessor:
             return
 
         # Calculate time window
-        start_time_ms, end_time_ms, current_checkpoint = (
-            self._checkpoint_manager.calculate_time_window()
-        )
+        time_window = self._checkpoint_manager.calculate_time_window()
         _logger.info(
             f"Online scoring for experiment {self._experiment_id}: "
-            f"time window [{start_time_ms}, {end_time_ms}]"
+            f"time window [{time_window.min_trace_timestamp_ms}, "
+            f"{time_window.max_trace_timestamp_ms}]"
         )
 
         # Fetch trace infos and apply sampling per filter group
-        single_turn_tasks, session_tasks = self._fetch_and_sample_traces(start_time_ms, end_time_ms)
-
-        if not single_turn_tasks and not session_tasks:
-            _logger.info("No traces selected after sampling, skipping")
-            self._checkpoint_manager.update_checkpoint_timestamp(end_time_ms)
-            return
-
-        _logger.info(
-            f"Running scoring: {len(single_turn_tasks)} single-turn tasks, "
-            f"{len(session_tasks)} session tasks"
+        tasks = self._fetch_and_sample_traces(
+            time_window.min_trace_timestamp_ms, time_window.max_trace_timestamp_ms
         )
 
-        # Fetch full traces only for sampled trace IDs
-        all_sampled_trace_ids = set(single_turn_tasks.keys())
-        for task in session_tasks.values():
-            all_sampled_trace_ids.update(ti.trace_id for ti in task.trace_infos)
+        if not tasks:
+            _logger.info("No traces selected after sampling, skipping")
+            self._checkpoint_manager.update_checkpoint_timestamp(time_window.max_trace_timestamp_ms)
+            return
 
-        full_traces = self._trace_loader.fetch_traces(list(all_sampled_trace_ids))
+        _logger.info(f"Running scoring: {len(tasks)} trace tasks")
+
+        # Fetch full traces only for sampled trace IDs
+        sampled_trace_ids = list(tasks.keys())
+        full_traces = self._trace_loader.fetch_traces(sampled_trace_ids)
         trace_map = {t.info.trace_id: t for t in full_traces}
 
         # Populate tasks with full traces
-        for trace_id, task in single_turn_tasks.items():
+        for trace_id, task in tasks.items():
             task.trace = trace_map.get(trace_id)
 
-        for task in session_tasks.values():
-            task.traces = [
-                trace_map[ti.trace_id] for ti in task.trace_infos if ti.trace_id in trace_map
-            ]
-            # Sort traces within session by timestamp
-            task.traces.sort(key=lambda t: t.info.timestamp_ms)
-
         # Execute scoring
-        self._execute_scoring(single_turn_tasks, session_tasks)
+        self._execute_scoring(tasks)
 
         # Update checkpoint after scoring
-        self._checkpoint_manager.update_checkpoint_timestamp(end_time_ms)
+        self._checkpoint_manager.update_checkpoint_timestamp(time_window.max_trace_timestamp_ms)
 
         _logger.info(f"Online scoring completed for experiment {self._experiment_id}")
 
@@ -145,23 +121,18 @@ class OnlineTraceScoringProcessor:
         self,
         start_time_ms: int,
         end_time_ms: int,
-    ) -> tuple[dict[str, TraceScoringTask], dict[str, SessionScoringTask]]:
+    ) -> dict[str, TraceScoringTask]:
         """
         Fetch traces for each filter and apply sampling.
 
         Returns:
-            Tuple of (single_turn_tasks, session_tasks).
+            Dictionary mapping trace_id to TraceScoringTask.
         """
-        single_turn_tasks: dict[str, TraceScoringTask] = {}
-        session_tasks: dict[str, SessionScoringTask] = {}
+        tasks: dict[str, TraceScoringTask] = {}
 
         for filter_string in self._sampler.get_filter_strings():
-            single_turn_scorers = self._sampler.get_scorers_for_filter(
-                filter_string, session_level=False
-            )
-            session_scorers = self._sampler.get_scorers_for_filter(
-                filter_string, session_level=True
-            )
+            # Only get trace-level scorers (session-level is handled by session_processor)
+            trace_scorers = self._sampler.get_scorers_for_filter(filter_string, session_level=False)
 
             trace_infos = self._trace_loader.fetch_trace_infos_between(
                 self._experiment_id,
@@ -178,147 +149,48 @@ class OnlineTraceScoringProcessor:
             _logger.info(f"Found {len(trace_infos)} trace infos for filter: {filter_string}")
 
             # Sample scorers for each trace
-            sampled_trace_ids = []
             for trace_info in trace_infos:
                 trace_id = trace_info.trace_id
-                if selected := self._sampler.sample(trace_id, single_turn_scorers):
-                    sampled_trace_ids.append(trace_id)
+                if selected := self._sampler.sample(trace_id, trace_scorers):
                     # Store just the trace_id and scorers - we'll fetch full traces later
-                    if trace_id not in single_turn_tasks:
-                        single_turn_tasks[trace_id] = TraceScoringTask(trace=None, scorers=[])
-                    single_turn_tasks[trace_id].scorers.extend(selected)
+                    if trace_id not in tasks:
+                        tasks[trace_id] = TraceScoringTask(trace=None, scorers=[])
+                    tasks[trace_id].scorers.extend(selected)
 
-            # For session-level scorers, we need to group traces by session
-            if session_scorers:
-                # Collect trace_ids that have sessions
-                session_trace_infos = [
-                    ti
-                    for ti in trace_infos
-                    if ti.trace_metadata and ti.trace_metadata.get(TraceMetadataKey.TRACE_SESSION)
-                ]
-
-                # Group by session_id
-                session_groups = defaultdict(list)
-                for trace_info in session_trace_infos:
-                    session_id = trace_info.trace_metadata[TraceMetadataKey.TRACE_SESSION]
-                    session_groups[session_id].append(trace_info)
-
-                # Sample session-level scorers per session
-                for session_id, session_trace_infos in session_groups.items():
-                    if selected := self._sampler.sample(session_id, session_scorers):
-                        # Store trace_ids for this session
-                        trace_ids = [ti.trace_id for ti in session_trace_infos]
-                        sampled_trace_ids.extend(trace_ids)
-                        if session_id not in session_tasks:
-                            session_tasks[session_id] = SessionScoringTask(traces=[], scorers=[])
-                        session_tasks[session_id].scorers.extend(selected)
-                        # Store trace_infos (we'll fetch full traces later)
-                        session_tasks[session_id].trace_infos = session_trace_infos
-
-        return single_turn_tasks, session_tasks
-
-    def _group_traces_by_session(self, traces: list[Trace]) -> dict[str, list[Trace]]:
-        """Group traces by their session ID."""
-        session_groups: dict[str, list[Trace]] = defaultdict(list)
-
-        for trace in traces:
-            trace_metadata = trace.info.trace_metadata or {}
-            if session_id := trace_metadata.get(TraceMetadataKey.TRACE_SESSION):
-                session_groups[session_id].append(trace)
-
-        # Sort traces within each session by timestamp
-        for session_id in session_groups:
-            session_groups[session_id] = sorted(
-                session_groups[session_id],
-                key=lambda t: t.info.timestamp_ms,
-            )
-
-        return dict(session_groups)
+        return tasks
 
     def _execute_scoring(
         self,
-        single_turn_tasks: dict[str, TraceScoringTask],
-        session_tasks: dict[str, SessionScoringTask],
+        tasks: dict[str, TraceScoringTask],
     ) -> None:
         """
-        Execute scoring tasks.
+        Execute trace scoring tasks in parallel.
 
         Args:
-            single_turn_tasks: Single-turn scoring tasks.
-            session_tasks: Session-level scoring tasks.
+            tasks: Trace-level scoring tasks.
         """
         with ThreadPoolExecutor(
             max_workers=MLFLOW_GENAI_EVAL_MAX_WORKERS.get(),
             thread_name_prefix="OnlineScoring",
         ) as executor:
-            # Phase 1: Single-turn scorers
-            self._execute_single_turn_tasks(executor, single_turn_tasks)
-
-            # Phase 2: Session-level scorers
-            self._execute_session_tasks(executor, session_tasks)
-
-    def _execute_single_turn_tasks(
-        self,
-        executor: ThreadPoolExecutor,
-        tasks: dict[str, TraceScoringTask],
-    ) -> None:
-        """Execute single-turn scoring tasks."""
-        futures = {}
-        for task in tasks.values():
-            if task.trace is None:
-                _logger.warning("Skipping task with no trace")
-                continue
-            eval_item = EvalItem.from_trace(task.trace)
-            future = executor.submit(
-                _compute_eval_scores, eval_item=eval_item, scorers=task.scorers
-            )
-            futures[future] = task
-
-        for future in as_completed(futures):
-            task = futures[future]
-            try:
-                if feedbacks := future.result():
-                    _log_assessments(run_id=None, trace=task.trace, assessments=feedbacks)
-            except Exception as e:
-                _logger.warning(
-                    f"Failed to score trace {task.trace.info.trace_id}: {e}",
-                    exc_info=True,
+            futures = {}
+            for task in tasks.values():
+                if task.trace is None:
+                    _logger.warning("Skipping task with no trace")
+                    continue
+                eval_item = EvalItem.from_trace(task.trace)
+                future = executor.submit(
+                    _compute_eval_scores, eval_item=eval_item, scorers=task.scorers
                 )
+                futures[future] = task
 
-    def _execute_session_tasks(
-        self,
-        executor: ThreadPoolExecutor,
-        tasks: dict[str, SessionScoringTask],
-    ) -> None:
-        """Execute session-level scoring tasks."""
-        futures = {}
-        for session_id, task in tasks.items():
-            if not task.traces:
-                _logger.warning(f"Skipping session {session_id} with no traces")
-                continue
-            session_items = [EvalItem.from_trace(t) for t in task.traces]
-            future = executor.submit(
-                evaluate_session_level_scorers,
-                session_id=session_id,
-                session_items=session_items,
-                multi_turn_scorers=task.scorers,
-            )
-            futures[future] = (session_id, task)
-
-        for future in as_completed(futures):
-            session_id, task = futures[future]
-            try:
-                result = future.result()
-                for trace_id, feedbacks in result.items():
-                    if feedbacks:
-                        trace = next(
-                            (t for t in task.traces if t.info.trace_id == trace_id),
-                            None,
-                        )
-                        if trace:
-                            _log_assessments(run_id=None, trace=trace, assessments=feedbacks)
-            except Exception as e:
-                _logger.warning(
-                    f"Failed to score session {session_id}: {e}",
-                    exc_info=True,
-                )
+            for future in as_completed(futures):
+                task = futures[future]
+                try:
+                    if feedbacks := future.result():
+                        _log_assessments(run_id=None, trace=task.trace, assessments=feedbacks)
+                except Exception as e:
+                    _logger.warning(
+                        f"Failed to score trace {task.trace.info.trace_id}: {e}",
+                        exc_info=True,
+                    )
