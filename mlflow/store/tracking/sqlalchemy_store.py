@@ -2460,10 +2460,7 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
             List of OnlineScorer entities with serialized_scorer, sample_rate,
             and filter_string fields populated.
         """
-        from mlflow.genai.scorers.online.online_scorer import OnlineScorer
-
         with self.ManagedSessionMaker() as session:
-            # Subquery to get the max version for each scorer
             max_version_subquery = (
                 session.query(
                     SqlScorerVersion.scorer_id,
@@ -2473,7 +2470,6 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
                 .subquery()
             )
 
-            # Get all online configs with sample_rate > 0, joined with their latest version
             results = (
                 session.query(
                     SqlScorerOnlineConfig,
