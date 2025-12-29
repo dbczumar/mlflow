@@ -6,9 +6,9 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from mlflow.environment_variables import MLFLOW_GENAI_EVAL_MAX_WORKERS
 from mlflow.genai.evaluation.entities import EvalItem
 from mlflow.genai.evaluation.session_utils import evaluate_session_level_scorers
-from mlflow.genai.scorers.online.checkpoint import CheckpointType, OnlineCheckpointManager
 from mlflow.genai.scorers.online.online_scorer import CompletedSession, OnlineScorer
 from mlflow.genai.scorers.online.sampler import OnlineScorerSampler
+from mlflow.genai.scorers.online.session_checkpoint import OnlineSessionCheckpointManager
 from mlflow.genai.scorers.online.trace_loader import OnlineTraceLoader
 from mlflow.store.tracking.abstract_store import AbstractStore
 
@@ -30,7 +30,7 @@ class OnlineSessionScoringProcessor:
     def __init__(
         self,
         trace_loader: "OnlineTraceLoader",
-        checkpoint_manager: OnlineCheckpointManager,
+        checkpoint_manager: OnlineSessionCheckpointManager,
         sampler: OnlineScorerSampler,
         experiment_id: str,
         tracking_store: AbstractStore,
@@ -61,9 +61,7 @@ class OnlineSessionScoringProcessor:
         """
         return cls(
             trace_loader=OnlineTraceLoader(tracking_store),
-            checkpoint_manager=OnlineCheckpointManager(
-                tracking_store, experiment_id, CheckpointType.SESSION
-            ),
+            checkpoint_manager=OnlineSessionCheckpointManager(tracking_store, experiment_id),
             sampler=OnlineScorerSampler(online_scorers),
             experiment_id=experiment_id,
             tracking_store=tracking_store,
