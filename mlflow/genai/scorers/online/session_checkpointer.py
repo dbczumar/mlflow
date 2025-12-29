@@ -15,6 +15,9 @@ SESSION_CHECKPOINT_TAG = "mlflow.latestOnlineScoring.session.timestampMs"
 # Default lookback period when no checkpoint exists (1 hour)
 _DEFAULT_LOOKBACK_MS = 60 * 60 * 1000
 
+# Maximum lookback period to prevent getting stuck on old failing sessions (1 hour)
+_MAX_LOOKBACK_MS = 60 * 60 * 1000
+
 # Session inactivity buffer: 10 minutes without new traces = session complete
 _SESSION_COMPLETION_BUFFER_MS = 10 * 60 * 1000
 
@@ -65,18 +68,27 @@ class OnlineSessionCheckpointManager:
         """
         Calculate the time window for session scoring.
 
+        Enforces a maximum lookback of 1 hour to prevent getting stuck on persistently
+        failing sessions. If the checkpoint is older than 1 hour, uses current_time - 1 hour
+        instead to skip over old problematic sessions.
+
         Returns:
             OnlineSessionScoringTimeWindow with min and max last trace timestamps.
-            min_last_trace_timestamp_ms is the checkpoint if it exists, otherwise now - 1 hour.
+            min_last_trace_timestamp_ms is the checkpoint if it exists and is within the last hour,
+            otherwise now - 1 hour.
             max_last_trace_timestamp_ms is current time - 10 minutes (session completion buffer).
         """
         current_time_ms = int(time.time() * 1000)
         current_checkpoint = self.get_checkpoint_timestamp()
 
+        # Start from checkpoint, but never look back more than 1 hour
+        min_lookback_time_ms = current_time_ms - _MAX_LOOKBACK_MS
+
         if current_checkpoint is not None:
-            min_last_trace_timestamp_ms = current_checkpoint
+            # Use the more recent of: checkpoint or (current_time - 1 hour)
+            min_last_trace_timestamp_ms = max(current_checkpoint, min_lookback_time_ms)
         else:
-            min_last_trace_timestamp_ms = current_time_ms - _DEFAULT_LOOKBACK_MS
+            min_last_trace_timestamp_ms = min_lookback_time_ms
 
         max_last_trace_timestamp_ms = current_time_ms - _SESSION_COMPLETION_BUFFER_MS
 
