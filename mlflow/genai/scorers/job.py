@@ -363,25 +363,20 @@ def run_online_scoring_scheduler() -> None:
 
     tracking_store = _get_tracking_store()
     online_scorers = tracking_store.get_active_online_scorers()
-
     _logger.info(f"Online scoring scheduler found {len(online_scorers)} active scorers")
 
-    # Group scorers by experiment_id
     scorers_by_experiment: dict[str, list[OnlineScorer]] = defaultdict(list)
     for scorer in online_scorers:
         scorers_by_experiment[scorer.experiment_id].append(scorer)
-
-    # Convert to list of (experiment_id, scorers) tuples and shuffle
+    # Shuffle configs randomly to prevent scorer starvation when there are
+    # limited job runners available
     experiment_groups = list(scorers_by_experiment.items())
     random.shuffle(experiment_groups)
-
     _logger.info(
         f"Grouped into {len(experiment_groups)} experiments, submitting one job per experiment"
     )
 
-    # Submit one job per experiment
     for experiment_id, scorers in experiment_groups:
         _logger.info(f"Submitting job for experiment {experiment_id} with {len(scorers)} scorers")
-        # Convert OnlineScorer objects to dicts for job serialization
         scorer_dicts = [asdict(scorer) for scorer in scorers]
         run_online_scorer_job(experiment_id, scorer_dicts)
