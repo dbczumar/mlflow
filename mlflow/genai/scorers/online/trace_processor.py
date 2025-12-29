@@ -11,7 +11,7 @@ from mlflow.genai.evaluation.entities import EvalItem
 from mlflow.genai.evaluation.harness import _compute_eval_scores, _log_assessments
 from mlflow.genai.evaluation.session_utils import evaluate_session_level_scorers
 from mlflow.genai.scorers.base import Scorer
-from mlflow.genai.scorers.online.checkpoint import OnlineCheckpointManager
+from mlflow.genai.scorers.online.checkpoint import CheckpointType, OnlineCheckpointManager
 from mlflow.genai.scorers.online.online_scorer import OnlineScorer
 from mlflow.genai.scorers.online.sampler import OnlineScorerSampler
 from mlflow.genai.scorers.online.trace_loader import OnlineTraceLoader
@@ -76,7 +76,9 @@ class OnlineTraceScoringProcessor:
         """
         return cls(
             trace_loader=OnlineTraceLoader(tracking_store),
-            checkpoint_manager=OnlineCheckpointManager(tracking_store, experiment_id),
+            checkpoint_manager=OnlineCheckpointManager(
+                tracking_store, experiment_id, CheckpointType.TRACE
+            ),
             sampler=OnlineScorerSampler(online_scorers),
             experiment_id=experiment_id,
         )
