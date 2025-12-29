@@ -1,8 +1,20 @@
 """
-Internal entity for scorer online configuration.
+Online scorer entities and configuration.
 
-This is an internal entity used by the store layer and is not part of the public API.
+This module contains entities for online scorer configuration used by the store layer
+and online scoring infrastructure.
 """
+
+from dataclasses import dataclass
+
+
+@dataclass
+class OnlineScorer:
+    """An online scorer with sampling configuration."""
+
+    serialized_scorer: str
+    sample_rate: float
+    filter_string: str | None = None
 
 
 class ScorerOnlineConfig:

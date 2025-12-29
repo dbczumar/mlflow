@@ -12,6 +12,7 @@ from mlflow.genai.evaluation.harness import _compute_eval_scores, _log_assessmen
 from mlflow.genai.evaluation.session_utils import evaluate_session_level_scorers
 from mlflow.genai.scorers.base import Scorer
 from mlflow.genai.scorers.online.checkpoint import OnlineCheckpointManager
+from mlflow.genai.scorers.online.online_scorer import OnlineScorer
 from mlflow.genai.scorers.online.sampler import OnlineScorerSampler
 from mlflow.genai.scorers.online.trace_loader import TraceLoader
 from mlflow.store.tracking.abstract_store import AbstractStore
@@ -21,15 +22,6 @@ _logger = logging.getLogger(__name__)
 
 # Maximum traces to process per job run
 _MAX_TRACES_PER_JOB = 500
-
-
-@dataclass
-class OnlineScorer:
-    """An online scorer with sampling configuration."""
-
-    serialized_scorer: str
-    sample_rate: float
-    filter_string: str | None = None
 
 
 @dataclass

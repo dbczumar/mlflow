@@ -68,7 +68,7 @@ from mlflow.entities.trace_metrics import (
 from mlflow.entities.trace_state import TraceState
 from mlflow.entities.trace_status import TraceStatus
 from mlflow.exceptions import MlflowException, MlflowTracingException
-from mlflow.genai.scorers.online.scorer_online_config import ScorerOnlineConfig
+from mlflow.genai.scorers.online.online_scorer import OnlineScorer, ScorerOnlineConfig
 from mlflow.genai.scorers.scorer_utils import (
     build_gateway_model,
     extract_endpoint_ref,
@@ -2448,6 +2448,61 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
                 )
                 for config in results
             }
+
+    def get_active_online_scorers(self) -> list["OnlineScorer"]:
+        """
+        Get all active online scorers across all experiments.
+
+        Active online scorers are those with a sample_rate greater than zero.
+        Each OnlineScorer contains the serialized scorer and sampling configuration.
+
+        Returns:
+            List of OnlineScorer entities with serialized_scorer, sample_rate,
+            and filter_string fields populated.
+        """
+        from mlflow.genai.scorers.online.online_scorer import OnlineScorer
+
+        with self.ManagedSessionMaker() as session:
+            # Get all online configs with sample_rate > 0, with their associated scorer
+            # and latest scorer version. We need to join with scorer versions to get
+            # the serialized_scorer.
+            results = (
+                session.query(
+                    SqlScorerOnlineConfig,
+                    SqlScorer,
+                    SqlScorerVersion,
+                )
+                .filter(SqlScorerOnlineConfig.sample_rate > 0)
+                .join(SqlScorer, SqlScorerOnlineConfig.scorer_id == SqlScorer.scorer_id)
+                .join(SqlScorerVersion, SqlScorer.scorer_id == SqlScorerVersion.scorer_id)
+                .all()
+            )
+
+            if not results:
+                return []
+
+            # Group by config to find the latest version for each
+            config_to_latest: dict[
+                str, tuple[SqlScorerOnlineConfig, SqlScorer, SqlScorerVersion]
+            ] = {}
+            for config, scorer, version in results:
+                config_id = config.scorer_online_config_id
+                if config_id not in config_to_latest:
+                    config_to_latest[config_id] = (config, scorer, version)
+                else:
+                    _, _, existing_version = config_to_latest[config_id]
+                    if version.scorer_version > existing_version.scorer_version:
+                        config_to_latest[config_id] = (config, scorer, version)
+
+            # Convert to OnlineScorer entities
+            return [
+                OnlineScorer(
+                    serialized_scorer=version.serialized_scorer,
+                    sample_rate=config.sample_rate,
+                    filter_string=config.filter_string,
+                )
+                for config, scorer, version in config_to_latest.values()
+            ]
 
     def update_scorer_online_config(
         self,

@@ -25,7 +25,7 @@ from mlflow.entities.trace_metrics import (
 
 if TYPE_CHECKING:
     from mlflow.entities import EvaluationDataset
-    from mlflow.genai.scorers.online.scorer_online_config import ScorerOnlineConfig
+    from mlflow.genai.scorers.online.online_scorer import OnlineScorer, ScorerOnlineConfig
 from mlflow.entities.metric import MetricWithRunId
 from mlflow.entities.trace import Span, Trace
 from mlflow.entities.trace_info import TraceInfo
@@ -1469,5 +1469,18 @@ class AbstractStore(GatewayStoreMixin):
         Returns:
             A dictionary mapping scorer_id to ScorerOnlineConfig for scorers that
             have configurations. Scorers without configurations are not included.
+        """
+        raise NotImplementedError(self.__class__.__name__)
+
+    def get_active_online_scorers(self) -> list["OnlineScorer"]:
+        """
+        Get all active online scorers across all experiments.
+
+        Active online scorers are those with a sample_rate greater than zero.
+        Each OnlineScorer contains the serialized scorer and sampling configuration.
+
+        Returns:
+            List of OnlineScorer entities with serialized_scorer, sample_rate,
+            and filter_string fields populated.
         """
         raise NotImplementedError(self.__class__.__name__)
