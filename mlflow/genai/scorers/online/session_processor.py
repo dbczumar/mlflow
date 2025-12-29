@@ -26,9 +26,6 @@ class CompletedSession:
     last_trace_timestamp_ms: int
 
 
-# Session inactivity buffer: 10 minutes without new traces = session complete
-_SESSION_COMPLETION_BUFFER_MS = 10 * 60 * 1000
-
 # Minimum number of sessions to process per job run
 _MIN_SESSIONS_PER_JOB = 10
 
@@ -92,29 +89,24 @@ class OnlineSessionScoringProcessor:
             return
 
         # Calculate time window for completed sessions
-        min_last_trace_timestamp_ms, current_time_ms, current_checkpoint = (
-            self._checkpoint_manager.calculate_time_window()
-        )
-
-        # Sessions are "complete" if they haven't had new traces in 10+ minutes
-        max_last_trace_timestamp_ms = current_time_ms - _SESSION_COMPLETION_BUFFER_MS
+        time_window = self._checkpoint_manager.calculate_time_window()
 
         _logger.info(
             f"Session scoring for experiment {self._experiment_id}: "
             f"looking for sessions in "
-            f"[{min_last_trace_timestamp_ms}, {max_last_trace_timestamp_ms}]"
+            f"[{time_window.min_last_trace_timestamp_ms}, "
+            f"{time_window.max_last_trace_timestamp_ms}]"
         )
 
         # Find completed sessions
         completed_sessions = self._tracking_store.find_completed_sessions(
             experiment_id=self._experiment_id,
-            min_last_trace_timestamp_ms=min_last_trace_timestamp_ms,
-            max_last_trace_timestamp_ms=max_last_trace_timestamp_ms,
+            min_last_trace_timestamp_ms=time_window.min_last_trace_timestamp_ms,
+            max_last_trace_timestamp_ms=time_window.max_last_trace_timestamp_ms,
         )
 
         if not completed_sessions:
             _logger.info("No completed sessions found, skipping")
-            self._checkpoint_manager.update_checkpoint_timestamp(current_time_ms)
             return
 
         _logger.info(f"Found {len(completed_sessions)} completed sessions")
@@ -124,7 +116,6 @@ class OnlineSessionScoringProcessor:
 
         if not sessions_to_score:
             _logger.info("No sessions selected after batching, skipping")
-            self._checkpoint_manager.update_checkpoint_timestamp(current_time_ms)
             return
 
         _logger.info(

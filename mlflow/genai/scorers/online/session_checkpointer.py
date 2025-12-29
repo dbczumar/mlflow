@@ -2,6 +2,7 @@
 
 import logging
 import time
+from dataclasses import dataclass
 
 from mlflow.entities.experiment_tag import ExperimentTag
 from mlflow.store.tracking.abstract_store import AbstractStore
@@ -13,6 +14,17 @@ SESSION_CHECKPOINT_TAG = "mlflow.latestOnlineScoring.session.timestampMs"
 
 # Default lookback period when no checkpoint exists (1 hour)
 _DEFAULT_LOOKBACK_MS = 60 * 60 * 1000
+
+# Session inactivity buffer: 10 minutes without new traces = session complete
+_SESSION_COMPLETION_BUFFER_MS = 10 * 60 * 1000
+
+
+@dataclass
+class OnlineSessionScoringTimeWindow:
+    """Time window for session-level online scoring."""
+
+    min_last_trace_timestamp_ms: int
+    max_last_trace_timestamp_ms: int
 
 
 class OnlineSessionCheckpointManager:
@@ -49,21 +61,26 @@ class OnlineSessionCheckpointManager:
             ExperimentTag(SESSION_CHECKPOINT_TAG, str(timestamp_ms)),
         )
 
-    def calculate_time_window(self) -> tuple[int, int, int | None]:
+    def calculate_time_window(self) -> OnlineSessionScoringTimeWindow:
         """
-        Calculate the time window for session fetching.
+        Calculate the time window for session scoring.
 
         Returns:
-            Tuple of (start_timestamp_ms, end_timestamp_ms, current_checkpoint).
-            start_timestamp_ms is the checkpoint if it exists, otherwise now - 1 hour.
-            end_timestamp_ms is the current time.
+            OnlineSessionScoringTimeWindow with min and max last trace timestamps.
+            min_last_trace_timestamp_ms is the checkpoint if it exists, otherwise now - 1 hour.
+            max_last_trace_timestamp_ms is current time - 10 minutes (session completion buffer).
         """
         current_time_ms = int(time.time() * 1000)
         current_checkpoint = self.get_checkpoint_timestamp()
 
         if current_checkpoint is not None:
-            start_time_ms = current_checkpoint
+            min_last_trace_timestamp_ms = current_checkpoint
         else:
-            start_time_ms = current_time_ms - _DEFAULT_LOOKBACK_MS
+            min_last_trace_timestamp_ms = current_time_ms - _DEFAULT_LOOKBACK_MS
 
-        return start_time_ms, current_time_ms, current_checkpoint
+        max_last_trace_timestamp_ms = current_time_ms - _SESSION_COMPLETION_BUFFER_MS
+
+        return OnlineSessionScoringTimeWindow(
+            min_last_trace_timestamp_ms=min_last_trace_timestamp_ms,
+            max_last_trace_timestamp_ms=max_last_trace_timestamp_ms,
+        )
