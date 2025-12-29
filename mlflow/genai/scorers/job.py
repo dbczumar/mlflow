@@ -3,6 +3,7 @@
 import json
 import logging
 import random
+from collections import defaultdict
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
@@ -57,22 +58,26 @@ def _extract_failures_from_feedbacks(feedbacks: list[Any]) -> list[ScorerFailure
 )
 def run_online_scorer_job(
     experiment_id: str,
-    scorer_configs: list[dict[str, Any]],
+    online_scorers: list[dict[str, Any]],
 ) -> None:
     """
     Job that fetches samples of traces and runs scorers on them.
 
-    This job is exclusive per (experiment_id, scorer_configs) combination to prevent
+    This job is exclusive per (experiment_id, online_scorers) combination to prevent
     duplicate scoring of the same traces.
 
     Args:
         experiment_id: The experiment ID to fetch traces from.
-        scorer_configs: List of OnlineScorerConfig dicts specifying which scorers to run.
+        online_scorers: List of OnlineScorer dicts specifying which scorers to run.
     """
+    from mlflow.genai.scorers.online.online_scorer import OnlineScorer
     from mlflow.server.handlers import _get_tracking_store
 
+    # Convert dicts back to OnlineScorer instances
+    scorer_objects = [OnlineScorer(**scorer_dict) for scorer_dict in online_scorers]
+
     tracking_store = _get_tracking_store()
-    processor = OnlineScoringProcessor.create(experiment_id, scorer_configs, tracking_store)
+    processor = OnlineScoringProcessor.create(experiment_id, scorer_objects, tracking_store)
     processor.process_traces()
 
 
@@ -347,25 +352,36 @@ def get_trace_batches_for_scorer(
 
 def run_online_scoring_scheduler() -> None:
     """
-    Periodic task that fetches active scorer online configs and submits scoring jobs.
+    Periodic task that fetches active online scorers and submits scoring jobs.
 
-    This function runs directly in the huey consumer process (not in a subprocess),
-    allowing it to call submit_job to enqueue scorer jobs.
+    Groups scorers by experiment_id and submits one job per experiment to process
+    all active scorers for that experiment together. Groups are shuffled to prevent
+    starvation when there are limited job runners available.
     """
+    from mlflow.genai.scorers.online.online_scorer import OnlineScorer
     from mlflow.server.handlers import _get_tracking_store
 
     tracking_store = _get_tracking_store()
-    active_configs = tracking_store.get_active_scorer_online_configs()
+    online_scorers = tracking_store.get_active_online_scorers()
 
-    # Shuffle configs randomly to prevent scorer starvation when there are
-    # limited job runners available
-    random.shuffle(active_configs)
+    _logger.info(f"Online scoring scheduler found {len(online_scorers)} active scorers")
 
-    _logger.info(f"Online scoring scheduler found {len(active_configs)} active configs")
+    # Group scorers by experiment_id
+    scorers_by_experiment: dict[str, list[OnlineScorer]] = defaultdict(list)
+    for scorer in online_scorers:
+        scorers_by_experiment[scorer.experiment_id].append(scorer)
 
-    # TODO: For each config, fetch traces and submit invoke_scorer_job
-    for config in active_configs:
-        _logger.debug(
-            f"Processing config {config.scorer_online_config_id} "
-            f"for scorer {config.scorer_id} with sample_rate {config.sample_rate}"
-        )
+    # Convert to list of (experiment_id, scorers) tuples and shuffle
+    experiment_groups = list(scorers_by_experiment.items())
+    random.shuffle(experiment_groups)
+
+    _logger.info(
+        f"Grouped into {len(experiment_groups)} experiments, submitting one job per experiment"
+    )
+
+    # Submit one job per experiment
+    for experiment_id, scorers in experiment_groups:
+        _logger.info(f"Submitting job for experiment {experiment_id} with {len(scorers)} scorers")
+        # Convert OnlineScorer objects to dicts for job serialization
+        scorer_dicts = [asdict(scorer) for scorer in scorers]
+        run_online_scorer_job(experiment_id, scorer_dicts)
