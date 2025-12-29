@@ -92,28 +92,29 @@ class OnlineSessionScoringProcessor:
             return
 
         # Calculate time window for completed sessions
-        start_time_ms, end_time_ms, current_checkpoint = (
+        min_last_trace_timestamp_ms, current_time_ms, current_checkpoint = (
             self._checkpoint_manager.calculate_time_window()
         )
 
         # Sessions are "complete" if they haven't had new traces in 10+ minutes
-        max_last_trace_timestamp_ms = end_time_ms - _SESSION_COMPLETION_BUFFER_MS
+        max_last_trace_timestamp_ms = current_time_ms - _SESSION_COMPLETION_BUFFER_MS
 
         _logger.info(
             f"Session scoring for experiment {self._experiment_id}: "
-            f"looking for sessions in [{start_time_ms}, {max_last_trace_timestamp_ms}]"
+            f"looking for sessions in "
+            f"[{min_last_trace_timestamp_ms}, {max_last_trace_timestamp_ms}]"
         )
 
         # Find completed sessions
         completed_sessions = self._tracking_store.find_completed_sessions(
             experiment_id=self._experiment_id,
-            min_last_trace_timestamp_ms=start_time_ms,
+            min_last_trace_timestamp_ms=min_last_trace_timestamp_ms,
             max_last_trace_timestamp_ms=max_last_trace_timestamp_ms,
         )
 
         if not completed_sessions:
             _logger.info("No completed sessions found, skipping")
-            self._checkpoint_manager.update_checkpoint_timestamp(end_time_ms)
+            self._checkpoint_manager.update_checkpoint_timestamp(current_time_ms)
             return
 
         _logger.info(f"Found {len(completed_sessions)} completed sessions")
@@ -123,7 +124,7 @@ class OnlineSessionScoringProcessor:
 
         if not sessions_to_score:
             _logger.info("No sessions selected after batching, skipping")
-            self._checkpoint_manager.update_checkpoint_timestamp(end_time_ms)
+            self._checkpoint_manager.update_checkpoint_timestamp(current_time_ms)
             return
 
         _logger.info(
