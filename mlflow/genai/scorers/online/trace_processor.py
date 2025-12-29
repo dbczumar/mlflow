@@ -13,7 +13,7 @@ from mlflow.genai.evaluation.session_utils import evaluate_session_level_scorers
 from mlflow.genai.scorers.base import Scorer
 from mlflow.genai.scorers.online.online_scorer import OnlineScorer
 from mlflow.genai.scorers.online.sampler import OnlineScorerSampler
-from mlflow.genai.scorers.online.trace_checkpoint import OnlineTraceCheckpointManager
+from mlflow.genai.scorers.online.trace_checkpointer import OnlineTraceCheckpointManager
 from mlflow.genai.scorers.online.trace_loader import OnlineTraceLoader
 from mlflow.store.tracking.abstract_store import AbstractStore
 from mlflow.tracing.constant import TraceMetadataKey
