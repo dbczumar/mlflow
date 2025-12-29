@@ -1463,7 +1463,7 @@ class RestStore(RestGatewayStoreMixin, AbstractStore):
         Returns:
             List of CompletedSession objects sorted by trace_count DESC.
         """
-        from mlflow.genai.scorers.online.online_scorer import CompletedSession
+        from mlflow.genai.scorers.online.session_processor import CompletedSession
 
         request_body = {
             "experiment_id": experiment_id,

@@ -471,11 +471,19 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
         stages = LifecycleStage.view_type_to_stages(view_type)
         query_options = self._get_eager_experiment_query_options() if eager else []
 
+        try:
+            experiment_id_int = int(experiment_id)
+        except (ValueError, TypeError):
+            raise MlflowException(
+                f"Invalid experiment ID '{experiment_id}'. Experiment ID must be a valid integer.",
+                INVALID_PARAMETER_VALUE,
+            )
+
         experiment = (
             session.query(SqlExperiment)
             .options(*query_options)
             .filter(
-                SqlExperiment.experiment_id == int(experiment_id),
+                SqlExperiment.experiment_id == experiment_id_int,
                 SqlExperiment.lifecycle_stage.in_(stages),
             )
             .one_or_none()
@@ -483,7 +491,7 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
 
         if experiment is None:
             raise MlflowException(
-                f"No Experiment with id={experiment_id} exists", RESOURCE_DOES_NOT_EXIST
+                f"No Experiment with id={experiment_id_int} exists", RESOURCE_DOES_NOT_EXIST
             )
 
         return experiment
@@ -2153,7 +2161,9 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
             session.add(sql_scorer_version)
             session.flush()
 
-            return sql_scorer_version.to_mlflow_entity()
+            entity = sql_scorer_version.to_mlflow_entity()
+            # Resolve gateway endpoint ID to name before returning
+            return self._resolve_endpoint_in_scorer(entity)
 
     def list_scorers(self, experiment_id) -> list[ScorerVersion]:
         """
