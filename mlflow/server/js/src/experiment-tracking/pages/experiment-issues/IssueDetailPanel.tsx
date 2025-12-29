@@ -12,20 +12,23 @@ import {
   ShareIcon,
   CopyIcon,
   OverflowIcon,
-  ChartLineIcon,
   CheckIcon,
-  CloseIcon,
   Spinner,
   TrashIcon,
   NewWindowIcon,
-  Tag,
   Table,
   TableRow,
   TableCell,
   TableHeader,
+  PlayIcon,
+  FormUI,
+  Input,
+  Checkbox,
+  Tag,
+  SparkleDoubleIcon,
 } from '@databricks/design-system';
 import { FormattedMessage } from 'react-intl';
-import type { Issue, IssueState, IssueDetailTab, IssueComment } from './types';
+import type { Issue, IssueState, IssueDetailTab, IssueComment, IssueJudge } from './types';
 import { useUpdateIssueMutation, useGetLinkedEvaluationRuns } from './hooks/useIssuesApi';
 import {
   useSearchIssueComments,
@@ -33,6 +36,7 @@ import {
   useUpdateIssueCommentMutation,
   useDeleteIssueCommentMutation,
 } from './hooks/useIssueCommentsApi';
+import { useGetJudgeForIssue, useCreateJudgeMutation } from './hooks/useJudgeApi';
 import Routes from '../../routes';
 import { TracesView } from '../../components/traces/TracesView';
 import { ExperimentViewTracesTableColumns } from '../../components/traces/TracesView.utils';
@@ -369,40 +373,349 @@ const DetailDescription = ({
   );
 };
 
-const MonitorTabContent = () => {
+const JudgeEmptyState = ({
+  issueId,
+  experimentId,
+  onJudgeCreated,
+}: {
+  issueId: string;
+  experimentId: string;
+  onJudgeCreated: () => void;
+}) => {
   const { theme } = useDesignSystemTheme();
+  const createJudgeMutation = useCreateJudgeMutation();
+
+  const handleCreateJudge = async () => {
+    try {
+      await createJudgeMutation.mutateAsync({ issueId, experimentId });
+      onJudgeCreated();
+    } catch (error) {
+      console.error('Failed to create judge:', error);
+    }
+  };
+
+  return (
+    <div css={{ padding: theme.spacing.lg }}>
+      <Empty
+        image={<PlayIcon css={{ fontSize: 48, color: theme.colors.textSecondary }} />}
+        title={
+          <FormattedMessage
+            defaultMessage="No Judge Created"
+            description="Empty state title when no judge exists for the issue"
+          />
+        }
+        description={
+          <FormattedMessage
+            defaultMessage="Create an LLM-as-a-Judge to automatically detect this issue on new traces. The judge will evaluate incoming traces and flag those that match this issue."
+            description="Empty state description for judge tab"
+          />
+        }
+      />
+      <div css={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: theme.spacing.md }}>
+        <Button
+          componentId="mlflow.issues.create-judge-button"
+          type="primary"
+          onClick={handleCreateJudge}
+          loading={createJudgeMutation.isLoading}
+        >
+          {createJudgeMutation.isLoading ? (
+            <FormattedMessage defaultMessage="Creating Judge..." description="Button text while creating judge" />
+          ) : (
+            <FormattedMessage defaultMessage="Create Judge" description="Button to create a new judge for the issue" />
+          )}
+        </Button>
+        {createJudgeMutation.isLoading && (
+          <Typography.Text color="secondary" css={{ marginTop: theme.spacing.sm }}>
+            <FormattedMessage
+              defaultMessage="Crafting LLM Judge for the issue... this may take a minute"
+              description="Loading message while creating judge"
+            />
+          </Typography.Text>
+        )}
+      </div>
+      {createJudgeMutation.isError && (
+        <div css={{ textAlign: 'center', marginTop: theme.spacing.md, color: theme.colors.textValidationDanger }}>
+          <FormattedMessage
+            defaultMessage="Failed to create judge. Please try again."
+            description="Error message when judge creation fails"
+          />
+        </div>
+      )}
+    </div>
+  );
+};
+
+const JudgeDetails = ({ judge }: { judge: IssueJudge }) => {
+  const { theme } = useDesignSystemTheme();
+
+  // Editable state
+  const [name, setName] = useState(judge.scorer_name);
+  const [useDefaultModel, setUseDefaultModel] = useState(true);
+  const [model, setModel] = useState(judge.model || 'openai:/gpt-4o-mini');
+  const [prompt, setPrompt] = useState(judge.prompt);
+  const [isEditingPrompt, setIsEditingPrompt] = useState(false);
+
+  // Track if there are unsaved changes
+  const hasChanges =
+    name !== judge.scorer_name ||
+    prompt !== judge.prompt ||
+    model !== (judge.model || 'openai:/gpt-4o-mini');
+
+  const cardStyles = {
+    border: `1px solid ${theme.colors.border}`,
+    borderRadius: theme.borders.borderRadiusMd,
+    padding: theme.spacing.md,
+    marginBottom: theme.spacing.md,
+  };
+
+  const handleSave = () => {
+    // TODO: Implement save API call
+    console.log('Saving judge:', { name, model, prompt });
+    setIsEditingPrompt(false);
+  };
+
+  const handleCancel = () => {
+    setName(judge.scorer_name);
+    setModel(judge.model || 'openai:/gpt-4o-mini');
+    setPrompt(judge.prompt);
+    setIsEditingPrompt(false);
+  };
+
+  // Calculate line numbers for prompt
+  const promptLines = (isEditingPrompt ? prompt : judge.prompt).split('\n');
 
   return (
     <div css={{ padding: theme.spacing.md }}>
+      {/* Header with LLM-as-a-judge tag on the right */}
       <div
         css={{
           display: 'flex',
-          alignItems: 'center',
+          alignItems: 'flex-start',
           justifyContent: 'space-between',
           marginBottom: theme.spacing.md,
         }}
       >
-        <Typography.Text bold>
+        <Typography.Text color="secondary">
           <FormattedMessage
-            defaultMessage="Judge results (last 14 days)"
-            description="Title for judge results chart section"
+            defaultMessage="This judge automatically evaluates new traces and flags those that match this issue."
+            description="Description of what the judge does"
           />
         </Typography.Text>
-        <Button componentId="mlflow.issues.view-judge-button" type="tertiary">
-          <FormattedMessage defaultMessage="View Judge" description="Button to view judge details" />
-        </Button>
+        <div css={{ display: 'flex', alignItems: 'center', gap: theme.spacing.sm, flexShrink: 0 }}>
+          {hasChanges && (
+            <>
+              <Button componentId="mlflow.issues.judge.cancel-button" type="tertiary" size="small" onClick={handleCancel}>
+                <FormattedMessage defaultMessage="Cancel" description="Cancel button" />
+              </Button>
+              <Button componentId="mlflow.issues.judge.save-button" type="primary" size="small" onClick={handleSave}>
+                <FormattedMessage defaultMessage="Save Changes" description="Save button" />
+              </Button>
+            </>
+          )}
+          <Tag componentId="mlflow.issues.judge.type-tag" color="purple" icon={<SparkleDoubleIcon />}>
+            <FormattedMessage defaultMessage="LLM-as-a-judge" description="Label indicating this is an LLM judge" />
+          </Tag>
+        </div>
       </div>
-      <Empty
-        image={<ChartLineIcon css={{ fontSize: 48, color: theme.colors.textSecondary }} />}
-        description={
+
+      {/* Name Section */}
+      <div css={{ marginBottom: theme.spacing.md }}>
+        <FormUI.Label>
+          <FormattedMessage defaultMessage="Name" description="Section header for judge name" />
+        </FormUI.Label>
+        <Input
+          componentId="mlflow.issues.judge.name-input"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Enter judge name"
+          css={{ marginTop: theme.spacing.xs }}
+        />
+      </div>
+
+      {/* Model Card */}
+      <div css={cardStyles}>
+        <Typography.Text bold css={{ display: 'block', marginBottom: theme.spacing.sm }}>
+          <FormattedMessage defaultMessage="Model" description="Section header for judge model" />
+        </Typography.Text>
+        <Checkbox
+          componentId="mlflow.issues.judge.use-default-model-checkbox"
+          isChecked={useDefaultModel}
+          onChange={(checked) => setUseDefaultModel(checked)}
+        >
           <FormattedMessage
-            defaultMessage="Judge results chart coming soon"
-            description="Placeholder for judge results chart"
+            defaultMessage="Use default evaluation model"
+            description="Checkbox label for using default model"
           />
-        }
-      />
+        </Checkbox>
+        <div css={{ marginLeft: theme.spacing.lg, marginTop: theme.spacing.xs }}>
+          {useDefaultModel ? (
+            <Typography.Text color="secondary">
+              <FormattedMessage
+                defaultMessage="Current default model: {model}"
+                description="Display current default model"
+                values={{ model }}
+              />
+            </Typography.Text>
+          ) : (
+            <Input
+              componentId="mlflow.issues.judge.model-input"
+              value={model}
+              onChange={(e) => setModel(e.target.value)}
+              placeholder="Enter model name (e.g., openai:/gpt-4o)"
+              css={{ marginTop: theme.spacing.xs }}
+            />
+          )}
+        </div>
+      </div>
+
+      {/* Prompt Card */}
+      <div css={cardStyles}>
+        <div css={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: theme.spacing.sm }}>
+          <Typography.Text bold>
+            <FormattedMessage defaultMessage="Prompt" description="Section header for judge prompt" />
+          </Typography.Text>
+          {!isEditingPrompt && (
+            <Button
+              componentId="mlflow.issues.judge.edit-prompt-button"
+              icon={<PencilIcon />}
+              type="tertiary"
+              size="small"
+              onClick={() => setIsEditingPrompt(true)}
+            >
+              <FormattedMessage defaultMessage="Edit" description="Edit button" />
+            </Button>
+          )}
+        </div>
+        <Typography.Text color="secondary" css={{ display: 'block', marginBottom: theme.spacing.sm }}>
+          <FormattedMessage
+            defaultMessage="LLM-as-a-Judge evaluation prompt. You can customize the prompt."
+            description="Hint text for prompt section"
+          />
+        </Typography.Text>
+        <div
+          css={{
+            border: `1px solid ${theme.colors.border}`,
+            borderRadius: theme.borders.borderRadiusMd,
+            maxHeight: 400,
+            overflow: 'auto',
+            display: 'flex',
+          }}
+        >
+          {/* Line numbers - sticky to left */}
+          <div
+            css={{
+              padding: theme.spacing.sm,
+              backgroundColor: theme.colors.backgroundSecondary,
+              borderRight: `1px solid ${theme.colors.border}`,
+              color: theme.colors.textSecondary,
+              fontFamily: 'monospace',
+              fontSize: theme.typography.fontSizeSm,
+              lineHeight: '20px',
+              userSelect: 'none',
+              textAlign: 'right',
+              minWidth: 40,
+              flexShrink: 0,
+              position: 'sticky',
+              left: 0,
+            }}
+          >
+            {promptLines.map((_, index) => (
+              <div key={index}>{index + 1}</div>
+            ))}
+          </div>
+          {/* Prompt content */}
+          {isEditingPrompt ? (
+            <textarea
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              css={{
+                flex: 1,
+                padding: theme.spacing.sm,
+                fontFamily: 'monospace',
+                fontSize: theme.typography.fontSizeSm,
+                lineHeight: '20px',
+                border: 'none',
+                outline: 'none',
+                resize: 'none',
+                minHeight: 200,
+              }}
+            />
+          ) : (
+            <div
+              css={{
+                flex: 1,
+                padding: theme.spacing.sm,
+                fontFamily: 'monospace',
+                fontSize: theme.typography.fontSizeSm,
+                lineHeight: '20px',
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word',
+              }}
+            >
+              {judge.prompt}
+            </div>
+          )}
+        </div>
+        {isEditingPrompt && (
+          <div css={{ display: 'flex', justifyContent: 'flex-end', gap: theme.spacing.sm, marginTop: theme.spacing.sm }}>
+            <Button
+              componentId="mlflow.issues.judge.cancel-prompt-button"
+              type="tertiary"
+              size="small"
+              onClick={() => {
+                setPrompt(judge.prompt);
+                setIsEditingPrompt(false);
+              }}
+            >
+              <FormattedMessage defaultMessage="Cancel" description="Cancel button" />
+            </Button>
+            <Button
+              componentId="mlflow.issues.judge.done-prompt-button"
+              type="primary"
+              size="small"
+              onClick={() => setIsEditingPrompt(false)}
+            >
+              <FormattedMessage defaultMessage="Done" description="Done editing button" />
+            </Button>
+          </div>
+        )}
+      </div>
     </div>
   );
+};
+
+const JudgeTabContent = ({ issue, experimentId }: { issue: Issue; experimentId: string }) => {
+  const { theme } = useDesignSystemTheme();
+  const { data: judge, isLoading, error, refetch } = useGetJudgeForIssue(issue.issue_id, experimentId);
+
+  if (isLoading) {
+    return (
+      <div css={{ padding: theme.spacing.lg, display: 'flex', justifyContent: 'center' }}>
+        <Spinner />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div css={{ padding: theme.spacing.lg }}>
+        <Empty
+          description={
+            <FormattedMessage
+              defaultMessage="Failed to load judge information"
+              description="Error message when loading judge fails"
+            />
+          }
+        />
+      </div>
+    );
+  }
+
+  if (!judge) {
+    return <JudgeEmptyState issueId={issue.issue_id} experimentId={experimentId} onJudgeCreated={() => refetch()} />;
+  }
+
+  return <JudgeDetails judge={judge} />;
 };
 
 const TracesTabContent = ({ issue, experimentId }: { issue: Issue; experimentId: string }) => {
@@ -732,9 +1045,6 @@ const CommentItem = ({
     onUpdated();
   };
 
-  // Avatar size is 24px, we use a fixed width for the avatar column to ensure consistent alignment
-  const avatarColumnWidth = 32;
-
   return (
     <div
       css={{
@@ -1010,8 +1320,8 @@ export const IssueDetailPanel = ({ issue, experimentId, onIssueUpdated }: IssueD
           <Tabs.Trigger value="traces">
             <FormattedMessage defaultMessage="Traces" description="Tab label for traces section" />
           </Tabs.Trigger>
-          <Tabs.Trigger value="monitor">
-            <FormattedMessage defaultMessage="Monitor" description="Tab label for monitor section" />
+          <Tabs.Trigger value="judge">
+            <FormattedMessage defaultMessage="Judge" description="Tab label for judge section" />
           </Tabs.Trigger>
           <Tabs.Trigger value="evaluation-runs">
             <FormattedMessage defaultMessage="Evaluation Runs" description="Tab label for evaluation runs section" />
@@ -1023,8 +1333,8 @@ export const IssueDetailPanel = ({ issue, experimentId, onIssueUpdated }: IssueD
         <Tabs.Content value="traces">
           <TracesTabContent issue={issue} experimentId={experimentId} />
         </Tabs.Content>
-        <Tabs.Content value="monitor">
-          <MonitorTabContent />
+        <Tabs.Content value="judge">
+          <JudgeTabContent issue={issue} experimentId={experimentId} />
         </Tabs.Content>
         <Tabs.Content value="evaluation-runs">
           <EvaluationRunsTabContent issue={issue} experimentId={experimentId} />

@@ -49,7 +49,7 @@ export interface UpdateIssueResponse {
 /**
  * Tab names for the issue detail panel
  */
-export type IssueDetailTab = 'monitor' | 'traces' | 'evaluation-runs' | 'comments';
+export type IssueDetailTab = 'judge' | 'traces' | 'evaluation-runs' | 'comments';
 
 /**
  * Metric associated with a run
@@ -127,4 +127,35 @@ export interface GetIssueCommentResponse {
  */
 export interface UpdateIssueCommentResponse {
   comment: IssueComment;
+}
+
+/**
+ * Judge (scorer) entity for issue detection
+ */
+export interface IssueJudge {
+  scorer_id: string;
+  scorer_name: string;
+  scorer_version: number;
+  experiment_id: number;
+  creation_time: number;
+  // Parsed from serialized_scorer
+  issue_id: string;
+  issue_name: string;
+  prompt: string;
+  model: string;
+  description?: string;
+}
+
+/**
+ * Response from createJudgeFromIssue API
+ */
+export interface CreateJudgeFromIssueResponse {
+  scorer: {
+    experiment_id: number;
+    scorer_name: string;
+    scorer_version: number;
+    serialized_scorer: string;
+    creation_time: number;
+    scorer_id?: string;
+  };
 }

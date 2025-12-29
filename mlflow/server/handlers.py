@@ -4036,9 +4036,11 @@ def _create_judge_from_issue():
     scorer_proto = Scorer()
     scorer_proto.experiment_id = int(issue.experiment_id)
     scorer_proto.scorer_name = judge.name
-    scorer_proto.scorer_version = version if version else 1
+    scorer_proto.scorer_version = version.scorer_version if version else 1
     scorer_proto.serialized_scorer = json.dumps(judge.model_dump())
-    scorer_proto.creation_time = int(time.time() * 1000)
+    scorer_proto.creation_time = version.creation_time if version else int(time.time() * 1000)
+    if version and version.scorer_id:
+        scorer_proto.scorer_id = version.scorer_id
     response_message.scorer.CopyFrom(scorer_proto)
     return _wrap_response(response_message)
 

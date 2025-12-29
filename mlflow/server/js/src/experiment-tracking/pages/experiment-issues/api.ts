@@ -3,6 +3,7 @@ import type {
   Issue,
   IssueState,
   IssueComment,
+  IssueJudge,
   SearchIssuesResponse,
   CreateIssueResponse,
   GetIssueResponse,
@@ -12,6 +13,7 @@ import type {
   CreateIssueCommentResponse,
   GetIssueCommentResponse,
   UpdateIssueCommentResponse,
+  CreateJudgeFromIssueResponse,
 } from './types';
 
 /**
@@ -325,4 +327,107 @@ export async function deleteIssueComment(commentId: string): Promise<void> {
     }),
   });
   await res.json();
+}
+
+// ========== Issue Judge API ==========
+
+/**
+ * Parse serialized scorer JSON to extract issue judge details
+ */
+function parseSerializedScorer(serializedScorer: string): {
+  issue_id: string;
+  issue_name: string;
+  prompt: string;
+  model: string;
+  description?: string;
+} | null {
+  try {
+    const parsed = JSON.parse(serializedScorer);
+    const judgeData = parsed.instructions_judge_pydantic_data;
+
+    if (!judgeData || !judgeData.is_issue_judge) {
+      return null;
+    }
+
+    return {
+      issue_id: judgeData.issue_id || '',
+      issue_name: judgeData.issue_name || '',
+      prompt: judgeData.system_prompt || '',
+      model: judgeData.model || '',
+      description: parsed.description,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Create a judge from an issue
+ */
+export async function createJudgeFromIssue(issueId: string): Promise<IssueJudge> {
+  const res = await fetchOrFail(getAjaxUrl('ajax-api/3.0/mlflow/issues/create-judge'), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      issue_id: issueId,
+    }),
+  });
+  const data: CreateJudgeFromIssueResponse = await res.json();
+
+  const parsedDetails = parseSerializedScorer(data.scorer.serialized_scorer);
+  if (!parsedDetails) {
+    throw new Error('Failed to parse judge scorer data');
+  }
+
+  return {
+    scorer_id: data.scorer.scorer_id || '',
+    scorer_name: data.scorer.scorer_name,
+    scorer_version: data.scorer.scorer_version,
+    experiment_id: data.scorer.experiment_id,
+    creation_time: data.scorer.creation_time,
+    ...parsedDetails,
+  };
+}
+
+/**
+ * Get judge for an issue by looking up scorers with matching issue_id
+ */
+export async function getJudgeForIssue(issueId: string, experimentId: string): Promise<IssueJudge | null> {
+  const params = new URLSearchParams();
+  params.append('experiment_id', experimentId);
+
+  const res = await fetch(getAjaxUrl(`ajax-api/3.0/mlflow/scorers/list?${params.toString()}`));
+
+  // Handle 404 as no scorers
+  if (res.status === 404) {
+    return null;
+  }
+
+  if (!res.ok) {
+    const errorText = await res.text();
+    console.error('Scorers API error:', res.status, errorText);
+    return null;
+  }
+
+  const data = await res.json();
+  const scorers = data.scorers || [];
+
+  // Find the scorer that is an issue judge for this issue
+  for (const scorer of scorers) {
+    const parsedDetails = parseSerializedScorer(scorer.serialized_scorer);
+    if (parsedDetails && parsedDetails.issue_id === issueId) {
+      return {
+        scorer_id: scorer.scorer_id || '',
+        scorer_name: scorer.scorer_name,
+        scorer_version: scorer.scorer_version,
+        experiment_id: scorer.experiment_id,
+        creation_time: scorer.creation_time,
+        ...parsedDetails,
+      };
+    }
+  }
+
+  return null;
 }
