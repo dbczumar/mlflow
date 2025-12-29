@@ -26,6 +26,11 @@ import {
   Checkbox,
   Tag,
   SparkleDoubleIcon,
+  Popover,
+  SearchIcon,
+  ChevronDownIcon,
+  CalendarEventIcon,
+  CodeIcon,
 } from '@databricks/design-system';
 import { FormattedMessage } from 'react-intl';
 import type { Issue, IssueState, IssueDetailTab, IssueComment, IssueJudge } from './types';
@@ -445,7 +450,213 @@ const JudgeEmptyState = ({
   );
 };
 
-const JudgeDetails = ({ judge }: { judge: IssueJudge }) => {
+type RunJudgeTab = 'quick-scan' | 'batch-evaluation' | 'schedule';
+
+const RunJudgeDropdown = ({ judge, experimentId }: { judge: IssueJudge; experimentId: string }) => {
+  const { theme } = useDesignSystemTheme();
+  const [isOpen, setIsOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<RunJudgeTab>('quick-scan');
+  const [traceSearch, setTraceSearch] = useState('');
+  const [copied, setCopied] = useState(false);
+
+  const codeSnippet = `import mlflow
+
+# Load the judge scorer
+scorer = mlflow.genai.scorers.get_scorer(
+    experiment_id="${experimentId}",
+    scorer_name="${judge.scorer_name}",
+)
+
+# Run evaluation on your traces
+results = mlflow.genai.evaluate(
+    data=traces,
+    scorers=[scorer],
+)
+
+# View the evaluation results
+results.tables["eval_results"]`;
+
+  const handleCopyCode = async () => {
+    await navigator.clipboard.writeText(codeSnippet);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <Popover.Root componentId="mlflow.issues.judge.run-popover" open={isOpen} onOpenChange={setIsOpen}>
+      <Popover.Trigger asChild>
+        <Button
+          componentId="mlflow.issues.judge.run-judge-button"
+          type="primary"
+          icon={<PlayIcon />}
+          endIcon={<ChevronDownIcon />}
+        >
+          <FormattedMessage defaultMessage="Run Judge" description="Button to run the judge" />
+        </Button>
+      </Popover.Trigger>
+      <Popover.Content align="end" css={{ width: 480, padding: 0 }}>
+        <div css={{ padding: theme.spacing.md }}>
+          <Typography.Title level={4} css={{ marginBottom: theme.spacing.sm }}>
+            <FormattedMessage defaultMessage="Run Judge" description="Run judge dropdown title" />
+          </Typography.Title>
+          <Tabs.Root
+            componentId="mlflow.issues.judge.run-tabs"
+            value={activeTab}
+            onValueChange={(value) => setActiveTab(value as RunJudgeTab)}
+          >
+            <Tabs.List>
+              <Tabs.Trigger value="quick-scan">
+                <span css={{ display: 'flex', alignItems: 'center', gap: theme.spacing.xs }}>
+                  <SearchIcon />
+                  <FormattedMessage defaultMessage="Quick Scan" description="Tab for quick scan" />
+                </span>
+              </Tabs.Trigger>
+              <Tabs.Trigger value="batch-evaluation">
+                <span css={{ display: 'flex', alignItems: 'center', gap: theme.spacing.xs }}>
+                  <CodeIcon />
+                  <FormattedMessage defaultMessage="Batch Evaluation" description="Tab for batch evaluation code" />
+                </span>
+              </Tabs.Trigger>
+              <Tabs.Trigger value="schedule">
+                <span css={{ display: 'flex', alignItems: 'center', gap: theme.spacing.xs }}>
+                  <CalendarEventIcon />
+                  <FormattedMessage defaultMessage="Schedule" description="Tab for scheduling judge" />
+                </span>
+              </Tabs.Trigger>
+            </Tabs.List>
+
+            <Tabs.Content value="quick-scan" css={{ paddingTop: theme.spacing.md }}>
+              <Typography.Text color="secondary" css={{ display: 'block', marginBottom: theme.spacing.sm }}>
+                <FormattedMessage
+                  defaultMessage="Search and select traces to quickly run the judge on."
+                  description="Quick scan description"
+                />
+              </Typography.Text>
+              <Input
+                componentId="mlflow.issues.judge.trace-search"
+                value={traceSearch}
+                onChange={(e) => setTraceSearch(e.target.value)}
+                placeholder="Search traces by request ID or content..."
+                prefix={<SearchIcon />}
+                css={{ marginBottom: theme.spacing.sm }}
+              />
+              <div
+                css={{
+                  border: `1px solid ${theme.colors.border}`,
+                  borderRadius: theme.borders.borderRadiusMd,
+                  padding: theme.spacing.md,
+                  minHeight: 150,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Typography.Text color="secondary">
+                  <FormattedMessage
+                    defaultMessage="Search for traces to evaluate"
+                    description="Empty state for trace search"
+                  />
+                </Typography.Text>
+              </div>
+              <div css={{ display: 'flex', justifyContent: 'flex-end', marginTop: theme.spacing.md }}>
+                <Button componentId="mlflow.issues.judge.run-quick-scan" type="primary" disabled>
+                  <FormattedMessage defaultMessage="Run on Selected" description="Button to run judge on selected traces" />
+                </Button>
+              </div>
+            </Tabs.Content>
+
+            <Tabs.Content value="batch-evaluation" css={{ paddingTop: theme.spacing.md }}>
+              <Typography.Text color="secondary" css={{ display: 'block', marginBottom: theme.spacing.sm }}>
+                <FormattedMessage
+                  defaultMessage="Use this code snippet to run the judge on a batch of traces programmatically."
+                  description="Batch evaluation description"
+                />
+              </Typography.Text>
+              <div
+                css={{
+                  position: 'relative',
+                  border: `1px solid ${theme.colors.border}`,
+                  borderRadius: theme.borders.borderRadiusMd,
+                  backgroundColor: theme.colors.backgroundSecondary,
+                }}
+              >
+                <Button
+                  componentId="mlflow.issues.judge.copy-code"
+                  type="tertiary"
+                  size="small"
+                  icon={copied ? <CheckIcon /> : <CopyIcon />}
+                  onClick={handleCopyCode}
+                  css={{ position: 'absolute', top: theme.spacing.xs, right: theme.spacing.xs }}
+                >
+                  {copied ? (
+                    <FormattedMessage defaultMessage="Copied!" description="Copied confirmation" />
+                  ) : (
+                    <FormattedMessage defaultMessage="Copy" description="Copy button" />
+                  )}
+                </Button>
+                <pre
+                  css={{
+                    padding: theme.spacing.md,
+                    margin: 0,
+                    fontSize: theme.typography.fontSizeSm,
+                    fontFamily: 'monospace',
+                    overflow: 'auto',
+                    maxHeight: 250,
+                  }}
+                >
+                  {codeSnippet}
+                </pre>
+              </div>
+            </Tabs.Content>
+
+            <Tabs.Content value="schedule" css={{ paddingTop: theme.spacing.md }}>
+              <Typography.Text color="secondary" css={{ display: 'block', marginBottom: theme.spacing.sm }}>
+                <FormattedMessage
+                  defaultMessage="Configure the judge to automatically run on new traces."
+                  description="Schedule description"
+                />
+              </Typography.Text>
+              <div css={{ marginBottom: theme.spacing.md }}>
+                <Checkbox componentId="mlflow.issues.judge.auto-evaluate" isChecked={false} onChange={() => {}}>
+                  <FormattedMessage
+                    defaultMessage="Automatically evaluate future traces using this judge"
+                    description="Auto evaluate checkbox"
+                  />
+                </Checkbox>
+              </div>
+              <div css={{ marginBottom: theme.spacing.md }}>
+                <FormUI.Label>
+                  <FormattedMessage defaultMessage="Sample Rate" description="Sample rate label" />
+                </FormUI.Label>
+                <Input
+                  componentId="mlflow.issues.judge.sample-rate"
+                  type="number"
+                  value="100"
+                  disabled
+                  suffix="%"
+                  css={{ width: 120, marginTop: theme.spacing.xs }}
+                />
+                <FormUI.Hint>
+                  <FormattedMessage
+                    defaultMessage="Percentage of traces to evaluate (1-100%)"
+                    description="Sample rate hint"
+                  />
+                </FormUI.Hint>
+              </div>
+              <div css={{ display: 'flex', justifyContent: 'flex-end', marginTop: theme.spacing.md }}>
+                <Button componentId="mlflow.issues.judge.save-schedule" type="primary" disabled>
+                  <FormattedMessage defaultMessage="Save Schedule" description="Save schedule button" />
+                </Button>
+              </div>
+            </Tabs.Content>
+          </Tabs.Root>
+        </div>
+      </Popover.Content>
+    </Popover.Root>
+  );
+};
+
+const JudgeDetails = ({ judge, experimentId }: { judge: IssueJudge; experimentId: string }) => {
   const { theme } = useDesignSystemTheme();
 
   // Editable state
@@ -486,22 +697,19 @@ const JudgeDetails = ({ judge }: { judge: IssueJudge }) => {
 
   return (
     <div css={{ padding: theme.spacing.md }}>
-      {/* Header with LLM-as-a-judge tag on the right */}
+      {/* Header with LLM-as-a-judge tag on the left and Run Judge on the right */}
       <div
         css={{
           display: 'flex',
-          alignItems: 'flex-start',
+          alignItems: 'center',
           justifyContent: 'space-between',
-          marginBottom: theme.spacing.md,
+          marginBottom: theme.spacing.sm,
         }}
       >
-        <Typography.Text color="secondary">
-          <FormattedMessage
-            defaultMessage="This judge automatically evaluates new traces and flags those that match this issue."
-            description="Description of what the judge does"
-          />
-        </Typography.Text>
-        <div css={{ display: 'flex', alignItems: 'center', gap: theme.spacing.sm, flexShrink: 0 }}>
+        <Tag componentId="mlflow.issues.judge.type-tag" color="purple" icon={<SparkleDoubleIcon />}>
+          <FormattedMessage defaultMessage="LLM-as-a-judge" description="Label indicating this is an LLM judge" />
+        </Tag>
+        <div css={{ display: 'flex', alignItems: 'center', gap: theme.spacing.sm }}>
           {hasChanges && (
             <>
               <Button componentId="mlflow.issues.judge.cancel-button" type="tertiary" size="small" onClick={handleCancel}>
@@ -512,11 +720,16 @@ const JudgeDetails = ({ judge }: { judge: IssueJudge }) => {
               </Button>
             </>
           )}
-          <Tag componentId="mlflow.issues.judge.type-tag" color="purple" icon={<SparkleDoubleIcon />}>
-            <FormattedMessage defaultMessage="LLM-as-a-judge" description="Label indicating this is an LLM judge" />
-          </Tag>
+          <RunJudgeDropdown judge={judge} experimentId={experimentId} />
         </div>
       </div>
+      {/* Description */}
+      <Typography.Text color="secondary" css={{ display: 'block', marginBottom: theme.spacing.md }}>
+        <FormattedMessage
+          defaultMessage="This judge automatically evaluates new traces and flags those that match this issue."
+          description="Description of what the judge does"
+        />
+      </Typography.Text>
 
       {/* Name Section */}
       <div css={{ marginBottom: theme.spacing.md }}>
@@ -715,7 +928,7 @@ const JudgeTabContent = ({ issue, experimentId }: { issue: Issue; experimentId: 
     return <JudgeEmptyState issueId={issue.issue_id} experimentId={experimentId} onJudgeCreated={() => refetch()} />;
   }
 
-  return <JudgeDetails judge={judge} />;
+  return <JudgeDetails judge={judge} experimentId={experimentId} />;
 };
 
 const TracesTabContent = ({ issue, experimentId }: { issue: Issue; experimentId: string }) => {
