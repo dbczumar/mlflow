@@ -8,8 +8,8 @@ from mlflow.store.tracking.abstract_store import AbstractStore
 _logger = logging.getLogger(__name__)
 
 
-class TraceLoader:
-    """Loads traces from the tracking store."""
+class OnlineTraceLoader:
+    """Loads traces from the tracking store for online scoring."""
 
     def __init__(self, tracking_store: AbstractStore):
         self._tracking_store = tracking_store

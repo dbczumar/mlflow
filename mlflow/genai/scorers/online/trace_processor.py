@@ -14,7 +14,7 @@ from mlflow.genai.scorers.base import Scorer
 from mlflow.genai.scorers.online.checkpoint import OnlineCheckpointManager
 from mlflow.genai.scorers.online.online_scorer import OnlineScorer
 from mlflow.genai.scorers.online.sampler import OnlineScorerSampler
-from mlflow.genai.scorers.online.trace_loader import TraceLoader
+from mlflow.genai.scorers.online.trace_loader import OnlineTraceLoader
 from mlflow.store.tracking.abstract_store import AbstractStore
 from mlflow.tracing.constant import TraceMetadataKey
 
@@ -41,12 +41,12 @@ class SessionScoringTask:
     trace_infos: list[TraceInfo] | None = None  # Used temporarily during fetching
 
 
-class TraceScoringProcessor:
+class OnlineTraceScoringProcessor:
     """Orchestrates online scoring of individual traces."""
 
     def __init__(
         self,
-        trace_loader: TraceLoader,
+        trace_loader: OnlineTraceLoader,
         checkpoint_manager: OnlineCheckpointManager,
         sampler: OnlineScorerSampler,
         experiment_id: str,
@@ -62,9 +62,9 @@ class TraceScoringProcessor:
         experiment_id: str,
         online_scorers: list[OnlineScorer],
         tracking_store: AbstractStore,
-    ) -> "TraceScoringProcessor":
+    ) -> "OnlineTraceScoringProcessor":
         """
-        Factory method to create a TraceScoringProcessor with dependencies.
+        Factory method to create an OnlineTraceScoringProcessor with dependencies.
 
         Args:
             experiment_id: The experiment ID to process traces from.
@@ -72,10 +72,10 @@ class TraceScoringProcessor:
             tracking_store: The tracking store instance.
 
         Returns:
-            Configured TraceScoringProcessor instance.
+            Configured OnlineTraceScoringProcessor instance.
         """
         return cls(
-            trace_loader=TraceLoader(tracking_store),
+            trace_loader=OnlineTraceLoader(tracking_store),
             checkpoint_manager=OnlineCheckpointManager(tracking_store, experiment_id),
             sampler=OnlineScorerSampler(online_scorers),
             experiment_id=experiment_id,
