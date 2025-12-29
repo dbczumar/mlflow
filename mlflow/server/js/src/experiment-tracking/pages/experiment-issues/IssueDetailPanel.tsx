@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { GenAIMarkdownRenderer } from '../../../shared/web-shared/genai-markdown-renderer';
 import {
   useDesignSystemTheme,
@@ -31,8 +31,10 @@ import {
   ChevronDownIcon,
   CalendarEventIcon,
   CodeIcon,
+  ParagraphSkeleton,
+  DangerIcon,
 } from '@databricks/design-system';
-import { FormattedMessage } from 'react-intl';
+import { FormattedMessage, useIntl } from 'react-intl';
 import type { Issue, IssueState, IssueDetailTab, IssueComment, IssueJudge } from './types';
 import { useUpdateIssueMutation, useGetLinkedEvaluationRuns } from './hooks/useIssuesApi';
 import {
@@ -43,10 +45,35 @@ import {
 } from './hooks/useIssueCommentsApi';
 import { useGetJudgeForIssue, useCreateJudgeMutation } from './hooks/useJudgeApi';
 import Routes from '../../routes';
-import { TracesView } from '../../components/traces/TracesView';
-import { ExperimentViewTracesTableColumns } from '../../components/traces/TracesView.utils';
 import { Link } from '../../../common/utils/RoutingUtils';
 import Utils from '../../../common/utils/Utils';
+import {
+  GenAiTracesMarkdownConverterProvider,
+  GenAITracesTableBodyContainer,
+  GenAITracesTableToolbar,
+  GenAITracesTableProvider,
+  useSearchMlflowTraces,
+  useSelectedColumns,
+  useMlflowTracesTableMetadata,
+  useFilters,
+  useTableSort,
+  TracesTableColumnType,
+  TracesTableColumnGroup,
+  REQUEST_TIME_COLUMN_ID,
+  EXECUTION_DURATION_COLUMN_ID,
+  TRACE_ID_COLUMN_ID,
+  RESPONSE_COLUMN_ID,
+  createTraceLocationForExperiment,
+  type TracesTableColumn,
+  type TraceActions,
+} from '@databricks/web-shared/genai-traces-table';
+import { useMarkdownConverter } from '@mlflow/mlflow/src/common/utils/MarkdownUtils';
+import { getTrace as getTraceV3 } from '@mlflow/mlflow/src/experiment-tracking/utils/TraceUtils';
+import { useEditExperimentTraceTags } from '../../components/traces/hooks/useEditExperimentTraceTags';
+import { useQueryClient } from '@databricks/web-shared/query-client';
+import { invalidateMlflowSearchTracesCache, getTracesTagKeys } from '@databricks/web-shared/genai-traces-table';
+import { useGetDeleteTracesAction } from '../../components/experiment-page/components/traces-v3/hooks/useGetDeleteTracesAction';
+
 
 interface IssueDetailPanelProps {
   issue: Issue | null;
@@ -931,21 +958,270 @@ const JudgeTabContent = ({ issue, experimentId }: { issue: Issue; experimentId: 
   return <JudgeDetails judge={judge} experimentId={experimentId} />;
 };
 
+/**
+ * Helper function to check if a trace has an assessment for a specific issue.
+ * The issue_id is stored as assessment_name in the backend.
+ */
+const traceHasIssueAssessment = (
+  trace: import('@databricks/web-shared/model-trace-explorer').ModelTraceInfoV3,
+  issueId: string,
+): boolean => {
+  if (!trace.assessments) {
+    return false;
+  }
+  return trace.assessments.some(
+    (assessment) =>
+      'issue' in assessment &&
+      assessment.issue !== undefined &&
+      assessment.assessment_name === issueId &&
+      assessment.valid !== false,
+  );
+};
+
+// Column ID for request/inputs (not exported from genai-traces-table)
+const INPUTS_COLUMN_ID = 'request';
+// Issue column ID prefix - matches the one used in genai-traces-table for pass/fail rendering
+const ISSUE_COLUMN_ID_PREFIX = 'issue_';
+
 const TracesTabContent = ({ issue, experimentId }: { issue: Issue; experimentId: string }) => {
-  // Filter traces by issue assessment: issue.<issue_id> = 'true'
-  const issueFilter = useMemo(() => {
-    return `issue.\`${issue.issue_id}\` = 'true'`;
-  }, [issue.issue_id]);
+  const { theme } = useDesignSystemTheme();
+  const intl = useIntl();
+  const makeHtmlFromMarkdown = useMarkdownConverter();
+  const queryClient = useQueryClient();
+
+  const traceSearchLocations = useMemo(
+    () => [createTraceLocationForExperiment(experimentId)],
+    [experimentId],
+  );
+
+  // Get metadata
+  const {
+    assessmentInfos,
+    allColumns: baseColumns,
+    isLoading: isMetadataLoading,
+    error: metadataError,
+    tableFilterOptions,
+  } = useMlflowTracesTableMetadata({
+    locations: traceSearchLocations,
+    disabled: false,
+  });
+
+  // Create a custom column for this specific issue (shows Pass/Fail)
+  // The column ID must use issue.name because the cell renderer extracts the name
+  // from the column ID and uses it to look up the assessment via getIssueName()
+  // Using INFO group to avoid showing the "Issues (x/y)" group header
+  const issueColumnId = ISSUE_COLUMN_ID_PREFIX + issue.name;
+  const issueColumn: TracesTableColumn = useMemo(
+    () => ({
+      id: issueColumnId,
+      label: 'Judge',
+      type: TracesTableColumnType.TRACE_INFO,
+      group: TracesTableColumnGroup.INFO,
+      issueName: issue.name,
+    }),
+    [issueColumnId, issue.name],
+  );
+
+  // Add the issue column to allColumns, positioned before execution_duration
+  // Remove the generic "issues" column since we only want to show this specific issue
+  const allColumns = useMemo(() => {
+    const filteredColumns = baseColumns.filter((col) => col.id !== 'issues');
+
+    // Find the execution duration column and insert our issue column before it
+    const executionDurationIndex = filteredColumns.findIndex((col) => col.id === EXECUTION_DURATION_COLUMN_ID);
+    if (executionDurationIndex !== -1) {
+      const result = [...filteredColumns];
+      result.splice(executionDurationIndex, 0, issueColumn);
+      return result;
+    }
+
+    // Fallback: find response column and insert after it
+    const responseIndex = filteredColumns.findIndex((col) => col.id === RESPONSE_COLUMN_ID);
+    if (responseIndex !== -1) {
+      const result = [...filteredColumns];
+      result.splice(responseIndex + 1, 0, issueColumn);
+      return result;
+    }
+
+    // Last fallback: append to the end
+    return [...filteredColumns, issueColumn];
+  }, [baseColumns, issueColumn]);
+
+  // Setup table states
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [filters, setFilters] = useFilters();
+
+  // Default columns in order: trace_id, request, response, issue (pass/fail), execution_duration, request_time
+  const defaultSelectedColumns = useCallback(
+    (cols: TracesTableColumn[]) => {
+      const columnOrder = [
+        TRACE_ID_COLUMN_ID,
+        INPUTS_COLUMN_ID,
+        RESPONSE_COLUMN_ID,
+        issueColumnId,
+        EXECUTION_DURATION_COLUMN_ID,
+        REQUEST_TIME_COLUMN_ID,
+      ];
+
+      const filteredCols = cols.filter((col) => columnOrder.includes(col.id));
+      return filteredCols.sort((a, b) => {
+        const aIndex = columnOrder.indexOf(a.id);
+        const bIndex = columnOrder.indexOf(b.id);
+        return aIndex - bIndex;
+      });
+    },
+    [issueColumnId],
+  );
+
+  const { selectedColumns, toggleColumns, setSelectedColumns } = useSelectedColumns(
+    experimentId,
+    allColumns,
+    defaultSelectedColumns,
+  );
+
+  const [tableSort, setTableSort] = useTableSort(selectedColumns, {
+    key: REQUEST_TIME_COLUMN_ID,
+    type: TracesTableColumnType.TRACE_INFO,
+    asc: false,
+  });
+
+  // Get traces data
+  const {
+    data: allTraceInfos,
+    isLoading: traceInfosLoading,
+    error: traceInfosError,
+  } = useSearchMlflowTraces({
+    locations: traceSearchLocations,
+    searchQuery,
+    filters,
+    tableSort,
+    disabled: false,
+  });
+
+  // Filter traces client-side to only show traces that have an assessment for this specific issue
+  // This is necessary because the backend doesn't support OR conditions for issue filters
+  const traceInfos = useMemo(() => {
+    if (!allTraceInfos) {
+      return undefined;
+    }
+    return allTraceInfos.filter((trace) => traceHasIssueAssessment(trace, issue.issue_id));
+  }, [allTraceInfos, issue.issue_id]);
+
+  const { showEditTagsModalForTrace, EditTagsModal } = useEditExperimentTraceTags({
+    onSuccess: () => invalidateMlflowSearchTracesCache({ queryClient }),
+    existingTagKeys: getTracesTagKeys(traceInfos || []),
+  });
+
+  const deleteTracesAction = useGetDeleteTracesAction({ traceSearchLocations });
+
+  const traceActions: TraceActions = useMemo(() => {
+    return {
+      deleteTracesAction,
+      editTags: {
+        showEditTagsModalForTrace,
+        EditTagsModal,
+      },
+    };
+  }, [deleteTracesAction, showEditTagsModalForTrace, EditTagsModal]);
+
+  const isTableLoading = traceInfosLoading || isMetadataLoading;
+  const tableError = traceInfosError || metadataError;
+
+  const countInfo = useMemo(() => {
+    return {
+      currentCount: traceInfos?.length,
+      logCountLoading: traceInfosLoading,
+      totalCount: traceInfos?.length ?? 0,
+      maxAllowedCount: 10000,
+    };
+  }, [traceInfos, traceInfosLoading]);
 
   return (
-    <div css={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <TracesView
-        experimentIds={[experimentId]}
-        fixedFilter={issueFilter}
-        baseComponentId="mlflow.issue_page.traces"
-        disabledColumns={[ExperimentViewTracesTableColumns.runName, ExperimentViewTracesTableColumns.tags]}
-      />
-    </div>
+    <GenAITracesTableProvider>
+      <div
+        css={{
+          height: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+        }}
+      >
+        <GenAITracesTableToolbar
+          experimentId={experimentId}
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          filters={filters}
+          setFilters={setFilters}
+          assessmentInfos={assessmentInfos}
+          traceInfos={traceInfos}
+          tableFilterOptions={tableFilterOptions}
+          countInfo={countInfo}
+          traceActions={traceActions}
+          tableSort={tableSort}
+          setTableSort={setTableSort}
+          allColumns={allColumns}
+          selectedColumns={selectedColumns}
+          toggleColumns={toggleColumns}
+          setSelectedColumns={setSelectedColumns}
+          isMetadataLoading={isMetadataLoading}
+          metadataError={metadataError}
+          usesV4APIs={true}
+        />
+        <div css={{ flex: 1, overflow: 'hidden', display: 'flex' }}>
+          {isTableLoading ? (
+            <div
+              css={{
+                display: 'flex',
+                flexDirection: 'column',
+                width: '100%',
+                gap: theme.spacing.sm,
+                padding: theme.spacing.md,
+              }}
+            >
+              {[...Array(10).keys()].map((i) => (
+                <ParagraphSkeleton label="Loading..." key={i} seed={`s-${i}`} />
+              ))}
+            </div>
+          ) : tableError ? (
+            <div
+              css={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '100%',
+                height: '100%',
+              }}
+            >
+              <Empty
+                image={<DangerIcon />}
+                title={intl.formatMessage({
+                  defaultMessage: 'Fetching traces failed',
+                  description: 'Issue detail > traces tab > error state title',
+                })}
+                description={tableError.message}
+              />
+            </div>
+          ) : (
+            <GenAiTracesMarkdownConverterProvider makeHtml={makeHtmlFromMarkdown}>
+              <GenAITracesTableBodyContainer
+                experimentId={experimentId}
+                allColumns={allColumns}
+                currentTraceInfoV3={traceInfos || []}
+                currentRunDisplayName=""
+                getTrace={getTraceV3}
+                assessmentInfos={assessmentInfos}
+                setFilters={setFilters}
+                filters={filters}
+                selectedColumns={selectedColumns}
+                tableSort={tableSort}
+                onTraceTagsEdit={showEditTagsModalForTrace}
+                displayLoadingOverlay={false}
+              />
+            </GenAiTracesMarkdownConverterProvider>
+          )}
+        </div>
+      </div>
+    </GenAITracesTableProvider>
   );
 };
 

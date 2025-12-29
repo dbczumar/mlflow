@@ -25,6 +25,8 @@ export const TracesView = ({
   disabledColumns,
   baseComponentId = runUuid ? 'mlflow.run.traces' : 'mlflow.experiment_page.traces',
   fixedFilter,
+  issueId,
+  issueName,
 }: {
   experimentIds: string[];
   /**
@@ -49,6 +51,14 @@ export const TracesView = ({
    * Useful for pre-filtering traces (e.g., by issue ID).
    */
   fixedFilter?: string;
+  /**
+   * If `issueId` is provided, an issue status column will be shown displaying pass/fail for this issue.
+   */
+  issueId?: string;
+  /**
+   * The display name for the issue column. Required when issueId is provided.
+   */
+  issueName?: string;
 }) => {
   const timeoutRef = useRef<number | undefined>(undefined);
   const [filter, setFilter] = useState<string>('');
@@ -211,6 +221,8 @@ export const TracesView = ({
         setRowSelection={setRowSelection}
         baseComponentId={baseComponentId}
         toggleHiddenColumn={toggleHiddenColumn}
+        issueId={issueId}
+        issueName={issueName}
       />
       {selectedTraceId && (
         <TraceDataDrawer

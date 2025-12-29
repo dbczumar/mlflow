@@ -1,3 +1,4 @@
+import contextvars
 import json
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -60,7 +61,10 @@ def extract_trace_evidences(
 
     results = []
     with ThreadPoolExecutor(max_workers=10) as executor:
-        futures = [executor.submit(_summarize_trace, trace_id) for trace_id in trace_ids]
+        futures = [
+            executor.submit(contextvars.copy_context().run, _summarize_trace, trace_id)
+            for trace_id in trace_ids
+        ]
         for future in as_completed(futures):
             results.extend(future.result())
     _logger.info(f"Extracted {len(results)} summaries")

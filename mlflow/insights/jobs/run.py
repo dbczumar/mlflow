@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 
 import mlflow
 from mlflow.entities.assessment import Issue as IssueAssessment
@@ -30,24 +31,10 @@ def analyze_issues(
     provider, model_name = _parse_model_uri(model)
 
     traces = mlflow.search_traces(filter_string=filter_string, return_type="list", include_spans=False)
-    project_summary = _understand_project(
-        experiment_id="3",
-        trace_ids=[t.info.trace_id for t in traces],
-        provider=provider,
-        model_name=model_name,
-    )
-
-    evidences = extract_trace_evidences(
-        trace_ids=[t.info.trace_id for t in traces],
-        user_question=user_question,
-        project_summary=project_summary,
-        provider=provider,
-        model_name=model_name,
-    )
-
-    issues = discover_issues(
-        issue_candidates=evidences,
-        project_summary=project_summary,
+    trace_ids = [t.info.trace_id for t in traces]
+    issues = _analyze_traces(
+        experiment_id=experiment_id,
+        trace_ids=trace_ids,
         user_question=user_question,
         provider=provider,
         model_name=model_name,
@@ -70,4 +57,58 @@ def analyze_issues(
                 rationale=json.dumps(evidence),
             )
             assessment = mlflow.log_assessment(trace_id=trace_id, assessment=assessment)
+    return issues
+
+
+
+def _analyze_traces(
+    experiment_id: str,
+    trace_ids: list[str],
+    user_question: str,
+    provider: str,
+    model_name: str,
+    enable_tracing: bool = False,
+) -> list[dict]:
+    """
+    Analyze traces to discover issues.
+
+    Args:
+        experiment_id: The experiment ID.
+        trace_ids: List of trace IDs to analyze.
+        user_question: The user's question or focus area for analysis.
+        provider: The LLM provider.
+        model_name: The model name.
+
+    Returns:
+        List of discovered issues with their evidences.
+    """
+    if enable_tracing:
+        os.environ["MLFLOW_GENAI_EVAL_ENABLE_SCORER_TRACING"] = "true"
+        mlflow.litellm.autolog()
+
+    wrap_trace = mlflow.trace if enable_tracing else lambda x: x
+
+    project_summary = wrap_trace(_understand_project)(
+        experiment_id=experiment_id,
+        trace_ids=trace_ids,
+        provider=provider,
+        model_name=model_name
+    )
+
+    evidences = wrap_trace(extract_trace_evidences)(
+        trace_ids=trace_ids,
+        user_question=user_question,
+        project_summary=project_summary,
+        provider=provider,
+        model_name=model_name,
+    )
+
+    issues = wrap_trace(discover_issues)(
+        issue_candidates=evidences,
+        project_summary=project_summary,
+        user_question=user_question,
+        provider=provider,
+        model_name=model_name,
+    )
+
     return issues

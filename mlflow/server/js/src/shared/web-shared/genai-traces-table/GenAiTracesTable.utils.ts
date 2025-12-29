@@ -18,6 +18,7 @@ import {
   LOGGED_MODEL_COLUMN_ID,
   TOKENS_COLUMN_ID,
   LINKED_PROMPTS_COLUMN_ID,
+  ISSUE_COLUMN_ID_PREFIX,
 } from './hooks/useTableColumns';
 import { TracesTableColumnGroup, TracesTableColumnType } from './types';
 import type { TracesTableColumn, EvalTraceComparisonEntry, RunEvaluationTracesDataEntry } from './types';
@@ -56,6 +57,10 @@ const assessmentColumnRank: Record<string, number> = Object.fromEntries(
   ASSESSMENT_COLUMN_PRIORITY.map((id, idx) => [id, idx]),
 );
 
+// Rank for issue columns (columns with ID starting with "issue_")
+// This places them after RESPONSE (rank 2) but before unlisted columns (rank Infinity)
+const ISSUE_COLUMN_RANK = 2.5;
+
 export function sortGroupedColumns(columns: TracesTableColumn[], isComparing?: boolean): TracesTableColumn[] {
   return [...columns].sort((colA, colB) => {
     // If comparing, always put request time column first
@@ -72,8 +77,15 @@ export function sortGroupedColumns(columns: TracesTableColumn[], isComparing?: b
 
     // 2) Same group: INFO
     if (groupA === TracesTableColumnGroup.INFO) {
-      const rankA = infoColumnRank[colA.id] ?? Infinity;
-      const rankB = infoColumnRank[colB.id] ?? Infinity;
+      // Get rank for column, with special handling for issue columns
+      const getRank = (col: TracesTableColumn) => {
+        if (col.id in infoColumnRank) return infoColumnRank[col.id];
+        // Issue columns (ID starts with "issue_") get a rank after RESPONSE
+        if (col.id.startsWith(ISSUE_COLUMN_ID_PREFIX)) return ISSUE_COLUMN_RANK;
+        return Infinity;
+      };
+      const rankA = getRank(colA);
+      const rankB = getRank(colB);
       if (rankA !== rankB) return rankA - rankB;
       return colA.label.localeCompare(colB.label);
     }
