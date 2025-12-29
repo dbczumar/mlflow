@@ -3058,13 +3058,13 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
     def find_completed_sessions(
         self,
         experiment_id: str,
-        min_start_timestamp_ms: int,
-        max_last_activity_timestamp_ms: int,
+        min_last_trace_timestamp_ms: int,
+        max_last_trace_timestamp_ms: int,
     ) -> list[CompletedSession]:
-        """Find sessions that started after X and have no activity after Y."""
+        """Find completed sessions based on their last trace timestamp."""
         with self.ManagedSessionMaker() as session:
-            # Subquery: sessions in the target window with aggregated stats
-            sessions_in_window = (
+            # Subquery: sessions with aggregated stats
+            sessions_with_stats = (
                 session.query(
                     SqlTraceInfo.request_metadata["mlflow.trace.session"].astext.label(
                         "session_id"
@@ -3076,41 +3076,43 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
                 .filter(
                     SqlTraceInfo.experiment_id == experiment_id,
                     SqlTraceInfo.request_metadata["mlflow.trace.session"].astext.isnot(None),
-                    SqlTraceInfo.timestamp_ms > min_start_timestamp_ms,
-                    SqlTraceInfo.timestamp_ms <= max_last_activity_timestamp_ms,
                 )
                 .group_by(SqlTraceInfo.request_metadata["mlflow.trace.session"].astext)
                 .subquery()
             )
 
-            # Subquery: sessions with activity after the cutoff
-            sessions_with_recent_activity = (
+            # Subquery: sessions with traces after the cutoff
+            sessions_with_recent_traces = (
                 session.query(
                     SqlTraceInfo.request_metadata["mlflow.trace.session"].astext.label("session_id")
                 )
                 .filter(
                     SqlTraceInfo.experiment_id == experiment_id,
                     SqlTraceInfo.request_metadata["mlflow.trace.session"].astext.isnot(None),
-                    SqlTraceInfo.timestamp_ms > max_last_activity_timestamp_ms,
+                    SqlTraceInfo.timestamp_ms > max_last_trace_timestamp_ms,
                 )
                 .distinct()
                 .subquery()
             )
 
-            # Main query: sessions in window WITHOUT recent activity
+            # Main query: sessions in timestamp window WITHOUT recent traces
             results = (
                 session.query(
-                    sessions_in_window.c.session_id,
-                    sessions_in_window.c.trace_count,
-                    sessions_in_window.c.first_trace_timestamp_ms,
-                    sessions_in_window.c.last_trace_timestamp_ms,
+                    sessions_with_stats.c.session_id,
+                    sessions_with_stats.c.trace_count,
+                    sessions_with_stats.c.first_trace_timestamp_ms,
+                    sessions_with_stats.c.last_trace_timestamp_ms,
                 )
                 .outerjoin(
-                    sessions_with_recent_activity,
-                    sessions_in_window.c.session_id == sessions_with_recent_activity.c.session_id,
+                    sessions_with_recent_traces,
+                    sessions_with_stats.c.session_id == sessions_with_recent_traces.c.session_id,
                 )
-                .filter(sessions_with_recent_activity.c.session_id.is_(None))
-                .order_by(sessions_in_window.c.trace_count.desc())
+                .filter(
+                    sessions_with_recent_traces.c.session_id.is_(None),
+                    sessions_with_stats.c.last_trace_timestamp_ms >= min_last_trace_timestamp_ms,
+                    sessions_with_stats.c.last_trace_timestamp_ms <= max_last_trace_timestamp_ms,
+                )
+                .order_by(sessions_with_stats.c.last_trace_timestamp_ms.asc())
                 .all()
             )
 

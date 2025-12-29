@@ -97,18 +97,18 @@ class OnlineSessionScoringProcessor:
         )
 
         # Sessions are "complete" if they haven't had new traces in 10+ minutes
-        max_last_activity_timestamp_ms = end_time_ms - _SESSION_COMPLETION_BUFFER_MS
+        max_last_trace_timestamp_ms = end_time_ms - _SESSION_COMPLETION_BUFFER_MS
 
         _logger.info(
             f"Session scoring for experiment {self._experiment_id}: "
-            f"looking for sessions in [{start_time_ms}, {max_last_activity_timestamp_ms}]"
+            f"looking for sessions in [{start_time_ms}, {max_last_trace_timestamp_ms}]"
         )
 
         # Find completed sessions
         completed_sessions = self._tracking_store.find_completed_sessions(
             experiment_id=self._experiment_id,
-            min_start_timestamp_ms=start_time_ms,
-            max_last_activity_timestamp_ms=max_last_activity_timestamp_ms,
+            min_last_trace_timestamp_ms=start_time_ms,
+            max_last_trace_timestamp_ms=max_last_trace_timestamp_ms,
         )
 
         if not completed_sessions:
@@ -134,8 +134,10 @@ class OnlineSessionScoringProcessor:
         # Execute scoring in parallel
         self._execute_session_scoring(sessions_to_score)
 
-        # Update checkpoint after scoring
-        self._checkpoint_manager.update_checkpoint_timestamp(end_time_ms)
+        # Update checkpoint to the last processed session's last trace timestamp
+        # Sessions are sorted by last_trace_timestamp_ms ASC, so take the last one
+        latest_session = sessions_to_score[-1]
+        self._checkpoint_manager.update_checkpoint_timestamp(latest_session.last_trace_timestamp_ms)
 
         _logger.info(f"Session scoring completed for experiment {self._experiment_id}")
 
@@ -149,7 +151,7 @@ class OnlineSessionScoringProcessor:
         would exceed MAX_TRACES_PER_JOB.
 
         Args:
-            completed_sessions: List of completed sessions sorted by trace_count DESC.
+            completed_sessions: List of completed sessions sorted by last_trace_timestamp_ms ASC.
 
         Returns:
             List of sessions to score.
@@ -218,7 +220,6 @@ class OnlineSessionScoringProcessor:
             start_time_ms=session.first_trace_timestamp_ms,
             end_time_ms=session.last_trace_timestamp_ms,
             filter_string=f"request_metadata.`mlflow.trace.session` = '{session.session_id}'",
-            max_results=session.trace_count + 10,  # Add buffer for concurrent traces
         )
 
         if not traces:

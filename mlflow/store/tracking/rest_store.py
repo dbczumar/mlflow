@@ -1449,26 +1449,26 @@ class RestStore(RestGatewayStoreMixin, AbstractStore):
     def find_completed_sessions(
         self,
         experiment_id: str,
-        min_start_timestamp_ms: int,
-        max_last_activity_timestamp_ms: int,
+        min_last_trace_timestamp_ms: int,
+        max_last_trace_timestamp_ms: int,
     ) -> list["CompletedSession"]:
         """
-        Find sessions that started after a timestamp and have no activity after another timestamp.
+        Find completed sessions based on their last trace timestamp.
 
         Args:
             experiment_id: The experiment to search.
-            min_start_timestamp_ms: Only consider sessions with first trace after this time.
-            max_last_activity_timestamp_ms: Sessions are complete if no traces after this time.
+            min_last_trace_timestamp_ms: Only consider sessions with last trace after this.
+            max_last_trace_timestamp_ms: Sessions are complete if last trace before this.
 
         Returns:
-            List of CompletedSession objects sorted by trace_count DESC.
+            List of CompletedSession objects sorted by last_trace_timestamp_ms ASC.
         """
         from mlflow.genai.scorers.online.session_processor import CompletedSession
 
         request_body = {
             "experiment_id": experiment_id,
-            "min_start_timestamp_ms": min_start_timestamp_ms,
-            "max_last_activity_timestamp_ms": max_last_activity_timestamp_ms,
+            "min_last_trace_timestamp_ms": min_last_trace_timestamp_ms,
+            "max_last_trace_timestamp_ms": max_last_trace_timestamp_ms,
         }
 
         response = http_request(

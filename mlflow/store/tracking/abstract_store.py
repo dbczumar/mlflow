@@ -417,26 +417,25 @@ class AbstractStore(GatewayStoreMixin):
     def find_completed_sessions(
         self,
         experiment_id: str,
-        min_start_timestamp_ms: int,
-        max_last_activity_timestamp_ms: int,
+        min_last_trace_timestamp_ms: int,
+        max_last_trace_timestamp_ms: int,
     ) -> list["CompletedSession"]:
         """
-        Find sessions that started after a timestamp and have no activity after another.
+        Find completed sessions within a time window based on their last trace timestamp.
 
         This efficiently identifies completed sessions in a single query by:
-        1. Finding all sessions with traces in [min_start_timestamp_ms,
-           max_last_activity_timestamp_ms]
-        2. Checking if each session has any traces after max_last_activity_timestamp_ms
-        3. Returning sessions with no activity after max_last_activity_timestamp_ms with
-           trace counts
+        1. Finding all sessions with last trace in [min_last_trace_timestamp_ms,
+           max_last_trace_timestamp_ms]
+        2. Checking if each session has any traces after max_last_trace_timestamp_ms
+        3. Returning sessions with no traces after max_last_trace_timestamp_ms
 
         Args:
             experiment_id: The experiment to search.
-            min_start_timestamp_ms: Only consider sessions with first trace after this time.
-            max_last_activity_timestamp_ms: Sessions are complete if no traces after this.
+            min_last_trace_timestamp_ms: Only consider sessions with last trace after this.
+            max_last_trace_timestamp_ms: Sessions are complete if last trace before this.
 
         Returns:
-            List of CompletedSession objects sorted by trace_count DESC.
+            List of CompletedSession objects sorted by last_trace_timestamp_ms ASC.
         """
         raise NotImplementedError(self.__class__.__name__)
 

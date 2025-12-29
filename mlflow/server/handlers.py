@@ -3159,32 +3159,32 @@ def _calculate_trace_filter_correlation():
 def _find_completed_sessions():
     """
     Internal API handler for finding completed sessions.
-    Returns sessions that started after a timestamp and have no activity after another timestamp.
+    Returns sessions based on their last trace timestamp.
     """
     request_json = _get_request_json()
     experiment_id = request_json.get("experiment_id")
-    min_start_timestamp_ms = request_json.get("min_start_timestamp_ms")
-    max_last_activity_timestamp_ms = request_json.get("max_last_activity_timestamp_ms")
+    min_last_trace_timestamp_ms = request_json.get("min_last_trace_timestamp_ms")
+    max_last_trace_timestamp_ms = request_json.get("max_last_trace_timestamp_ms")
 
     if not experiment_id:
         raise MlflowException(
             "Missing required parameter: experiment_id", error_code=INVALID_PARAMETER_VALUE
         )
-    if min_start_timestamp_ms is None:
+    if min_last_trace_timestamp_ms is None:
         raise MlflowException(
-            "Missing required parameter: min_start_timestamp_ms",
+            "Missing required parameter: min_last_trace_timestamp_ms",
             error_code=INVALID_PARAMETER_VALUE,
         )
-    if max_last_activity_timestamp_ms is None:
+    if max_last_trace_timestamp_ms is None:
         raise MlflowException(
-            "Missing required parameter: max_last_activity_timestamp_ms",
+            "Missing required parameter: max_last_trace_timestamp_ms",
             error_code=INVALID_PARAMETER_VALUE,
         )
 
     completed_sessions = _get_tracking_store().find_completed_sessions(
         experiment_id=experiment_id,
-        min_start_timestamp_ms=int(min_start_timestamp_ms),
-        max_last_activity_timestamp_ms=int(max_last_activity_timestamp_ms),
+        min_last_trace_timestamp_ms=int(min_last_trace_timestamp_ms),
+        max_last_trace_timestamp_ms=int(max_last_trace_timestamp_ms),
     )
 
     response = Response(mimetype="application/json")
