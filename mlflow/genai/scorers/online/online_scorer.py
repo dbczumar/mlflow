@@ -19,6 +19,16 @@ class OnlineScorer:
     filter_string: str | None = None
 
 
+@dataclass
+class CompletedSession:
+    """A completed session with metadata."""
+
+    session_id: str
+    trace_count: int
+    first_trace_timestamp_ms: int
+    last_trace_timestamp_ms: int
+
+
 class OnlineScoringConfig:
     """
     Internal entity representing the online configuration for a scorer.

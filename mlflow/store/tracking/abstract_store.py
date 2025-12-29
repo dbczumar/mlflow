@@ -25,7 +25,11 @@ from mlflow.entities.trace_metrics import (
 
 if TYPE_CHECKING:
     from mlflow.entities import EvaluationDataset
-    from mlflow.genai.scorers.online.online_scorer import OnlineScorer, OnlineScoringConfig
+    from mlflow.genai.scorers.online.online_scorer import (
+        CompletedSession,
+        OnlineScorer,
+        OnlineScoringConfig,
+    )
 from mlflow.entities.metric import MetricWithRunId
 from mlflow.entities.trace import Span, Trace
 from mlflow.entities.trace_info import TraceInfo
@@ -412,6 +416,30 @@ class AbstractStore(GatewayStoreMixin):
             not be meaningful in such cases.
         """
         raise NotImplementedError
+
+    def find_completed_sessions(
+        self,
+        experiment_id: str,
+        session_start_after_ms: int,
+        no_activity_after_ms: int,
+    ) -> list["CompletedSession"]:
+        """
+        Find sessions that started after a timestamp and have no activity after another timestamp.
+
+        This efficiently identifies completed sessions in a single query by:
+        1. Finding all sessions with traces in [session_start_after_ms, no_activity_after_ms]
+        2. Checking if each session has any traces after no_activity_after_ms
+        3. Returning sessions with no activity after no_activity_after_ms with trace counts
+
+        Args:
+            experiment_id: The experiment to search.
+            session_start_after_ms: Only consider sessions with first trace after this time.
+            no_activity_after_ms: Sessions are complete if no traces after this time.
+
+        Returns:
+            List of CompletedSession objects sorted by trace_count DESC.
+        """
+        raise NotImplementedError(self.__class__.__name__)
 
     def query_trace_metrics(
         self,

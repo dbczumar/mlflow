@@ -68,7 +68,11 @@ from mlflow.entities.trace_metrics import (
 from mlflow.entities.trace_state import TraceState
 from mlflow.entities.trace_status import TraceStatus
 from mlflow.exceptions import MlflowException, MlflowTracingException
-from mlflow.genai.scorers.online.online_scorer import OnlineScorer, OnlineScoringConfig
+from mlflow.genai.scorers.online.online_scorer import (
+    CompletedSession,
+    OnlineScorer,
+    OnlineScoringConfig,
+)
 from mlflow.genai.scorers.scorer_utils import (
     build_gateway_model,
     extract_endpoint_ref,
@@ -3043,6 +3047,75 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
                 next_token = None
 
             return trace_infos, next_token
+
+    def find_completed_sessions(
+        self,
+        experiment_id: str,
+        session_start_after_ms: int,
+        no_activity_after_ms: int,
+    ) -> list[CompletedSession]:
+        """Find sessions that started after X and have no activity after Y."""
+        with self.ManagedSessionMaker() as session:
+            # Subquery: sessions in the target window with aggregated stats
+            sessions_in_window = (
+                session.query(
+                    SqlTraceInfo.request_metadata["mlflow.trace.session"].astext.label(
+                        "session_id"
+                    ),
+                    func.count(SqlTraceInfo.request_id).label("trace_count"),
+                    func.min(SqlTraceInfo.timestamp_ms).label("first_trace_timestamp_ms"),
+                    func.max(SqlTraceInfo.timestamp_ms).label("last_trace_timestamp_ms"),
+                )
+                .filter(
+                    SqlTraceInfo.experiment_id == experiment_id,
+                    SqlTraceInfo.request_metadata["mlflow.trace.session"].astext.isnot(None),
+                    SqlTraceInfo.timestamp_ms > session_start_after_ms,
+                    SqlTraceInfo.timestamp_ms <= no_activity_after_ms,
+                )
+                .group_by(SqlTraceInfo.request_metadata["mlflow.trace.session"].astext)
+                .subquery()
+            )
+
+            # Subquery: sessions with activity after the cutoff
+            sessions_with_recent_activity = (
+                session.query(
+                    SqlTraceInfo.request_metadata["mlflow.trace.session"].astext.label("session_id")
+                )
+                .filter(
+                    SqlTraceInfo.experiment_id == experiment_id,
+                    SqlTraceInfo.request_metadata["mlflow.trace.session"].astext.isnot(None),
+                    SqlTraceInfo.timestamp_ms > no_activity_after_ms,
+                )
+                .distinct()
+                .subquery()
+            )
+
+            # Main query: sessions in window WITHOUT recent activity
+            results = (
+                session.query(
+                    sessions_in_window.c.session_id,
+                    sessions_in_window.c.trace_count,
+                    sessions_in_window.c.first_trace_timestamp_ms,
+                    sessions_in_window.c.last_trace_timestamp_ms,
+                )
+                .outerjoin(
+                    sessions_with_recent_activity,
+                    sessions_in_window.c.session_id == sessions_with_recent_activity.c.session_id,
+                )
+                .filter(sessions_with_recent_activity.c.session_id.is_(None))
+                .order_by(sessions_in_window.c.trace_count.desc())
+                .all()
+            )
+
+            return [
+                CompletedSession(
+                    session_id=row.session_id,
+                    trace_count=row.trace_count,
+                    first_trace_timestamp_ms=row.first_trace_timestamp_ms,
+                    last_trace_timestamp_ms=row.last_trace_timestamp_ms,
+                )
+                for row in results
+            ]
 
     def _validate_max_results_param(self, max_results: int, allow_null=False):
         if (not allow_null and max_results is None) or max_results < 1:
