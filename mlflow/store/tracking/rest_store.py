@@ -7,7 +7,8 @@ from mlflow.entities.model_registry.prompt_version import PromptVersion
 
 if TYPE_CHECKING:
     from mlflow.entities import DatasetRecord, EvaluationDataset
-    from mlflow.genai.scorers.online.online_scorer import CompletedSession, OnlineScoringConfig
+    from mlflow.genai.scorers.online.online_scorer import OnlineScoringConfig
+    from mlflow.genai.scorers.online.session_processor import CompletedSession
 
 from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import ExportTraceServiceRequest
 from packaging.version import Version

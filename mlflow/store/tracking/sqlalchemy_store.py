@@ -68,11 +68,8 @@ from mlflow.entities.trace_metrics import (
 from mlflow.entities.trace_state import TraceState
 from mlflow.entities.trace_status import TraceStatus
 from mlflow.exceptions import MlflowException, MlflowTracingException
-from mlflow.genai.scorers.online.online_scorer import (
-    CompletedSession,
-    OnlineScorer,
-    OnlineScoringConfig,
-)
+from mlflow.genai.scorers.online.online_scorer import OnlineScorer, OnlineScoringConfig
+from mlflow.genai.scorers.online.session_processor import CompletedSession
 from mlflow.genai.scorers.scorer_utils import (
     build_gateway_model,
     extract_endpoint_ref,

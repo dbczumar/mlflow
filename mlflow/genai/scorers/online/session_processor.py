@@ -2,17 +2,29 @@
 
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass
 
 from mlflow.environment_variables import MLFLOW_GENAI_EVAL_MAX_WORKERS
 from mlflow.genai.evaluation.entities import EvalItem
 from mlflow.genai.evaluation.session_utils import evaluate_session_level_scorers
-from mlflow.genai.scorers.online.online_scorer import CompletedSession, OnlineScorer
+from mlflow.genai.scorers.online.online_scorer import OnlineScorer
 from mlflow.genai.scorers.online.sampler import OnlineScorerSampler
 from mlflow.genai.scorers.online.session_checkpoint import OnlineSessionCheckpointManager
 from mlflow.genai.scorers.online.trace_loader import OnlineTraceLoader
 from mlflow.store.tracking.abstract_store import AbstractStore
 
 _logger = logging.getLogger(__name__)
+
+
+@dataclass
+class CompletedSession:
+    """A completed session with metadata."""
+
+    session_id: str
+    trace_count: int
+    first_trace_timestamp_ms: int
+    last_trace_timestamp_ms: int
+
 
 # Session inactivity buffer: 10 minutes without new traces = session complete
 _SESSION_COMPLETION_BUFFER_MS = 10 * 60 * 1000
