@@ -68,7 +68,7 @@ from mlflow.entities.trace_metrics import (
 from mlflow.entities.trace_state import TraceState
 from mlflow.entities.trace_status import TraceStatus
 from mlflow.exceptions import MlflowException, MlflowTracingException
-from mlflow.genai.scorers.online.online_scorer import OnlineScorer, ScorerOnlineConfig
+from mlflow.genai.scorers.online.online_scorer import OnlineScorer, OnlineScoringConfig
 from mlflow.genai.scorers.scorer_utils import (
     build_gateway_model,
     extract_endpoint_ref,
@@ -112,10 +112,10 @@ from mlflow.store.tracking.dbmodels.models import (
     SqlLoggedModelParam,
     SqlLoggedModelTag,
     SqlMetric,
+    SqlOnlineScoringConfig,
     SqlParam,
     SqlRun,
     SqlScorer,
-    SqlScorerOnlineConfig,
     SqlScorerVersion,
     SqlSpan,
     SqlTag,
@@ -2418,15 +2418,15 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
                 for i, sv in enumerate(sql_scorer_versions)
             ]
 
-    def get_scorer_online_configs(self, scorer_ids: list[str]) -> dict[str, ScorerOnlineConfig]:
+    def get_online_scoring_configs(self, scorer_ids: list[str]) -> dict[str, OnlineScoringConfig]:
         """
-        Get online configurations for multiple scorers by their IDs.
+        Get online scoring configurations for multiple scorers by their IDs.
 
         Args:
             scorer_ids: List of scorer IDs to fetch configurations for.
 
         Returns:
-            A dictionary mapping scorer_id to ScorerOnlineConfig for scorers that
+            A dictionary mapping scorer_id to OnlineScoringConfig for scorers that
             have configurations. Scorers without configurations are not included.
         """
         if not scorer_ids:
@@ -2434,14 +2434,14 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
 
         with self.ManagedSessionMaker() as session:
             results = (
-                session.query(SqlScorerOnlineConfig)
-                .filter(SqlScorerOnlineConfig.scorer_id.in_(scorer_ids))
+                session.query(SqlOnlineScoringConfig)
+                .filter(SqlOnlineScoringConfig.scorer_id.in_(scorer_ids))
                 .all()
             )
 
             return {
-                config.scorer_id: ScorerOnlineConfig(
-                    scorer_online_config_id=config.scorer_online_config_id,
+                config.scorer_id: OnlineScoringConfig(
+                    online_scoring_config_id=config.online_scoring_config_id,
                     scorer_id=config.scorer_id,
                     sample_rate=config.sample_rate,
                     filter_string=config.filter_string,
@@ -2476,12 +2476,12 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
             # Get all online configs with sample_rate > 0, joined with their latest version
             results = (
                 session.query(
-                    SqlScorerOnlineConfig,
+                    SqlOnlineScoringConfig,
                     SqlScorer,
                     SqlScorerVersion,
                 )
-                .filter(SqlScorerOnlineConfig.sample_rate > 0)
-                .join(SqlScorer, SqlScorerOnlineConfig.scorer_id == SqlScorer.scorer_id)
+                .filter(SqlOnlineScoringConfig.sample_rate > 0)
+                .join(SqlScorer, SqlOnlineScoringConfig.scorer_id == SqlScorer.scorer_id)
                 .join(
                     max_version_subquery,
                     SqlScorer.scorer_id == max_version_subquery.c.scorer_id,
@@ -2507,15 +2507,15 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
                 for config, scorer, version in results
             ]
 
-    def update_scorer_online_config(
+    def update_online_scoring_config(
         self,
         experiment_id: str,
         name: str,
         sample_rate: float,
         filter_string: str | None = None,
-    ) -> ScorerOnlineConfig:
+    ) -> OnlineScoringConfig:
         """
-        Update online configuration for a scorer.
+        Update online scoring configuration for a scorer.
 
         Args:
             experiment_id: The experiment ID.
@@ -2524,7 +2524,7 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
             filter_string: Optional filter expression for trace selection.
 
         Returns:
-            The updated ScorerOnlineConfig entity.
+            The updated OnlineScoringConfig entity.
 
         Raises:
             MlflowException: If scorer is not found or does not use a gateway model.
@@ -2573,13 +2573,13 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
                 SearchTraceUtils.parse_search_filter_for_search_traces(filter_string)
 
             # Delete existing online configs for this scorer
-            session.query(SqlScorerOnlineConfig).filter(
-                SqlScorerOnlineConfig.scorer_id == scorer.scorer_id
+            session.query(SqlOnlineScoringConfig).filter(
+                SqlOnlineScoringConfig.scorer_id == scorer.scorer_id
             ).delete()
 
             # Create new online config
-            config = SqlScorerOnlineConfig(
-                scorer_online_config_id=uuid.uuid4().hex,
+            config = SqlOnlineScoringConfig(
+                online_scoring_config_id=uuid.uuid4().hex,
                 scorer_id=scorer.scorer_id,
                 sample_rate=sample_rate,
                 filter_string=filter_string,
@@ -2587,8 +2587,8 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
             session.add(config)
             session.flush()
 
-            return ScorerOnlineConfig(
-                scorer_online_config_id=config.scorer_online_config_id,
+            return OnlineScoringConfig(
+                online_scoring_config_id=config.online_scoring_config_id,
                 scorer_id=config.scorer_id,
                 sample_rate=config.sample_rate,
                 filter_string=config.filter_string,

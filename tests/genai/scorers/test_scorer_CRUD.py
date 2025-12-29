@@ -170,10 +170,10 @@ def _mock_gateway_endpoint():
     )
 
 
-def test_mlflow_backend_scorer_online_config_operations():
+def test_mlflow_backend_online_scoring_config_operations():
     from mlflow.genai.scorers import Guidelines
 
-    experiment_id = mlflow.create_experiment("test_scorer_online_config_experiment")
+    experiment_id = mlflow.create_experiment("test_online_scoring_config_experiment")
     mlflow.set_experiment(experiment_id=experiment_id)
 
     test_scorer = Guidelines(
@@ -229,7 +229,7 @@ def test_mlflow_backend_scorer_online_config_operations():
         assert version == 1
 
 
-def test_mlflow_backend_scorer_online_config_chained_update():
+def test_mlflow_backend_online_scoring_config_chained_update():
     from mlflow.genai.scorers import Guidelines
 
     with patch(
@@ -256,18 +256,18 @@ def test_mlflow_backend_scorer_online_config_chained_update():
         # Chain: get_scorer().update() should work
         updated_scorer = get_scorer(name="test_chained_scorer", experiment_id=experiment_id).update(
             experiment_id=experiment_id,
-            sampling_config=ScorerSamplingConfig(sample_rate=0.8, filter_string="new_filter"),
+            sampling_config=ScorerSamplingConfig(sample_rate=0.8, filter_string="status = 'OK'"),
         )
 
         # Verify the update worked
         assert updated_scorer.sample_rate == 0.8
-        assert updated_scorer.filter_string == "new_filter"
+        assert updated_scorer.filter_string == "status = 'OK'"
         assert updated_scorer.status == ScorerStatus.STARTED
 
         # Verify the update is persisted
         retrieved_scorer = get_scorer(name="test_chained_scorer", experiment_id=experiment_id)
         assert retrieved_scorer.sample_rate == 0.8
-        assert retrieved_scorer.filter_string == "new_filter"
+        assert retrieved_scorer.filter_string == "status = 'OK'"
 
         # Chain: get_scorer().stop() should work
         stopped_scorer = get_scorer(name="test_chained_scorer", experiment_id=experiment_id).stop(

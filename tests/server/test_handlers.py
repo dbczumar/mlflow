@@ -1629,16 +1629,16 @@ def test_delete_scorer_without_version(mock_get_request_message, mock_tracking_s
     assert response_data == {}
 
 
-def test_update_scorer_online_config_smoke(mock_tracking_store):
-    from mlflow.genai.scorers.online.scorer_online_config import ScorerOnlineConfig
+def test_update_online_scoring_config_smoke(mock_tracking_store):
+    from mlflow.genai.scorers.online.online_scorer import OnlineScoringConfig
 
-    mock_config = ScorerOnlineConfig(
-        scorer_online_config_id="cfg-1",
+    mock_config = OnlineScoringConfig(
+        online_scoring_config_id="cfg-1",
         scorer_id="scorer-1",
         sample_rate=0.1,
         filter_string="status = 'OK'",
     )
-    mock_tracking_store.update_scorer_online_config.return_value = mock_config
+    mock_tracking_store.update_online_scoring_config.return_value = mock_config
 
     with app.test_client() as c:
         # First update
@@ -1657,12 +1657,12 @@ def test_update_scorer_online_config_smoke(mock_tracking_store):
         assert data["config"]["filter_string"] == "status = 'OK'"
 
         # Second update (overwrite)
-        mock_config2 = ScorerOnlineConfig(
-            scorer_online_config_id="cfg-2",
+        mock_config2 = OnlineScoringConfig(
+            online_scoring_config_id="cfg-2",
             scorer_id="scorer-1",
             sample_rate=0.5,
         )
-        mock_tracking_store.update_scorer_online_config.return_value = mock_config2
+        mock_tracking_store.update_online_scoring_config.return_value = mock_config2
 
         resp = c.put(
             "/ajax-api/3.0/mlflow/scorers/online-config",
@@ -1677,11 +1677,11 @@ def test_update_scorer_online_config_smoke(mock_tracking_store):
         assert data["config"]["sample_rate"] == 0.5
 
 
-def test_update_scorer_online_config_nonexistent_scorer(mock_tracking_store):
+def test_update_online_scoring_config_nonexistent_scorer(mock_tracking_store):
     from mlflow.exceptions import MlflowException
     from mlflow.protos.databricks_pb2 import RESOURCE_DOES_NOT_EXIST
 
-    mock_tracking_store.update_scorer_online_config.side_effect = MlflowException(
+    mock_tracking_store.update_online_scoring_config.side_effect = MlflowException(
         "Scorer not found", error_code=RESOURCE_DOES_NOT_EXIST
     )
 
@@ -1699,23 +1699,23 @@ def test_update_scorer_online_config_nonexistent_scorer(mock_tracking_store):
         assert "Scorer not found" in data["message"]
 
 
-def test_get_scorer_online_configs_batch(mock_tracking_store):
-    from mlflow.genai.scorers.online.scorer_online_config import ScorerOnlineConfig
+def test_get_online_scoring_configs_batch(mock_tracking_store):
+    from mlflow.genai.scorers.online.online_scorer import OnlineScoringConfig
 
     mock_configs = {
-        "scorer-1": ScorerOnlineConfig(
-            scorer_online_config_id="cfg-1",
+        "scorer-1": OnlineScoringConfig(
+            online_scoring_config_id="cfg-1",
             scorer_id="scorer-1",
             sample_rate=0.5,
             filter_string="status = 'OK'",
         ),
-        "scorer-2": ScorerOnlineConfig(
-            scorer_online_config_id="cfg-2",
+        "scorer-2": OnlineScoringConfig(
+            online_scoring_config_id="cfg-2",
             scorer_id="scorer-2",
             sample_rate=0.8,
         ),
     }
-    mock_tracking_store.get_scorer_online_configs.return_value = mock_configs
+    mock_tracking_store.get_online_scoring_configs.return_value = mock_configs
 
     with app.test_client() as c:
         resp = c.post(
@@ -1730,11 +1730,11 @@ def test_get_scorer_online_configs_batch(mock_tracking_store):
         assert data["configs"]["scorer-2"]["sample_rate"] == 0.8
         assert data["configs"]["scorer-2"].get("filter_string") is None
 
-    mock_tracking_store.get_scorer_online_configs.assert_called_once_with(["scorer-1", "scorer-2"])
+    mock_tracking_store.get_online_scoring_configs.assert_called_once_with(["scorer-1", "scorer-2"])
 
 
-def test_get_scorer_online_configs_empty_list(mock_tracking_store):
-    mock_tracking_store.get_scorer_online_configs.return_value = {}
+def test_get_online_scoring_configs_empty_list(mock_tracking_store):
+    mock_tracking_store.get_online_scoring_configs.return_value = {}
 
     with app.test_client() as c:
         resp = c.post(
@@ -1744,7 +1744,7 @@ def test_get_scorer_online_configs_empty_list(mock_tracking_store):
         assert resp.status_code == 400
 
 
-def test_get_scorer_online_configs_missing_param(mock_tracking_store):
+def test_get_online_scoring_configs_missing_param(mock_tracking_store):
     with app.test_client() as c:
         resp = c.post(
             "/ajax-api/3.0/mlflow/scorers/online-configs",

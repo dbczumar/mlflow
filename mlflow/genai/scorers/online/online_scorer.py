@@ -19,7 +19,7 @@ class OnlineScorer:
     filter_string: str | None = None
 
 
-class ScorerOnlineConfig:
+class OnlineScoringConfig:
     """
     Internal entity representing the online configuration for a scorer.
 
@@ -30,20 +30,20 @@ class ScorerOnlineConfig:
 
     def __init__(
         self,
-        scorer_online_config_id: str,
+        online_scoring_config_id: str,
         scorer_id: str,
         sample_rate: float,
         filter_string: str | None = None,
     ):
-        self._scorer_online_config_id = scorer_online_config_id
+        self._online_scoring_config_id = online_scoring_config_id
         self._scorer_id = scorer_id
         self._sample_rate = sample_rate
         self._filter_string = filter_string
 
     @property
-    def scorer_online_config_id(self) -> str:
+    def online_scoring_config_id(self) -> str:
         """The unique identifier for this online config."""
-        return self._scorer_online_config_id
+        return self._online_scoring_config_id
 
     @property
     def scorer_id(self) -> str:
@@ -62,14 +62,14 @@ class ScorerOnlineConfig:
 
     def __repr__(self):
         return (
-            f"<ScorerOnlineConfig(scorer_online_config_id={self.scorer_online_config_id}, "
+            f"<OnlineScoringConfig(online_scoring_config_id={self.online_scoring_config_id}, "
             f"scorer_id='{self.scorer_id}', sample_rate={self.sample_rate})>"
         )
 
     def to_dict(self) -> dict[str, str | float]:
         """Convert the entity to a dictionary for JSON serialization."""
         result: dict[str, str | float] = {
-            "scorer_online_config_id": self.scorer_online_config_id,
+            "online_scoring_config_id": self.online_scoring_config_id,
             "scorer_id": self.scorer_id,
             "sample_rate": self.sample_rate,
         }

@@ -203,7 +203,7 @@ class MlflowTrackingStore(AbstractScorerStore):
 
         Args:
             scorer: The scorer to populate.
-            online_config: Optional ScorerOnlineConfig from the tracking store.
+            online_config: Optional OnlineScoringConfig from the tracking store.
         """
         scorer._registered_backend = "tracking"
         if online_config is not None:
@@ -225,7 +225,7 @@ class MlflowTrackingStore(AbstractScorerStore):
 
         # Batch fetch online configs
         online_configs = (
-            self._tracking_store.get_scorer_online_configs(scorer_ids) if scorer_ids else {}
+            self._tracking_store.get_online_scoring_configs(scorer_ids) if scorer_ids else {}
         )
 
         # Convert to Scorer objects and populate with backend info
@@ -248,7 +248,7 @@ class MlflowTrackingStore(AbstractScorerStore):
         # Fetch online config for this scorer
         online_config = None
         if scorer_version.scorer_id:
-            online_configs = self._tracking_store.get_scorer_online_configs(
+            online_configs = self._tracking_store.get_online_scoring_configs(
                 [scorer_version.scorer_id]
             )
             online_config = online_configs.get(scorer_version.scorer_id)
@@ -271,7 +271,7 @@ class MlflowTrackingStore(AbstractScorerStore):
 
         # Batch fetch online configs
         online_configs = (
-            self._tracking_store.get_scorer_online_configs(scorer_ids) if scorer_ids else {}
+            self._tracking_store.get_online_scoring_configs(scorer_ids) if scorer_ids else {}
         )
 
         # Convert to Scorer objects and populate with backend info
@@ -295,7 +295,7 @@ class MlflowTrackingStore(AbstractScorerStore):
         experiment_id = experiment_id or _get_experiment_id()
         return self._tracking_store.delete_scorer(experiment_id, name, version)
 
-    def update_scorer_online_config(
+    def update_online_scoring_config(
         self,
         experiment_id: str | None,
         name: str,
@@ -332,7 +332,7 @@ class MlflowTrackingStore(AbstractScorerStore):
         effective_sample_rate = sample_rate if sample_rate is not None else 0.0
 
         # Call the tracking store method with direct parameters
-        self._tracking_store.update_scorer_online_config(
+        self._tracking_store.update_online_scoring_config(
             experiment_id=experiment_id,
             name=name,
             sample_rate=effective_sample_rate,

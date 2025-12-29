@@ -3939,7 +3939,7 @@ def _delete_scorer():
 
 @catch_mlflow_exception
 @_disable_if_artifacts_only
-def _update_scorer_online_config():
+def _update_online_scoring_config():
     request_json = _get_request_json()
     experiment_id = request_json.get("experiment_id")
     name = request_json.get("name")
@@ -3953,7 +3953,7 @@ def _update_scorer_online_config():
     if sample_rate is None:
         raise MlflowException("Missing required parameter: sample_rate")
 
-    config = _get_tracking_store().update_scorer_online_config(
+    config = _get_tracking_store().update_online_scoring_config(
         experiment_id=experiment_id,
         name=name,
         sample_rate=sample_rate,
@@ -3967,7 +3967,7 @@ def _update_scorer_online_config():
 
 @catch_mlflow_exception
 @_disable_if_artifacts_only
-def _get_scorer_online_configs():
+def _get_online_scoring_configs():
     request_json = _get_request_json()
     scorer_ids = request_json.get("scorer_ids")
 
@@ -3980,7 +3980,7 @@ def _get_scorer_online_configs():
             "Parameter scorer_ids must be a list", error_code=INVALID_PARAMETER_VALUE
         )
 
-    configs = _get_tracking_store().get_scorer_online_configs(scorer_ids)
+    configs = _get_tracking_store().get_online_scoring_configs(scorer_ids)
 
     response = Response(mimetype="application/json")
     response.set_data(json.dumps({"configs": {k: v.to_dict() for k, v in configs.items()}}))
@@ -4668,23 +4668,23 @@ def get_endpoints(get_handler=get_handler):
             # Non-proto scorer endpoints (both ajax and non-ajax paths)
             (
                 _get_ajax_path("/mlflow/scorers/online-config", version=3),
-                _update_scorer_online_config,
+                _update_online_scoring_config,
                 ["PUT"],
             ),
             (
                 _get_rest_path("/mlflow/scorers/online-config", version=3),
-                _update_scorer_online_config,
+                _update_online_scoring_config,
                 ["PUT"],
             ),
-            # Batch get scorer online configs endpoint
+            # Batch get online scoring configs endpoint
             (
                 _get_ajax_path("/mlflow/scorers/online-configs", version=3),
-                _get_scorer_online_configs,
+                _get_online_scoring_configs,
                 ["POST"],
             ),
             (
                 _get_rest_path("/mlflow/scorers/online-configs", version=3),
-                _get_scorer_online_configs,
+                _get_online_scoring_configs,
                 ["POST"],
             ),
         ]

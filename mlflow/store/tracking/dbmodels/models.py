@@ -69,7 +69,7 @@ from mlflow.entities.logged_model_tag import LoggedModelTag
 from mlflow.entities.trace_location import TraceLocation
 from mlflow.entities.trace_state import TraceState
 from mlflow.exceptions import MlflowException
-from mlflow.genai.scorers.online.online_scorer import ScorerOnlineConfig
+from mlflow.genai.scorers.online.online_scorer import OnlineScoringConfig
 from mlflow.store.db.base_sql_model import Base
 from mlflow.tracing.utils import generate_assessment_id
 from mlflow.utils.mlflow_tags import MLFLOW_USER, _get_run_name_from_tags
@@ -1988,18 +1988,18 @@ class SqlScorerVersion(Base):
         )
 
 
-class SqlScorerOnlineConfig(Base):
+class SqlOnlineScoringConfig(Base):
     """
-    DB model for storing scorer online configuration. These are recorded in
-    ``scorer_online_configs`` table.
+    DB model for storing online scoring configuration. These are recorded in
+    ``online_scoring_configs`` table.
     """
 
-    __tablename__ = "scorer_online_configs"
+    __tablename__ = "online_scoring_configs"
 
-    scorer_online_config_id = Column(String(36), nullable=False)
+    online_scoring_config_id = Column(String(36), nullable=False)
     """
-    Scorer Online Config ID: `String` (limit 36 characters). *Primary Key* for
-    ``scorer_online_configs`` table.
+    Online Scoring Config ID: `String` (limit 36 characters). *Primary Key* for
+    ``online_scoring_configs`` table.
     """
     scorer_id = Column(
         String(36), ForeignKey("scorers.scorer_id", ondelete="CASCADE"), nullable=False
@@ -2024,25 +2024,25 @@ class SqlScorerOnlineConfig(Base):
     """
 
     __table_args__ = (
-        PrimaryKeyConstraint("scorer_online_config_id", name="scorer_online_config_pk"),
-        UniqueConstraint("scorer_id", name="unique_scorer_online_config_scorer_id"),
+        PrimaryKeyConstraint("online_scoring_config_id", name="online_scoring_config_pk"),
+        UniqueConstraint("scorer_id", name="unique_online_scoring_config_scorer_id"),
     )
 
     def __repr__(self):
         return (
-            f"<SqlScorerOnlineConfig ({self.scorer_online_config_id}, {self.scorer_id}, "
+            f"<SqlOnlineScoringConfig ({self.online_scoring_config_id}, {self.scorer_id}, "
             f"{self.sample_rate})>"
         )
 
-    def to_mlflow_entity(self) -> ScorerOnlineConfig:
+    def to_mlflow_entity(self) -> OnlineScoringConfig:
         """
-        Convert this SqlScorerOnlineConfig to a ScorerOnlineConfig entity.
+        Convert this SqlOnlineScoringConfig to an OnlineScoringConfig entity.
 
         Returns:
-            ScorerOnlineConfig: The entity representation of this online config.
+            OnlineScoringConfig: The entity representation of this online config.
         """
-        return ScorerOnlineConfig(
-            scorer_online_config_id=self.scorer_online_config_id,
+        return OnlineScoringConfig(
+            online_scoring_config_id=self.online_scoring_config_id,
             scorer_id=self.scorer_id,
             sample_rate=self.sample_rate,
             filter_string=self.filter_string,

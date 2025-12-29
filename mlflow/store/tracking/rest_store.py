@@ -7,7 +7,7 @@ from mlflow.entities.model_registry.prompt_version import PromptVersion
 
 if TYPE_CHECKING:
     from mlflow.entities import DatasetRecord, EvaluationDataset
-    from mlflow.genai.scorers.online.online_scorer import ScorerOnlineConfig
+    from mlflow.genai.scorers.online.online_scorer import OnlineScoringConfig
 
 from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import ExportTraceServiceRequest
 from packaging.version import Version
@@ -1363,13 +1363,13 @@ class RestStore(RestGatewayStoreMixin, AbstractStore):
             endpoint="/api/3.0/mlflow/scorers/delete",
         )
 
-    def update_scorer_online_config(
+    def update_online_scoring_config(
         self,
         experiment_id: str,
         name: str,
         sample_rate: float,
         filter_string: str | None = None,
-    ) -> "ScorerOnlineConfig":
+    ) -> "OnlineScoringConfig":
         """
         Update the online scoring configuration for a registered scorer.
 
@@ -1380,9 +1380,9 @@ class RestStore(RestGatewayStoreMixin, AbstractStore):
             filter_string: Optional filter expression for trace selection.
 
         Returns:
-            The updated ScorerOnlineConfig object.
+            The updated OnlineScoringConfig object.
         """
-        from mlflow.genai.scorers.online.online_scorer import ScorerOnlineConfig
+        from mlflow.genai.scorers.online.online_scorer import OnlineScoringConfig
 
         request_body = {
             "experiment_id": experiment_id,
@@ -1401,25 +1401,25 @@ class RestStore(RestGatewayStoreMixin, AbstractStore):
 
         verify_rest_response(response, "/api/3.0/mlflow/scorers/online-config")
         config_dict = response.json().get("config", {})
-        return ScorerOnlineConfig(
-            scorer_online_config_id=config_dict.get("scorer_online_config_id", ""),
+        return OnlineScoringConfig(
+            online_scoring_config_id=config_dict.get("online_scoring_config_id", ""),
             scorer_id=config_dict.get("scorer_id", ""),
             sample_rate=config_dict.get("sample_rate", 0.0),
             filter_string=config_dict.get("filter_string"),
         )
 
-    def get_scorer_online_configs(self, scorer_ids: list[str]) -> dict[str, "ScorerOnlineConfig"]:
+    def get_online_scoring_configs(self, scorer_ids: list[str]) -> dict[str, "OnlineScoringConfig"]:
         """
-        Get online configurations for multiple scorers by their IDs.
+        Get online scoring configurations for multiple scorers by their IDs.
 
         Args:
             scorer_ids: List of scorer IDs to fetch configurations for.
 
         Returns:
-            A dictionary mapping scorer_id to ScorerOnlineConfig for scorers that
+            A dictionary mapping scorer_id to OnlineScoringConfig for scorers that
             have configurations. Scorers without configurations are not included.
         """
-        from mlflow.genai.scorers.online.online_scorer import ScorerOnlineConfig
+        from mlflow.genai.scorers.online.online_scorer import OnlineScoringConfig
 
         if not scorer_ids:
             return {}
@@ -1436,8 +1436,8 @@ class RestStore(RestGatewayStoreMixin, AbstractStore):
         verify_rest_response(response, "/api/3.0/mlflow/scorers/online-configs")
         configs_dict = response.json()["configs"]
         return {
-            scorer_id: ScorerOnlineConfig(
-                scorer_online_config_id=config["scorer_online_config_id"],
+            scorer_id: OnlineScoringConfig(
+                online_scoring_config_id=config["online_scoring_config_id"],
                 scorer_id=config["scorer_id"],
                 sample_rate=config["sample_rate"],
                 filter_string=config.get("filter_string"),

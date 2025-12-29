@@ -747,7 +747,7 @@ class Scorer(BaseModel):
             )
 
         # MlflowTrackingStore - use OSS tracking store
-        return store.update_scorer_online_config(
+        return store.update_online_scoring_config(
             experiment_id=experiment_id,
             name=scorer_name,
             scorer=self,
@@ -828,7 +828,7 @@ class Scorer(BaseModel):
             )
 
         # MlflowTrackingStore - use OSS tracking store
-        return store.update_scorer_online_config(
+        return store.update_online_scoring_config(
             experiment_id=experiment_id,
             name=scorer_name,
             scorer=self,

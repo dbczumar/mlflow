@@ -25,7 +25,7 @@ from mlflow.entities.trace_metrics import (
 
 if TYPE_CHECKING:
     from mlflow.entities import EvaluationDataset
-    from mlflow.genai.scorers.online.online_scorer import OnlineScorer, ScorerOnlineConfig
+    from mlflow.genai.scorers.online.online_scorer import OnlineScorer, OnlineScoringConfig
 from mlflow.entities.metric import MetricWithRunId
 from mlflow.entities.trace import Span, Trace
 from mlflow.entities.trace_info import TraceInfo
@@ -1435,15 +1435,15 @@ class AbstractStore(GatewayStoreMixin):
         """
         raise NotImplementedError(self.__class__.__name__)
 
-    def update_scorer_online_config(
+    def update_online_scoring_config(
         self,
         experiment_id: str,
         name: str,
         sample_rate: float,
         filter_string: str | None = None,
-    ) -> "ScorerOnlineConfig":
+    ) -> "OnlineScoringConfig":
         """
-        Update online configuration for a scorer.
+        Update online scoring configuration for a scorer.
 
         Args:
             experiment_id: The experiment ID.
@@ -1452,22 +1452,22 @@ class AbstractStore(GatewayStoreMixin):
             filter_string: Optional filter expression for trace selection.
 
         Returns:
-            The updated ScorerOnlineConfig object.
+            The updated OnlineScoringConfig object.
 
         Raises:
             MlflowException: If scorer is not found.
         """
         raise NotImplementedError(self.__class__.__name__)
 
-    def get_scorer_online_configs(self, scorer_ids: list[str]) -> dict[str, "ScorerOnlineConfig"]:
+    def get_online_scoring_configs(self, scorer_ids: list[str]) -> dict[str, "OnlineScoringConfig"]:
         """
-        Get online configurations for multiple scorers by their IDs.
+        Get online scoring configurations for multiple scorers by their IDs.
 
         Args:
             scorer_ids: List of scorer IDs to fetch configurations for.
 
         Returns:
-            A dictionary mapping scorer_id to ScorerOnlineConfig for scorers that
+            A dictionary mapping scorer_id to OnlineScoringConfig for scorers that
             have configurations. Scorers without configurations are not included.
         """
         raise NotImplementedError(self.__class__.__name__)
