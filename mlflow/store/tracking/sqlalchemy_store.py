@@ -2457,10 +2457,13 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
         Each OnlineScorer contains the serialized scorer and sampling configuration.
 
         Returns:
-            List of OnlineScorer entities with serialized_scorer, sample_rate,
-            and filter_string fields populated.
+            List of OnlineScorer entities with name, experiment_id, serialized_scorer,
+            sample_rate, and filter_string fields populated.
         """
+        from mlflow.genai.scorers.online.online_scorer import OnlineScorer
+
         with self.ManagedSessionMaker() as session:
+            # Subquery to get the max version for each scorer
             max_version_subquery = (
                 session.query(
                     SqlScorerVersion.scorer_id,
@@ -2470,9 +2473,11 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
                 .subquery()
             )
 
+            # Get all online configs with sample_rate > 0, joined with their latest version
             results = (
                 session.query(
                     SqlScorerOnlineConfig,
+                    SqlScorer,
                     SqlScorerVersion,
                 )
                 .filter(SqlScorerOnlineConfig.sample_rate > 0)
@@ -2493,11 +2498,13 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
 
             return [
                 OnlineScorer(
+                    name=scorer.name,
+                    experiment_id=scorer.experiment_id,
                     serialized_scorer=version.serialized_scorer,
                     sample_rate=config.sample_rate,
                     filter_string=config.filter_string,
                 )
-                for config, version in results
+                for config, scorer, version in results
             ]
 
     def update_scorer_online_config(

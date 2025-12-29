@@ -12,6 +12,8 @@ from dataclasses import dataclass
 class OnlineScorer:
     """An online scorer with sampling configuration."""
 
+    name: str
+    experiment_id: str
     serialized_scorer: str
     sample_rate: float
     filter_string: str | None = None
