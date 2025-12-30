@@ -15,6 +15,7 @@ AVAILABLE COMMANDS:
     update-comment      Update an existing comment
     delete-comment      Delete a comment by ID
     search-comments     Search comments for an issue
+    link-traces         Link trace(s) to an issue
 
 EXAMPLE USAGE:
     # Create a new issue
@@ -39,6 +40,9 @@ EXAMPLE USAGE:
     # Search comments for an issue
     mlflow issues search-comments --issue-id abc123
 
+    # Link traces to an issue
+    mlflow issues link-traces --issue-id abc123 --trace-ids tr-1234,tr-5678
+
 ISSUE STATES:
     - draft: Created by analysis, pending review
     - open: User confirmed as valid issue
@@ -52,8 +56,11 @@ import json
 
 import click
 
+from mlflow.entities.assessment import Issue as IssueAssessment
+from mlflow.entities.assessment_source import AssessmentSource, AssessmentSourceType
 from mlflow.entities.issue import IssueState
 from mlflow.environment_variables import MLFLOW_EXPERIMENT_ID
+from mlflow.tracing.assessment import log_assessment
 from mlflow.tracking import MlflowClient
 from mlflow.utils.string_utils import _create_table
 
@@ -560,3 +567,76 @@ def search_issue_comments(
 
         if hasattr(comments, "token") and comments.token:
             click.echo(f"\nNext page token: {comments.token}")
+
+
+# Issue-Trace Linking Commands
+
+
+@commands.command("link-traces")
+@ISSUE_ID
+@click.option(
+    "--trace-ids",
+    type=click.STRING,
+    required=True,
+    help="Comma-separated list of trace IDs to link to the issue.",
+)
+@click.option(
+    "--rationale",
+    type=click.STRING,
+    help="Rationale/justification for linking these traces to the issue.",
+)
+def link_traces_to_issue(
+    issue_id: str,
+    trace_ids: str,
+    rationale: str | None = None,
+) -> None:
+    """
+    Link one or more traces to an issue by creating issue assessments.
+
+    This creates Issue assessments that associate the specified traces with
+    the issue. Each linked trace will show the issue in its assessments.
+
+    \b
+    Examples:
+    # Link a single trace to an issue
+    mlflow issues link-traces --issue-id abc123 --trace-ids tr-1234567890
+
+    \b
+    # Link multiple traces to an issue
+    mlflow issues link-traces --issue-id abc123 \\
+        --trace-ids tr-1234567890,tr-0987654321
+
+    \b
+    # Link with rationale
+    mlflow issues link-traces --issue-id abc123 \\
+        --trace-ids tr-1234567890 \\
+        --rationale "This trace exhibits the hallucination pattern"
+    """
+    client = MlflowClient()
+
+    # Get the issue to retrieve the issue name
+    issue = client.get_issue(issue_id)
+
+    # Parse trace IDs
+    trace_id_list = [tid.strip() for tid in trace_ids.split(",") if tid.strip()]
+
+    if not trace_id_list:
+        raise click.BadParameter("At least one trace ID must be provided.")
+
+    # Create Issue assessments for each trace
+    linked_count = 0
+    for trace_id in trace_id_list:
+        issue_assessment = IssueAssessment(
+            issue_id=issue.issue_id,
+            issue_name=issue.name,
+            trace_id=trace_id,
+            rationale=rationale,
+            source=AssessmentSource(
+                source_type=AssessmentSourceType.HUMAN,
+                source_id="cli",
+            ),
+        )
+        log_assessment(trace_id=trace_id, assessment=issue_assessment)
+        linked_count += 1
+
+    click.echo(f"Linked {linked_count} trace(s) to issue '{issue.name}' ({issue_id}).")
