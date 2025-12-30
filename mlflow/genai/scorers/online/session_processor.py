@@ -7,7 +7,11 @@ from dataclasses import dataclass
 from mlflow.environment_variables import MLFLOW_GENAI_EVAL_MAX_WORKERS
 from mlflow.genai.evaluation.entities import EvalItem
 from mlflow.genai.evaluation.session_utils import evaluate_session_level_scorers
-from mlflow.genai.scorers.online.const import MAX_TRACES_PER_JOB, MIN_SESSIONS_PER_JOB
+from mlflow.genai.scorers.online.const import (
+    EXCLUDE_TRAINING_TRACES_FILTER,
+    MAX_TRACES_PER_JOB,
+    MIN_SESSIONS_PER_JOB,
+)
 from mlflow.genai.scorers.online.online_scorer import OnlineScorer
 from mlflow.genai.scorers.online.sampler import OnlineScorerSampler
 from mlflow.genai.scorers.online.session_checkpointer import OnlineSessionCheckpointManager
@@ -199,13 +203,13 @@ class OnlineSessionScoringProcessor:
         Args:
             session: The CompletedSession to score.
         """
-        # Fetch traces for this session by searching with session filter
-        # Note: The trace loader already excludes training traces (mlflow.sourceRun IS NULL)
+        session_filter = f"metadata.`mlflow.trace.session` = '{session.session_id}'"
+        combined_filter = f"{EXCLUDE_TRAINING_TRACES_FILTER} AND {session_filter}"
         traces = self._trace_loader.fetch_trace_infos_between(
             experiment_id=self._experiment_id,
             start_time_ms=session.first_trace_timestamp_ms,
             end_time_ms=session.last_trace_timestamp_ms,
-            filter_string=f"metadata.`mlflow.trace.session` = '{session.session_id}'",
+            filter_string=combined_filter,
         )
 
         if not traces:

@@ -127,8 +127,8 @@ class OnlineTraceScoringProcessor:
         """
         tasks: dict[str, TraceScoringTask] = {}
 
+        # Group by filter string to fetch matching traces in a single query per filter
         for filter_string in self._sampler.get_filter_strings():
-            # Only get trace-level scorers (session-level is handled by session_processor)
             trace_scorers = self._sampler.get_scorers_for_filter(filter_string, session_level=False)
 
             combined_filter = (
@@ -150,7 +150,6 @@ class OnlineTraceScoringProcessor:
 
             _logger.info(f"Found {len(trace_infos)} trace infos for filter: {filter_string}")
 
-            # Sample scorers for each trace
             for trace_info in trace_infos:
                 trace_id = trace_info.trace_id
                 if selected := self._sampler.sample(trace_id, trace_scorers):
