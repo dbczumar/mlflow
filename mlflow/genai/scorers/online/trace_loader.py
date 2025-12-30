@@ -64,9 +64,8 @@ class OnlineTraceLoader:
 
         all_trace_infos = []
         page_token = None
-        has_more = True
 
-        while has_more and len(all_trace_infos) < max_traces:
+        while len(all_trace_infos) < max_traces:
             batch_size = min(page_size, max_traces - len(all_trace_infos))
 
             trace_batch, token = self._tracking_store.search_traces(
@@ -77,17 +76,19 @@ class OnlineTraceLoader:
                 page_token=page_token,
             )
 
-            if trace_batch:
-                remaining = max_traces - len(all_trace_infos)
-                all_trace_infos.extend(trace_batch[:remaining])
-                _logger.debug(
-                    f"Fetched batch of {len(trace_batch)} traces, total: {len(all_trace_infos)}"
-                )
-                page_token = token
-                if not page_token:
-                    has_more = False
-            else:
-                has_more = False
+            if not trace_batch:
+                break
+
+            remaining = max_traces - len(all_trace_infos)
+            all_trace_infos.extend(trace_batch[:remaining])
+            _logger.debug(
+                f"Fetched batch of {len(trace_batch)} traces, total: {len(all_trace_infos)}"
+            )
+
+            if not token:
+                break
+
+            page_token = token
 
         _logger.info(
             f"Fetched {len(all_trace_infos)} trace infos between {start_time_ms} and {end_time_ms}"
