@@ -108,10 +108,12 @@ class OnlineSessionScoringProcessor:
 
         self._execute_session_scoring(completed_sessions)
 
-        # Update checkpoint to the last processed session's last trace timestamp
-        # Sessions are sorted by last_trace_timestamp_ms ASC, so take the last one
+        # Update checkpoint to last processed session's last trace timestamp + 1ms
+        # to avoid reprocessing the same session (checkpoint comparison uses >=)
         latest_session = completed_sessions[-1]
-        self._checkpoint_manager.update_checkpoint_timestamp(latest_session.last_trace_timestamp_ms)
+        self._checkpoint_manager.update_checkpoint_timestamp(
+            latest_session.last_trace_timestamp_ms + 1
+        )
 
         _logger.info(f"Online session scoring completed for experiment {self._experiment_id}")
 
