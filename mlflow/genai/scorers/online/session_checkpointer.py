@@ -12,9 +12,6 @@ _logger = logging.getLogger(__name__)
 # Checkpoint tag for tracking last processed session timestamp
 SESSION_CHECKPOINT_TAG = "mlflow.latestOnlineScoring.session.timestampMs"
 
-# Default lookback period when no checkpoint exists (1 hour)
-_DEFAULT_LOOKBACK_MS = 60 * 60 * 1000
-
 # Maximum lookback period to prevent getting stuck on old failing sessions (1 hour)
 _MAX_LOOKBACK_MS = 60 * 60 * 1000
 

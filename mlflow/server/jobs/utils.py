@@ -350,12 +350,20 @@ def _get_or_init_huey_instance(instance_key: str):
 
     class JsonSerializer(Serializer):
         def serialize(self, data):
-            return json.dumps(data._asdict(), cls=CustomJSONEncoder).encode("utf-8")
+            if hasattr(data, "_asdict"):
+                return json.dumps(data._asdict(), cls=CustomJSONEncoder).encode("utf-8")
+            return json.dumps(data, cls=CustomJSONEncoder).encode("utf-8")
 
         def deserialize(self, data):
             from huey.registry import Message
 
-            return Message(**json.loads(data.decode("utf-8"), object_hook=json_loader_object_hook))
+            decoded = json.loads(data.decode("utf-8"), object_hook=json_loader_object_hook)
+            if isinstance(decoded, dict) and "name" in decoded:
+                try:
+                    return Message(**decoded)
+                except TypeError:
+                    return decoded
+            return decoded
 
     with _huey_instance_map_lock:
         if instance_key not in _huey_instance_map:
@@ -404,6 +412,29 @@ def _launch_huey_consumer(job_name: str) -> None:
     threading.Thread(
         target=_huey_consumer_thread,
         name=f"MLflow-huey-consumer-{job_name}-watcher",
+        daemon=False,
+    ).start()
+
+
+def _launch_periodic_tasks_consumer() -> None:
+    """
+    Launch a dedicated Huey consumer for periodic tasks.
+    This consumer runs scheduled tasks like the online scoring scheduler.
+    """
+    _logger.info("Starting dedicated Huey consumer for periodic tasks")
+
+    def _huey_consumer_thread() -> None:
+        while True:
+            job_runner_proc = _start_huey_consumer_proc(
+                "periodic_tasks",
+                max_job_parallelism=1,  # Only 1 worker needed for periodic scheduler
+            )
+            job_runner_proc.wait()
+            time.sleep(1)
+
+    threading.Thread(
+        target=_huey_consumer_thread,
+        name="MLflow-huey-consumer-periodic-tasks-watcher",
         daemon=False,
     ).start()
 

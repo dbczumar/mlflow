@@ -22,7 +22,8 @@ from mlflow.genai.evaluation.session_utils import (
     get_first_trace_in_session,
 )
 from mlflow.genai.scorers.base import Scorer
-from mlflow.genai.scorers.online import OnlineTraceScoringProcessor
+from mlflow.genai.scorers.online import OnlineSessionScoringProcessor, OnlineTraceScoringProcessor
+from mlflow.genai.scorers.online.online_scorer import OnlineScorer
 from mlflow.server.jobs import job
 from mlflow.store.tracking.abstract_store import AbstractStore
 from mlflow.tracing.constant import TraceMetadataKey
@@ -72,7 +73,6 @@ def run_online_trace_scorer_job(
         experiment_id: The experiment ID to fetch traces from.
         online_scorers: List of OnlineScorer dicts specifying which scorers to run.
     """
-    from mlflow.genai.scorers.online.online_scorer import OnlineScorer
     from mlflow.server.handlers import _get_tracking_store
 
     # Convert dicts back to OnlineScorer instances
@@ -102,8 +102,6 @@ def run_online_session_scorer_job(
         experiment_id: The experiment ID to fetch sessions from.
         online_scorers: List of OnlineScorer dicts specifying which scorers to run.
     """
-    from mlflow.genai.scorers.online import OnlineSessionScoringProcessor
-    from mlflow.genai.scorers.online.online_scorer import OnlineScorer
     from mlflow.server.handlers import _get_tracking_store
 
     # Convert dicts back to OnlineScorer instances
@@ -403,7 +401,6 @@ def run_online_scoring_scheduler() -> None:
 
     Groups are shuffled to prevent starvation when there are limited job runners available.
     """
-    from mlflow.genai.scorers.online.online_scorer import OnlineScorer
     from mlflow.server.handlers import _get_tracking_store
 
     tracking_store = _get_tracking_store()
@@ -429,5 +426,6 @@ def run_online_scoring_scheduler() -> None:
         # Submit trace-level scoring job
         run_online_trace_scorer_job(experiment_id, scorer_dicts)
 
+        # TODO: Re-enable session scoring once SQLAlchemy JSON field access is fixed
         # Submit session-level scoring job
-        run_online_session_scorer_job(experiment_id, scorer_dicts)
+        # run_online_session_scorer_job(experiment_id, scorer_dicts)

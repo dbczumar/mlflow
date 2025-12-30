@@ -1457,8 +1457,10 @@ class RestStore(RestGatewayStoreMixin, AbstractStore):
 
         Args:
             experiment_id: The experiment to search.
-            min_last_trace_timestamp_ms: Only consider sessions with last trace after this.
-            max_last_trace_timestamp_ms: Sessions are complete if last trace before this.
+            min_last_trace_timestamp_ms: Lower bound for session's last trace timestamp (inclusive).
+                Sessions with last trace before this time are excluded.
+            max_last_trace_timestamp_ms: Upper bound for session's last trace timestamp (inclusive).
+                Sessions with any traces after this time are excluded.
 
         Returns:
             List of CompletedSession objects sorted by last_trace_timestamp_ms ASC.

@@ -2509,8 +2509,8 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
 
             return [
                 OnlineScorer(
-                    name=scorer.name,
-                    experiment_id=scorer.experiment_id,
+                    name=scorer.scorer_name,
+                    experiment_id=str(scorer.experiment_id),
                     serialized_scorer=version.serialized_scorer,
                     sample_rate=config.sample_rate,
                     filter_string=config.filter_string,
@@ -3061,7 +3061,19 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
         min_last_trace_timestamp_ms: int,
         max_last_trace_timestamp_ms: int,
     ) -> list[CompletedSession]:
-        """Find completed sessions based on their last trace timestamp."""
+        """
+        Find completed sessions based on their last trace timestamp.
+
+        Args:
+            experiment_id: The experiment to search.
+            min_last_trace_timestamp_ms: Lower bound for session's last trace timestamp (inclusive).
+                Sessions with last trace before this time are excluded.
+            max_last_trace_timestamp_ms: Upper bound for session's last trace timestamp (inclusive).
+                Sessions with any traces after this time are excluded.
+
+        Returns:
+            List of CompletedSession objects sorted by last_trace_timestamp_ms ASC.
+        """
         with self.ManagedSessionMaker() as session:
             # Subquery: sessions with aggregated stats
             sessions_with_stats = (
