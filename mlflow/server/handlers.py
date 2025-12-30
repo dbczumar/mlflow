@@ -4721,36 +4721,7 @@ def get_endpoints(get_handler=get_handler):
     """
     return (
         get_service_endpoints(MlflowService, get_handler)
-        + [
-            # Batch get online scoring configs endpoint
-            (
-                _get_ajax_path("/mlflow/scorers/online-configs", version=3),
-                _get_online_scoring_configs,
-                ["POST"],
-            ),
-            (
-                _get_rest_path("/mlflow/scorers/online-configs", version=3),
-                _get_online_scoring_configs,
-                ["POST"],
-            ),
-            # Update online scoring config endpoint
-            (
-                _get_ajax_path("/mlflow/scorers/online-config", version=3),
-                _update_online_scoring_config,
-                ["PUT"],
-            ),
-            (
-                _get_rest_path("/mlflow/scorers/online-config", version=3),
-                _update_online_scoring_config,
-                ["PUT"],
-            ),
-            # Find completed sessions endpoint (internal API)
-            (
-                _get_rest_path("/mlflow/traces/find-completed-sessions", version=3),
-                _find_completed_sessions,
-                ["POST"],
-            ),
-        ]
+        + get_internal_online_scoring_endpoints()
         + get_service_endpoints(ModelRegistryService, get_handler)
         + get_service_endpoints(MlflowArtifactsService, get_handler)
         + get_service_endpoints(WebhookService, get_handler)
@@ -4785,6 +4756,38 @@ def get_gateway_endpoints():
         (
             _get_ajax_path("/mlflow/scorer/invoke", version=3),
             _invoke_scorer_handler,
+            ["POST"],
+        ),
+    ]
+
+
+def get_internal_online_scoring_endpoints():
+    """Returns endpoint definitions for internal online scoring APIs."""
+    return [
+        (
+            _get_ajax_path("/mlflow/scorers/online-configs", version=3),
+            _get_online_scoring_configs,
+            ["POST"],
+        ),
+        (
+            _get_rest_path("/mlflow/scorers/online-configs", version=3),
+            _get_online_scoring_configs,
+            ["POST"],
+        ),
+        (
+            _get_ajax_path("/mlflow/scorers/online-config", version=3),
+            _update_online_scoring_config,
+            ["PUT"],
+        ),
+        (
+            _get_rest_path("/mlflow/scorers/online-config", version=3),
+            _update_online_scoring_config,
+            ["PUT"],
+        ),
+        # No ajax equivalent needed - this is an internal API not called by the UI
+        (
+            _get_rest_path("/mlflow/traces/find-completed-sessions", version=3),
+            _find_completed_sessions,
             ["POST"],
         ),
     ]
