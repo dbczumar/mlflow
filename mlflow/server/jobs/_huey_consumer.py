@@ -18,7 +18,6 @@ import os
 import threading
 
 from mlflow.server.constants import MLFLOW_HUEY_INSTANCE_KEY
-from mlflow.server.jobs._periodic_tasks import register_periodic_tasks
 from mlflow.server.jobs.utils import (
     _exit_when_orphaned,
     _get_or_init_huey_instance,
@@ -35,9 +34,3 @@ threading.Thread(
 
 huey_instance_key = os.environ[MLFLOW_HUEY_INSTANCE_KEY]
 huey_instance = _get_or_init_huey_instance(huey_instance_key).instance
-
-# If this is the periodic_tasks consumer, register periodic tasks
-if huey_instance_key == "periodic_tasks":
-    from mlflow.server.jobs._periodic_tasks import register_periodic_tasks
-
-    register_periodic_tasks(huey_instance)

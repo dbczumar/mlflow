@@ -39,7 +39,7 @@ if __name__ == "__main__":
             logging.warning(f"Launch Huey consumer for {job_name} jobs failed, root cause: {e!r}")
 
     # Launch dedicated consumer for periodic tasks
-    # (the consumer itself will register periodic tasks on startup)
+    # (periodic tasks are registered when the consumer starts up)
     _launch_periodic_tasks_consumer()
 
     time.sleep(10)  # wait for huey consumer launching
