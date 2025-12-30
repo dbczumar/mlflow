@@ -113,7 +113,7 @@ class OnlineSessionScoringProcessor:
         latest_session = completed_sessions[-1]
         self._checkpoint_manager.update_checkpoint_timestamp(latest_session.last_trace_timestamp_ms)
 
-        _logger.info(f"Session scoring completed for experiment {self._experiment_id}")
+        _logger.info(f"Online session scoring completed for experiment {self._experiment_id}")
 
     def _execute_session_scoring(self, sessions: list[CompletedSession]) -> None:
         """
