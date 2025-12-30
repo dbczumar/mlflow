@@ -5,7 +5,7 @@ import time
 from dataclasses import dataclass
 
 from mlflow.entities.experiment_tag import ExperimentTag
-from mlflow.genai.scorers.online.const import (
+from mlflow.genai.scorers.online.constants import (
     MAX_LOOKBACK_MS,
     SESSION_CHECKPOINT_TAG,
     SESSION_COMPLETION_BUFFER_MS,

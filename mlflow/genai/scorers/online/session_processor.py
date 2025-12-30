@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from mlflow.environment_variables import MLFLOW_GENAI_EVAL_MAX_WORKERS
 from mlflow.genai.evaluation.entities import EvalItem
 from mlflow.genai.evaluation.session_utils import evaluate_session_level_scorers
-from mlflow.genai.scorers.online.const import (
+from mlflow.genai.scorers.online.constants import (
     EXCLUDE_EVAL_RUN_TRACES_FILTER,
     MAX_SESSIONS_PER_JOB,
 )

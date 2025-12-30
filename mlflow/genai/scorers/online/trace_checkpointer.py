@@ -5,7 +5,7 @@ import time
 from dataclasses import dataclass
 
 from mlflow.entities.experiment_tag import ExperimentTag
-from mlflow.genai.scorers.online.const import MAX_LOOKBACK_MS, TRACE_CHECKPOINT_TAG
+from mlflow.genai.scorers.online.constants import MAX_LOOKBACK_MS, TRACE_CHECKPOINT_TAG
 from mlflow.store.tracking.abstract_store import AbstractStore
 
 _logger = logging.getLogger(__name__)
