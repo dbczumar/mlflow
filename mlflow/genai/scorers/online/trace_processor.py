@@ -105,7 +105,8 @@ class OnlineTraceScoringProcessor:
 
         self._execute_scoring(tasks)
 
-        self._checkpoint_manager.update_checkpoint_timestamp(time_window.max_trace_timestamp_ms)
+        # Update checkpoint to end of window + 1ms to avoid reprocessing traces at the boundary
+        self._checkpoint_manager.update_checkpoint_timestamp(time_window.max_trace_timestamp_ms + 1)
 
         _logger.info(f"Online trace scoring completed for experiment {self._experiment_id}")
 

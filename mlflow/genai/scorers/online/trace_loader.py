@@ -47,7 +47,7 @@ class OnlineTraceLoader:
 
         Args:
             experiment_id: The experiment ID to search.
-            start_time_ms: Start of time window (exclusive).
+            start_time_ms: Start of time window (inclusive).
             end_time_ms: End of time window (inclusive).
             filter_string: Optional additional filter criteria.
             max_traces: Maximum number of traces to return.
@@ -57,7 +57,7 @@ class OnlineTraceLoader:
             List of TraceInfo objects matching the criteria.
         """
         time_filter = (
-            f"trace.timestamp_ms > {start_time_ms} AND trace.timestamp_ms <= {end_time_ms}"
+            f"trace.timestamp_ms >= {start_time_ms} AND trace.timestamp_ms <= {end_time_ms}"
         )
         combined_filter = f"{time_filter} AND {filter_string}" if filter_string else time_filter
         _logger.info(f"Fetching traces with filter: {combined_filter}")
