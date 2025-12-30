@@ -2540,12 +2540,13 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
         Raises:
             MlflowException: If scorer is not found or does not use a gateway model.
         """
+        if filter_string:
+            SearchTraceUtils.parse_search_filter_for_search_traces(filter_string)
+
         with self.ManagedSessionMaker() as session:
-            # Validate experiment exists and is active
             experiment = self.get_experiment(experiment_id)
             self._check_experiment_is_active(experiment)
 
-            # Get the scorer record
             scorer = (
                 session.query(SqlScorer)
                 .filter(
@@ -2561,7 +2562,6 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
                     RESOURCE_DOES_NOT_EXIST,
                 )
 
-            # Get the latest scorer version to validate it uses a gateway model
             latest_version = (
                 session.query(SqlScorerVersion)
                 .filter(SqlScorerVersion.scorer_id == scorer.scorer_id)
@@ -2578,10 +2578,6 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
                         "Online scoring is only supported for scorers that use gateway models.",
                         INVALID_PARAMETER_VALUE,
                     )
-
-            if filter_string:
-                # Parse to validate syntax - raises MlflowException if invalid
-                SearchTraceUtils.parse_search_filter_for_search_traces(filter_string)
 
             # Delete existing online configs for this scorer
             session.query(SqlOnlineScoringConfig).filter(
