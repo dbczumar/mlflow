@@ -167,7 +167,6 @@ class OnlineSessionScoringProcessor:
             _logger.warning(f"No traces found for session {session.session_id}")
             return
 
-        # Fetch full trace data
         trace_ids = [t.trace_id for t in traces]
         full_traces = self._trace_loader.fetch_traces(trace_ids)
 
@@ -175,11 +174,8 @@ class OnlineSessionScoringProcessor:
             _logger.warning(f"Failed to fetch full traces for session {session.session_id}")
             return
 
-        # Sort traces by timestamp
         full_traces.sort(key=lambda t: t.info.timestamp_ms)
 
-        # Get session-level scorers that apply to this session
-        # For now, we'll check all filters and combine scorers
         applicable_scorers = []
         for filter_string in self._sampler.get_filter_strings():
             session_scorers = self._sampler.get_scorers_for_filter(
@@ -191,10 +187,8 @@ class OnlineSessionScoringProcessor:
         if not applicable_scorers:
             return
 
-        # Convert traces to eval items
         session_items = [EvalItem.from_trace(t) for t in full_traces]
 
-        # Run session-level scorers
         try:
             result = evaluate_session_level_scorers(
                 session_id=session.session_id,
@@ -202,7 +196,6 @@ class OnlineSessionScoringProcessor:
                 multi_turn_scorers=applicable_scorers,
             )
 
-            # Log assessments for each trace in the result
             from mlflow.genai.evaluation.harness import _log_assessments
 
             for trace_id, feedbacks in result.items():
