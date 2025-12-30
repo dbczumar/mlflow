@@ -3161,11 +3161,10 @@ def _find_completed_sessions():
     Internal API handler for finding completed sessions.
     Returns sessions based on their last trace timestamp.
     """
-    request_json = _get_request_json()
-    experiment_id = request_json.get("experiment_id")
-    min_last_trace_timestamp_ms = request_json.get("min_last_trace_timestamp_ms")
-    max_last_trace_timestamp_ms = request_json.get("max_last_trace_timestamp_ms")
-    max_results = request_json.get("max_results")
+    experiment_id = request.args.get("experiment_id")
+    min_last_trace_timestamp_ms = request.args.get("min_last_trace_timestamp_ms")
+    max_last_trace_timestamp_ms = request.args.get("max_last_trace_timestamp_ms")
+    max_results = request.args.get("max_results")
 
     if not experiment_id:
         raise MlflowException(
@@ -3991,16 +3990,11 @@ def _delete_scorer():
 @catch_mlflow_exception
 @_disable_if_artifacts_only
 def _get_online_scoring_configs():
-    request_json = _get_request_json()
-    scorer_ids = request_json.get("scorer_ids")
+    scorer_ids = request.args.getlist("scorer_ids")
 
     if not scorer_ids:
         raise MlflowException(
             "Missing required parameter: scorer_ids", error_code=INVALID_PARAMETER_VALUE
-        )
-    if not isinstance(scorer_ids, list):
-        raise MlflowException(
-            "Parameter scorer_ids must be a list", error_code=INVALID_PARAMETER_VALUE
         )
 
     configs = _get_tracking_store().get_online_scoring_configs(scorer_ids)
@@ -4767,12 +4761,12 @@ def get_internal_online_scoring_endpoints():
         (
             _get_ajax_path("/mlflow/scorers/online-configs", version=3),
             _get_online_scoring_configs,
-            ["POST"],
+            ["GET"],
         ),
         (
             _get_rest_path("/mlflow/scorers/online-configs", version=3),
             _get_online_scoring_configs,
-            ["POST"],
+            ["GET"],
         ),
         (
             _get_ajax_path("/mlflow/scorers/online-config", version=3),
@@ -4786,9 +4780,9 @@ def get_internal_online_scoring_endpoints():
         ),
         # No ajax equivalent needed - this is an internal API not called by the UI
         (
-            _get_rest_path("/mlflow/traces/find-completed-sessions", version=3),
+            _get_rest_path("/mlflow/traces/completed-sessions", version=3),
             _find_completed_sessions,
-            ["POST"],
+            ["GET"],
         ),
     ]
 

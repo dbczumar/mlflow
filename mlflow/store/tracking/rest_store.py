@@ -1425,13 +1425,11 @@ class RestStore(RestGatewayStoreMixin, AbstractStore):
         if not scorer_ids:
             return {}
 
-        request_body = {"scorer_ids": scorer_ids}
-
         response = http_request(
             host_creds=self.get_host_creds(),
             endpoint="/api/3.0/mlflow/scorers/online-configs",
-            method="POST",
-            json=request_body,
+            method="GET",
+            params=[("scorer_ids", sid) for sid in scorer_ids],
         )
 
         verify_rest_response(response, "/api/3.0/mlflow/scorers/online-configs")
@@ -1470,22 +1468,22 @@ class RestStore(RestGatewayStoreMixin, AbstractStore):
         """
         from mlflow.genai.scorers.online.session_processor import CompletedSession
 
-        request_body = {
+        params = {
             "experiment_id": experiment_id,
             "min_last_trace_timestamp_ms": min_last_trace_timestamp_ms,
             "max_last_trace_timestamp_ms": max_last_trace_timestamp_ms,
         }
         if max_results is not None:
-            request_body["max_results"] = max_results
+            params["max_results"] = max_results
 
         response = http_request(
             host_creds=self.get_host_creds(),
-            endpoint="/api/3.0/mlflow/traces/find-completed-sessions",
-            method="POST",
-            json=request_body,
+            endpoint="/api/3.0/mlflow/traces/completed-sessions",
+            method="GET",
+            params=params,
         )
 
-        verify_rest_response(response, "/api/3.0/mlflow/traces/find-completed-sessions")
+        verify_rest_response(response, "/api/3.0/mlflow/traces/completed-sessions")
         sessions_list = response.json()["sessions"]
         return [
             CompletedSession(
