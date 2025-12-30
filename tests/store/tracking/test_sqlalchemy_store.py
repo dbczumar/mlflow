@@ -12441,47 +12441,32 @@ def test_find_completed_sessions(store: SqlAlchemyStore):
     assert completed[1].session_id == "session-b"
 
 
-def test_find_completed_sessions_with_traces_before_min_timestamp(store: SqlAlchemyStore):
+def test_find_completed_sessions_aggregates_across_all_traces(store: SqlAlchemyStore):
     """
-    Test that first_trace_timestamp_ms and last_trace_timestamp_ms are computed correctly
-    across ALL traces in a session, even when some traces fall before min_last_trace_timestamp_ms.
-
-    This is a regression test for a bug where timestamps were aggregated only on filtered traces,
-    causing first_trace_timestamp_ms to equal last_trace_timestamp_ms when only one trace
-    passed the filter.
+    Regression test: first/last timestamps should be computed across ALL session traces,
+    not just those matching the min_last_trace_timestamp_ms filter.
     """
-    exp_id = store.create_experiment("test_session_timestamps_across_all_traces")
+    exp_id = store.create_experiment("test_session_timestamp_aggregation")
 
     _create_trace(
         store,
-        "trace_d1",
+        "trace1",
         exp_id,
         request_time=1000,
-        trace_metadata={TraceMetadataKey.TRACE_SESSION: "session-d"},
+        trace_metadata={TraceMetadataKey.TRACE_SESSION: "session-a"},
     )
     _create_trace(
         store,
-        "trace_d2",
-        exp_id,
-        request_time=2000,
-        trace_metadata={TraceMetadataKey.TRACE_SESSION: "session-d"},
-    )
-    _create_trace(
-        store,
-        "trace_d3",
+        "trace2",
         exp_id,
         request_time=3000,
-        trace_metadata={TraceMetadataKey.TRACE_SESSION: "session-d"},
+        trace_metadata={TraceMetadataKey.TRACE_SESSION: "session-a"},
     )
 
     completed = store.find_completed_sessions(
-        experiment_id=exp_id,
-        min_last_trace_timestamp_ms=2500,
-        max_last_trace_timestamp_ms=4000,
+        experiment_id=exp_id, min_last_trace_timestamp_ms=2000, max_last_trace_timestamp_ms=4000
     )
 
     assert len(completed) == 1
-    session_d = completed[0]
-    assert session_d.session_id == "session-d"
-    assert session_d.first_trace_timestamp_ms == 1000
-    assert session_d.last_trace_timestamp_ms == 3000
+    assert completed[0].first_trace_timestamp_ms == 1000
+    assert completed[0].last_trace_timestamp_ms == 3000
