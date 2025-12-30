@@ -737,7 +737,6 @@ class Scorer(BaseModel):
         store = _get_scorer_store()
 
         if isinstance(store, DatabricksStore):
-            # Use Databricks-specific API
             return DatabricksStore.update_registered_scorer(
                 name=scorer_name,
                 scorer=self,
@@ -746,7 +745,6 @@ class Scorer(BaseModel):
                 experiment_id=experiment_id,
             )
 
-        # MlflowTrackingStore - use OSS tracking store
         return store.update_online_scoring_config(
             experiment_id=experiment_id,
             name=scorer_name,
@@ -818,7 +816,6 @@ class Scorer(BaseModel):
         store = _get_scorer_store()
 
         if isinstance(store, DatabricksStore):
-            # Use Databricks-specific API
             return DatabricksStore.update_registered_scorer(
                 name=scorer_name,
                 scorer=self,
@@ -827,7 +824,6 @@ class Scorer(BaseModel):
                 experiment_id=experiment_id,
             )
 
-        # MlflowTrackingStore - use OSS tracking store
         return store.update_online_scoring_config(
             experiment_id=experiment_id,
             name=scorer_name,

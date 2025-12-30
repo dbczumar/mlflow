@@ -75,7 +75,6 @@ def run_online_trace_scorer_job(
     """
     from mlflow.server.handlers import _get_tracking_store
 
-    # Convert dicts back to OnlineScorer instances
     scorer_objects = [OnlineScorer(**scorer_dict) for scorer_dict in online_scorers]
 
     tracking_store = _get_tracking_store()
@@ -104,7 +103,6 @@ def run_online_session_scorer_job(
     """
     from mlflow.server.handlers import _get_tracking_store
 
-    # Convert dicts back to OnlineScorer instances
     scorer_objects = [OnlineScorer(**scorer_dict) for scorer_dict in online_scorers]
 
     tracking_store = _get_tracking_store()
@@ -422,9 +420,5 @@ def run_online_scoring_scheduler() -> None:
     for experiment_id, scorers in experiment_groups:
         _logger.info(f"Submitting jobs for experiment {experiment_id} with {len(scorers)} scorers")
         scorer_dicts = [asdict(scorer) for scorer in scorers]
-
-        # Submit trace-level scoring job
         run_online_trace_scorer_job(experiment_id, scorer_dicts)
-
-        # Submit session-level scoring job
         run_online_session_scorer_job(experiment_id, scorer_dicts)
