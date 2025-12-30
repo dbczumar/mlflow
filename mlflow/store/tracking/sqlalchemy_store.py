@@ -3077,10 +3077,25 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
             # Alias for the recent traces metadata join
             recent_session_metadata = aliased(SqlTraceMetadata)
 
-            # Subquery: sessions with aggregated stats
-            # Join trace_info with trace_request_metadata to get session IDs
-            # Filter by timestamp to avoid full table scan - only consider traces
-            # that could contribute to a session within the target window
+            # Subquery: candidate sessions (sessions with at least one trace in the time window)
+            # This optimization avoids aggregating stats for sessions with no traces in the window
+            candidate_metadata = aliased(SqlTraceMetadata)
+            candidate_sessions = (
+                session.query(candidate_metadata.value.label("session_id"))
+                .join(
+                    SqlTraceInfo,
+                    (SqlTraceInfo.request_id == candidate_metadata.request_id)
+                    & (candidate_metadata.key == TraceMetadataKey.TRACE_SESSION),
+                )
+                .filter(
+                    SqlTraceInfo.experiment_id == experiment_id,
+                    SqlTraceInfo.timestamp_ms >= min_last_trace_timestamp_ms,
+                )
+                .distinct()
+                .subquery()
+            )
+
+            # Subquery: aggregated stats for candidate sessions (across ALL their traces)
             sessions_with_stats = (
                 session.query(
                     session_metadata.value.label("session_id"),
@@ -3092,10 +3107,11 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
                     (SqlTraceInfo.request_id == session_metadata.request_id)
                     & (session_metadata.key == TraceMetadataKey.TRACE_SESSION),
                 )
-                .filter(
-                    SqlTraceInfo.experiment_id == experiment_id,
-                    SqlTraceInfo.timestamp_ms >= min_last_trace_timestamp_ms,
+                .join(
+                    candidate_sessions,
+                    session_metadata.value == candidate_sessions.c.session_id,
                 )
+                .filter(SqlTraceInfo.experiment_id == experiment_id)
                 .group_by(session_metadata.value)
                 .subquery()
             )
