@@ -216,19 +216,11 @@ class MlflowTrackingStore(AbstractScorerStore):
         from mlflow.genai.scorers import Scorer
 
         experiment_id = experiment_id or _get_experiment_id()
-
-        # Get ScorerVersion entities from tracking store
         scorer_versions = self._tracking_store.list_scorers(experiment_id)
-
-        # Collect scorer IDs for batch config fetch
         scorer_ids = [sv.scorer_id for sv in scorer_versions if sv.scorer_id]
-
-        # Batch fetch online configs
         online_configs = (
             self._tracking_store.get_online_scoring_configs(scorer_ids) if scorer_ids else {}
         )
-
-        # Convert to Scorer objects and populate with backend info
         scorers = []
         for scorer_version in scorer_versions:
             scorer = Scorer.model_validate(scorer_version.serialized_scorer)
@@ -241,19 +233,13 @@ class MlflowTrackingStore(AbstractScorerStore):
         from mlflow.genai.scorers import Scorer
 
         experiment_id = experiment_id or _get_experiment_id()
-
-        # Get ScorerVersion entity from tracking store
         scorer_version = self._tracking_store.get_scorer(experiment_id, name, version)
-
-        # Fetch online config for this scorer
         online_config = None
         if scorer_version.scorer_id:
             online_configs = self._tracking_store.get_online_scoring_configs(
                 [scorer_version.scorer_id]
             )
             online_config = online_configs.get(scorer_version.scorer_id)
-
-        # Convert to Scorer object and populate with backend info
         scorer = Scorer.model_validate(scorer_version.serialized_scorer)
         self._populate_scorer_from_backend(scorer, online_config)
         return scorer
@@ -262,26 +248,17 @@ class MlflowTrackingStore(AbstractScorerStore):
         from mlflow.genai.scorers import Scorer
 
         experiment_id = experiment_id or _get_experiment_id()
-
-        # Get ScorerVersion entities from tracking store
         scorer_versions = self._tracking_store.list_scorer_versions(experiment_id, name)
-
-        # Collect scorer IDs for batch config fetch
         scorer_ids = [sv.scorer_id for sv in scorer_versions if sv.scorer_id]
-
-        # Batch fetch online configs
         online_configs = (
             self._tracking_store.get_online_scoring_configs(scorer_ids) if scorer_ids else {}
         )
-
-        # Convert to Scorer objects and populate with backend info
         scorers = []
         for scorer_version in scorer_versions:
             scorer = Scorer.model_validate(scorer_version.serialized_scorer)
             online_config = online_configs.get(scorer_version.scorer_id)
             self._populate_scorer_from_backend(scorer, online_config)
             scorers.append((scorer, scorer_version.scorer_version))
-
         return scorers
 
     def delete_scorer(self, experiment_id, name, version):
@@ -328,10 +305,8 @@ class MlflowTrackingStore(AbstractScorerStore):
 
         experiment_id = experiment_id or _get_experiment_id()
 
-        # Determine the effective sample rate
         effective_sample_rate = sample_rate if sample_rate is not None else 0.0
 
-        # Call the tracking store method with direct parameters
         self._tracking_store.update_online_scoring_config(
             experiment_id=experiment_id,
             name=name,
@@ -339,7 +314,6 @@ class MlflowTrackingStore(AbstractScorerStore):
             filter_string=filter_string,
         )
 
-        # Create a copy with updated sampling config
         new_scorer = scorer._create_copy()
         new_scorer._sampling_config = ScorerSamplingConfig(
             sample_rate=effective_sample_rate,
