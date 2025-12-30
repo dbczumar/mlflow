@@ -186,39 +186,30 @@ def test_mlflow_backend_online_scoring_config_operations():
         "mlflow.store.tracking.sqlalchemy_store.SqlAlchemyStore.get_gateway_endpoint",
         return_value=_mock_gateway_endpoint(),
     ):
-        # Register the scorer
         registered_scorer = test_scorer.register(experiment_id=experiment_id)
-
-        # Initially sample_rate and filter_string should be None
         assert registered_scorer.sample_rate is None
         assert registered_scorer.filter_string is None
         assert registered_scorer.status == ScorerStatus.STOPPED
 
-        # Start the scorer with a sampling config
         started_scorer = registered_scorer.start(
             experiment_id=experiment_id,
             sampling_config=ScorerSamplingConfig(sample_rate=0.75, filter_string="status = 'OK'"),
         )
-
-        # Verify the started scorer has the correct config
         assert started_scorer.sample_rate == 0.75
         assert started_scorer.filter_string == "status = 'OK'"
         assert started_scorer.status == ScorerStatus.STARTED
 
-        # Verify get_scorer returns scorer with correct sample_rate and filter_string
         retrieved_scorer = get_scorer(name="test_online_config_scorer", experiment_id=experiment_id)
         assert retrieved_scorer.sample_rate == 0.75
         assert retrieved_scorer.filter_string == "status = 'OK'"
         assert retrieved_scorer.status == ScorerStatus.STARTED
 
-        # Verify list_scorers returns scorers with correct sample_rate and filter_string
         scorers = list_scorers(experiment_id=experiment_id)
         assert len(scorers) == 1
         assert scorers[0].sample_rate == 0.75
         assert scorers[0].filter_string == "status = 'OK'"
         assert scorers[0].status == ScorerStatus.STARTED
 
-        # Verify list_scorer_versions returns scorers with correct sample_rate and filter_string
         scorer_versions = list_scorer_versions(
             name="test_online_config_scorer", experiment_id=experiment_id
         )
@@ -253,47 +244,37 @@ def test_mlflow_backend_online_scoring_config_chained_update():
         assert started_scorer.sample_rate == 0.5
         assert started_scorer.filter_string is None
 
-        # Chain: get_scorer().update() should work
         updated_scorer = get_scorer(name="test_chained_scorer", experiment_id=experiment_id).update(
             experiment_id=experiment_id,
             sampling_config=ScorerSamplingConfig(sample_rate=0.8, filter_string="status = 'OK'"),
         )
-
-        # Verify the update worked
         assert updated_scorer.sample_rate == 0.8
         assert updated_scorer.filter_string == "status = 'OK'"
         assert updated_scorer.status == ScorerStatus.STARTED
 
-        # Verify the update is persisted
         retrieved_scorer = get_scorer(name="test_chained_scorer", experiment_id=experiment_id)
         assert retrieved_scorer.sample_rate == 0.8
         assert retrieved_scorer.filter_string == "status = 'OK'"
 
-        # Chain: get_scorer().stop() should work
         stopped_scorer = get_scorer(name="test_chained_scorer", experiment_id=experiment_id).stop(
             experiment_id=experiment_id
         )
-
         assert stopped_scorer.sample_rate == 0.0
         assert stopped_scorer.status == ScorerStatus.STOPPED
 
-        # Verify the stop is persisted
         retrieved_after_stop = get_scorer(name="test_chained_scorer", experiment_id=experiment_id)
         assert retrieved_after_stop.sample_rate == 0.0
         assert retrieved_after_stop.status == ScorerStatus.STOPPED
 
-        # Chain: get_scorer().start() should work to restart
         restarted_scorer = get_scorer(
             name="test_chained_scorer", experiment_id=experiment_id
         ).start(
             experiment_id=experiment_id,
             sampling_config=ScorerSamplingConfig(sample_rate=0.3),
         )
-
         assert restarted_scorer.sample_rate == 0.3
         assert restarted_scorer.status == ScorerStatus.STARTED
 
-        # Verify the restart is persisted
         retrieved_after_restart = get_scorer(
             name="test_chained_scorer", experiment_id=experiment_id
         )

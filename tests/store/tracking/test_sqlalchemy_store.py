@@ -10759,14 +10759,12 @@ def test_update_online_scoring_config_overwrites(store: SqlAlchemyStore):
     with mock.patch.object(store, "get_gateway_endpoint", return_value=_mock_gateway_endpoint()):
         store.register_scorer(experiment_id, "scorer", _gateway_model_scorer_json())
 
-    # Create initial config
     store.update_online_scoring_config(
         experiment_id=experiment_id,
         name="scorer",
         sample_rate=0.1,
     )
 
-    # Overwrite with new config
     new_config = store.update_online_scoring_config(
         experiment_id=experiment_id,
         name="scorer",
@@ -10807,7 +10805,6 @@ def test_update_online_scoring_config_validates_filter_string(store: SqlAlchemyS
     with mock.patch.object(store, "get_gateway_endpoint", return_value=_mock_gateway_endpoint()):
         store.register_scorer(experiment_id, "test_scorer", _gateway_model_scorer_json())
 
-    # Valid filter string should work
     config = store.update_online_scoring_config(
         experiment_id=experiment_id,
         name="test_scorer",
@@ -10816,7 +10813,6 @@ def test_update_online_scoring_config_validates_filter_string(store: SqlAlchemyS
     )
     assert config.filter_string == "status = 'OK'"
 
-    # Invalid filter string should raise
     with pytest.raises(MlflowException, match="Invalid"):
         store.update_online_scoring_config(
             experiment_id=experiment_id,
@@ -10917,7 +10913,6 @@ def test_get_online_scoring_configs_batch(store: SqlAlchemyStore):
         store.register_scorer(experiment_id, "scorer2", _gateway_model_scorer_json())
         store.register_scorer(experiment_id, "scorer3", _gateway_model_scorer_json())
 
-    # Create configs for scorer1 and scorer2
     config1 = store.update_online_scoring_config(
         experiment_id=experiment_id,
         name="scorer1",
@@ -10929,9 +10924,7 @@ def test_get_online_scoring_configs_batch(store: SqlAlchemyStore):
         name="scorer2",
         sample_rate=0.5,
     )
-    # scorer3 has no config
 
-    # Get configs for all three scorers
     scorer_ids = [config1.scorer_id, config2.scorer_id]
     configs = store.get_online_scoring_configs(scorer_ids)
 
