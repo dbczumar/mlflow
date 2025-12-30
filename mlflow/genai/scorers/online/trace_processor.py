@@ -85,7 +85,6 @@ class OnlineTraceScoringProcessor:
             f"{time_window.max_trace_timestamp_ms}]"
         )
 
-        # Fetch trace infos and apply sampling per filter group
         tasks = self._fetch_and_sample_traces(
             time_window.min_trace_timestamp_ms, time_window.max_trace_timestamp_ms
         )
@@ -97,19 +96,15 @@ class OnlineTraceScoringProcessor:
 
         _logger.info(f"Running scoring: {len(tasks)} trace tasks")
 
-        # Fetch full traces only for sampled trace IDs
         sampled_trace_ids = list(tasks.keys())
         full_traces = self._trace_loader.fetch_traces(sampled_trace_ids)
         trace_map = {t.info.trace_id: t for t in full_traces}
 
-        # Populate tasks with full traces
         for trace_id, task in tasks.items():
             task.trace = trace_map.get(trace_id)
 
-        # Execute scoring
         self._execute_scoring(tasks)
 
-        # Update checkpoint after scoring
         self._checkpoint_manager.update_checkpoint_timestamp(time_window.max_trace_timestamp_ms)
 
         _logger.info(f"Online scoring completed for experiment {self._experiment_id}")
