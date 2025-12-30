@@ -3085,7 +3085,6 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
             sessions_with_stats = (
                 session.query(
                     session_metadata.value.label("session_id"),
-                    func.count(SqlTraceInfo.request_id).label("trace_count"),
                     func.min(SqlTraceInfo.timestamp_ms).label("first_trace_timestamp_ms"),
                     func.max(SqlTraceInfo.timestamp_ms).label("last_trace_timestamp_ms"),
                 )
@@ -3125,7 +3124,6 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
             results = (
                 session.query(
                     sessions_with_stats.c.session_id,
-                    sessions_with_stats.c.trace_count,
                     sessions_with_stats.c.first_trace_timestamp_ms,
                     sessions_with_stats.c.last_trace_timestamp_ms,
                 )
@@ -3145,7 +3143,6 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
             return [
                 CompletedSession(
                     session_id=row.session_id,
-                    trace_count=row.trace_count,
                     first_trace_timestamp_ms=row.first_trace_timestamp_ms,
                     last_trace_timestamp_ms=row.last_trace_timestamp_ms,
                 )

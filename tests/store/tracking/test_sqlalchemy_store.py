@@ -6307,26 +6307,22 @@ def test_search_traces_with_metadata_rlike_filters(store: SqlAlchemyStore):
 def test_search_traces_with_metadata_is_null_filter(store: SqlAlchemyStore):
     exp_id = store.create_experiment("test_metadata_is_null")
 
-    # Create traces with and without specific metadata keys
     trace1_id = "trace1"
     trace2_id = "trace2"
     trace3_id = "trace3"
 
     _create_trace(store, trace1_id, exp_id, trace_metadata={"env": "production", "region": "us"})
-    _create_trace(store, trace2_id, exp_id, trace_metadata={"env": "staging"})  # No 'region' key
-    _create_trace(store, trace3_id, exp_id, trace_metadata={})  # No metadata at all
+    _create_trace(store, trace2_id, exp_id, trace_metadata={"env": "staging"})
+    _create_trace(store, trace3_id, exp_id, trace_metadata={})
 
-    # Test: IS NULL finds traces where the 'region' key doesn't exist
     traces, _ = store.search_traces([exp_id], filter_string="metadata.region IS NULL")
     trace_ids = {t.request_id for t in traces}
     assert trace_ids == {trace2_id, trace3_id}
 
-    # Test: IS NULL finds traces where the 'env' key doesn't exist
     traces, _ = store.search_traces([exp_id], filter_string="metadata.env IS NULL")
     trace_ids = {t.request_id for t in traces}
     assert trace_ids == {trace3_id}
 
-    # Test: IS NULL combined with other filters
     traces, _ = store.search_traces(
         [exp_id], filter_string='metadata.region IS NULL AND metadata.env = "staging"'
     )

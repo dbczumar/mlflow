@@ -11,11 +11,8 @@ MAX_LOOKBACK_MS = 60 * 60 * 1000
 # TODO: CHANGE BACK TO 10 * 60 * 1000 - Currently set to 15 seconds for testing!
 SESSION_COMPLETION_BUFFER_MS = 15 * 1000
 
-# Minimum sessions to process before submitting batch job
-MIN_SESSIONS_PER_JOB = 10
-
-# Maximum traces to include in a single scoring job
-MAX_TRACES_PER_JOB = 500
+# Maximum sessions to process in a single scoring job
+MAX_SESSIONS_PER_JOB = 50
 
 # Filter to exclude eval run traces (traces generated from MLflow runs)
 EXCLUDE_EVAL_RUN_TRACES_FILTER = "metadata.mlflow.sourceRun IS NULL"

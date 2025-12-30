@@ -9,8 +9,7 @@ from mlflow.genai.evaluation.entities import EvalItem
 from mlflow.genai.evaluation.session_utils import evaluate_session_level_scorers
 from mlflow.genai.scorers.online.const import (
     EXCLUDE_EVAL_RUN_TRACES_FILTER,
-    MAX_TRACES_PER_JOB,
-    MIN_SESSIONS_PER_JOB,
+    MAX_SESSIONS_PER_JOB,
 )
 from mlflow.genai.scorers.online.online_scorer import OnlineScorer
 from mlflow.genai.scorers.online.sampler import OnlineScorerSampler
@@ -26,7 +25,6 @@ class CompletedSession:
     """A completed session with metadata."""
 
     session_id: str
-    trace_count: int
     first_trace_timestamp_ms: int
     last_trace_timestamp_ms: int
 
@@ -108,15 +106,7 @@ class OnlineSessionScoringProcessor:
         _logger.info(f"Found {len(completed_sessions)} completed sessions")
 
         sessions_to_score = self._select_sessions_to_score(completed_sessions)
-
-        if not sessions_to_score:
-            _logger.info("No sessions selected after batching, skipping")
-            return
-
-        _logger.info(
-            f"Selected {len(sessions_to_score)} sessions "
-            f"({sum(s.trace_count for s in sessions_to_score)} total traces)"
-        )
+        _logger.info(f"Selected {len(sessions_to_score)} sessions for scoring")
 
         # Execute scoring in parallel
         self._execute_session_scoring(sessions_to_score)
@@ -134,33 +124,13 @@ class OnlineSessionScoringProcessor:
         """
         Select which sessions to score based on batching constraints.
 
-        Selects at least MIN_SESSIONS_PER_JOB sessions, but stops when total traces
-        would exceed MAX_TRACES_PER_JOB.
-
         Args:
             completed_sessions: List of completed sessions sorted by last_trace_timestamp_ms ASC.
 
         Returns:
-            List of sessions to score.
+            List of sessions to score (up to MAX_SESSIONS_PER_JOB).
         """
-        selected = []
-        total_traces = 0
-
-        for session in completed_sessions:
-            # Always include at least MIN_SESSIONS_PER_JOB sessions
-            if len(selected) < MIN_SESSIONS_PER_JOB:
-                selected.append(session)
-                total_traces += session.trace_count
-                continue
-
-            # After min sessions, check trace limit
-            if total_traces + session.trace_count > MAX_TRACES_PER_JOB:
-                break
-
-            selected.append(session)
-            total_traces += session.trace_count
-
-        return selected
+        return completed_sessions[:MAX_SESSIONS_PER_JOB]
 
     def _execute_session_scoring(self, sessions: list[CompletedSession]) -> None:
         """

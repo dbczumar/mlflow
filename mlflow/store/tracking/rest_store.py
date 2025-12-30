@@ -1485,7 +1485,6 @@ class RestStore(RestGatewayStoreMixin, AbstractStore):
         return [
             CompletedSession(
                 session_id=session["session_id"],
-                trace_count=session["trace_count"],
                 first_trace_timestamp_ms=session["first_trace_timestamp_ms"],
                 last_trace_timestamp_ms=session["last_trace_timestamp_ms"],
             )

@@ -3194,7 +3194,6 @@ def _find_completed_sessions():
                 "sessions": [
                     {
                         "session_id": s.session_id,
-                        "trace_count": s.trace_count,
                         "first_trace_timestamp_ms": s.first_trace_timestamp_ms,
                         "last_trace_timestamp_ms": s.last_trace_timestamp_ms,
                     }
