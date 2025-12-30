@@ -2555,20 +2555,19 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
                 )
                 .first()
             )
-
             if scorer is None:
                 raise MlflowException(
                     f"Scorer with name '{name}' not found for experiment {experiment_id}.",
                     RESOURCE_DOES_NOT_EXIST,
                 )
 
+            # Get the latest scorer version to validate it uses a gateway model
             latest_version = (
                 session.query(SqlScorerVersion)
                 .filter(SqlScorerVersion.scorer_id == scorer.scorer_id)
                 .order_by(SqlScorerVersion.scorer_version.desc())
                 .first()
             )
-
             if latest_version is not None and sample_rate > 0:
                 serialized_data = json.loads(latest_version.serialized_scorer)
                 model = extract_model_from_serialized_scorer(serialized_data)
@@ -2583,7 +2582,6 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
             session.query(SqlOnlineScoringConfig).filter(
                 SqlOnlineScoringConfig.scorer_id == scorer.scorer_id
             ).delete()
-
             # Create new online config
             config = SqlOnlineScoringConfig(
                 online_scoring_config_id=uuid.uuid4().hex,
