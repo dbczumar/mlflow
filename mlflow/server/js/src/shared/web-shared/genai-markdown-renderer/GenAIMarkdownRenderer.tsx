@@ -98,6 +98,22 @@ type ExtededCodeRenderers = {
 
 type ExtendedComponents = Omit<ReactMarkdownComponents, 'code'> & ExtededCodeRenderers;
 
+const Blockquote = ({ children }: ReactMarkdownProps<'blockquote'>) => {
+  const { theme } = useDesignSystemTheme();
+  return (
+    <blockquote
+      css={{
+        margin: `${theme.spacing.sm}px 0`,
+        paddingLeft: theme.spacing.md,
+        borderLeft: `4px solid ${theme.colors.border}`,
+        color: theme.colors.textSecondary,
+      }}
+    >
+      {children}
+    </blockquote>
+  );
+};
+
 export const getMarkdownComponents = (props: { extensions?: ExtendedComponents }) =>
   ({
     a: ({ href, children }) => (
@@ -138,6 +154,7 @@ export const getMarkdownComponents = (props: { extensions?: ExtendedComponents }
     thead: ({ children }) => <>{children}</>,
     tbody: ({ children }) => <>{children}</>,
     img: ({ src, alt }) => <img src={src} alt={alt} css={{ maxWidth: '100%' }} />,
+    blockquote: Blockquote,
   } satisfies ReactMarkdownComponents);
 
 const isCodeSnippetLanguage = (languageString: string): languageString is CodeSnippetLanguage => {

@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { Spacer, Typography, useDesignSystemTheme } from '@databricks/design-system';
 import { FormattedMessage, useIntl } from '@databricks/i18n';
+import { GenAIMarkdownRenderer } from '@databricks/web-shared/genai-markdown-renderer';
 
 import {
   KnownEvaluationResultAssessmentValueMapping,
@@ -160,7 +161,7 @@ export const EvaluationsReviewAssessmentDetailedHistory = ({
                 />
               )}
             </Typography.Hint>
-            {next.rationale && <Typography.Text>{next.rationale}</Typography.Text>}
+            {next.rationale && <GenAIMarkdownRenderer>{next.rationale}</GenAIMarkdownRenderer>}
           </div>
         );
       })}

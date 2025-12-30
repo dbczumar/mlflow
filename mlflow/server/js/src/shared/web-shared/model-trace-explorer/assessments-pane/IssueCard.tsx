@@ -12,6 +12,7 @@ import {
 } from '@databricks/design-system';
 import { FormattedMessage } from '@databricks/i18n';
 
+import { GenAIMarkdownRenderer } from '@databricks/web-shared/genai-markdown-renderer';
 import type { IssueAssessment } from '../ModelTrace.types';
 import type { Issue } from '../../../../experiment-tracking/pages/experiment-issues/types';
 import { useUnlinkIssueFromTrace } from '../hooks/useUnlinkIssueFromTrace';
@@ -219,13 +220,15 @@ export const IssueCard = ({ issueAssessment, issueDetails, experimentId, onUnlin
                     description="Label for rationale explaining why issue was linked to trace"
                   />
                 </Typography.Text>
-                <Typography.Text
-                  color="secondary"
-                  size="sm"
-                  css={{ display: 'block', marginTop: theme.spacing.xs, whiteSpace: 'pre-wrap' }}
+                <div
+                  css={{
+                    marginTop: theme.spacing.xs,
+                    color: theme.colors.textSecondary,
+                    fontSize: theme.typography.fontSizeSm,
+                  }}
                 >
-                  {rationale}
-                </Typography.Text>
+                  <GenAIMarkdownRenderer>{rationale ?? ''}</GenAIMarkdownRenderer>
+                </div>
               </div>
             )}
 
