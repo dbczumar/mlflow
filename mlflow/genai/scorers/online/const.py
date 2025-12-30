@@ -8,8 +8,7 @@ SESSION_CHECKPOINT_TAG = "mlflow.latestOnlineScoring.session.timestampMs"
 MAX_LOOKBACK_MS = 60 * 60 * 1000
 
 # Session inactivity buffer: 10 minutes without new traces = session complete
-# TODO: CHANGE BACK TO 10 * 60 * 1000 - Currently set to 15 seconds for testing!
-SESSION_COMPLETION_BUFFER_MS = 15 * 1000
+SESSION_COMPLETION_BUFFER_MS = 10 * 60 * 1000
 
 # Maximum sessions to process in a single scoring job
 MAX_SESSIONS_PER_JOB = 50
