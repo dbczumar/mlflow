@@ -10884,7 +10884,6 @@ def test_scorer_deletion_cascades_to_online_configs(store: SqlAlchemyStore):
     with mock.patch.object(store, "get_gateway_endpoint", return_value=_mock_gateway_endpoint()):
         store.register_scorer(experiment_id, "scorer", _gateway_model_scorer_json())
 
-    # Create online config
     config = store.update_online_scoring_config(
         experiment_id=experiment_id,
         name="scorer",
@@ -10892,7 +10891,6 @@ def test_scorer_deletion_cascades_to_online_configs(store: SqlAlchemyStore):
     )
     config_id = config.online_scoring_config_id
 
-    # Verify config exists
     with store.ManagedSessionMaker() as session:
         assert (
             session.query(SqlOnlineScoringConfig)
@@ -10901,10 +10899,8 @@ def test_scorer_deletion_cascades_to_online_configs(store: SqlAlchemyStore):
             == 1
         )
 
-    # Delete scorer
     store.delete_scorer(experiment_id, "scorer")
 
-    # Verify online config is also deleted (cascade)
     with store.ManagedSessionMaker() as session:
         assert (
             session.query(SqlOnlineScoringConfig)
@@ -12356,7 +12352,6 @@ def test_log_spans_session_id_handling(store: SqlAlchemyStore) -> None:
 def test_find_completed_sessions(store: SqlAlchemyStore):
     exp_id = store.create_experiment("test_find_completed_sessions")
 
-    # Create traces for session A (timestamps 1000, 2000)
     _create_trace(
         store,
         "trace_a1",
@@ -12372,7 +12367,6 @@ def test_find_completed_sessions(store: SqlAlchemyStore):
         trace_metadata={TraceMetadataKey.TRACE_SESSION: "session-a"},
     )
 
-    # Create traces for session B (timestamps 3000, 4000)
     _create_trace(
         store,
         "trace_b1",
@@ -12388,7 +12382,6 @@ def test_find_completed_sessions(store: SqlAlchemyStore):
         trace_metadata={TraceMetadataKey.TRACE_SESSION: "session-b"},
     )
 
-    # Create traces for session C (timestamps 5000, ongoing at 10000)
     _create_trace(
         store,
         "trace_c1",
@@ -12404,12 +12397,8 @@ def test_find_completed_sessions(store: SqlAlchemyStore):
         trace_metadata={TraceMetadataKey.TRACE_SESSION: "session-c"},
     )
 
-    # Create a trace without session (should be excluded)
     _create_trace(store, "trace_no_session", exp_id, request_time=2500)
 
-    # Find sessions completed between timestamps 0 and 5000
-    # Session A (last trace at 2000) and session B (last trace at 4000) should be returned
-    # Session C should NOT be returned (has traces after 5000)
     completed = store.find_completed_sessions(
         experiment_id=exp_id,
         min_last_trace_timestamp_ms=0,
@@ -12420,23 +12409,19 @@ def test_find_completed_sessions(store: SqlAlchemyStore):
     session_ids = {s.session_id for s in completed}
     assert session_ids == {"session-a", "session-b"}
 
-    # Verify session A stats
     session_a = next(s for s in completed if s.session_id == "session-a")
     assert session_a.trace_count == 2
     assert session_a.first_trace_timestamp_ms == 1000
     assert session_a.last_trace_timestamp_ms == 2000
 
-    # Verify session B stats
     session_b = next(s for s in completed if s.session_id == "session-b")
     assert session_b.trace_count == 2
     assert session_b.first_trace_timestamp_ms == 3000
     assert session_b.last_trace_timestamp_ms == 4000
 
-    # Results should be sorted by last_trace_timestamp_ms ASC
     assert completed[0].session_id == "session-a"
     assert completed[1].session_id == "session-b"
 
-    # Find sessions with min timestamp filter (only session B)
     completed = store.find_completed_sessions(
         experiment_id=exp_id,
         min_last_trace_timestamp_ms=3000,

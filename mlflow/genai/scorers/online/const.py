@@ -14,5 +14,8 @@ SESSION_COMPLETION_BUFFER_MS = 15 * 1000
 # Maximum sessions to process in a single scoring job
 MAX_SESSIONS_PER_JOB = 50
 
+# Maximum traces to include in a single scoring job
+MAX_TRACES_PER_JOB = 500
+
 # Filter to exclude eval run traces (traces generated from MLflow runs)
 EXCLUDE_EVAL_RUN_TRACES_FILTER = "metadata.mlflow.sourceRun IS NULL"
