@@ -8,7 +8,7 @@ from mlflow.environment_variables import MLFLOW_GENAI_EVAL_MAX_WORKERS
 from mlflow.genai.evaluation.entities import EvalItem
 from mlflow.genai.evaluation.session_utils import evaluate_session_level_scorers
 from mlflow.genai.scorers.online.const import (
-    EXCLUDE_TRAINING_TRACES_FILTER,
+    EXCLUDE_EVAL_RUN_TRACES_FILTER,
     MAX_TRACES_PER_JOB,
     MIN_SESSIONS_PER_JOB,
 )
@@ -95,7 +95,6 @@ class OnlineSessionScoringProcessor:
             f"{time_window.max_last_trace_timestamp_ms}]"
         )
 
-        # Find completed sessions
         completed_sessions = self._tracking_store.find_completed_sessions(
             experiment_id=self._experiment_id,
             min_last_trace_timestamp_ms=time_window.min_last_trace_timestamp_ms,
@@ -108,7 +107,6 @@ class OnlineSessionScoringProcessor:
 
         _logger.info(f"Found {len(completed_sessions)} completed sessions")
 
-        # Select sessions to score based on batching constraints
         sessions_to_score = self._select_sessions_to_score(completed_sessions)
 
         if not sessions_to_score:
@@ -204,7 +202,7 @@ class OnlineSessionScoringProcessor:
             session: The CompletedSession to score.
         """
         session_filter = f"metadata.`mlflow.trace.session` = '{session.session_id}'"
-        combined_filter = f"{EXCLUDE_TRAINING_TRACES_FILTER} AND {session_filter}"
+        combined_filter = f"{EXCLUDE_EVAL_RUN_TRACES_FILTER} AND {session_filter}"
         traces = self._trace_loader.fetch_trace_infos_between(
             experiment_id=self._experiment_id,
             start_time_ms=session.first_trace_timestamp_ms,

@@ -9,7 +9,7 @@ from mlflow.environment_variables import MLFLOW_GENAI_EVAL_MAX_WORKERS
 from mlflow.genai.evaluation.entities import EvalItem
 from mlflow.genai.evaluation.harness import _compute_eval_scores, _log_assessments
 from mlflow.genai.scorers.base import Scorer
-from mlflow.genai.scorers.online.const import EXCLUDE_TRAINING_TRACES_FILTER, MAX_TRACES_PER_JOB
+from mlflow.genai.scorers.online.const import EXCLUDE_EVAL_RUN_TRACES_FILTER, MAX_TRACES_PER_JOB
 from mlflow.genai.scorers.online.online_scorer import OnlineScorer
 from mlflow.genai.scorers.online.sampler import OnlineScorerSampler
 from mlflow.genai.scorers.online.trace_checkpointer import OnlineTraceCheckpointManager
@@ -132,9 +132,9 @@ class OnlineTraceScoringProcessor:
             trace_scorers = self._sampler.get_scorers_for_filter(filter_string, session_level=False)
 
             combined_filter = (
-                f"{EXCLUDE_TRAINING_TRACES_FILTER} AND {filter_string}"
+                f"{EXCLUDE_EVAL_RUN_TRACES_FILTER} AND {filter_string}"
                 if filter_string
-                else EXCLUDE_TRAINING_TRACES_FILTER
+                else EXCLUDE_EVAL_RUN_TRACES_FILTER
             )
             trace_infos = self._trace_loader.fetch_trace_infos_between(
                 self._experiment_id,

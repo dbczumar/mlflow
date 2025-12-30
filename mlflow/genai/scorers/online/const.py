@@ -17,5 +17,5 @@ MIN_SESSIONS_PER_JOB = 10
 # Maximum traces to include in a single scoring job
 MAX_TRACES_PER_JOB = 500
 
-# Filter to exclude training traces (traces generated from MLflow runs)
-EXCLUDE_TRAINING_TRACES_FILTER = "metadata.mlflow.sourceRun IS NULL"
+# Filter to exclude eval run traces (traces generated from MLflow runs)
+EXCLUDE_EVAL_RUN_TRACES_FILTER = "metadata.mlflow.sourceRun IS NULL"
