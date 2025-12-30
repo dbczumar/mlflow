@@ -419,6 +419,7 @@ class AbstractStore(GatewayStoreMixin):
         experiment_id: str,
         min_last_trace_timestamp_ms: int,
         max_last_trace_timestamp_ms: int,
+        max_results: int | None = None,
     ) -> list["CompletedSession"]:
         """
         Find completed sessions within a time window based on their last trace timestamp.
@@ -435,6 +436,8 @@ class AbstractStore(GatewayStoreMixin):
                 Sessions with last trace before this time are excluded.
             max_last_trace_timestamp_ms: Upper bound for session's last trace timestamp (inclusive).
                 Sessions with any traces after this time are excluded.
+            max_results: Maximum number of sessions to return. If None, returns all
+                matching sessions.
 
         Returns:
             List of CompletedSession objects sorted by last_trace_timestamp_ms ASC.

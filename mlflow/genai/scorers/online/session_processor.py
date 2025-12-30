@@ -97,40 +97,23 @@ class OnlineSessionScoringProcessor:
             experiment_id=self._experiment_id,
             min_last_trace_timestamp_ms=time_window.min_last_trace_timestamp_ms,
             max_last_trace_timestamp_ms=time_window.max_last_trace_timestamp_ms,
+            max_results=MAX_SESSIONS_PER_JOB,
         )
 
         if not completed_sessions:
             _logger.info("No completed sessions found, skipping")
             return
 
-        _logger.info(f"Found {len(completed_sessions)} completed sessions")
+        _logger.info(f"Found {len(completed_sessions)} completed sessions for scoring")
 
-        sessions_to_score = self._select_sessions_to_score(completed_sessions)
-        _logger.info(f"Selected {len(sessions_to_score)} sessions for scoring")
-
-        # Execute scoring in parallel
-        self._execute_session_scoring(sessions_to_score)
+        self._execute_session_scoring(completed_sessions)
 
         # Update checkpoint to the last processed session's last trace timestamp
         # Sessions are sorted by last_trace_timestamp_ms ASC, so take the last one
-        latest_session = sessions_to_score[-1]
+        latest_session = completed_sessions[-1]
         self._checkpoint_manager.update_checkpoint_timestamp(latest_session.last_trace_timestamp_ms)
 
         _logger.info(f"Session scoring completed for experiment {self._experiment_id}")
-
-    def _select_sessions_to_score(
-        self, completed_sessions: list[CompletedSession]
-    ) -> list[CompletedSession]:
-        """
-        Select which sessions to score based on batching constraints.
-
-        Args:
-            completed_sessions: List of completed sessions sorted by last_trace_timestamp_ms ASC.
-
-        Returns:
-            List of sessions to score (up to MAX_SESSIONS_PER_JOB).
-        """
-        return completed_sessions[:MAX_SESSIONS_PER_JOB]
 
     def _execute_session_scoring(self, sessions: list[CompletedSession]) -> None:
         """

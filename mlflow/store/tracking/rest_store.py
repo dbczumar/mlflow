@@ -1451,6 +1451,7 @@ class RestStore(RestGatewayStoreMixin, AbstractStore):
         experiment_id: str,
         min_last_trace_timestamp_ms: int,
         max_last_trace_timestamp_ms: int,
+        max_results: int | None = None,
     ) -> list["CompletedSession"]:
         """
         Find completed sessions based on their last trace timestamp.
@@ -1461,6 +1462,8 @@ class RestStore(RestGatewayStoreMixin, AbstractStore):
                 Sessions with last trace before this time are excluded.
             max_last_trace_timestamp_ms: Upper bound for session's last trace timestamp (inclusive).
                 Sessions with any traces after this time are excluded.
+            max_results: Maximum number of sessions to return. If None, returns all
+                matching sessions.
 
         Returns:
             List of CompletedSession objects sorted by last_trace_timestamp_ms ASC.
@@ -1472,6 +1475,8 @@ class RestStore(RestGatewayStoreMixin, AbstractStore):
             "min_last_trace_timestamp_ms": min_last_trace_timestamp_ms,
             "max_last_trace_timestamp_ms": max_last_trace_timestamp_ms,
         }
+        if max_results is not None:
+            request_body["max_results"] = max_results
 
         response = http_request(
             host_creds=self.get_host_creds(),

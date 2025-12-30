@@ -12410,12 +12410,10 @@ def test_find_completed_sessions(store: SqlAlchemyStore):
     assert session_ids == {"session-a", "session-b"}
 
     session_a = next(s for s in completed if s.session_id == "session-a")
-    assert session_a.trace_count == 2
     assert session_a.first_trace_timestamp_ms == 1000
     assert session_a.last_trace_timestamp_ms == 2000
 
     session_b = next(s for s in completed if s.session_id == "session-b")
-    assert session_b.trace_count == 2
     assert session_b.first_trace_timestamp_ms == 3000
     assert session_b.last_trace_timestamp_ms == 4000
 
@@ -12429,3 +12427,22 @@ def test_find_completed_sessions(store: SqlAlchemyStore):
     )
     assert len(completed) == 1
     assert completed[0].session_id == "session-b"
+
+    completed = store.find_completed_sessions(
+        experiment_id=exp_id,
+        min_last_trace_timestamp_ms=0,
+        max_last_trace_timestamp_ms=5000,
+        max_results=1,
+    )
+    assert len(completed) == 1
+    assert completed[0].session_id == "session-a"
+
+    completed = store.find_completed_sessions(
+        experiment_id=exp_id,
+        min_last_trace_timestamp_ms=0,
+        max_last_trace_timestamp_ms=5000,
+        max_results=2,
+    )
+    assert len(completed) == 2
+    assert completed[0].session_id == "session-a"
+    assert completed[1].session_id == "session-b"

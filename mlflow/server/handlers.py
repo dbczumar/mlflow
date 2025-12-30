@@ -3165,6 +3165,7 @@ def _find_completed_sessions():
     experiment_id = request_json.get("experiment_id")
     min_last_trace_timestamp_ms = request_json.get("min_last_trace_timestamp_ms")
     max_last_trace_timestamp_ms = request_json.get("max_last_trace_timestamp_ms")
+    max_results = request_json.get("max_results")
 
     if not experiment_id:
         raise MlflowException(
@@ -3185,6 +3186,7 @@ def _find_completed_sessions():
         experiment_id=experiment_id,
         min_last_trace_timestamp_ms=int(min_last_trace_timestamp_ms),
         max_last_trace_timestamp_ms=int(max_last_trace_timestamp_ms),
+        max_results=int(max_results) if max_results is not None else None,
     )
 
     response = Response(mimetype="application/json")

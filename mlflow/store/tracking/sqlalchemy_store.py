@@ -3060,6 +3060,7 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
         experiment_id: str,
         min_last_trace_timestamp_ms: int,
         max_last_trace_timestamp_ms: int,
+        max_results: int | None = None,
     ) -> list[CompletedSession]:
         """
         Find completed sessions based on their last trace timestamp.
@@ -3070,6 +3071,8 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
                 Sessions with last trace before this time are excluded.
             max_last_trace_timestamp_ms: Upper bound for session's last trace timestamp (inclusive).
                 Sessions with any traces after this time are excluded.
+            max_results: Maximum number of sessions to return. If None, returns all
+                matching sessions.
 
         Returns:
             List of CompletedSession objects sorted by last_trace_timestamp_ms ASC.
@@ -3105,14 +3108,16 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
             recent_session_metadata = aliased(SqlTraceMetadata)
 
             # Subquery: sessions with traces after the cutoff
+            # Start from trace_info (filtered by timestamp) for efficiency, then join to metadata
             sessions_with_recent_traces = (
                 session.query(recent_session_metadata.value.label("session_id"))
+                .select_from(SqlTraceInfo)
                 .join(
-                    SqlTraceInfo,
-                    (SqlTraceInfo.request_id == recent_session_metadata.request_id),
+                    recent_session_metadata,
+                    (SqlTraceInfo.request_id == recent_session_metadata.request_id)
+                    & (recent_session_metadata.key == TraceMetadataKey.TRACE_SESSION),
                 )
                 .filter(
-                    recent_session_metadata.key == TraceMetadataKey.TRACE_SESSION,
                     SqlTraceInfo.experiment_id == experiment_id,
                     SqlTraceInfo.timestamp_ms > max_last_trace_timestamp_ms,
                 )
@@ -3121,7 +3126,7 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
             )
 
             # Main query: sessions in timestamp window WITHOUT recent traces
-            results = (
+            query = (
                 session.query(
                     sessions_with_stats.c.session_id,
                     sessions_with_stats.c.first_trace_timestamp_ms,
@@ -3133,12 +3138,15 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
                 )
                 .filter(
                     sessions_with_recent_traces.c.session_id.is_(None),
-                    sessions_with_stats.c.last_trace_timestamp_ms >= min_last_trace_timestamp_ms,
                     sessions_with_stats.c.last_trace_timestamp_ms <= max_last_trace_timestamp_ms,
                 )
                 .order_by(sessions_with_stats.c.last_trace_timestamp_ms.asc())
-                .all()
             )
+
+            if max_results is not None:
+                query = query.limit(max_results)
+
+            results = query.all()
 
             return [
                 CompletedSession(
