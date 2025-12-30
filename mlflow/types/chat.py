@@ -160,7 +160,7 @@ class ResponseFormat(BaseModel):
 class BaseRequestPayload(BaseModel):
     """Common parameters used for chat completions and completion endpoints."""
 
-    temperature: float = Field(0.0, ge=0, le=2)
+    temperature: float | None = Field(None, ge=0, le=2)
     n: int = Field(1, ge=1)
     stop: list[str] | None = Field(None, min_length=1)
     max_tokens: int | None = Field(None, ge=1)
