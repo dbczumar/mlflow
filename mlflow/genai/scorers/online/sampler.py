@@ -37,7 +37,6 @@ class OnlineScorerSampler:
         tracking_store: "AbstractStore",
     ):
         self.configs = configs
-        # Map scorer name -> sample rate and scorer name -> Scorer
         self._sample_rates: dict[str, float] = {}
         self._scorers: dict[str, Scorer] = {}
         for config in configs:
@@ -85,6 +84,15 @@ class OnlineScorerSampler:
     def sample(self, entity_id: str, scorers: list[Scorer]) -> list[Scorer]:
         """
         Apply dense sampling to select scorers for an entity.
+
+        Dense sampling ensures selected entities receive comprehensive evaluation across
+        multiple scorers, rather than spreading scorers thinly across all entities.
+        For example, with two scorers at 50% and 25% sample rates:
+        - 50% of entities get both scorers (dense coverage)
+        - 25% get only the first scorer
+        - 25% get no scorers
+        This is more valuable than having each scorer independently evaluate different
+        50% and 25% subsets, which would dilute signal and make comparisons harder.
 
         Args:
             entity_id: The trace ID or session ID to sample for.
