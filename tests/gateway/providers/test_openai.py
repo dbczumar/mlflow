@@ -244,7 +244,6 @@ async def _run_test_chat_stream(resp, provider):
             "https://api.openai.com/v1/chat/completions",
             json={
                 "model": "gpt-4o-mini",
-                "temperature": 0,
                 "n": 1,
                 **payload,
             },
