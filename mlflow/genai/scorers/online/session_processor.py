@@ -82,7 +82,6 @@ class OnlineSessionScoringProcessor:
             _logger.info("No scorer configs provided, skipping")
             return
 
-        # Calculate time window for completed sessions
         time_window = self._checkpoint_manager.calculate_time_window()
 
         _logger.info(

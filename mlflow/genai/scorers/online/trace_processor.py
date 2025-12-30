@@ -9,7 +9,7 @@ from mlflow.environment_variables import MLFLOW_GENAI_EVAL_MAX_WORKERS
 from mlflow.genai.evaluation.entities import EvalItem
 from mlflow.genai.evaluation.harness import _compute_eval_scores, _log_assessments
 from mlflow.genai.scorers.base import Scorer
-from mlflow.genai.scorers.online.const import MAX_TRACES_PER_JOB
+from mlflow.genai.scorers.online.const import EXCLUDE_TRAINING_TRACES_FILTER, MAX_TRACES_PER_JOB
 from mlflow.genai.scorers.online.online_scorer import OnlineScorer
 from mlflow.genai.scorers.online.sampler import OnlineScorerSampler
 from mlflow.genai.scorers.online.trace_checkpointer import OnlineTraceCheckpointManager
@@ -78,7 +78,6 @@ class OnlineTraceScoringProcessor:
             _logger.info("No scorer configs provided, skipping")
             return
 
-        # Calculate time window
         time_window = self._checkpoint_manager.calculate_time_window()
         _logger.info(
             f"Online scoring for experiment {self._experiment_id}: "
@@ -132,11 +131,16 @@ class OnlineTraceScoringProcessor:
             # Only get trace-level scorers (session-level is handled by session_processor)
             trace_scorers = self._sampler.get_scorers_for_filter(filter_string, session_level=False)
 
+            combined_filter = (
+                f"{EXCLUDE_TRAINING_TRACES_FILTER} AND {filter_string}"
+                if filter_string
+                else EXCLUDE_TRAINING_TRACES_FILTER
+            )
             trace_infos = self._trace_loader.fetch_trace_infos_between(
                 self._experiment_id,
                 start_time_ms,
                 end_time_ms,
-                filter_string,
+                combined_filter,
                 MAX_TRACES_PER_JOB,
             )
 
