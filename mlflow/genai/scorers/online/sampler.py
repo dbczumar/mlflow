@@ -91,8 +91,7 @@ class OnlineScorerSampler:
         - 50% of entities get both scorers (dense coverage)
         - 25% get only the first scorer
         - 25% get no scorers
-        This is more valuable than having each scorer independently evaluate different
-        50% and 25% subsets, which would dilute signal and make comparisons harder.
+        This enables better comparisons between scorers on the same entities.
 
         Args:
             entity_id: The trace ID or session ID to sample for.

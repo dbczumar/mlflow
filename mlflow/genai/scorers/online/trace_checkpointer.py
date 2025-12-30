@@ -5,15 +5,10 @@ import time
 from dataclasses import dataclass
 
 from mlflow.entities.experiment_tag import ExperimentTag
+from mlflow.genai.scorers.online.const import MAX_LOOKBACK_MS, TRACE_CHECKPOINT_TAG
 from mlflow.store.tracking.abstract_store import AbstractStore
 
 _logger = logging.getLogger(__name__)
-
-# Checkpoint tag for tracking last processed trace timestamp
-TRACE_CHECKPOINT_TAG = "mlflow.latestOnlineScoring.trace.timestampMs"
-
-# Maximum lookback period to prevent getting stuck on old failing traces (1 hour)
-_MAX_LOOKBACK_MS = 60 * 60 * 1000
 
 
 @dataclass
@@ -76,7 +71,7 @@ class OnlineTraceCheckpointManager:
         current_checkpoint = self.get_checkpoint_timestamp()
 
         # Start from checkpoint, but never look back more than 1 hour
-        min_lookback_time_ms = current_time_ms - _MAX_LOOKBACK_MS
+        min_lookback_time_ms = current_time_ms - MAX_LOOKBACK_MS
 
         if current_checkpoint is not None:
             # Use the more recent of: checkpoint or (current_time - 1 hour)

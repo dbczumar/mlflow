@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from mlflow.environment_variables import MLFLOW_GENAI_EVAL_MAX_WORKERS
 from mlflow.genai.evaluation.entities import EvalItem
 from mlflow.genai.evaluation.session_utils import evaluate_session_level_scorers
+from mlflow.genai.scorers.online.const import MAX_TRACES_PER_JOB, MIN_SESSIONS_PER_JOB
 from mlflow.genai.scorers.online.online_scorer import OnlineScorer
 from mlflow.genai.scorers.online.sampler import OnlineScorerSampler
 from mlflow.genai.scorers.online.session_checkpointer import OnlineSessionCheckpointManager
@@ -24,13 +25,6 @@ class CompletedSession:
     trace_count: int
     first_trace_timestamp_ms: int
     last_trace_timestamp_ms: int
-
-
-# Minimum number of sessions to process per job run
-_MIN_SESSIONS_PER_JOB = 10
-
-# Maximum traces across all sessions per job run (same as trace processor)
-_MAX_TRACES_PER_JOB = 500
 
 
 class OnlineSessionScoringProcessor:
@@ -153,13 +147,13 @@ class OnlineSessionScoringProcessor:
 
         for session in completed_sessions:
             # Always include at least MIN_SESSIONS_PER_JOB sessions
-            if len(selected) < _MIN_SESSIONS_PER_JOB:
+            if len(selected) < MIN_SESSIONS_PER_JOB:
                 selected.append(session)
                 total_traces += session.trace_count
                 continue
 
             # After min sessions, check trace limit
-            if total_traces + session.trace_count > _MAX_TRACES_PER_JOB:
+            if total_traces + session.trace_count > MAX_TRACES_PER_JOB:
                 break
 
             selected.append(session)

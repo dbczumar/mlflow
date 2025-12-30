@@ -5,19 +5,14 @@ import time
 from dataclasses import dataclass
 
 from mlflow.entities.experiment_tag import ExperimentTag
+from mlflow.genai.scorers.online.const import (
+    MAX_LOOKBACK_MS,
+    SESSION_CHECKPOINT_TAG,
+    SESSION_COMPLETION_BUFFER_MS,
+)
 from mlflow.store.tracking.abstract_store import AbstractStore
 
 _logger = logging.getLogger(__name__)
-
-# Checkpoint tag for tracking last processed session timestamp
-SESSION_CHECKPOINT_TAG = "mlflow.latestOnlineScoring.session.timestampMs"
-
-# Maximum lookback period to prevent getting stuck on old failing sessions (1 hour)
-_MAX_LOOKBACK_MS = 60 * 60 * 1000
-
-# Session inactivity buffer: 10 minutes without new traces = session complete
-# TODO: CHANGE BACK TO 10 * 60 * 1000 - Currently set to 15 seconds for testing!
-_SESSION_COMPLETION_BUFFER_MS = 15 * 1000
 
 
 @dataclass
@@ -79,14 +74,15 @@ class OnlineSessionCheckpointManager:
         current_time_ms = int(time.time() * 1000)
         current_checkpoint = self.get_checkpoint_timestamp()
 
-        min_lookback_time_ms = current_time_ms - _MAX_LOOKBACK_MS
+        # Start from checkpoint, but never look back more than 1 hour
+        min_lookback_time_ms = current_time_ms - MAX_LOOKBACK_MS
 
         if current_checkpoint is not None:
             min_last_trace_timestamp_ms = max(current_checkpoint, min_lookback_time_ms)
         else:
             min_last_trace_timestamp_ms = min_lookback_time_ms
 
-        max_last_trace_timestamp_ms = current_time_ms - _SESSION_COMPLETION_BUFFER_MS
+        max_last_trace_timestamp_ms = current_time_ms - SESSION_COMPLETION_BUFFER_MS
 
         return OnlineSessionScoringTimeWindow(
             min_last_trace_timestamp_ms=min_last_trace_timestamp_ms,

@@ -9,6 +9,7 @@ from mlflow.environment_variables import MLFLOW_GENAI_EVAL_MAX_WORKERS
 from mlflow.genai.evaluation.entities import EvalItem
 from mlflow.genai.evaluation.harness import _compute_eval_scores, _log_assessments
 from mlflow.genai.scorers.base import Scorer
+from mlflow.genai.scorers.online.const import MAX_TRACES_PER_JOB
 from mlflow.genai.scorers.online.online_scorer import OnlineScorer
 from mlflow.genai.scorers.online.sampler import OnlineScorerSampler
 from mlflow.genai.scorers.online.trace_checkpointer import OnlineTraceCheckpointManager
@@ -16,9 +17,6 @@ from mlflow.genai.scorers.online.trace_loader import OnlineTraceLoader
 from mlflow.store.tracking.abstract_store import AbstractStore
 
 _logger = logging.getLogger(__name__)
-
-# Maximum traces to process per job run
-_MAX_TRACES_PER_JOB = 500
 
 
 @dataclass
@@ -139,7 +137,7 @@ class OnlineTraceScoringProcessor:
                 start_time_ms,
                 end_time_ms,
                 filter_string,
-                _MAX_TRACES_PER_JOB,
+                MAX_TRACES_PER_JOB,
             )
 
             if not trace_infos:

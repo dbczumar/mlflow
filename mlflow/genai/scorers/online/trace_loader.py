@@ -56,18 +56,13 @@ class OnlineTraceLoader:
         Returns:
             List of TraceInfo objects matching the criteria.
         """
-        # Build time filter
         time_filter = (
             f"trace.timestamp_ms > {start_time_ms} AND trace.timestamp_ms <= {end_time_ms}"
         )
-
         # Exclude traces from MLflow runs (training traces)
         combined_filter = f"{time_filter} AND metadata.mlflow.sourceRun IS NULL"
-
-        # Add user filter if provided
         if filter_string:
             combined_filter = f"{combined_filter} AND {filter_string}"
-
         _logger.info(f"Fetching traces with filter: {combined_filter}")
 
         all_trace_infos = []
