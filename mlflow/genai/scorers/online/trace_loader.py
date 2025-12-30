@@ -61,8 +61,8 @@ class OnlineTraceLoader:
             f"trace.timestamp_ms > {start_time_ms} AND trace.timestamp_ms <= {end_time_ms}"
         )
 
-        # Start with time filter
-        combined_filter = time_filter
+        # Exclude traces from MLflow runs (training traces)
+        combined_filter = f"{time_filter} AND metadata.mlflow.sourceRun IS NULL"
 
         # Add user filter if provided
         if filter_string:

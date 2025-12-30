@@ -65,7 +65,7 @@ class OnlineTraceScoringProcessor:
         return cls(
             trace_loader=OnlineTraceLoader(tracking_store),
             checkpoint_manager=OnlineTraceCheckpointManager(tracking_store, experiment_id),
-            sampler=OnlineScorerSampler(online_scorers),
+            sampler=OnlineScorerSampler(online_scorers, tracking_store),
             experiment_id=experiment_id,
         )
 

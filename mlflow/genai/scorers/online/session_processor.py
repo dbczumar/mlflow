@@ -71,7 +71,7 @@ class OnlineSessionScoringProcessor:
         return cls(
             trace_loader=OnlineTraceLoader(tracking_store),
             checkpoint_manager=OnlineSessionCheckpointManager(tracking_store, experiment_id),
-            sampler=OnlineScorerSampler(online_scorers),
+            sampler=OnlineScorerSampler(online_scorers, tracking_store),
             experiment_id=experiment_id,
             tracking_store=tracking_store,
         )
@@ -207,11 +207,12 @@ class OnlineSessionScoringProcessor:
             session: The CompletedSession to score.
         """
         # Fetch traces for this session by searching with session filter
+        # Note: The trace loader already excludes training traces (mlflow.sourceRun IS NULL)
         traces = self._trace_loader.fetch_trace_infos_between(
             experiment_id=self._experiment_id,
             start_time_ms=session.first_trace_timestamp_ms,
             end_time_ms=session.last_trace_timestamp_ms,
-            filter_string=f"request_metadata.`mlflow.trace.session` = '{session.session_id}'",
+            filter_string=f"metadata.`mlflow.trace.session` = '{session.session_id}'",
         )
 
         if not traces:
