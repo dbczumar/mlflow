@@ -3074,6 +3074,8 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
         with self.ManagedSessionMaker() as session:
             # Alias for the session metadata join
             session_metadata = aliased(SqlTraceMetadata)
+            # Alias for the recent traces metadata join
+            recent_session_metadata = aliased(SqlTraceMetadata)
 
             # Subquery: sessions with aggregated stats
             # Join trace_info with trace_request_metadata to get session IDs
@@ -3097,9 +3099,6 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
                 .group_by(session_metadata.value)
                 .subquery()
             )
-
-            # Alias for the recent traces metadata join
-            recent_session_metadata = aliased(SqlTraceMetadata)
 
             # Subquery: sessions with traces after the cutoff
             # Start from trace_info (filtered by timestamp) for efficiency, then join to metadata
