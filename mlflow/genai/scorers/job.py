@@ -426,6 +426,5 @@ def run_online_scoring_scheduler() -> None:
         # Submit trace-level scoring job
         run_online_trace_scorer_job(experiment_id, scorer_dicts)
 
-        # TODO: Re-enable session scoring once SQLAlchemy JSON field access is fixed
         # Submit session-level scoring job
-        # run_online_session_scorer_job(experiment_id, scorer_dicts)
+        run_online_session_scorer_job(experiment_id, scorer_dicts)

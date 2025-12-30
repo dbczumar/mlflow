@@ -3074,33 +3074,46 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
         Returns:
             List of CompletedSession objects sorted by last_trace_timestamp_ms ASC.
         """
+        session_key = TraceMetadataKey.TRACE_SESSION
+
         with self.ManagedSessionMaker() as session:
+            # Alias for the session metadata join
+            session_metadata = aliased(SqlTraceMetadata)
+
             # Subquery: sessions with aggregated stats
+            # Join trace_info with trace_request_metadata to get session IDs
             sessions_with_stats = (
                 session.query(
-                    SqlTraceInfo.request_metadata["mlflow.trace.session"].astext.label(
-                        "session_id"
-                    ),
+                    session_metadata.value.label("session_id"),
                     func.count(SqlTraceInfo.request_id).label("trace_count"),
                     func.min(SqlTraceInfo.timestamp_ms).label("first_trace_timestamp_ms"),
                     func.max(SqlTraceInfo.timestamp_ms).label("last_trace_timestamp_ms"),
                 )
+                .join(
+                    session_metadata,
+                    (SqlTraceInfo.request_id == session_metadata.request_id)
+                    & (session_metadata.key == session_key),
+                )
                 .filter(
                     SqlTraceInfo.experiment_id == experiment_id,
-                    SqlTraceInfo.request_metadata["mlflow.trace.session"].astext.isnot(None),
                 )
-                .group_by(SqlTraceInfo.request_metadata["mlflow.trace.session"].astext)
+                .group_by(session_metadata.value)
                 .subquery()
             )
 
+            # Alias for the recent traces metadata join
+            recent_session_metadata = aliased(SqlTraceMetadata)
+
             # Subquery: sessions with traces after the cutoff
             sessions_with_recent_traces = (
-                session.query(
-                    SqlTraceInfo.request_metadata["mlflow.trace.session"].astext.label("session_id")
+                session.query(recent_session_metadata.value.label("session_id"))
+                .join(
+                    SqlTraceInfo,
+                    (SqlTraceInfo.request_id == recent_session_metadata.request_id),
                 )
                 .filter(
+                    recent_session_metadata.key == session_key,
                     SqlTraceInfo.experiment_id == experiment_id,
-                    SqlTraceInfo.request_metadata["mlflow.trace.session"].astext.isnot(None),
                     SqlTraceInfo.timestamp_ms > max_last_trace_timestamp_ms,
                 )
                 .distinct()

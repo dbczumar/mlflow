@@ -16,7 +16,8 @@ SESSION_CHECKPOINT_TAG = "mlflow.latestOnlineScoring.session.timestampMs"
 _MAX_LOOKBACK_MS = 60 * 60 * 1000
 
 # Session inactivity buffer: 10 minutes without new traces = session complete
-_SESSION_COMPLETION_BUFFER_MS = 10 * 60 * 1000
+# TODO: CHANGE BACK TO 10 * 60 * 1000 - Currently set to 15 seconds for testing!
+_SESSION_COMPLETION_BUFFER_MS = 15 * 1000
 
 
 @dataclass
@@ -73,7 +74,7 @@ class OnlineSessionCheckpointManager:
             OnlineSessionScoringTimeWindow with min and max last trace timestamps.
             min_last_trace_timestamp_ms is the checkpoint if it exists and is within the last hour,
             otherwise now - 1 hour.
-            max_last_trace_timestamp_ms is current time - 10 minutes (session completion buffer).
+            max_last_trace_timestamp_ms is current time - session completion buffer.
         """
         current_time_ms = int(time.time() * 1000)
         current_checkpoint = self.get_checkpoint_timestamp()

@@ -80,9 +80,9 @@ class OnlineSessionScoringProcessor:
         """
         Execute online scoring for completed sessions in the experiment.
 
-        Finds sessions that have been inactive for 10+ minutes, applies sampling to
-        select scorers, runs scoring in parallel (one thread per session), and updates
-        the checkpoint.
+        Finds sessions that have been inactive for the completion buffer duration,
+        applies sampling to select scorers, runs scoring in parallel (one thread per
+        session), and updates the checkpoint.
         """
         if not self._sampler.configs:
             _logger.info("No scorer configs provided, skipping")
