@@ -1401,11 +1401,11 @@ class RestStore(RestGatewayStoreMixin, AbstractStore):
         )
 
         verify_rest_response(response, "/api/3.0/mlflow/scorers/online-config")
-        config_dict = response.json().get("config", {})
+        config_dict = response.json()["config"]
         return OnlineScoringConfig(
-            online_scoring_config_id=config_dict.get("online_scoring_config_id", ""),
-            scorer_id=config_dict.get("scorer_id", ""),
-            sample_rate=config_dict.get("sample_rate", 0.0),
+            online_scoring_config_id=config_dict["online_scoring_config_id"],
+            scorer_id=config_dict["scorer_id"],
+            sample_rate=config_dict["sample_rate"],
             filter_string=config_dict.get("filter_string"),
         )
 

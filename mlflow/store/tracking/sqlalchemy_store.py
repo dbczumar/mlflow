@@ -3074,14 +3074,14 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
         Returns:
             List of CompletedSession objects sorted by last_trace_timestamp_ms ASC.
         """
-        session_key = TraceMetadataKey.TRACE_SESSION
-
         with self.ManagedSessionMaker() as session:
             # Alias for the session metadata join
             session_metadata = aliased(SqlTraceMetadata)
 
             # Subquery: sessions with aggregated stats
             # Join trace_info with trace_request_metadata to get session IDs
+            # Filter by timestamp to avoid full table scan - only consider traces
+            # that could contribute to a session within the target window
             sessions_with_stats = (
                 session.query(
                     session_metadata.value.label("session_id"),
@@ -3092,10 +3092,11 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
                 .join(
                     session_metadata,
                     (SqlTraceInfo.request_id == session_metadata.request_id)
-                    & (session_metadata.key == session_key),
+                    & (session_metadata.key == TraceMetadataKey.TRACE_SESSION),
                 )
                 .filter(
                     SqlTraceInfo.experiment_id == experiment_id,
+                    SqlTraceInfo.timestamp_ms >= min_last_trace_timestamp_ms,
                 )
                 .group_by(session_metadata.value)
                 .subquery()
@@ -3112,7 +3113,7 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
                     (SqlTraceInfo.request_id == recent_session_metadata.request_id),
                 )
                 .filter(
-                    recent_session_metadata.key == session_key,
+                    recent_session_metadata.key == TraceMetadataKey.TRACE_SESSION,
                     SqlTraceInfo.experiment_id == experiment_id,
                     SqlTraceInfo.timestamp_ms > max_last_trace_timestamp_ms,
                 )

@@ -31,7 +31,6 @@ if __name__ == "__main__":
 
     huey_store_path = os.environ[HUEY_STORAGE_PATH_ENV_VAR]
 
-    # Launch Huey consumers for each job type
     for job_name in _job_name_to_fn_fullname_map:
         try:
             _launch_huey_consumer(job_name)

@@ -7,10 +7,10 @@ It is launched by the job runner and runs in a separate process from job executi
 
 import threading
 
-from mlflow.server.jobs._periodic_tasks import register_periodic_tasks
 from mlflow.server.jobs.utils import (
     _exit_when_orphaned,
     _get_or_init_huey_instance,
+    register_periodic_tasks,
 )
 
 # Ensure the subprocess is killed when parent process dies.
