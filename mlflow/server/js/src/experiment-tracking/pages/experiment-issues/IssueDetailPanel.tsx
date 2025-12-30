@@ -74,7 +74,6 @@ import { useQueryClient } from '@databricks/web-shared/query-client';
 import { invalidateMlflowSearchTracesCache, getTracesTagKeys } from '@databricks/web-shared/genai-traces-table';
 import { useGetDeleteTracesAction } from '../../components/experiment-page/components/traces-v3/hooks/useGetDeleteTracesAction';
 
-
 interface IssueDetailPanelProps {
   issue: Issue | null;
   experimentId: string;
@@ -177,10 +176,7 @@ const IssueIdPill = ({ issueId }: { issueId: string }) => {
   };
 
   return (
-    <Tooltip
-      componentId="mlflow.issues.id-pill-tooltip"
-      content={copied ? 'Copied!' : `Click to copy: ${issueId}`}
-    >
+    <Tooltip componentId="mlflow.issues.id-pill-tooltip" content={copied ? 'Copied!' : `Click to copy: ${issueId}`}>
       <button
         onClick={handleCopy}
         css={{
@@ -587,7 +583,10 @@ results.tables["eval_results"]`;
               </div>
               <div css={{ display: 'flex', justifyContent: 'flex-end', marginTop: theme.spacing.md }}>
                 <Button componentId="mlflow.issues.judge.run-quick-scan" type="primary" disabled>
-                  <FormattedMessage defaultMessage="Run on Selected" description="Button to run judge on selected traces" />
+                  <FormattedMessage
+                    defaultMessage="Run on Selected"
+                    description="Button to run judge on selected traces"
+                  />
                 </Button>
               </div>
             </Tabs.Content>
@@ -695,9 +694,7 @@ const JudgeDetails = ({ judge, experimentId }: { judge: IssueJudge; experimentId
 
   // Track if there are unsaved changes
   const hasChanges =
-    name !== judge.scorer_name ||
-    prompt !== judge.prompt ||
-    model !== (judge.model || 'openai:/gpt-4o-mini');
+    name !== judge.scorer_name || prompt !== judge.prompt || model !== (judge.model || 'openai:/gpt-4o-mini');
 
   const cardStyles = {
     border: `1px solid ${theme.colors.border}`,
@@ -739,7 +736,12 @@ const JudgeDetails = ({ judge, experimentId }: { judge: IssueJudge; experimentId
         <div css={{ display: 'flex', alignItems: 'center', gap: theme.spacing.sm }}>
           {hasChanges && (
             <>
-              <Button componentId="mlflow.issues.judge.cancel-button" type="tertiary" size="small" onClick={handleCancel}>
+              <Button
+                componentId="mlflow.issues.judge.cancel-button"
+                type="tertiary"
+                size="small"
+                onClick={handleCancel}
+              >
                 <FormattedMessage defaultMessage="Cancel" description="Cancel button" />
               </Button>
               <Button componentId="mlflow.issues.judge.save-button" type="primary" size="small" onClick={handleSave}>
@@ -810,7 +812,14 @@ const JudgeDetails = ({ judge, experimentId }: { judge: IssueJudge; experimentId
 
       {/* Prompt Card */}
       <div css={cardStyles}>
-        <div css={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: theme.spacing.sm }}>
+        <div
+          css={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: theme.spacing.sm,
+          }}
+        >
           <Typography.Text bold>
             <FormattedMessage defaultMessage="Prompt" description="Section header for judge prompt" />
           </Typography.Text>
@@ -897,7 +906,9 @@ const JudgeDetails = ({ judge, experimentId }: { judge: IssueJudge; experimentId
           )}
         </div>
         {isEditingPrompt && (
-          <div css={{ display: 'flex', justifyContent: 'flex-end', gap: theme.spacing.sm, marginTop: theme.spacing.sm }}>
+          <div
+            css={{ display: 'flex', justifyContent: 'flex-end', gap: theme.spacing.sm, marginTop: theme.spacing.sm }}
+          >
             <Button
               componentId="mlflow.issues.judge.cancel-prompt-button"
               type="tertiary"
@@ -989,10 +1000,7 @@ const TracesTabContent = ({ issue, experimentId }: { issue: Issue; experimentId:
   const makeHtmlFromMarkdown = useMarkdownConverter();
   const queryClient = useQueryClient();
 
-  const traceSearchLocations = useMemo(
-    () => [createTraceLocationForExperiment(experimentId)],
-    [experimentId],
-  );
+  const traceSearchLocations = useMemo(() => [createTraceLocationForExperiment(experimentId)], [experimentId]);
 
   // Get metadata
   const {
@@ -1257,13 +1265,7 @@ const getPassRateDisplay = (
   return { passCount, failCount, passRate };
 };
 
-const PassRateBadge = ({
-  passCount,
-  failCount,
-}: {
-  passCount: number;
-  failCount: number;
-}) => {
+const PassRateBadge = ({ passCount, failCount }: { passCount: number; failCount: number }) => {
   const { theme } = useDesignSystemTheme();
   const total = passCount + failCount;
   const passRate = total > 0 ? passCount / total : 0;
@@ -1439,7 +1441,9 @@ const EvaluationRunsTabContent = ({ issue, experimentId }: { issue: Issue; exper
         {sortedRuns.map((run) => {
           const passRateData = getPassRateDisplay(run.metrics, issue.issue_id);
           // Link to Evaluation Runs tab with this run selected
-          const evalRunsUrl = `${Routes.getExperimentPageRoute(experimentId)}/evaluation-runs?selectedRunUuid=${run.info.run_id}`;
+          const evalRunsUrl = `${Routes.getExperimentPageRoute(experimentId)}/evaluation-runs?selectedRunUuid=${
+            run.info.run_id
+          }`;
 
           return (
             <TableRow key={run.info.run_id}>

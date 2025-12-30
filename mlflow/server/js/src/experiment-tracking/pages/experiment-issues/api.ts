@@ -291,10 +291,7 @@ export async function createIssueComment(
 /**
  * Update an existing comment
  */
-export async function updateIssueComment(
-  commentId: string,
-  content: string,
-): Promise<UpdateIssueCommentResponse> {
+export async function updateIssueComment(commentId: string, content: string): Promise<UpdateIssueCommentResponse> {
   const body: { [key: string]: unknown } = {
     comment_id: commentId,
     content,

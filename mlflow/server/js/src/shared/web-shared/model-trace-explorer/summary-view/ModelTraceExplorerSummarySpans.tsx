@@ -11,6 +11,7 @@ import { createListFromObject, getSpanExceptionEvents } from '../ModelTraceExplo
 import { AssessmentPaneToggle } from '../assessments-pane/AssessmentPaneToggle';
 import { useModelTraceExplorerViewState } from '../ModelTraceExplorerViewStateContext';
 import { ModelTraceExplorerFieldRenderer } from '../field-renderers/ModelTraceExplorerFieldRenderer';
+import { PinnedFieldsSection } from '../pinned-fields';
 
 export const SUMMARY_SPANS_MIN_WIDTH = 400;
 
@@ -78,6 +79,12 @@ export const ModelTraceExplorerSummarySpans = ({
           </div>
         </div>
       )}
+      <PinnedFieldsSection
+        rootInputs={rootInputs}
+        rootOutputs={rootOutputs}
+        renderMode={renderMode}
+        chatMessageFormat={chatMessageFormat}
+      />
       {hasExceptions && <ModelTraceExplorerSummaryViewExceptionsSection node={rootNode} />}
       <ModelTraceExplorerSummarySection
         title={
@@ -88,6 +95,7 @@ export const ModelTraceExplorerSummarySpans = ({
         }
         css={{ marginBottom: hasIntermediateNodes ? 0 : theme.spacing.md }}
         sectionKey="summary-inputs"
+        fieldPathPrefix="inputs"
         data={inputList}
         renderMode={renderMode}
         chatMessageFormat={chatMessageFormat}
@@ -104,6 +112,7 @@ export const ModelTraceExplorerSummarySpans = ({
           />
         }
         sectionKey="summary-outputs"
+        fieldPathPrefix="outputs"
         data={outputList}
         renderMode={renderMode}
         chatMessageFormat={chatMessageFormat ?? 'openai'}

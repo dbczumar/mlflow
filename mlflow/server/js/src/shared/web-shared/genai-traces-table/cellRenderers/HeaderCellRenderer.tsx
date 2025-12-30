@@ -17,8 +17,8 @@ type HeaderCellRendererMeta = {
 export const HeaderCellRenderer = (props: HeaderContext<EvalTraceComparisonEntry, unknown>) => {
   const { theme } = useDesignSystemTheme();
   const intl = useIntl();
-  const { groupId, visibleCount, totalCount, enableGrouping, issuesExpanded, onToggleIssuesExpanded } =
-    props.column.columnDef.meta as HeaderCellRendererMeta;
+  const { groupId, visibleCount, totalCount, enableGrouping, issuesExpanded, onToggleIssuesExpanded } = props.column
+    .columnDef.meta as HeaderCellRendererMeta;
 
   if (!enableGrouping) {
     return TracesTableColumnGroupToLabelMap[groupId as TracesTableColumnGroup];

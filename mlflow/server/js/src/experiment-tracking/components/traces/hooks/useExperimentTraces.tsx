@@ -174,9 +174,7 @@ export const useExperimentTraces = ({
           timestamp_ms: trace.request_time ? new Date(trace.request_time).getTime() : undefined,
           execution_time_ms: trace.execution_duration ? parseFloat(trace.execution_duration) * 1000 : undefined,
           status: trace.state === 'OK' ? 'OK' : trace.state === 'ERROR' ? 'ERROR' : 'UNSET',
-          tags: trace.tags
-            ? Object.entries(trace.tags).map(([key, value]) => ({ key, value }))
-            : [],
+          tags: trace.tags ? Object.entries(trace.tags).map(([key, value]) => ({ key, value })) : [],
           request_metadata: trace.trace_metadata
             ? Object.entries(trace.trace_metadata).map(([key, value]) => ({ key, value }))
             : [],

@@ -78,9 +78,7 @@ export const TracesViewControlsActions = ({
         refreshTraces={refreshTraces}
         setRowSelection={setRowSelection}
       />
-      {isCompareModalOpen && (
-        <GenAITraceComparisonModal traceIds={selectedTraceIds} onClose={closeCompareModal} />
-      )}
+      {isCompareModalOpen && <GenAITraceComparisonModal traceIds={selectedTraceIds} onClose={closeCompareModal} />}
     </div>
   );
 };

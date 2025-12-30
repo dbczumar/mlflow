@@ -43,6 +43,7 @@ export function ModelTraceExplorerCodeSnippet({
   activeMatch = null,
   containsActiveMatch = false,
   initialRenderMode,
+  titleActions,
 }: {
   title: string;
   tokens?: number;
@@ -54,6 +55,8 @@ export function ModelTraceExplorerCodeSnippet({
   // current active match (either in the key or value)
   containsActiveMatch?: boolean;
   initialRenderMode?: CodeSnippetRenderMode;
+  // optional element to render next to the title (e.g., pin button)
+  titleActions?: React.ReactNode;
 }) {
   const parsedData = useMemo(() => JSON.parse(data), [data]);
   const dataIsString = isString(parsedData);
@@ -83,7 +86,7 @@ export function ModelTraceExplorerCodeSnippet({
           overflow: 'hidden',
         }}
       >
-        {(title || shouldShowRenderModeDropdown) && (
+        {(title || shouldShowRenderModeDropdown || titleActions) && (
           <div
             css={{
               display: 'flex',
@@ -111,7 +114,8 @@ export function ModelTraceExplorerCodeSnippet({
                 isActiveMatch={isTitleMatch}
               />
             </Typography.Title>
-            <div css={{ display: 'flex', flexDirection: 'row', alignItems: 'center' }}>
+            <div css={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs }}>
+              {titleActions}
               {shouldShowRenderModeDropdown && (
                 <DropdownMenu.Root>
                   <DropdownMenu.Trigger asChild>

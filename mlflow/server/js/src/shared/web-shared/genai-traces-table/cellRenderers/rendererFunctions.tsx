@@ -283,7 +283,8 @@ export const issueCellRenderer = (
     }
     for (const assessment of traceInfo.assessments) {
       if ('issue' in assessment && assessment.issue !== undefined) {
-        const name = (assessment.metadata as Record<string, string>)?.['mlflow.issue.name'] || assessment.assessment_name;
+        const name =
+          (assessment.metadata as Record<string, string>)?.['mlflow.issue.name'] || assessment.assessment_name;
         if (name === issueName) {
           // Return the actual boolean value (true = issue detected, false = no issue)
           return assessment.issue?.value;

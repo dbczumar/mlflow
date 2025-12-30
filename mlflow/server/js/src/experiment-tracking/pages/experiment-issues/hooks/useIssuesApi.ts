@@ -142,9 +142,7 @@ export function useDeleteIssueMutation() {
 /**
  * Hook to get evaluation runs linked to an issue
  */
-export function useGetLinkedEvaluationRuns(
-  issueId?: string,
-): UseQueryResult<LinkedEvaluationRun[], PredefinedError> {
+export function useGetLinkedEvaluationRuns(issueId?: string): UseQueryResult<LinkedEvaluationRun[], PredefinedError> {
   return useQuery<LinkedEvaluationRun[], PredefinedError>({
     queryKey: [ISSUES_QUERY_KEY, 'linked-runs', issueId],
     queryFn: async () => {

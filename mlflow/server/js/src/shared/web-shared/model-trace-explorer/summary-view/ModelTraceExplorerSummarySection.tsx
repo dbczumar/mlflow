@@ -7,6 +7,7 @@ import {
   ModelTraceExplorerFieldRenderer,
   DEFAULT_MAX_VISIBLE_CHAT_MESSAGES,
 } from '../field-renderers/ModelTraceExplorerFieldRenderer';
+import { PinButton, usePinnedFields } from '../pinned-fields';
 
 const DEFAULT_MAX_VISIBLE_ITEMS = 3;
 
@@ -15,6 +16,7 @@ export const ModelTraceExplorerSummarySection = ({
   data,
   renderMode,
   sectionKey,
+  fieldPathPrefix,
   maxVisibleItems = DEFAULT_MAX_VISIBLE_ITEMS,
   maxVisibleChatMessages = DEFAULT_MAX_VISIBLE_CHAT_MESSAGES,
   className,
@@ -24,6 +26,7 @@ export const ModelTraceExplorerSummarySection = ({
   data: { key: string; value: string }[];
   renderMode: 'default' | 'json' | 'text';
   sectionKey: string;
+  fieldPathPrefix?: 'inputs' | 'outputs';
   maxVisibleItems?: number;
   maxVisibleChatMessages?: number;
   className?: string;
@@ -31,6 +34,7 @@ export const ModelTraceExplorerSummarySection = ({
 }) => {
   const { theme } = useDesignSystemTheme();
   const [expanded, setExpanded] = useState(false);
+  const { isPinned, togglePin } = usePinnedFields();
   const shouldTruncateItems = data.length > maxVisibleItems;
 
   const visibleItems = shouldTruncateItems && !expanded ? data.slice(-maxVisibleItems) : data;
@@ -48,16 +52,47 @@ export const ModelTraceExplorerSummarySection = ({
             {expanded ? 'Show less' : `Show ${hiddenItemCount} more`}
           </Typography.Link>
         )}
-        {visibleItems.map(({ key, value }, index) => (
-          <ModelTraceExplorerFieldRenderer
-            key={key || index}
-            title={key}
-            data={value}
-            renderMode={renderMode}
-            chatMessageFormat={chatMessageFormat}
-            maxVisibleMessages={maxVisibleChatMessages}
-          />
-        ))}
+        {visibleItems.map(({ key, value }, index) => {
+          // If there's a key, pin the specific field. If no key (scalar), pin the entire section.
+          const fieldPath = fieldPathPrefix ? (key ? `${fieldPathPrefix}.${key}` : fieldPathPrefix) : undefined;
+          const displayName = key || (fieldPathPrefix === 'inputs' ? 'Inputs' : 'Outputs');
+          const pinned = fieldPath ? isPinned(fieldPath) : false;
+
+          return (
+            <div
+              key={key || index}
+              css={{
+                position: 'relative',
+                '&:hover .pin-button-wrapper': {
+                  opacity: 1,
+                },
+              }}
+            >
+              {fieldPath && (
+                <div
+                  className="pin-button-wrapper"
+                  css={{
+                    position: 'absolute',
+                    top: theme.spacing.xs,
+                    right: theme.spacing.xs,
+                    zIndex: 1,
+                    opacity: pinned ? 1 : 0,
+                    transition: 'opacity 0.15s ease-in-out',
+                  }}
+                >
+                  <PinButton isPinned={pinned} onToggle={() => togglePin(fieldPath!, displayName)} />
+                </div>
+              )}
+              <ModelTraceExplorerFieldRenderer
+                title={key}
+                data={value}
+                renderMode={renderMode}
+                chatMessageFormat={chatMessageFormat}
+                maxVisibleMessages={maxVisibleChatMessages}
+              />
+            </div>
+          );
+        })}
       </div>
     </ModelTraceExplorerCollapsibleSection>
   );

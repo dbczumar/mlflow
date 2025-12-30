@@ -219,11 +219,7 @@ const SingleIssueValue = ({ issueDetected, isComparing }: SingleIssueValueProps)
 
   // Issue detected = Fail (red), No issue = Pass (green)
   const isPass = !issueDetected;
-  const backgroundColor = isPass
-    ? PASS_TAG_BACKGROUND
-    : theme.isDarkMode
-    ? theme.colors.red200
-    : theme.colors.red200;
+  const backgroundColor = isPass ? PASS_TAG_BACKGROUND : theme.isDarkMode ? theme.colors.red200 : theme.colors.red200;
   const textColor = isPass
     ? theme.isDarkMode
       ? theme.colors.green400
@@ -248,11 +244,7 @@ const SingleIssueValue = ({ issueDetected, isComparing }: SingleIssueValueProps)
         svg: { width: 12, height: 12 },
       }}
     >
-      {isPass ? (
-        <CheckCircleIcon css={{ color: iconColor }} />
-      ) : (
-        <XCircleIcon css={{ color: iconColor }} />
-      )}
+      {isPass ? <CheckCircleIcon css={{ color: iconColor }} /> : <XCircleIcon css={{ color: iconColor }} />}
       <span css={{ color: textColor }}>{isPass ? 'Pass' : 'Fail'}</span>
     </div>
   );
