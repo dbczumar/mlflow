@@ -66,7 +66,6 @@ class OnlineTraceLoader:
         page_token = None
         has_more = True
 
-        # Paginate through results
         while has_more and len(all_trace_infos) < max_traces:
             batch_size = min(page_size, max_traces - len(all_trace_infos))
 
