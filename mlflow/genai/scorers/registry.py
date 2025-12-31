@@ -270,19 +270,19 @@ class MlflowTrackingStore(AbstractScorerStore):
 
     def update_online_scoring_config(
         self,
-        experiment_id: str | None,
         name: str,
         scorer: Scorer,
-        sample_rate: float | None,
-        filter_string: str | None,
+        experiment_id: str | None = None,
+        sample_rate: float | None = None,
+        filter_string: str | None = None,
     ) -> Scorer:
         """
         Update the online scoring configuration for a registered scorer.
 
         Args:
-            experiment_id: The experiment ID. If None, uses the active experiment.
             name: The scorer name.
             scorer: The scorer instance to update.
+            experiment_id: The experiment ID. If None, uses the active experiment.
             sample_rate: The sampling rate (0.0 to 1.0). If None, defaults to 0.0.
             filter_string: Optional filter string.
 

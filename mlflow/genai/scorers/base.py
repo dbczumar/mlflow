@@ -746,9 +746,9 @@ class Scorer(BaseModel):
             )
 
         return store.update_online_scoring_config(
-            experiment_id=experiment_id,
             name=scorer_name,
             scorer=self,
+            experiment_id=experiment_id,
             sample_rate=sampling_config.sample_rate,
             filter_string=sampling_config.filter_string,
         )
@@ -825,9 +825,9 @@ class Scorer(BaseModel):
             )
 
         return store.update_online_scoring_config(
-            experiment_id=experiment_id,
             name=scorer_name,
             scorer=self,
+            experiment_id=experiment_id,
             sample_rate=sampling_config.sample_rate,
             filter_string=sampling_config.filter_string,
         )
