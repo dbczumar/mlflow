@@ -17,6 +17,7 @@ from mlflow.genai.scorers.online.sampler import OnlineScorerSampler
 from mlflow.genai.scorers.online.session_checkpointer import OnlineSessionCheckpointManager
 from mlflow.genai.scorers.online.trace_loader import OnlineTraceLoader
 from mlflow.store.tracking.abstract_store import AbstractStore
+from mlflow.tracing.constant import AssessmentMetadataKey
 
 _logger = logging.getLogger(__name__)
 
@@ -119,7 +120,7 @@ class OnlineSessionScoringProcessor:
         _logger.info(f"Online session scoring completed for experiment {self._experiment_id}")
 
     def _cleanup_old_assessments(
-        self, trace, session_id: str, newly_logged_assessments: list[Assessment]
+        self, trace, session_id: str, new_assessments: list[Assessment]
     ) -> None:
         """
         Remove old online scoring assessments after successfully logging new ones.
@@ -130,42 +131,30 @@ class OnlineSessionScoringProcessor:
         Args:
             trace: The Trace object containing all assessments.
             session_id: The session ID to match in assessment metadata.
-            newly_logged_assessments: List of assessments that were just logged.
+            new_assessments: List of new assessments that were just logged.
         """
-        from mlflow.tracing.constant import AssessmentMetadataKey
-
         if not trace or not trace.info.assessments:
             return
 
-        # Get the names of scorers we just ran
-        newly_logged_names = {a.name for a in newly_logged_assessments}
+        new_assessment_names = {a.name for a in new_assessments}
+        new_assessment_ids = {a.assessment_id for a in new_assessments}
 
-        # Collect assessment IDs from the newly logged assessments
-        new_assessment_ids = {a.assessment_id for a in newly_logged_assessments}
-
-        # Find old assessments to delete
         for assessment in trace.info.assessments:
             metadata = assessment.metadata or {}
             online_session_id = metadata.get(AssessmentMetadataKey.ONLINE_SCORING_SESSION_ID)
 
-            # Only consider online scoring assessments for this session with matching names
             if (
                 online_session_id == session_id
-                and assessment.name in newly_logged_names
+                and assessment.name in new_assessment_names
                 and assessment.assessment_id not in new_assessment_ids
             ):
-                try:
-                    self._tracking_store.delete_assessment(
-                        trace_id=trace.info.trace_id, assessment_id=assessment.assessment_id
-                    )
-                    _logger.info(
-                        f"Deleted old assessment {assessment.assessment_id} "
-                        f"(name={assessment.name}, session={session_id})"
-                    )
-                except Exception as e:
-                    _logger.warning(
-                        f"Failed to delete old assessment {assessment.assessment_id}: {e}"
-                    )
+                self._tracking_store.delete_assessment(
+                    trace_id=trace.info.trace_id, assessment_id=assessment.assessment_id
+                )
+                _logger.info(
+                    f"Deleted old assessment {assessment.assessment_id} "
+                    f"(name={assessment.name}, session={session_id})"
+                )
 
     def _execute_session_scoring(self, sessions: list[CompletedSession]) -> None:
         """
