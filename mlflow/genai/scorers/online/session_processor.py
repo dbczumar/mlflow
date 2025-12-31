@@ -141,38 +141,31 @@ class OnlineSessionScoringProcessor:
         newly_logged_names = {a.name for a in newly_logged_assessments}
 
         # Collect assessment IDs from the newly logged assessments
-        new_assessment_ids = {a.assessment_id for a in newly_logged_assessments if a.assessment_id}
+        new_assessment_ids = {a.assessment_id for a in newly_logged_assessments}
 
-        try:
-            # Find old assessments to delete
-            for assessment in trace.info.assessments:
-                metadata = assessment.metadata or {}
-                online_session_id = metadata.get(AssessmentMetadataKey.ONLINE_SCORING_SESSION_ID)
+        # Find old assessments to delete
+        for assessment in trace.info.assessments:
+            metadata = assessment.metadata or {}
+            online_session_id = metadata.get(AssessmentMetadataKey.ONLINE_SCORING_SESSION_ID)
 
-                # Only consider online scoring assessments for this session with matching names
-                if (
-                    online_session_id == session_id
-                    and assessment.name in newly_logged_names
-                    and assessment.assessment_id
-                    and assessment.assessment_id not in new_assessment_ids
-                ):
-                    try:
-                        self._tracking_store.delete_assessment(
-                            trace_id=trace.info.trace_id, assessment_id=assessment.assessment_id
-                        )
-                        _logger.info(
-                            f"Deleted old assessment {assessment.assessment_id} "
-                            f"(name={assessment.name}, session={session_id})"
-                        )
-                    except Exception as e:
-                        _logger.warning(
-                            f"Failed to delete old assessment {assessment.assessment_id}: {e}"
-                        )
-        except Exception as e:
-            _logger.warning(
-                f"Failed to cleanup old assessments for trace {trace.info.trace_id}: {e}",
-                exc_info=True,
-            )
+            # Only consider online scoring assessments for this session with matching names
+            if (
+                online_session_id == session_id
+                and assessment.name in newly_logged_names
+                and assessment.assessment_id not in new_assessment_ids
+            ):
+                try:
+                    self._tracking_store.delete_assessment(
+                        trace_id=trace.info.trace_id, assessment_id=assessment.assessment_id
+                    )
+                    _logger.info(
+                        f"Deleted old assessment {assessment.assessment_id} "
+                        f"(name={assessment.name}, session={session_id})"
+                    )
+                except Exception as e:
+                    _logger.warning(
+                        f"Failed to delete old assessment {assessment.assessment_id}: {e}"
+                    )
 
     def _execute_session_scoring(self, sessions: list[CompletedSession]) -> None:
         """
