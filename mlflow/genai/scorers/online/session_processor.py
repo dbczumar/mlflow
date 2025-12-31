@@ -201,18 +201,18 @@ class OnlineSessionScoringProcessor:
         """
         session_filter = f"metadata.`mlflow.trace.session` = '{session.session_id}'"
         combined_filter = f"{EXCLUDE_EVAL_RUN_TRACES_FILTER} AND {session_filter}"
-        traces = self._trace_loader.fetch_trace_infos_between(
+        trace_infos = self._trace_loader.fetch_trace_infos_between(
             experiment_id=self._experiment_id,
             start_time_ms=session.first_trace_timestamp_ms,
             end_time_ms=session.last_trace_timestamp_ms,
             filter_string=combined_filter,
         )
 
-        if not traces:
+        if not trace_infos:
             _logger.warning(f"No traces found for session {session.session_id}")
             return
 
-        trace_ids = [t.trace_id for t in traces]
+        trace_ids = [t.trace_id for t in trace_infos]
         full_traces = self._trace_loader.fetch_traces(trace_ids)
 
         if not full_traces:
