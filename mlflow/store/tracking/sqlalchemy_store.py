@@ -2466,6 +2466,7 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
 
         Active online scorers are those with a sample_rate greater than zero.
         Each OnlineScorer contains the serialized scorer and sampling configuration.
+        Gateway endpoint IDs in the serialized scorers are resolved to endpoint names.
 
         Returns:
             List of OnlineScorer entities with name, experiment_id, serialized_scorer,
@@ -2507,15 +2508,22 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
                 .all()
             )
 
+            # Batch resolve gateway endpoint IDs to names
+            scorers_with_resolved_endpoint = self._batch_resolve_endpoint_in_serialized_scorers(
+                [version.serialized_scorer for config, scorer, version in results]
+            )
+
             return [
                 OnlineScorer(
                     name=scorer.scorer_name,
                     experiment_id=str(scorer.experiment_id),
-                    serialized_scorer=version.serialized_scorer,
+                    serialized_scorer=scorer_with_resolved_endpoint,
                     sample_rate=config.sample_rate,
                     filter_string=config.filter_string,
                 )
-                for config, scorer, version in results
+                for (config, scorer, version), scorer_with_resolved_endpoint in zip(
+                    results, scorers_with_resolved_endpoint
+                )
             ]
 
     def update_online_scoring_config(

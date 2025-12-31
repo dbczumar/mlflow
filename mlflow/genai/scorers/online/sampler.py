@@ -5,19 +5,10 @@ import json
 import logging
 from typing import TYPE_CHECKING
 
-from mlflow.exceptions import MlflowException
 from mlflow.genai.scorers.base import Scorer
-from mlflow.genai.scorers.scorer_utils import (
-    build_gateway_model,
-    extract_endpoint_ref,
-    extract_model_from_serialized_scorer,
-    is_gateway_model,
-    update_model_in_serialized_scorer,
-)
 
 if TYPE_CHECKING:
     from mlflow.genai.scorers.online.processor import OnlineScorer
-    from mlflow.store.tracking.abstract_store import AbstractStore
 
 _logger = logging.getLogger(__name__)
 
@@ -31,32 +22,12 @@ class OnlineScorerSampler:
     - Use conditional probability: if a scorer is rejected, skip all lower-rate scorers
     """
 
-    def __init__(
-        self,
-        configs: list["OnlineScorer"],
-        tracking_store: "AbstractStore",
-    ):
+    def __init__(self, configs: list["OnlineScorer"]):
         self.configs = configs
         self._sample_rates: dict[str, float] = {}
         self._scorers: dict[str, Scorer] = {}
         for config in configs:
             scorer_dict = json.loads(config.serialized_scorer)
-
-            # Resolve gateway endpoint IDs to names
-            model = extract_model_from_serialized_scorer(scorer_dict)
-            if is_gateway_model(model):
-                endpoint_ref = extract_endpoint_ref(model)
-                try:
-                    endpoint = tracking_store.get_gateway_endpoint(endpoint_id=endpoint_ref)
-                    new_model = build_gateway_model(endpoint.name)
-                    scorer_dict = update_model_in_serialized_scorer(scorer_dict, new_model)
-                except MlflowException:
-                    _logger.warning(
-                        f"Skipping scorer '{scorer_dict.get('name')}': "
-                        f"failed to resolve gateway endpoint from ID '{endpoint_ref}'"
-                    )
-                    continue
-
             scorer = Scorer.model_validate(scorer_dict)
             self._sample_rates[scorer.name] = config.sample_rate
             self._scorers[scorer.name] = scorer
