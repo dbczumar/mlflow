@@ -57,24 +57,24 @@ class OnlineTraceCheckpointManager:
         """
         Calculate the time window for trace scoring.
 
-        Enforces a maximum lookback of 1 hour to prevent getting stuck on persistently
-        failing traces. If the checkpoint is older than 1 hour, uses current_time - 1 hour
-        instead to skip over old problematic traces.
+        Enforces a maximum lookback period to prevent getting stuck on persistently
+        failing traces. If the checkpoint is older than MAX_LOOKBACK_MS, uses
+        current_time - MAX_LOOKBACK_MS instead to skip over old problematic traces.
 
         Returns:
             OnlineTraceScoringTimeWindow with min and max trace timestamps.
-            min_trace_timestamp_ms is the checkpoint if it exists and is within the last hour,
-            otherwise now - 1 hour.
+            min_trace_timestamp_ms is the checkpoint if it exists and is within the
+            lookback period, otherwise now - MAX_LOOKBACK_MS.
             max_trace_timestamp_ms is the current time.
         """
         current_time_ms = int(time.time() * 1000)
         current_checkpoint = self.get_checkpoint_timestamp()
 
-        # Start from checkpoint, but never look back more than 1 hour
+        # Start from checkpoint, but never look back more than MAX_LOOKBACK_MS
         min_lookback_time_ms = current_time_ms - MAX_LOOKBACK_MS
 
         if current_checkpoint is not None:
-            # Use the more recent of: checkpoint or (current_time - 1 hour)
+            # Use the more recent of: checkpoint or (current_time - MAX_LOOKBACK_MS)
             min_trace_timestamp_ms = max(current_checkpoint, min_lookback_time_ms)
         else:
             min_trace_timestamp_ms = min_lookback_time_ms

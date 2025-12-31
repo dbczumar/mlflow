@@ -61,20 +61,20 @@ class OnlineSessionCheckpointManager:
         """
         Calculate the time window for session scoring.
 
-        Enforces a maximum lookback of 1 hour to prevent getting stuck on persistently
-        failing sessions. If the checkpoint is older than 1 hour, uses current_time - 1 hour
-        instead to skip over old problematic sessions.
+        Enforces a maximum lookback period to prevent getting stuck on persistently
+        failing sessions. If the checkpoint is older than MAX_LOOKBACK_MS, uses
+        current_time - MAX_LOOKBACK_MS instead to skip over old problematic sessions.
 
         Returns:
             OnlineSessionScoringTimeWindow with min and max last trace timestamps.
-            min_last_trace_timestamp_ms is the checkpoint if it exists and is within the last hour,
-            otherwise now - 1 hour.
+            min_last_trace_timestamp_ms is the checkpoint if it exists and is within
+            the lookback period, otherwise now - MAX_LOOKBACK_MS.
             max_last_trace_timestamp_ms is current time - session completion buffer.
         """
         current_time_ms = int(time.time() * 1000)
         current_checkpoint = self.get_checkpoint_timestamp()
 
-        # Start from checkpoint, but never look back more than 1 hour
+        # Start from checkpoint, but never look back more than MAX_LOOKBACK_MS
         min_lookback_time_ms = current_time_ms - MAX_LOOKBACK_MS
 
         if current_checkpoint is not None:
