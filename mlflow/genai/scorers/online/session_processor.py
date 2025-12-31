@@ -119,7 +119,7 @@ class OnlineSessionScoringProcessor:
 
         _logger.info(f"Online session scoring completed for experiment {self._experiment_id}")
 
-    def _cleanup_old_assessments(
+    def _clean_up_old_assessments(
         self, trace, session_id: str, new_assessments: list[Assessment]
     ) -> None:
         """
@@ -253,7 +253,7 @@ class OnlineSessionScoringProcessor:
                     _log_assessments(run_id=None, trace=trace, assessments=feedbacks)
 
                     # Clean up old assessments after successfully logging new ones
-                    self._cleanup_old_assessments(trace, session.session_id, feedbacks)
+                    self._clean_up_old_assessments(trace, session.session_id, feedbacks)
         except Exception as e:
             _logger.warning(
                 f"Failed to evaluate session {session.session_id}: {e}",
