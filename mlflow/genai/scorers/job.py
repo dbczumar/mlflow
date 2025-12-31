@@ -12,6 +12,7 @@ from mlflow.entities import Trace
 from mlflow.environment_variables import (
     MLFLOW_GENAI_EVAL_MAX_WORKERS,
     MLFLOW_SERVER_JUDGE_INVOKE_MAX_WORKERS,
+    MLFLOW_SERVER_ONLINE_SCORING_MAX_WORKERS,
     MLFLOW_SERVER_SCORER_INVOKE_BATCH_SIZE,
 )
 from mlflow.exceptions import MlflowException
@@ -56,7 +57,7 @@ def _extract_failures_from_feedbacks(feedbacks: list[Any]) -> list[ScorerFailure
 
 @job(
     name="run_online_trace_scorer",
-    max_workers=MLFLOW_SERVER_JUDGE_INVOKE_MAX_WORKERS.get(),
+    max_workers=MLFLOW_SERVER_ONLINE_SCORING_MAX_WORKERS.get(),
     exclusive=True,
 )
 def run_online_trace_scorer_job(
@@ -84,7 +85,7 @@ def run_online_trace_scorer_job(
 
 @job(
     name="run_online_session_scorer",
-    max_workers=MLFLOW_SERVER_JUDGE_INVOKE_MAX_WORKERS.get(),
+    max_workers=MLFLOW_SERVER_ONLINE_SCORING_MAX_WORKERS.get(),
     exclusive=True,
 )
 def run_online_session_scorer_job(
