@@ -193,16 +193,16 @@ class MlflowTrackingStore(AbstractScorerStore):
         experiment_id = experiment_id or _get_experiment_id()
         return self._tracking_store.register_scorer(experiment_id, scorer.name, serialized_scorer)
 
-    def _populate_scorer_from_backend(
+    def _hydrate_scorer_from_store(
         self,
         scorer: Scorer,
         online_config=None,
     ) -> None:
         """
-        Populate a scorer with sampling config and registered backend from the tracking store.
+        Hydrate a scorer with runtime state from the tracking store.
 
         Args:
-            scorer: The scorer to populate.
+            scorer: The scorer to hydrate.
             online_config: Optional OnlineScoringConfig from the tracking store.
         """
         scorer._registered_backend = "tracking"
@@ -217,7 +217,7 @@ class MlflowTrackingStore(AbstractScorerStore):
 
         experiment_id = experiment_id or _get_experiment_id()
         scorer_versions = self._tracking_store.list_scorers(experiment_id)
-        scorer_ids = [sv.scorer_id for sv in scorer_versions if sv.scorer_id]
+        scorer_ids = [sv.scorer_id for sv in scorer_versions]
         online_configs = (
             self._tracking_store.get_online_scoring_configs(scorer_ids) if scorer_ids else {}
         )
@@ -225,7 +225,7 @@ class MlflowTrackingStore(AbstractScorerStore):
         for scorer_version in scorer_versions:
             scorer = Scorer.model_validate(scorer_version.serialized_scorer)
             online_config = online_configs.get(scorer_version.scorer_id)
-            self._populate_scorer_from_backend(scorer, online_config)
+            self._hydrate_scorer_from_store(scorer, online_config)
             scorers.append(scorer)
         return scorers
 
@@ -234,14 +234,10 @@ class MlflowTrackingStore(AbstractScorerStore):
 
         experiment_id = experiment_id or _get_experiment_id()
         scorer_version = self._tracking_store.get_scorer(experiment_id, name, version)
-        online_config = None
-        if scorer_version.scorer_id:
-            online_configs = self._tracking_store.get_online_scoring_configs(
-                [scorer_version.scorer_id]
-            )
-            online_config = online_configs.get(scorer_version.scorer_id)
+        online_configs = self._tracking_store.get_online_scoring_configs([scorer_version.scorer_id])
+        online_config = online_configs.get(scorer_version.scorer_id)
         scorer = Scorer.model_validate(scorer_version.serialized_scorer)
-        self._populate_scorer_from_backend(scorer, online_config)
+        self._hydrate_scorer_from_store(scorer, online_config)
         return scorer
 
     def list_scorer_versions(self, experiment_id, name) -> list[tuple[Scorer, int]]:
@@ -249,7 +245,7 @@ class MlflowTrackingStore(AbstractScorerStore):
 
         experiment_id = experiment_id or _get_experiment_id()
         scorer_versions = self._tracking_store.list_scorer_versions(experiment_id, name)
-        scorer_ids = [sv.scorer_id for sv in scorer_versions if sv.scorer_id]
+        scorer_ids = [sv.scorer_id for sv in scorer_versions]
         online_configs = (
             self._tracking_store.get_online_scoring_configs(scorer_ids) if scorer_ids else {}
         )
@@ -257,7 +253,7 @@ class MlflowTrackingStore(AbstractScorerStore):
         for scorer_version in scorer_versions:
             scorer = Scorer.model_validate(scorer_version.serialized_scorer)
             online_config = online_configs.get(scorer_version.scorer_id)
-            self._populate_scorer_from_backend(scorer, online_config)
+            self._hydrate_scorer_from_store(scorer, online_config)
             scorers.append((scorer, scorer_version.scorer_version))
         return scorers
 
