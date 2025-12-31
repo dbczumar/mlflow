@@ -24,7 +24,11 @@ _logger = logging.getLogger(__name__)
 
 @dataclass
 class CompletedSession:
-    """A completed session with metadata."""
+    """
+    Metadata about a session that has been determined complete and is eligible for online scoring.
+
+    Contains only the session ID and timestamp range, not the actual trace data.
+    """
 
     session_id: str
     first_trace_timestamp_ms: int
