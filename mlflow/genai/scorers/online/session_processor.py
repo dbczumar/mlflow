@@ -222,6 +222,7 @@ class OnlineSessionScoringProcessor:
         full_traces.sort(key=lambda t: t.info.timestamp_ms)
 
         applicable_scorers = []
+        # Group scorers by filter_string to apply dense sampling separately per filter group
         for filter_string in self._sampler.get_filter_strings():
             session_scorers = self._sampler.get_scorers_for_filter(
                 filter_string, session_level=True
