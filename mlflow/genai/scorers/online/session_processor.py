@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from mlflow.entities.assessment import Assessment
 from mlflow.environment_variables import MLFLOW_GENAI_EVAL_MAX_WORKERS
 from mlflow.genai.evaluation.entities import EvalItem
+from mlflow.genai.evaluation.harness import _log_assessments
 from mlflow.genai.evaluation.session_utils import evaluate_session_level_scorers
 from mlflow.genai.scorers.online.constants import (
     EXCLUDE_EVAL_RUN_TRACES_FILTER,
@@ -241,9 +242,6 @@ class OnlineSessionScoringProcessor:
                 session_items=session_items,
                 multi_turn_scorers=applicable_scorers,
             )
-
-            from mlflow.genai.evaluation.harness import _log_assessments
-            from mlflow.tracing.constant import AssessmentMetadataKey
 
             for trace_id, feedbacks in result.items():
                 if feedbacks and (
