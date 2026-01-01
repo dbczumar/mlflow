@@ -10,6 +10,7 @@ import json
 import logging
 import shutil
 import subprocess
+import tempfile
 import uuid
 from pathlib import Path
 from typing import Any, AsyncGenerator
@@ -23,9 +24,33 @@ _logger = logging.getLogger(__name__)
 # Config file location
 CLAUDE_CONFIG_FILE = Path.home() / ".mlflow" / "claude-config.json"
 
-# Session storage (in-memory with TTL)
-# In production, consider using Redis or similar for persistence
-_sessions: dict[str, dict[str, Any]] = {}
+# Session storage directory (file-based to work across workers)
+SESSION_DIR = Path(tempfile.gettempdir()) / "mlflow-claude-sessions"
+SESSION_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def _get_session_file(session_id: str) -> Path:
+    """Get path to session file."""
+    return SESSION_DIR / f"{session_id}.json"
+
+
+def _save_session(session_id: str, data: dict[str, Any]) -> None:
+    """Save session data to file."""
+    session_file = _get_session_file(session_id)
+    with open(session_file, "w") as f:
+        json.dump(data, f)
+
+
+def _load_session(session_id: str) -> dict[str, Any] | None:
+    """Load session data from file."""
+    session_file = _get_session_file(session_id)
+    if session_file.exists():
+        try:
+            with open(session_file) as f:
+                return json.load(f)
+        except (json.JSONDecodeError, IOError):
+            pass
+    return None
 
 # Create FastAPI router
 claude_agent_router = APIRouter(prefix="/api/claude-agent", tags=["claude-agent"])
@@ -100,10 +125,12 @@ async def _run_claude_agent(
     if model and model != "default":
         cmd.extend(["--model", model])
 
-    if session_id and session_id in _sessions:
-        stored_session = _sessions[session_id].get("claude_session_id")
-        if stored_session:
-            cmd.extend(["--resume", stored_session])
+    if session_id:
+        session_data = _load_session(session_id)
+        if session_data:
+            stored_session = session_data.get("claude_session_id")
+            if stored_session:
+                cmd.extend(["--resume", stored_session])
 
     try:
         # Start the Claude process
@@ -142,9 +169,12 @@ async def _run_claude_agent(
                         yield f"event: message\ndata: {json.dumps({'text': text})}\n\n"
 
                 elif msg_type == "result":
-                    # Final result
+                    # Final result - save claude session ID to file
                     if claude_session_id and session_id:
-                        _sessions[session_id]["claude_session_id"] = claude_session_id
+                        session_data = _load_session(session_id)
+                        if session_data:
+                            session_data["claude_session_id"] = claude_session_id
+                            _save_session(session_id, session_data)
                     yield f"event: done\ndata: {json.dumps({'status': 'complete'})}\n\n"
 
                 elif msg_type == "error":
@@ -185,12 +215,12 @@ async def analyze_trace(request: AnalyzeRequest) -> AnalyzeResponse:
     # Generate or use existing session ID
     session_id = request.session_id or str(uuid.uuid4())
 
-    # Store session data
-    _sessions[session_id] = {
+    # Store session data to file (works across workers)
+    _save_session(session_id, {
         "trace_context": request.trace_context,
         "prompt": request.prompt,
         "messages": [],
-    }
+    })
 
     return AnalyzeResponse(
         session_id=session_id,
@@ -209,10 +239,10 @@ async def stream_response(session_id: str) -> StreamingResponse:
     Returns:
         StreamingResponse with SSE events
     """
-    if session_id not in _sessions:
+    session = _load_session(session_id)
+    if session is None:
         raise HTTPException(status_code=404, detail="Session not found")
 
-    session = _sessions[session_id]
     config = _load_config()
 
     # Build the prompt
@@ -260,14 +290,15 @@ async def send_message(request: MessageRequest) -> StreamingResponse:
     Returns:
         StreamingResponse with SSE events
     """
-    if request.session_id not in _sessions:
+    session = _load_session(request.session_id)
+    if session is None:
         raise HTTPException(status_code=404, detail="Session not found")
 
-    session = _sessions[request.session_id]
     config = _load_config()
 
-    # Add message to session history
+    # Add message to session history and save
     session["messages"].append({"role": "user", "content": request.message})
+    _save_session(request.session_id, session)
 
     # Get config values
     cwd = config.get("projectPath")
