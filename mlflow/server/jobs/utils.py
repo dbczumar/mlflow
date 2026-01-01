@@ -414,22 +414,6 @@ def _launch_huey_consumer(job_name: str) -> None:
     ).start()
 
 
-def _start_periodic_tasks_consumer_proc():
-    from mlflow.utils.process import _exec_cmd
-
-    return _exec_cmd(
-        [
-            sys.executable,
-            shutil.which("huey_consumer.py"),
-            "mlflow.server.jobs._periodic_tasks_consumer.huey_instance",
-            "-w",
-            str(PERIODIC_TASKS_WORKER_COUNT),
-        ],
-        capture_output=False,
-        synchronous=False,
-    )
-
-
 def _launch_periodic_tasks_consumer() -> None:
     """
     Launch a dedicated Huey consumer for periodic tasks.
@@ -448,6 +432,22 @@ def _launch_periodic_tasks_consumer() -> None:
         name="MLflow-huey-consumer-periodic-tasks-watcher",
         daemon=False,
     ).start()
+
+
+def _start_periodic_tasks_consumer_proc():
+    from mlflow.utils.process import _exec_cmd
+
+    return _exec_cmd(
+        [
+            sys.executable,
+            shutil.which("huey_consumer.py"),
+            "mlflow.server.jobs._periodic_tasks_consumer.huey_instance",
+            "-w",
+            str(PERIODIC_TASKS_WORKER_COUNT),
+        ],
+        capture_output=False,
+        synchronous=False,
+    )
 
 
 def _launch_job_runner(env_map, server_proc_pid):
