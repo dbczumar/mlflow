@@ -3990,6 +3990,15 @@ def _delete_scorer():
 @catch_mlflow_exception
 @_disable_if_artifacts_only
 def _get_online_scoring_configs():
+    """
+    Get online scoring configurations for a list of scorer IDs.
+
+    Query Parameters:
+        scorer_ids: List of scorer IDs to fetch configurations for.
+
+    Returns:
+        JSON response containing a mapping of scorer_id to configuration.
+    """
     scorer_ids = request.args.getlist("scorer_ids")
 
     if not scorer_ids:
@@ -4007,6 +4016,18 @@ def _get_online_scoring_configs():
 @catch_mlflow_exception
 @_disable_if_artifacts_only
 def _update_online_scoring_config():
+    """
+    Update the online scoring configuration for a registered scorer.
+
+    Request Body (JSON):
+        experiment_id: The experiment ID containing the scorer.
+        name: The scorer name.
+        sample_rate: The sampling rate (0.0 to 1.0).
+        filter_string: Optional filter string for trace selection.
+
+    Returns:
+        JSON response containing the updated configuration.
+    """
     request_json = _get_request_json()
     experiment_id = request_json.get("experiment_id")
     name = request_json.get("name")
