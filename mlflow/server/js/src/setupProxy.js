@@ -17,6 +17,12 @@ module.exports = function (app) {
     }),
   );
   app.use(
+    createProxyMiddleware('/api/claude-agent', {
+      target: proxyTarget,
+      changeOrigin: true,
+    }),
+  );
+  app.use(
     createProxyMiddleware('/graphql', {
       target: proxyTarget,
       changeOrigin: true,
