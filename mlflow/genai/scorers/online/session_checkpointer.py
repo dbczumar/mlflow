@@ -65,9 +65,9 @@ class OnlineSessionCheckpointManager:
             pass
         return None
 
-    def update_checkpoint(self, checkpoint: OnlineSessionScoringCheckpoint) -> None:
+    def persist_checkpoint(self, checkpoint: OnlineSessionScoringCheckpoint) -> None:
         """
-        Update the checkpoint tag with a new checkpoint.
+        Persist the checkpoint tag with a new checkpoint.
 
         Args:
             checkpoint: The checkpoint to store.
