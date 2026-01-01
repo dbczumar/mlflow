@@ -68,7 +68,7 @@ export interface HealthCheckResponse {
  * Claude Agent context state.
  */
 export interface ClaudeAgentState {
-  isDrawerOpen: boolean;
+  isClaudeTabActive: boolean;
   traceContext: ModelTrace | null;
   sessionId: string | null;
   messages: ChatMessage[];
@@ -81,8 +81,8 @@ export interface ClaudeAgentState {
  * Claude Agent context actions.
  */
 export interface ClaudeAgentActions {
-  openDrawer: (trace: ModelTrace) => void;
-  closeDrawer: () => void;
+  openClaudeTab: (trace: ModelTrace) => void;
+  closeClaudeTab: () => void;
   sendMessage: (message: string) => void;
   startAnalysis: (prompt?: string) => Promise<void>;
   reset: () => void;

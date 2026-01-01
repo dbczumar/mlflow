@@ -9,7 +9,7 @@
 export { ClaudeAgentProvider, useClaudeAgentContext, useClaudeAgentContextOptional } from './ClaudeAgentContext';
 
 // Components
-export { ClaudeAgentDrawer } from './ClaudeAgentDrawer';
+export { ClaudeAgentTabContent, ClaudeAgentDrawer } from './ClaudeAgentDrawer';
 export { ClaudeAgentChatPanel } from './ClaudeAgentChatPanel';
 export { AskClaudeButton } from './AskClaudeButton';
 

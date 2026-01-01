@@ -13,7 +13,7 @@ import { useGetModelTraceInfo } from './hooks/useGetModelTraceInfo';
 import { useTraceCachedActions } from './hooks/useTraceCachedActions';
 import { ModelTraceExplorerContent } from './ModelTraceExplorerContent';
 import { ModelTraceExplorerComparisonView } from './ModelTraceExplorerComparisonView';
-import { ClaudeAgentProvider, ClaudeAgentDrawer } from '../claude-agent';
+import { ClaudeAgentProvider, ClaudeAgentTabContent, useClaudeAgentContextOptional } from '../claude-agent';
 
 const ContextProviders = ({ children }: { traceId: string; children: React.ReactNode }) => {
   return <ErrorBoundary fallbackRender={ModelTraceExplorerErrorState}>{children}</ErrorBoundary>;
@@ -86,31 +86,77 @@ export const ModelTraceExplorerImpl = ({
 
   return (
     <ClaudeAgentProvider>
-      <ContextProviders traceId={traceId}>
-        <ModelTraceExplorerViewStateProvider
-          modelTrace={modelTrace}
-          initialActiveView={initialActiveView}
-          selectedSpanIdOnRender={selectedSpanId}
-          assessmentsPaneEnabled={assessmentsPaneEnabled}
-          isInComparisonView={isInComparisonView}
-          initialAssessmentsPaneCollapsed={collapseAssessmentPane}
-          isTraceInitialLoading={isTraceInitialLoading}
-        >
-          <ModelTraceHeaderDetails modelTraceInfo={modelTrace.info} modelTrace={modelTrace} />
-          {isInComparisonView ? (
-            <ModelTraceExplorerComparisonView modelTraceInfo={modelTrace.info} />
-          ) : (
-            <ModelTraceExplorerContent
-              modelTraceInfo={modelTrace.info}
-              className={className}
-              selectedSpanId={selectedSpanId}
-              onSelectSpan={onSelectSpan}
-            />
-          )}
-        </ModelTraceExplorerViewStateProvider>
-      </ContextProviders>
-      <ClaudeAgentDrawer />
+      <ModelTraceExplorerInner
+        traceId={traceId}
+        modelTrace={modelTrace}
+        initialActiveView={initialActiveView}
+        selectedSpanId={selectedSpanId}
+        onSelectSpan={onSelectSpan}
+        assessmentsPaneEnabled={assessmentsPaneEnabled}
+        isInComparisonView={isInComparisonView}
+        collapseAssessmentPane={collapseAssessmentPane}
+        isTraceInitialLoading={isTraceInitialLoading}
+        className={className}
+      />
     </ClaudeAgentProvider>
+  );
+};
+
+/**
+ * Inner component that has access to Claude context.
+ */
+const ModelTraceExplorerInner = ({
+  traceId,
+  modelTrace,
+  initialActiveView,
+  selectedSpanId,
+  onSelectSpan,
+  assessmentsPaneEnabled,
+  isInComparisonView,
+  collapseAssessmentPane,
+  isTraceInitialLoading,
+  className,
+}: {
+  traceId: string;
+  modelTrace: ModelTrace;
+  initialActiveView?: 'summary' | 'detail';
+  selectedSpanId?: string;
+  onSelectSpan?: (selectedSpanId?: string) => void;
+  assessmentsPaneEnabled: boolean;
+  isInComparisonView?: boolean;
+  collapseAssessmentPane?: boolean | 'force-open';
+  isTraceInitialLoading: boolean;
+  className?: string;
+}) => {
+  const claudeAgent = useClaudeAgentContextOptional();
+  const isClaudeTabActive = claudeAgent?.isClaudeTabActive ?? false;
+
+  return (
+    <ContextProviders traceId={traceId}>
+      <ModelTraceExplorerViewStateProvider
+        modelTrace={modelTrace}
+        initialActiveView={initialActiveView}
+        selectedSpanIdOnRender={selectedSpanId}
+        assessmentsPaneEnabled={assessmentsPaneEnabled}
+        isInComparisonView={isInComparisonView}
+        initialAssessmentsPaneCollapsed={collapseAssessmentPane}
+        isTraceInitialLoading={isTraceInitialLoading}
+      >
+        <ModelTraceHeaderDetails modelTraceInfo={modelTrace.info} modelTrace={modelTrace} />
+        {isClaudeTabActive ? (
+          <ClaudeAgentTabContent />
+        ) : isInComparisonView ? (
+          <ModelTraceExplorerComparisonView modelTraceInfo={modelTrace.info} />
+        ) : (
+          <ModelTraceExplorerContent
+            modelTraceInfo={modelTrace.info}
+            className={className}
+            selectedSpanId={selectedSpanId}
+            onSelectSpan={onSelectSpan}
+          />
+        )}
+      </ModelTraceExplorerViewStateProvider>
+    </ContextProviders>
   );
 };
 

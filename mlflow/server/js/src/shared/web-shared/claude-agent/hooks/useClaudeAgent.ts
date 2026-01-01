@@ -10,8 +10,8 @@ import { startAnalysis, sendMessageStream, checkHealth } from '../ClaudeAgentSer
 import { useSSEStream } from './useSSEStream';
 
 interface UseClaudeAgentReturn extends ClaudeAgentState {
-  openDrawer: (trace: ModelTrace) => void;
-  closeDrawer: () => void;
+  openClaudeTab: (trace: ModelTrace) => void;
+  closeClaudeTab: () => void;
   sendMessage: (message: string) => void;
   startAnalysis: (prompt?: string) => Promise<void>;
   reset: () => void;
@@ -22,7 +22,7 @@ const generateMessageId = (): string => {
 };
 
 export const useClaudeAgent = (): UseClaudeAgentReturn => {
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [isClaudeTabActive, setIsClaudeTabActive] = useState(false);
   const [traceContext, setTraceContext] = useState<ModelTrace | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -77,9 +77,9 @@ export const useClaudeAgent = (): UseClaudeAgentReturn => {
     onDone: finalizeStreamingMessage,
   });
 
-  const openDrawer = useCallback((trace: ModelTrace) => {
+  const openClaudeTab = useCallback((trace: ModelTrace) => {
     setTraceContext(trace);
-    setIsDrawerOpen(true);
+    setIsClaudeTabActive(true);
     setError(null);
 
     // Check if Claude is available
@@ -92,8 +92,8 @@ export const useClaudeAgent = (): UseClaudeAgentReturn => {
       });
   }, []);
 
-  const closeDrawer = useCallback(() => {
-    setIsDrawerOpen(false);
+  const closeClaudeTab = useCallback(() => {
+    setIsClaudeTabActive(false);
     disconnectSSE();
   }, [disconnectSSE]);
 
@@ -208,15 +208,15 @@ export const useClaudeAgent = (): UseClaudeAgentReturn => {
   );
 
   return {
-    isDrawerOpen,
+    isClaudeTabActive,
     traceContext,
     sessionId,
     messages,
     isStreaming,
     error,
     isClaudeAvailable,
-    openDrawer,
-    closeDrawer,
+    openClaudeTab,
+    closeClaudeTab,
     sendMessage: handleSendMessage,
     startAnalysis: handleStartAnalysis,
     reset,

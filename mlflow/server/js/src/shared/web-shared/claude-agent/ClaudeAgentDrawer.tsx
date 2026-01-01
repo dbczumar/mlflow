@@ -1,75 +1,79 @@
 /**
- * Drawer component for Claude Agent interaction.
+ * Tab content component for Claude Agent interaction.
+ * This component is displayed as a tab in the trace explorer.
  */
 
-import { Drawer, useDesignSystemTheme, SparkleIcon } from '@databricks/design-system';
+import { Button, useDesignSystemTheme, CloseIcon, SparkleIcon } from '@databricks/design-system';
 import { FormattedMessage } from '@databricks/i18n';
 
 import { useClaudeAgentContext } from './ClaudeAgentContext';
 import { ClaudeAgentChatPanel } from './ClaudeAgentChatPanel';
 
-const COMPONENT_ID = 'mlflow.trace.claude_agent.drawer';
+const COMPONENT_ID = 'mlflow.trace.claude_agent.tab_content';
 
 /**
- * Main drawer component for Claude Agent.
+ * Tab content component for Claude Agent.
+ * Displays the chat interface within the trace explorer tabs.
  */
-export const ClaudeAgentDrawer = () => {
+export const ClaudeAgentTabContent = () => {
   const { theme } = useDesignSystemTheme();
-  const { isDrawerOpen, closeDrawer, reset } = useClaudeAgentContext();
+  const { closeClaudeTab, reset } = useClaudeAgentContext();
 
-  const handleOpenChange = (open: boolean) => {
-    if (!open) {
-      closeDrawer();
-      // Reset state after drawer closes
-      setTimeout(() => {
-        reset();
-      }, 300);
-    }
+  const handleClose = () => {
+    closeClaudeTab();
+    // Reset state after closing
+    setTimeout(() => {
+      reset();
+    }, 100);
   };
 
   return (
-    <Drawer.Root modal open={isDrawerOpen} onOpenChange={handleOpenChange}>
-      <Drawer.Content
-        componentId={COMPONENT_ID}
-        width="50vw"
-        title={
-          <span
-            css={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: theme.spacing.sm,
-            }}
-          >
-            <span
-              css={{
-                borderRadius: theme.borders.borderRadiusSm,
-                background: theme.colors.actionDefaultBackgroundHover,
-                padding: theme.spacing.xs,
-                color: theme.colors.purple,
-                height: 'min-content',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <SparkleIcon />
-            </span>
-            <FormattedMessage defaultMessage="Ask Claude" description="Title for the Claude Agent drawer" />
-          </span>
-        }
-        expandContentToFullHeight
+    <div
+      css={{
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100%',
+        overflow: 'hidden',
+      }}
+    >
+      {/* Header */}
+      <div
+        css={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: theme.spacing.md,
+          borderBottom: `1px solid ${theme.colors.border}`,
+          flexShrink: 0,
+        }}
       >
-        <div
+        <span
           css={{
-            height: '100%',
-            marginLeft: -theme.spacing.lg,
-            marginRight: -theme.spacing.lg,
-            marginBottom: -theme.spacing.lg,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: theme.spacing.sm,
+            fontWeight: theme.typography.typographyBoldFontWeight,
           }}
         >
-          <ClaudeAgentChatPanel />
-        </div>
-      </Drawer.Content>
-    </Drawer.Root>
+          <SparkleIcon css={{ color: theme.colors.purple }} />
+          <FormattedMessage defaultMessage="Ask Claude" description="Title for the Claude Agent tab" />
+        </span>
+        <Button
+          componentId={`${COMPONENT_ID}.close`}
+          size="small"
+          icon={<CloseIcon />}
+          onClick={handleClose}
+          aria-label="Close Claude chat"
+        />
+      </div>
+
+      {/* Chat panel */}
+      <div css={{ flex: 1, minHeight: 0 }}>
+        <ClaudeAgentChatPanel />
+      </div>
+    </div>
   );
 };
+
+// Keep old export name for backwards compatibility during transition
+export const ClaudeAgentDrawer = ClaudeAgentTabContent;

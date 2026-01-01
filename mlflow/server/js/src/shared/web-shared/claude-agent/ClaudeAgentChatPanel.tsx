@@ -235,20 +235,11 @@ export const ClaudeAgentChatPanel = () => {
   const { messages, isStreaming, error, isClaudeAvailable, startAnalysis, sendMessage } = useClaudeAgentContext();
   const [inputValue, setInputValue] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const hasStartedRef = useRef(false);
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
-
-  // Start initial analysis when panel opens (if Claude is available)
-  useEffect(() => {
-    if (isClaudeAvailable && !hasStartedRef.current && messages.length === 0) {
-      hasStartedRef.current = true;
-      startAnalysis();
-    }
-  }, [isClaudeAvailable, messages.length, startAnalysis]);
 
   const handleSend = useCallback(() => {
     if (inputValue.trim() && !isStreaming) {

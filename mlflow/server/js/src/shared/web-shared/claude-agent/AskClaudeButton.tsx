@@ -15,7 +15,7 @@ interface AskClaudeButtonProps {
 }
 
 /**
- * Button that opens the Claude Agent drawer for trace analysis.
+ * Button that opens the Claude Agent tab for trace analysis.
  * Only renders if within a ClaudeAgentProvider context.
  */
 export const AskClaudeButton = ({ trace }: AskClaudeButtonProps) => {
@@ -27,10 +27,10 @@ export const AskClaudeButton = ({ trace }: AskClaudeButtonProps) => {
     return null;
   }
 
-  const { openDrawer, isDrawerOpen } = claudeAgent;
+  const { openClaudeTab, isClaudeTabActive } = claudeAgent;
 
   const handleClick = () => {
-    openDrawer(trace);
+    openClaudeTab(trace);
   };
 
   return (
@@ -47,7 +47,7 @@ export const AskClaudeButton = ({ trace }: AskClaudeButtonProps) => {
         componentId={COMPONENT_ID}
         size="small"
         onClick={handleClick}
-        disabled={isDrawerOpen}
+        disabled={isClaudeTabActive}
         icon={<SparkleIcon css={{ color: theme.colors.purple }} />}
       >
         <FormattedMessage defaultMessage="Ask Claude" description="Label for Ask Claude button" />
