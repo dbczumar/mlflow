@@ -12,7 +12,10 @@ from mlflow.genai.scorers.base import Scorer
 from mlflow.genai.scorers.online.constants import EXCLUDE_EVAL_RUN_TRACES_FILTER, MAX_TRACES_PER_JOB
 from mlflow.genai.scorers.online.online_scorer import OnlineScorer
 from mlflow.genai.scorers.online.sampler import OnlineScorerSampler
-from mlflow.genai.scorers.online.trace_checkpointer import OnlineTraceCheckpointManager
+from mlflow.genai.scorers.online.trace_checkpointer import (
+    OnlineTraceCheckpointManager,
+    OnlineTraceScoringCheckpoint,
+)
 from mlflow.genai.scorers.online.trace_loader import OnlineTraceLoader
 from mlflow.store.tracking.abstract_store import AbstractStore
 
@@ -91,7 +94,13 @@ class OnlineTraceScoringProcessor:
 
         if not tasks:
             _logger.info("No traces selected after sampling, skipping")
-            self._checkpoint_manager.update_checkpoint_timestamp(time_window.max_trace_timestamp_ms)
+            # Still need to advance checkpoint to avoid reprocessing the same time window
+            # Use a placeholder request_id since we have no actual traces
+            checkpoint = OnlineTraceScoringCheckpoint(
+                timestamp_ms=time_window.max_trace_timestamp_ms,
+                request_id="",
+            )
+            self._checkpoint_manager.persist_checkpoint(checkpoint)
             return
 
         _logger.info(f"Running scoring: {len(tasks)} trace tasks")
@@ -105,8 +114,13 @@ class OnlineTraceScoringProcessor:
 
         self._execute_scoring(tasks)
 
-        # Update checkpoint to end of window + 1ms to avoid reprocessing traces at the boundary
-        self._checkpoint_manager.update_checkpoint_timestamp(time_window.max_trace_timestamp_ms + 1)
+        # Find the trace with the latest timestamp to use for checkpoint
+        latest_trace = max(full_traces, key=lambda t: (t.info.timestamp_ms, t.info.request_id))
+        checkpoint = OnlineTraceScoringCheckpoint(
+            timestamp_ms=latest_trace.info.timestamp_ms,
+            request_id=latest_trace.info.request_id,
+        )
+        self._checkpoint_manager.persist_checkpoint(checkpoint)
 
         _logger.info(f"Online trace scoring completed for experiment {self._experiment_id}")
 

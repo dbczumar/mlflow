@@ -15,7 +15,10 @@ from mlflow.genai.scorers.online.constants import (
 )
 from mlflow.genai.scorers.online.online_scorer import OnlineScorer
 from mlflow.genai.scorers.online.sampler import OnlineScorerSampler
-from mlflow.genai.scorers.online.session_checkpointer import OnlineSessionCheckpointManager
+from mlflow.genai.scorers.online.session_checkpointer import (
+    OnlineSessionCheckpointManager,
+    OnlineSessionScoringCheckpoint,
+)
 from mlflow.genai.scorers.online.trace_loader import OnlineTraceLoader
 from mlflow.store.tracking.abstract_store import AbstractStore
 from mlflow.tracing.constant import AssessmentMetadataKey
@@ -115,12 +118,13 @@ class OnlineSessionScoringProcessor:
 
         self._execute_session_scoring(completed_sessions)
 
-        # Update checkpoint to last processed session's last trace timestamp + 1ms
-        # to avoid reprocessing the same session (checkpoint comparison uses >=)
+        # Update checkpoint to last processed session
         latest_session = completed_sessions[-1]
-        self._checkpoint_manager.update_checkpoint_timestamp(
-            latest_session.last_trace_timestamp_ms + 1
+        checkpoint = OnlineSessionScoringCheckpoint(
+            timestamp_ms=latest_session.last_trace_timestamp_ms,
+            session_id=latest_session.session_id,
         )
+        self._checkpoint_manager.persist_checkpoint(checkpoint)
 
         _logger.info(f"Online session scoring completed for experiment {self._experiment_id}")
 
