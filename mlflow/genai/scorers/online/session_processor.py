@@ -110,6 +110,17 @@ class OnlineSessionScoringProcessor:
             max_results=MAX_SESSIONS_PER_JOB,
         )
 
+        # Filter out sessions at checkpoint boundary that have already been processed
+        if time_window.min_session_id is not None:
+            completed_sessions = [
+                s
+                for s in completed_sessions
+                if not (
+                    s.last_trace_timestamp_ms == time_window.min_last_trace_timestamp_ms
+                    and s.session_id <= time_window.min_session_id
+                )
+            ]
+
         if not completed_sessions:
             _logger.info("No completed sessions found, skipping")
             return

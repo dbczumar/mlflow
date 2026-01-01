@@ -88,9 +88,7 @@ class OnlineTraceScoringProcessor:
             f"{time_window.max_trace_timestamp_ms}]"
         )
 
-        tasks = self._fetch_and_sample_traces(
-            time_window.min_trace_timestamp_ms, time_window.max_trace_timestamp_ms
-        )
+        tasks = self._fetch_and_sample_traces(time_window)
 
         if not tasks:
             _logger.info("No traces selected after sampling, skipping")
@@ -125,11 +123,13 @@ class OnlineTraceScoringProcessor:
 
     def _fetch_and_sample_traces(
         self,
-        start_time_ms: int,
-        end_time_ms: int,
+        time_window,
     ) -> dict[str, TraceScoringTask]:
         """
         Fetch traces for each filter and apply sampling.
+
+        Args:
+            time_window: OnlineTraceScoringTimeWindow with timestamp bounds and checkpoint ID.
 
         Returns:
             Dictionary mapping trace_id to TraceScoringTask.
@@ -147,8 +147,8 @@ class OnlineTraceScoringProcessor:
             )
             trace_infos = self._trace_loader.fetch_trace_infos_between(
                 self._experiment_id,
-                start_time_ms,
-                end_time_ms,
+                time_window.min_trace_timestamp_ms,
+                time_window.max_trace_timestamp_ms,
                 combined_filter,
                 MAX_TRACES_PER_JOB,
             )
@@ -156,6 +156,17 @@ class OnlineTraceScoringProcessor:
             if not trace_infos:
                 _logger.debug(f"No trace infos found for filter: {filter_string}")
                 continue
+
+            # Filter out traces at checkpoint boundary that have already been processed
+            if time_window.min_request_id is not None:
+                trace_infos = [
+                    t
+                    for t in trace_infos
+                    if not (
+                        t.timestamp_ms == time_window.min_trace_timestamp_ms
+                        and t.request_id <= time_window.min_request_id
+                    )
+                ]
 
             _logger.info(f"Found {len(trace_infos)} trace infos for filter: {filter_string}")
 
