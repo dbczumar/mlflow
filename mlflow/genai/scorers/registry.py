@@ -8,15 +8,18 @@ evaluate traces in MLflow experiments.
 import json
 import warnings
 from abc import ABCMeta, abstractmethod
+from typing import TYPE_CHECKING, Optional
 
 from mlflow.exceptions import MlflowException
 from mlflow.genai.scheduled_scorers import ScorerScheduleConfig
 from mlflow.genai.scorers.base import Scorer, ScorerSamplingConfig
-from mlflow.genai.scorers.online.online_scorer import OnlineScoringConfig
 from mlflow.tracking._tracking_service.utils import _get_store
 from mlflow.tracking.fluent import _get_experiment_id
 from mlflow.utils.plugins import get_entry_points
 from mlflow.utils.uri import get_uri_scheme
+
+if TYPE_CHECKING:
+    from mlflow.genai.scorers.online.online_scorer import OnlineScoringConfig
 
 
 class UnsupportedScorerStoreURIException(MlflowException):
@@ -201,7 +204,7 @@ class MlflowTrackingStore(AbstractScorerStore):
     def _hydrate_scorer(
         self,
         scorer: Scorer,
-        online_config: OnlineScoringConfig | None = None,
+        online_config: Optional["OnlineScoringConfig"] = None,
     ) -> None:
         """
         Hydrate a scorer with runtime state from the tracking store.

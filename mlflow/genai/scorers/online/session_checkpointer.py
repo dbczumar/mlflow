@@ -21,6 +21,7 @@ class OnlineSessionScoringTimeWindow:
 
     min_last_trace_timestamp_ms: int
     max_last_trace_timestamp_ms: int
+    min_session_id: str | None = None
 
 
 class OnlineSessionCheckpointManager:
@@ -40,14 +41,49 @@ class OnlineSessionCheckpointManager:
         try:
             experiment = self._tracking_store.get_experiment(self._experiment_id)
             if checkpoint := experiment.tags.get(SESSION_CHECKPOINT_TAG):
-                return int(checkpoint)
+                # Parse format: "timestamp_ms:session_id" or just "timestamp_ms" (legacy)
+                parts = checkpoint.split(":", 1)
+                return int(parts[0])
         except (TypeError, ValueError):
             pass
         return None
 
+    def get_checkpoint_session_id(self) -> str | None:
+        """
+        Get the last processed session ID from the experiment checkpoint tag.
+
+        Returns:
+            The session ID, or None if no checkpoint exists or it's a legacy
+            timestamp-only checkpoint.
+        """
+        try:
+            experiment = self._tracking_store.get_experiment(self._experiment_id)
+            if checkpoint := experiment.tags.get(SESSION_CHECKPOINT_TAG):
+                # Parse format: "timestamp_ms:session_id"
+                parts = checkpoint.split(":", 1)
+                if len(parts) == 2:
+                    return parts[1]
+        except (TypeError, ValueError):
+            pass
+        return None
+
+    def update_checkpoint(self, timestamp_ms: int, session_id: str) -> None:
+        """
+        Update the checkpoint tag with a new timestamp and session ID.
+
+        Args:
+            timestamp_ms: The new checkpoint timestamp in milliseconds.
+            session_id: The session ID of the last processed session.
+        """
+        checkpoint_value = f"{timestamp_ms}:{session_id}"
+        self._tracking_store.set_experiment_tag(
+            self._experiment_id,
+            ExperimentTag(SESSION_CHECKPOINT_TAG, checkpoint_value),
+        )
+
     def update_checkpoint_timestamp(self, timestamp_ms: int) -> None:
         """
-        Update the checkpoint tag with a new timestamp.
+        Update the checkpoint tag with a new timestamp (legacy method for backward compatibility).
 
         Args:
             timestamp_ms: The new checkpoint timestamp in milliseconds.
@@ -66,13 +102,16 @@ class OnlineSessionCheckpointManager:
         current_time - MAX_LOOKBACK_MS instead to skip over old problematic sessions.
 
         Returns:
-            OnlineSessionScoringTimeWindow with min and max last trace timestamps.
+            OnlineSessionScoringTimeWindow with min and max last trace timestamps and
+            optional min session ID for tiebreaking.
             min_last_trace_timestamp_ms is the checkpoint if it exists and is within
             the lookback period, otherwise now - MAX_LOOKBACK_MS.
             max_last_trace_timestamp_ms is current time - session completion buffer.
+            min_session_id is the session ID from checkpoint for handling timestamp ties.
         """
         current_time_ms = int(time.time() * 1000)
         current_checkpoint = self.get_checkpoint_timestamp()
+        checkpoint_session_id = self.get_checkpoint_session_id()
 
         # Start from checkpoint, but never look back more than MAX_LOOKBACK_MS
         min_lookback_time_ms = current_time_ms - MAX_LOOKBACK_MS
@@ -87,4 +126,5 @@ class OnlineSessionCheckpointManager:
         return OnlineSessionScoringTimeWindow(
             min_last_trace_timestamp_ms=min_last_trace_timestamp_ms,
             max_last_trace_timestamp_ms=max_last_trace_timestamp_ms,
+            min_session_id=checkpoint_session_id,
         )
