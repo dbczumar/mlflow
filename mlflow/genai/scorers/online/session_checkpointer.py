@@ -56,16 +56,11 @@ class OnlineSessionCheckpointManager:
 
         Returns:
             OnlineSessionScoringCheckpoint, or None if no checkpoint exists.
-            Handles legacy timestamp-only format for backward compatibility.
         """
         try:
             experiment = self._tracking_store.get_experiment(self._experiment_id)
             if checkpoint_str := experiment.tags.get(SESSION_CHECKPOINT_TAG):
-                # Try JSON format first
-                if checkpoint_str.startswith("{"):
-                    return OnlineSessionScoringCheckpoint.from_json(checkpoint_str)
-                # Legacy format: just a timestamp integer
-                return None
+                return OnlineSessionScoringCheckpoint.from_json(checkpoint_str)
         except (TypeError, ValueError, json.JSONDecodeError):
             pass
         return None
