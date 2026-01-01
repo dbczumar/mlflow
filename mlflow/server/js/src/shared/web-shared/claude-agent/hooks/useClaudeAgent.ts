@@ -2,7 +2,7 @@
  * Main hook for Claude Agent functionality.
  */
 
-import { useCallback, useState, useRef } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import type { ModelTrace } from '../../model-trace-explorer/ModelTrace.types';
 import type { ChatMessage, ClaudeAgentState } from '../types';
 import { serializeTraceContext } from '../TraceContextSerializer';
@@ -77,12 +77,8 @@ export const useClaudeAgent = (): UseClaudeAgentReturn => {
     onDone: finalizeStreamingMessage,
   });
 
-  const openClaudeTab = useCallback((trace: ModelTrace) => {
-    setTraceContext(trace);
-    setIsClaudeTabActive(true);
-    setError(null);
-
-    // Check if Claude is available
+  // Check Claude availability on mount
+  useEffect(() => {
     checkHealth()
       .then((health) => {
         setIsClaudeAvailable(health.claude_available === 'true' || health.claude_available === 'True');
@@ -90,6 +86,12 @@ export const useClaudeAgent = (): UseClaudeAgentReturn => {
       .catch(() => {
         setIsClaudeAvailable(false);
       });
+  }, []);
+
+  const openClaudeTab = useCallback((trace: ModelTrace) => {
+    setTraceContext(trace);
+    setIsClaudeTabActive(true);
+    setError(null);
   }, []);
 
   const closeClaudeTab = useCallback(() => {

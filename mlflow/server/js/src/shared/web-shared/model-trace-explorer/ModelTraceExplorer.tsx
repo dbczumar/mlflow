@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
+import { useDesignSystemTheme } from '@databricks/design-system';
 
 import { getLargeTraceDisplaySizeThreshold, shouldBlockLargeTraceDisplay } from './FeatureUtils';
 import type { ModelTrace } from './ModelTrace.types';
@@ -128,8 +129,19 @@ const ModelTraceExplorerInner = ({
   isTraceInitialLoading: boolean;
   className?: string;
 }) => {
+  const { theme } = useDesignSystemTheme();
   const claudeAgent = useClaudeAgentContextOptional();
   const isClaudeTabActive = claudeAgent?.isClaudeTabActive ?? false;
+  const isClaudeAvailable = claudeAgent?.isClaudeAvailable ?? false;
+  const hasAutoOpenedRef = useRef(false);
+
+  // Auto-open Claude panel when it's available and configured
+  useEffect(() => {
+    if (isClaudeAvailable && !hasAutoOpenedRef.current && claudeAgent?.openClaudeTab) {
+      hasAutoOpenedRef.current = true;
+      claudeAgent.openClaudeTab(modelTrace);
+    }
+  }, [isClaudeAvailable, claudeAgent, modelTrace]);
 
   return (
     <ContextProviders traceId={traceId}>
@@ -143,18 +155,52 @@ const ModelTraceExplorerInner = ({
         isTraceInitialLoading={isTraceInitialLoading}
       >
         <ModelTraceHeaderDetails modelTraceInfo={modelTrace.info} modelTrace={modelTrace} />
-        {isClaudeTabActive ? (
-          <ClaudeAgentTabContent />
-        ) : isInComparisonView ? (
-          <ModelTraceExplorerComparisonView modelTraceInfo={modelTrace.info} />
-        ) : (
-          <ModelTraceExplorerContent
-            modelTraceInfo={modelTrace.info}
-            className={className}
-            selectedSpanId={selectedSpanId}
-            onSelectSpan={onSelectSpan}
-          />
-        )}
+        <div
+          css={{
+            display: 'flex',
+            flex: 1,
+            minHeight: 0,
+            overflow: 'hidden',
+          }}
+        >
+          {/* Main trace content - takes 2/3 when Claude is open, full width otherwise */}
+          <div
+            css={{
+              flex: isClaudeTabActive ? '0 0 66%' : 1,
+              minWidth: 0,
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+            }}
+          >
+            {isInComparisonView ? (
+              <ModelTraceExplorerComparisonView modelTraceInfo={modelTrace.info} />
+            ) : (
+              <ModelTraceExplorerContent
+                modelTraceInfo={modelTrace.info}
+                className={className}
+                selectedSpanId={selectedSpanId}
+                onSelectSpan={onSelectSpan}
+              />
+            )}
+          </div>
+
+          {/* Claude panel on the right - 1/3 width */}
+          {isClaudeTabActive && (
+            <div
+              css={{
+                flex: '0 0 34%',
+                minWidth: 0,
+                borderLeft: `1px solid ${theme.colors.border}`,
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden',
+              }}
+            >
+              <ClaudeAgentTabContent />
+            </div>
+          )}
+        </div>
       </ModelTraceExplorerViewStateProvider>
     </ContextProviders>
   );
