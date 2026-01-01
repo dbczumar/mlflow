@@ -161,7 +161,9 @@ class OnlineTraceScoringProcessor:
                 _logger.debug(f"No trace infos found for filter: {filter_string}")
                 continue
 
-            # Filter out traces at checkpoint boundary that have already been processed
+            # Filter out traces at checkpoint boundary that have already been processed.
+            # Traces are ordered by (timestamp_ms ASC, request_id ASC), so we filter out
+            # any traces with the checkpoint timestamp and request_id <= checkpoint.request_id.
             if checkpoint is not None and checkpoint.request_id is not None:
                 trace_infos = [
                     t

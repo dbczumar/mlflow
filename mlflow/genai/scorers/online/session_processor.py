@@ -111,7 +111,9 @@ class OnlineSessionScoringProcessor:
             max_results=MAX_SESSIONS_PER_JOB,
         )
 
-        # Filter out sessions at checkpoint boundary that have already been processed
+        # Filter out sessions at checkpoint boundary that have already been processed.
+        # Sessions are ordered by (last_trace_timestamp_ms ASC, session_id ASC), so we filter
+        # out any sessions with the checkpoint timestamp and session_id <= checkpoint.session_id.
         if checkpoint is not None and checkpoint.session_id is not None:
             completed_sessions = [
                 s
