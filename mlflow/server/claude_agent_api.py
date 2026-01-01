@@ -120,7 +120,8 @@ async def _run_claude_agent(
         return
 
     # Build command
-    cmd = [claude_path, "-p", prompt, "--output-format", "stream-json"]
+    # Note: --verbose is required when using --output-format=stream-json with -p
+    cmd = [claude_path, "-p", prompt, "--output-format", "stream-json", "--verbose"]
 
     if model and model != "default":
         cmd.extend(["--model", model])
