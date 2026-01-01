@@ -3,11 +3,12 @@
  * This component is displayed as a tab in the trace explorer.
  */
 
-import { Button, useDesignSystemTheme, CloseIcon, SparkleIcon } from '@databricks/design-system';
+import { Button, useDesignSystemTheme, CloseIcon } from '@databricks/design-system';
 import { FormattedMessage } from '@databricks/i18n';
 
 import { useClaudeAgentContext } from './ClaudeAgentContext';
 import { ClaudeAgentChatPanel } from './ClaudeAgentChatPanel';
+import ClaudeLogo from '../../../common/static/logos/claude.svg';
 
 const COMPONENT_ID = 'mlflow.trace.claude_agent.tab_content';
 
@@ -17,14 +18,12 @@ const COMPONENT_ID = 'mlflow.trace.claude_agent.tab_content';
  */
 export const ClaudeAgentTabContent = () => {
   const { theme } = useDesignSystemTheme();
-  const { closeClaudeTab, reset } = useClaudeAgentContext();
+  const { closeClaudeTab } = useClaudeAgentContext();
 
   const handleClose = () => {
     closeClaudeTab();
-    // Reset state after closing
-    setTimeout(() => {
-      reset();
-    }, 100);
+    // Note: We don't reset the session here to preserve conversation history
+    // The session can be explicitly reset via the reset button if needed
   };
 
   return (
@@ -55,7 +54,7 @@ export const ClaudeAgentTabContent = () => {
             fontWeight: theme.typography.typographyBoldFontWeight,
           }}
         >
-          <SparkleIcon css={{ color: theme.colors.purple }} />
+          <img src={ClaudeLogo} width={18} height={18} alt="" aria-hidden css={{ display: 'block' }} />
           <FormattedMessage defaultMessage="Ask Claude" description="Title for the Claude Agent tab" />
         </span>
         <Button

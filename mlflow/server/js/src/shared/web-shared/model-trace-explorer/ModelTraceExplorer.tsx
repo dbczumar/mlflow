@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
-import { useDesignSystemTheme } from '@databricks/design-system';
 
 import { getLargeTraceDisplaySizeThreshold, shouldBlockLargeTraceDisplay } from './FeatureUtils';
 import type { ModelTrace } from './ModelTrace.types';
@@ -14,7 +13,7 @@ import { useGetModelTraceInfo } from './hooks/useGetModelTraceInfo';
 import { useTraceCachedActions } from './hooks/useTraceCachedActions';
 import { ModelTraceExplorerContent } from './ModelTraceExplorerContent';
 import { ModelTraceExplorerComparisonView } from './ModelTraceExplorerComparisonView';
-import { ClaudeAgentProvider, ClaudeAgentTabContent, useClaudeAgentContextOptional } from '../claude-agent';
+import { useGlobalClaudeOptional } from '../claude-agent';
 
 const ContextProviders = ({ children }: { traceId: string; children: React.ReactNode }) => {
   return <ErrorBoundary fallbackRender={ModelTraceExplorerErrorState}>{children}</ErrorBoundary>;
@@ -86,25 +85,23 @@ export const ModelTraceExplorerImpl = ({
   }
 
   return (
-    <ClaudeAgentProvider>
-      <ModelTraceExplorerInner
-        traceId={traceId}
-        modelTrace={modelTrace}
-        initialActiveView={initialActiveView}
-        selectedSpanId={selectedSpanId}
-        onSelectSpan={onSelectSpan}
-        assessmentsPaneEnabled={assessmentsPaneEnabled}
-        isInComparisonView={isInComparisonView}
-        collapseAssessmentPane={collapseAssessmentPane}
-        isTraceInitialLoading={isTraceInitialLoading}
-        className={className}
-      />
-    </ClaudeAgentProvider>
+    <ModelTraceExplorerInner
+      traceId={traceId}
+      modelTrace={modelTrace}
+      initialActiveView={initialActiveView}
+      selectedSpanId={selectedSpanId}
+      onSelectSpan={onSelectSpan}
+      assessmentsPaneEnabled={assessmentsPaneEnabled}
+      isInComparisonView={isInComparisonView}
+      collapseAssessmentPane={collapseAssessmentPane}
+      isTraceInitialLoading={isTraceInitialLoading}
+      className={className}
+    />
   );
 };
 
 /**
- * Inner component that has access to Claude context.
+ * Inner component that sets trace context for the global Claude assistant.
  */
 const ModelTraceExplorerInner = ({
   traceId,
@@ -129,80 +126,70 @@ const ModelTraceExplorerInner = ({
   isTraceInitialLoading: boolean;
   className?: string;
 }) => {
-  const { theme } = useDesignSystemTheme();
-  const claudeAgent = useClaudeAgentContextOptional();
-  const isClaudeTabActive = claudeAgent?.isClaudeTabActive ?? false;
-  const isClaudeAvailable = claudeAgent?.isClaudeAvailable ?? false;
-  const hasAutoOpenedRef = useRef(false);
+  const globalClaude = useGlobalClaudeOptional();
+  const setContext = globalClaude?.setContext;
+  const lastSetTraceIdRef = useRef<string | null>(null);
 
-  // Auto-open Claude panel when it's available and configured
+  // Set trace context for global Claude assistant when trace is loaded
+  // Use ref to prevent re-triggering when modelTrace object reference changes
   useEffect(() => {
-    if (isClaudeAvailable && !hasAutoOpenedRef.current && claudeAgent?.openClaudeTab) {
-      hasAutoOpenedRef.current = true;
-      claudeAgent.openClaudeTab(modelTrace);
+    if (setContext && modelTrace && lastSetTraceIdRef.current !== traceId) {
+      lastSetTraceIdRef.current = traceId;
+      setContext({
+        type: 'trace',
+        summary: `Trace ${traceId}`,
+        data: modelTrace,
+      });
     }
-  }, [isClaudeAvailable, claudeAgent, modelTrace]);
+  }, [setContext, modelTrace, traceId]);
+
+  // Clean up context when unmounting
+  useEffect(() => {
+    return () => {
+      if (setContext) {
+        setContext({
+          type: 'none',
+          summary: '',
+          data: null,
+        });
+      }
+    };
+  }, [setContext]);
 
   return (
-    <ContextProviders traceId={traceId}>
-      <ModelTraceExplorerViewStateProvider
-        modelTrace={modelTrace}
-        initialActiveView={initialActiveView}
-        selectedSpanIdOnRender={selectedSpanId}
-        assessmentsPaneEnabled={assessmentsPaneEnabled}
-        isInComparisonView={isInComparisonView}
-        initialAssessmentsPaneCollapsed={collapseAssessmentPane}
-        isTraceInitialLoading={isTraceInitialLoading}
-      >
-        <ModelTraceHeaderDetails modelTraceInfo={modelTrace.info} modelTrace={modelTrace} />
-        <div
-          css={{
-            display: 'flex',
-            flex: 1,
-            minHeight: 0,
-            overflow: 'hidden',
-          }}
+    <div
+      css={{
+        position: 'relative',
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100%',
+        overflow: 'hidden',
+      }}
+    >
+      <ContextProviders traceId={traceId}>
+        <ModelTraceExplorerViewStateProvider
+          modelTrace={modelTrace}
+          initialActiveView={initialActiveView}
+          selectedSpanIdOnRender={selectedSpanId}
+          assessmentsPaneEnabled={assessmentsPaneEnabled}
+          isInComparisonView={isInComparisonView}
+          initialAssessmentsPaneCollapsed={collapseAssessmentPane}
+          isTraceInitialLoading={isTraceInitialLoading}
         >
-          {/* Main trace content - takes 2/3 when Claude is open, full width otherwise */}
-          <div
-            css={{
-              flex: isClaudeTabActive ? '0 0 66%' : 1,
-              minWidth: 0,
-              overflow: 'hidden',
-              display: 'flex',
-              flexDirection: 'column',
-            }}
-          >
-            {isInComparisonView ? (
-              <ModelTraceExplorerComparisonView modelTraceInfo={modelTrace.info} />
-            ) : (
-              <ModelTraceExplorerContent
-                modelTraceInfo={modelTrace.info}
-                className={className}
-                selectedSpanId={selectedSpanId}
-                onSelectSpan={onSelectSpan}
-              />
-            )}
-          </div>
-
-          {/* Claude panel on the right - 1/3 width */}
-          {isClaudeTabActive && (
-            <div
-              css={{
-                flex: '0 0 34%',
-                minWidth: 0,
-                borderLeft: `1px solid ${theme.colors.border}`,
-                display: 'flex',
-                flexDirection: 'column',
-                overflow: 'hidden',
-              }}
-            >
-              <ClaudeAgentTabContent />
-            </div>
+          <ModelTraceHeaderDetails modelTraceInfo={modelTrace.info} modelTrace={modelTrace} />
+          {isInComparisonView ? (
+            <ModelTraceExplorerComparisonView modelTraceInfo={modelTrace.info} />
+          ) : (
+            <ModelTraceExplorerContent
+              modelTraceInfo={modelTrace.info}
+              className={className}
+              selectedSpanId={selectedSpanId}
+              onSelectSpan={onSelectSpan}
+            />
           )}
-        </div>
-      </ModelTraceExplorerViewStateProvider>
-    </ContextProviders>
+        </ModelTraceExplorerViewStateProvider>
+      </ContextProviders>
+    </div>
   );
 };
 

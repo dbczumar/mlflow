@@ -24,6 +24,86 @@ _logger = logging.getLogger(__name__)
 # Config file location
 CLAUDE_CONFIG_FILE = Path.home() / ".mlflow" / "claude-config.json"
 
+# System prompt for the Claude agent
+CLAUDE_SYSTEM_PROMPT = """You are an expert MLflow assistant integrated into the MLflow UI. Your role is to help users understand and troubleshoot their ML experiments, traces, runs, and models.
+
+## Core Behaviors
+
+1. **Be Concise**: Users are viewing you in a side panel. Keep responses focused and scannable. Use bullet points and short paragraphs.
+
+2. **Provide Actionable Insights**: Don't just describe what you see - explain what it means and what the user should do about it.
+
+3. **Ask for Clarification When Needed**: If a question is ambiguous or you need more context to give a good answer, ask. It's better to clarify than to guess wrong.
+
+4. **Reference Specific Data**: When analyzing traces/runs, reference specific span names, timestamps, metrics, or parameters to ground your analysis.
+
+## When to Search MLflow Documentation
+
+For questions about MLflow features, APIs, or best practices:
+- Use WebFetch to retrieve documentation from mlflow.org
+- **Pro tip**: Add `.md` to any doc URL to get the markdown source (easier to parse)
+  - Example: `https://mlflow.org/docs/latest/llms/tracing/index.html.md`
+- Search the docs site for specific topics: `https://mlflow.org/docs/latest/search.html?q=<query>`
+
+## Common Scenarios
+
+### Trace Analysis
+- Identify slow spans and potential bottlenecks
+- Check for errors or exceptions in span events
+- Analyze token usage for LLM calls
+- Compare input/output patterns
+
+### Run Troubleshooting
+- Check parameter configurations
+- Analyze metric trends
+- Compare with other runs
+- Identify failed or stuck runs
+
+### General Questions
+- Explain MLflow concepts clearly
+- Provide code examples when helpful
+- Link to relevant documentation
+
+## Response Format
+
+Use markdown formatting:
+- **Bold** for key terms and important findings
+- `code` for API names, parameters, file paths
+- Bulleted lists for multiple points
+- Code blocks for examples
+
+Keep the tone professional but approachable. You're a helpful expert, not a formal documentation system."""
+
+# Custom agents for specialized tasks
+CLAUDE_CUSTOM_AGENTS = {
+    "mlflow-docs": {
+        "description": "Search MLflow documentation to answer questions about MLflow features, APIs, and best practices",
+        "prompt": """You are a documentation search specialist for MLflow.
+
+When asked about MLflow features, APIs, or best practices:
+
+1. **Search the MLflow documentation** using WebFetch:
+   - Main docs: https://mlflow.org/docs/latest/
+   - Add `.md` to any URL to get markdown source (cleaner to parse)
+   - Example: https://mlflow.org/docs/latest/llms/tracing/index.html.md
+
+2. **Key documentation sections**:
+   - Tracing: https://mlflow.org/docs/latest/llms/tracing/index.html.md
+   - Tracking: https://mlflow.org/docs/latest/tracking.html.md
+   - Model Registry: https://mlflow.org/docs/latest/model-registry.html.md
+   - Python API: https://mlflow.org/docs/latest/python_api/index.html.md
+   - REST API: https://mlflow.org/docs/latest/rest-api.html.md
+   - LLM Evaluation: https://mlflow.org/docs/latest/llms/llm-evaluate/index.html.md
+
+3. **Provide accurate, documentation-backed answers** with:
+   - Direct quotes or summaries from the docs
+   - Code examples from the documentation
+   - Links to relevant sections for further reading
+
+Always cite your sources by including the documentation URL.""",
+    }
+}
+
 # Session storage directory (file-based to work across workers)
 SESSION_DIR = Path(tempfile.gettempdir()) / "mlflow-claude-sessions"
 SESSION_DIR.mkdir(parents=True, exist_ok=True)
@@ -51,6 +131,7 @@ def _load_session(session_id: str) -> dict[str, Any] | None:
         except (json.JSONDecodeError, IOError):
             pass
     return None
+
 
 # Create FastAPI router
 claude_agent_router = APIRouter(prefix="/api/claude-agent", tags=["claude-agent"])
@@ -123,6 +204,12 @@ async def _run_claude_agent(
     # Note: --verbose is required when using --output-format=stream-json with -p
     cmd = [claude_path, "-p", prompt, "--output-format", "stream-json", "--verbose"]
 
+    # Add system prompt
+    cmd.extend(["--append-system-prompt", CLAUDE_SYSTEM_PROMPT])
+
+    # Add custom agents
+    cmd.extend(["--agents", json.dumps(CLAUDE_CUSTOM_AGENTS)])
+
     if model and model != "default":
         cmd.extend(["--model", model])
 
@@ -168,6 +255,43 @@ async def _run_claude_agent(
                     if text_parts:
                         text = " ".join(text_parts)
                         yield f"event: message\ndata: {json.dumps({'text': text})}\n\n"
+
+                elif msg_type == "tool_use":
+                    # Forward tool usage as status message
+                    tool_name = data.get("name", "")
+                    tool_input = data.get("input", {})
+                    # Create human-readable status based on tool name
+                    if tool_name == "Read":
+                        file_path = tool_input.get("file_path", "")
+                        status_text = f"Reading {file_path.split('/')[-1] if file_path else 'file'}..."
+                    elif tool_name == "Glob":
+                        pattern = tool_input.get("pattern", "")
+                        status_text = f"Searching for {pattern}..."
+                    elif tool_name == "Grep":
+                        pattern = tool_input.get("pattern", "")
+                        status_text = f"Searching for '{pattern}'..."
+                    elif tool_name == "Bash":
+                        cmd = tool_input.get("command", "")
+                        # Truncate long commands
+                        cmd_preview = cmd[:50] + "..." if len(cmd) > 50 else cmd
+                        status_text = f"Running: {cmd_preview}"
+                    elif tool_name == "Edit":
+                        file_path = tool_input.get("file_path", "")
+                        status_text = f"Editing {file_path.split('/')[-1] if file_path else 'file'}..."
+                    elif tool_name == "Write":
+                        file_path = tool_input.get("file_path", "")
+                        status_text = f"Writing {file_path.split('/')[-1] if file_path else 'file'}..."
+                    elif tool_name == "Task":
+                        status_text = "Spawning sub-agent..."
+                    elif tool_name == "WebFetch":
+                        url = tool_input.get("url", "")
+                        status_text = f"Fetching {url[:40]}..." if url else "Fetching URL..."
+                    elif tool_name == "WebSearch":
+                        query = tool_input.get("query", "")
+                        status_text = f"Searching web for '{query}'..."
+                    else:
+                        status_text = f"Using {tool_name}..."
+                    yield f"event: status\ndata: {json.dumps({'status': status_text, 'tool': tool_name})}\n\n"
 
                 elif msg_type == "result":
                     # Final result - save claude session ID to file

@@ -9,6 +9,7 @@ interface UseSSEStreamOptions {
   onMessage?: (text: string) => void;
   onError?: (error: string) => void;
   onDone?: () => void;
+  onStatus?: (status: string) => void;
 }
 
 interface UseSSEStreamReturn {
@@ -19,7 +20,7 @@ interface UseSSEStreamReturn {
 }
 
 export const useSSEStream = (options: UseSSEStreamOptions = {}): UseSSEStreamReturn => {
-  const { onMessage, onError, onDone } = options;
+  const { onMessage, onError, onDone, onStatus } = options;
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
@@ -56,9 +57,12 @@ export const useSSEStream = (options: UseSSEStreamOptions = {}): UseSSEStreamRet
           setIsStreaming(false);
           onDone?.();
         },
+        (status) => {
+          onStatus?.(status);
+        },
       );
     },
-    [disconnect, onMessage, onError, onDone],
+    [disconnect, onMessage, onError, onDone, onStatus],
   );
 
   // Cleanup on unmount

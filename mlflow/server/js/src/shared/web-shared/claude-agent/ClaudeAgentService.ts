@@ -52,6 +52,7 @@ export const sendMessageStream = async (
   onMessage: (text: string) => void,
   onError: (error: string) => void,
   onDone: () => void,
+  onStatus?: (status: string) => void,
 ): Promise<void> => {
   try {
     const response = await fetch(`${API_BASE}/message`, {
@@ -100,7 +101,7 @@ export const sendMessageStream = async (
         }
         if (line.startsWith('data: ')) {
           const data = line.slice(6);
-          parseSSEData(data, onMessage, onError, onDone);
+          parseSSEData(data, onMessage, onError, onDone, onStatus);
         }
       }
     }
@@ -117,6 +118,7 @@ const parseSSEData = (
   onMessage: (text: string) => void,
   onError: (error: string) => void,
   onDone: () => void,
+  onStatus?: (status: string) => void,
 ): void => {
   try {
     const parsed = JSON.parse(data);
@@ -124,8 +126,13 @@ const parseSSEData = (
       onMessage(parsed.text);
     } else if ('error' in parsed) {
       onError(parsed.error);
-    } else if ('status' in parsed && parsed.status === 'complete') {
-      onDone();
+    } else if ('status' in parsed) {
+      if (parsed.status === 'complete') {
+        onDone();
+      } else {
+        // Tool usage status message
+        onStatus?.(parsed.status);
+      }
     }
   } catch {
     // Non-JSON data, treat as plain text
@@ -154,6 +161,7 @@ export const parseSSEStream = (
   onMessage: (text: string) => void,
   onError: (error: string) => void,
   onDone: () => void,
+  onStatus?: (status: string) => void,
 ): void => {
   eventSource.addEventListener('message', (event) => {
     try {
@@ -163,6 +171,17 @@ export const parseSSEStream = (
       }
     } catch {
       onMessage(event.data);
+    }
+  });
+
+  eventSource.addEventListener('status', (event) => {
+    try {
+      const data = JSON.parse((event as MessageEvent).data);
+      if ('status' in data && data.status !== 'complete') {
+        onStatus?.(data.status);
+      }
+    } catch {
+      // Ignore parse errors for status events
     }
   });
 

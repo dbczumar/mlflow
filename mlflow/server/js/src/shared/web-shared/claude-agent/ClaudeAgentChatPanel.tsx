@@ -2,7 +2,7 @@
  * Chat panel component for Claude Agent interaction.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Button,
   Input,
@@ -15,7 +15,7 @@ import {
 } from '@databricks/design-system';
 import { FormattedMessage } from '@databricks/i18n';
 
-import { useClaudeAgentContext } from './ClaudeAgentContext';
+import { useClaudeAgentContextOptional } from './ClaudeAgentContext';
 import type { ChatMessage } from './types';
 import { GenAIMarkdownRenderer } from '../genai-markdown-renderer';
 
@@ -181,6 +181,31 @@ const ErrorBanner = ({ error, onRetry }: { error: string; onRetry?: () => void }
 };
 
 /**
+ * Status indicator showing current tool usage.
+ */
+const StatusIndicator = ({ status }: { status: string }) => {
+  const { theme } = useDesignSystemTheme();
+
+  return (
+    <div
+      css={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: theme.spacing.sm,
+        padding: `${theme.spacing.xs}px ${theme.spacing.md}px`,
+        backgroundColor: theme.colors.backgroundSecondary,
+        borderBottom: `1px solid ${theme.colors.border}`,
+        fontSize: theme.typography.fontSizeSm,
+        color: theme.colors.textSecondary,
+      }}
+    >
+      <Spinner size="small" />
+      <span css={{ fontStyle: 'italic' }}>{status}</span>
+    </div>
+  );
+};
+
+/**
  * Setup required banner.
  */
 const SetupRequiredBanner = () => {
@@ -228,11 +253,47 @@ const SetupRequiredBanner = () => {
 };
 
 /**
- * Main chat panel component.
+ * Props for ClaudeAgentChatPanel when used in global mode.
  */
-export const ClaudeAgentChatPanel = () => {
+interface ClaudeAgentChatPanelProps {
+  /** Messages to display (for global mode) */
+  messages?: ChatMessage[];
+  /** Whether streaming is in progress (for global mode) */
+  isStreaming?: boolean;
+  /** Error message (for global mode) */
+  error?: string | null;
+  /** Current tool usage status (for global mode) */
+  currentStatus?: string | null;
+  /** Callback to send a message (for global mode) */
+  onSendMessage?: (message: string) => void;
+  /** Whether in global mode (uses props instead of context) */
+  isGlobalMode?: boolean;
+}
+
+/**
+ * Main chat panel component.
+ * Can be used standalone with ClaudeAgentContext or in global mode with props.
+ */
+export const ClaudeAgentChatPanel = (props: ClaudeAgentChatPanelProps) => {
   const { theme } = useDesignSystemTheme();
-  const { messages, isStreaming, error, isClaudeAvailable, startAnalysis, sendMessage } = useClaudeAgentContext();
+
+  // Always call the hook (rules of hooks), but only use its value in non-global mode
+  const contextValue = useClaudeAgentContextOptional();
+
+  // In global mode, use props; otherwise use context
+  const propsMessages = props.messages;
+  const contextMessages = contextValue?.messages;
+  const messages = useMemo(
+    () => (props.isGlobalMode ? propsMessages ?? [] : contextMessages ?? []),
+    [props.isGlobalMode, propsMessages, contextMessages],
+  );
+  const isStreaming = props.isGlobalMode ? props.isStreaming ?? false : contextValue?.isStreaming ?? false;
+  const error = props.isGlobalMode ? props.error ?? null : contextValue?.error ?? null;
+  const isClaudeAvailable = props.isGlobalMode ? true : contextValue?.isClaudeAvailable ?? null;
+  const currentStatus = props.isGlobalMode ? props.currentStatus ?? null : null;
+  const startAnalysisFn = props.isGlobalMode ? undefined : contextValue?.startAnalysis;
+  const sendMessageFn = props.isGlobalMode ? props.onSendMessage : contextValue?.sendMessage;
+
   const [inputValue, setInputValue] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -242,15 +303,15 @@ export const ClaudeAgentChatPanel = () => {
   }, [messages]);
 
   const handleSend = useCallback(() => {
-    if (inputValue.trim() && !isStreaming) {
-      if (messages.length === 0) {
-        startAnalysis(inputValue.trim());
+    if (inputValue.trim() && !isStreaming && sendMessageFn) {
+      if (messages.length === 0 && startAnalysisFn) {
+        startAnalysisFn(inputValue.trim());
       } else {
-        sendMessage(inputValue.trim());
+        sendMessageFn(inputValue.trim());
       }
       setInputValue('');
     }
-  }, [inputValue, isStreaming, messages.length, startAnalysis, sendMessage]);
+  }, [inputValue, isStreaming, messages.length, startAnalysisFn, sendMessageFn]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -264,9 +325,13 @@ export const ClaudeAgentChatPanel = () => {
 
   const handleSuggestionSelect = useCallback(
     (prompt: string) => {
-      startAnalysis(prompt);
+      if (startAnalysisFn) {
+        startAnalysisFn(prompt);
+      } else if (sendMessageFn) {
+        sendMessageFn(prompt);
+      }
     },
-    [startAnalysis],
+    [startAnalysisFn, sendMessageFn],
   );
 
   // Show setup banner if Claude is not available
@@ -322,6 +387,9 @@ export const ClaudeAgentChatPanel = () => {
 
         <div ref={messagesEndRef} />
       </div>
+
+      {/* Status indicator */}
+      {currentStatus && <StatusIndicator status={currentStatus} />}
 
       {/* Input area */}
       <div

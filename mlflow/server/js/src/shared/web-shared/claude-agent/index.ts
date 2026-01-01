@@ -5,7 +5,14 @@
  * using Claude Code Agent SDK.
  */
 
-// Context and Provider
+// Global Claude Context and Provider (New - recommended)
+export { GlobalClaudeProvider, useGlobalClaude, useGlobalClaudeOptional } from './GlobalClaudeContext';
+export { GlobalClaudeLayout } from './GlobalClaudeLayout';
+export { GlobalClaudeChatPanel } from './GlobalClaudeChatPanel';
+export { GlobalClaudeButton } from './GlobalClaudeButton';
+export { serializeContext } from './ContextSerializer';
+
+// Legacy Context and Provider (for backward compatibility)
 export { ClaudeAgentProvider, useClaudeAgentContext, useClaudeAgentContextOptional } from './ClaudeAgentContext';
 
 // Components
@@ -33,4 +40,10 @@ export type {
   ClaudeAgentState,
   ClaudeAgentActions,
   ClaudeAgentContextType,
+  // New global types
+  ClaudeContextType,
+  ClaudeContext,
+  GlobalClaudeAgentState,
+  GlobalClaudeAgentActions,
+  GlobalClaudeAgentContextType,
 } from './types';

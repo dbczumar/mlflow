@@ -13,7 +13,6 @@ import {
 import { FormattedMessage } from '@databricks/i18n';
 
 import { type ModelTrace, type ModelTraceInfoV3, type ModelTraceState } from './ModelTrace.types';
-import { AskClaudeButton } from '../claude-agent';
 import { createTraceV4LongIdentifier, doesTraceSupportV4API, isV3ModelTraceInfo } from './ModelTraceExplorer.utils';
 import { ModelTraceHeaderMetricSection } from './ModelTraceExplorerMetricSection';
 import { useModelTraceExplorerViewState } from './ModelTraceExplorerViewStateContext';
@@ -150,7 +149,6 @@ export const ModelTraceHeaderDetails = ({
           traceMetadata={(modelTraceInfo as ModelTraceInfoV3)?.trace_metadata}
           getTruncatedLabel={getTruncatedLabel}
         />
-        {modelTrace && <AskClaudeButton trace={modelTrace} />}
         {tags.length > 0 && (
           <div
             css={{

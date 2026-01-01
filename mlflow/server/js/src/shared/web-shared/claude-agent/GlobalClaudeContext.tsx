@@ -1,34 +1,45 @@
 /**
- * Main hook for Claude Agent functionality.
+ * Global React Context for Claude Agent.
+ * Provides Claude assistant functionality accessible from anywhere in MLflow.
  */
 
-import { useCallback, useEffect, useState, useRef } from 'react';
-import type { ModelTrace } from '../../model-trace-explorer/ModelTrace.types';
-import type { ChatMessage, ClaudeAgentState } from '../types';
-import { serializeTraceContext } from '../TraceContextSerializer';
-import { startAnalysis, sendMessageStream, checkHealth } from '../ClaudeAgentService';
-import { useSSEStream } from './useSSEStream';
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 
-interface UseClaudeAgentReturn extends ClaudeAgentState {
-  openClaudeTab: (trace: ModelTrace) => void;
-  closeClaudeTab: () => void;
-  sendMessage: (message: string) => void;
-  startAnalysis: (prompt?: string) => Promise<void>;
-  reset: () => void;
-}
+import type { ChatMessage, ClaudeContext, GlobalClaudeAgentContextType } from './types';
+import { serializeContext } from './ContextSerializer';
+import { startAnalysis, sendMessageStream, checkHealth } from './ClaudeAgentService';
+import { useSSEStream } from './hooks/useSSEStream';
+
+const DEFAULT_CONTEXT: ClaudeContext = {
+  type: 'none',
+  summary: '',
+  data: null,
+};
+
+const GlobalClaudeContext = createContext<GlobalClaudeAgentContextType | null>(null);
 
 const generateMessageId = (): string => {
   return `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 };
 
-export const useClaudeAgent = (): UseClaudeAgentReturn => {
-  const [isClaudeTabActive, setIsClaudeTabActive] = useState(false);
-  const [traceContext, setTraceContext] = useState<ModelTrace | null>(null);
+/**
+ * Global Claude Agent Provider.
+ * Wrap at the app root level (MlflowRootRoute) to enable Claude assistance everywhere.
+ */
+export const GlobalClaudeProvider = ({ children }: { children: ReactNode }) => {
+  // Panel state
+  const [isPanelOpen, setIsPanelOpen] = useState(false);
+
+  // Context state (set by pages)
+  const [context, setContextState] = useState<ClaudeContext>(DEFAULT_CONTEXT);
+
+  // Chat state (persists across navigation)
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isClaudeAvailable, setIsClaudeAvailable] = useState<boolean | null>(null);
+  const [currentStatus, setCurrentStatus] = useState<string | null>(null);
 
   // Use ref to track current streaming message
   const streamingMessageRef = useRef<string>('');
@@ -54,11 +65,17 @@ export const useClaudeAgent = (): UseClaudeAgentReturn => {
     });
     streamingMessageRef.current = '';
     setIsStreaming(false);
+    setCurrentStatus(null);
+  }, []);
+
+  const handleStatus = useCallback((status: string) => {
+    setCurrentStatus(status);
   }, []);
 
   const handleStreamError = useCallback((errorMsg: string) => {
     setError(errorMsg);
     setIsStreaming(false);
+    setCurrentStatus(null);
     setMessages((prev) => {
       const lastMessage = prev[prev.length - 1];
       if (lastMessage && lastMessage.role === 'assistant' && lastMessage.isStreaming) {
@@ -72,6 +89,7 @@ export const useClaudeAgent = (): UseClaudeAgentReturn => {
     onMessage: appendToStreamingMessage,
     onError: handleStreamError,
     onDone: finalizeStreamingMessage,
+    onStatus: handleStatus,
   });
 
   // Check Claude availability on mount
@@ -85,19 +103,22 @@ export const useClaudeAgent = (): UseClaudeAgentReturn => {
       });
   }, []);
 
-  const openClaudeTab = useCallback((trace: ModelTrace) => {
-    setTraceContext(trace);
-    setIsClaudeTabActive(true);
+  // Actions
+  const openPanel = useCallback(() => {
+    setIsPanelOpen(true);
     setError(null);
   }, []);
 
-  const closeClaudeTab = useCallback(() => {
-    setIsClaudeTabActive(false);
+  const closePanel = useCallback(() => {
+    setIsPanelOpen(false);
     disconnectSSE();
   }, [disconnectSSE]);
 
+  const setContext = useCallback((newContext: ClaudeContext) => {
+    setContextState(newContext);
+  }, []);
+
   const reset = useCallback(() => {
-    setTraceContext(null);
     setSessionId(null);
     setMessages([]);
     setIsStreaming(false);
@@ -108,11 +129,6 @@ export const useClaudeAgent = (): UseClaudeAgentReturn => {
 
   const handleStartAnalysis = useCallback(
     async (prompt?: string) => {
-      if (!traceContext) {
-        setError('No trace context available');
-        return;
-      }
-
       setError(null);
       setIsStreaming(true);
 
@@ -143,9 +159,9 @@ export const useClaudeAgent = (): UseClaudeAgentReturn => {
       ]);
 
       try {
-        const serializedTrace = serializeTraceContext(traceContext);
+        const serializedContext = serializeContext(context);
         const response = await startAnalysis({
-          trace_context: serializedTrace,
+          trace_context: serializedContext,
           prompt,
           session_id: sessionId ?? undefined,
         });
@@ -158,13 +174,14 @@ export const useClaudeAgent = (): UseClaudeAgentReturn => {
         handleStreamError(err instanceof Error ? err.message : 'Failed to start analysis');
       }
     },
-    [traceContext, sessionId, connectSSE, handleStreamError],
+    [context, sessionId, connectSSE, handleStreamError],
   );
 
   const handleSendMessage = useCallback(
     (message: string) => {
       if (!sessionId) {
-        setError('No active session');
+        // No session yet - start analysis with the message as prompt
+        handleStartAnalysis(message);
         return;
       }
 
@@ -201,23 +218,57 @@ export const useClaudeAgent = (): UseClaudeAgentReturn => {
         appendToStreamingMessage,
         handleStreamError,
         finalizeStreamingMessage,
+        handleStatus,
       );
     },
-    [sessionId, appendToStreamingMessage, handleStreamError, finalizeStreamingMessage],
+    [
+      sessionId,
+      handleStartAnalysis,
+      appendToStreamingMessage,
+      handleStreamError,
+      finalizeStreamingMessage,
+      handleStatus,
+    ],
   );
 
-  return {
-    isClaudeTabActive,
-    traceContext,
+  const value: GlobalClaudeAgentContextType = {
+    // State
+    isPanelOpen,
+    context,
     sessionId,
     messages,
     isStreaming,
     error,
     isClaudeAvailable,
-    openClaudeTab,
-    closeClaudeTab,
+    currentStatus,
+    // Actions
+    openPanel,
+    closePanel,
+    setContext,
     sendMessage: handleSendMessage,
     startAnalysis: handleStartAnalysis,
     reset,
   };
+
+  return <GlobalClaudeContext.Provider value={value}>{children}</GlobalClaudeContext.Provider>;
+};
+
+/**
+ * Hook to access the global Claude context.
+ * Must be used within a GlobalClaudeProvider.
+ */
+export const useGlobalClaude = (): GlobalClaudeAgentContextType => {
+  const context = useContext(GlobalClaudeContext);
+  if (!context) {
+    throw new Error('useGlobalClaude must be used within a GlobalClaudeProvider');
+  }
+  return context;
+};
+
+/**
+ * Optional hook that returns null if not within a provider.
+ * Useful for components that may or may not be in a global Claude context.
+ */
+export const useGlobalClaudeOptional = (): GlobalClaudeAgentContextType | null => {
+  return useContext(GlobalClaudeContext);
 };
