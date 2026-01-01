@@ -12,6 +12,7 @@ from abc import ABCMeta, abstractmethod
 from mlflow.exceptions import MlflowException
 from mlflow.genai.scheduled_scorers import ScorerScheduleConfig
 from mlflow.genai.scorers.base import Scorer, ScorerSamplingConfig
+from mlflow.genai.scorers.online.online_scorer import OnlineScoringConfig
 from mlflow.tracking._tracking_service.utils import _get_store
 from mlflow.tracking.fluent import _get_experiment_id
 from mlflow.utils.plugins import get_entry_points
@@ -194,13 +195,13 @@ class MlflowTrackingStore(AbstractScorerStore):
         version = self._tracking_store.register_scorer(
             experiment_id, scorer.name, serialized_scorer
         )
-        self._hydrate_scorer_from_store(scorer, online_config=None)
+        self._hydrate_scorer(scorer, online_config=None)
         return version
 
-    def _hydrate_scorer_from_store(
+    def _hydrate_scorer(
         self,
         scorer: Scorer,
-        online_config=None,
+        online_config: OnlineScoringConfig | None = None,
     ) -> None:
         """
         Hydrate a scorer with runtime state from the tracking store.
@@ -229,7 +230,7 @@ class MlflowTrackingStore(AbstractScorerStore):
         for scorer_version in scorer_versions:
             scorer = Scorer.model_validate(scorer_version.serialized_scorer)
             online_config = online_configs.get(scorer_version.scorer_id)
-            self._hydrate_scorer_from_store(scorer, online_config)
+            self._hydrate_scorer(scorer, online_config)
             scorers.append(scorer)
         return scorers
 
@@ -241,7 +242,7 @@ class MlflowTrackingStore(AbstractScorerStore):
         online_configs = self._tracking_store.get_online_scoring_configs([scorer_version.scorer_id])
         online_config = online_configs.get(scorer_version.scorer_id)
         scorer = Scorer.model_validate(scorer_version.serialized_scorer)
-        self._hydrate_scorer_from_store(scorer, online_config)
+        self._hydrate_scorer(scorer, online_config)
         return scorer
 
     def list_scorer_versions(self, experiment_id, name) -> list[tuple[Scorer, int]]:
@@ -257,7 +258,7 @@ class MlflowTrackingStore(AbstractScorerStore):
         for scorer_version in scorer_versions:
             scorer = Scorer.model_validate(scorer_version.serialized_scorer)
             online_config = online_configs.get(scorer_version.scorer_id)
-            self._hydrate_scorer_from_store(scorer, online_config)
+            self._hydrate_scorer(scorer, online_config)
             scorers.append((scorer, scorer_version.scorer_version))
         return scorers
 
@@ -313,12 +314,7 @@ class MlflowTrackingStore(AbstractScorerStore):
             filter_string=filter_string,
         )
 
-        new_scorer = scorer._create_copy()
-        new_scorer._sampling_config = ScorerSamplingConfig(
-            sample_rate=sample_rate,
-            filter_string=filter_string,
-        )
-        return new_scorer
+        return self.get_scorer(experiment_id, name)
 
 
 class DatabricksStore(AbstractScorerStore):
