@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useDesignSystemTheme, Empty } from '@databricks/design-system';
 import { FormattedMessage } from 'react-intl';
 import { ErrorBoundary } from 'react-error-boundary';
@@ -7,6 +7,7 @@ import { useSearchIssues } from './hooks/useIssuesApi';
 import type { Issue, IssueState } from './types';
 import { IssuesListPanel } from './IssuesListPanel';
 import { IssueDetailPanel } from './IssueDetailPanel';
+import { useGlobalClaudeOptional } from '@mlflow/mlflow/src/shared/web-shared/claude-agent';
 
 const ErrorFallback = ({ error }: { error?: Error }) => {
   const { theme } = useDesignSystemTheme();
@@ -77,6 +78,55 @@ const ExperimentIssuesPageContent = ({ experimentId }: { experimentId: string })
   const selectedIssue = useMemo(() => {
     return allIssues.find((issue) => issue.issue_id === selectedIssueId) || null;
   }, [allIssues, selectedIssueId]);
+
+  // Set Claude context for issue page
+  const globalClaude = useGlobalClaudeOptional();
+  const setContext = globalClaude?.setContext;
+  const lastContextKeyRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!setContext || isLoading) return;
+
+    const contextKey = selectedIssue
+      ? `issue-${selectedIssue.issue_id}`
+      : `issues-list-${experimentId}-${filteredIssues.length}`;
+
+    if (lastContextKeyRef.current !== contextKey) {
+      lastContextKeyRef.current = contextKey;
+
+      if (selectedIssue) {
+        // Set context for the selected issue
+        setContext({
+          type: 'issue',
+          summary: `Issue: ${selectedIssue.name}`,
+          data: {
+            issue_id: selectedIssue.issue_id,
+            name: selectedIssue.name,
+            state: selectedIssue.state,
+            description: selectedIssue.description,
+            creation_time: selectedIssue.creation_time,
+            last_update_time: selectedIssue.last_update_time,
+            tags: selectedIssue.tags,
+          },
+          navigation: {
+            experimentId,
+            page: 'issue-detail',
+          },
+        });
+      } else {
+        // No issue selected, set context for issues list
+        setContext({
+          type: 'none',
+          summary: `${filteredIssues.length} Issues`,
+          data: null,
+          navigation: {
+            experimentId,
+            page: 'issues',
+          },
+        });
+      }
+    }
+  }, [setContext, selectedIssue, experimentId, filteredIssues.length, isLoading]);
 
   // Handle initial issue selection from URL query param (runs once when data loads)
   useEffect(() => {

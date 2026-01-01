@@ -33,6 +33,8 @@ const getContextLabel = (type: string): string | null => {
       return 'Sessions';
     case 'session':
       return 'Session';
+    case 'issue':
+      return 'Issue';
     case 'model':
       return 'Model';
     default:

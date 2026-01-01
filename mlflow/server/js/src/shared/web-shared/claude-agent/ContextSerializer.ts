@@ -279,6 +279,92 @@ const serializeSessionContext = (data: Record<string, unknown>): string => {
 };
 
 /**
+ * Serialize issue context to text.
+ */
+const serializeIssueContext = (data: Record<string, unknown>): string => {
+  let text = '# Issue Details\n\n';
+  text += 'User is viewing an issue that tracks a quality problem found in LLM traces.\n\n';
+
+  if (data['issue_id']) {
+    text += `- Issue ID: ${data['issue_id']}\n`;
+  }
+
+  if (data['name']) {
+    text += `- Name: ${data['name']}\n`;
+  }
+
+  if (data['state']) {
+    text += `- State: ${data['state']}\n`;
+  }
+
+  if (data['description']) {
+    text += `\n## Description\n\n${data['description']}\n`;
+  }
+
+  if (data['creation_time']) {
+    text += `\n- Created: ${new Date(data['creation_time'] as number).toISOString()}\n`;
+  }
+
+  if (data['last_update_time']) {
+    text += `- Last Updated: ${new Date(data['last_update_time'] as number).toISOString()}\n`;
+  }
+
+  // Tags if present
+  if (data['tags'] && typeof data['tags'] === 'object') {
+    const tags = data['tags'] as Record<string, string>;
+    const tagEntries = Object.entries(tags);
+    if (tagEntries.length > 0) {
+      text += '\n## Tags\n\n';
+      for (const [key, value] of tagEntries) {
+        text += `- ${key}: ${value}\n`;
+      }
+    }
+  }
+
+  // Judge information if available
+  if (data['judge']) {
+    const judge = data['judge'] as Record<string, unknown>;
+    text += '\n## Issue Judge (Scorer)\n\n';
+    if (judge['scorer_name']) {
+      text += `- Scorer Name: ${judge['scorer_name']}\n`;
+    }
+    if (judge['model']) {
+      text += `- Model: ${judge['model']}\n`;
+    }
+    if (judge['prompt']) {
+      text += `\n### Judge Prompt\n\n\`\`\`\n${judge['prompt']}\n\`\`\`\n`;
+    }
+  }
+
+  // Linked traces count
+  if (data['linkedTracesCount'] !== undefined) {
+    text += `\n- Linked Traces: ${data['linkedTracesCount']}\n`;
+  }
+
+  // Linked evaluation runs
+  if (data['linkedRuns'] && Array.isArray(data['linkedRuns'])) {
+    const runs = data['linkedRuns'] as Array<Record<string, unknown>>;
+    if (runs.length > 0) {
+      text += `\n## Linked Evaluation Runs (${runs.length})\n\n`;
+      for (const run of runs.slice(0, 5)) {
+        // Limit to first 5
+        text += `- Run: ${run['run_name'] || run['run_id']}\n`;
+      }
+      if (runs.length > 5) {
+        text += `... and ${runs.length - 5} more runs\n`;
+      }
+    }
+  }
+
+  // Comments summary
+  if (data['commentsCount'] !== undefined) {
+    text += `\n- Comments: ${data['commentsCount']}\n`;
+  }
+
+  return text;
+};
+
+/**
  * Main function to serialize a ClaudeContext to a Claude-friendly format.
  */
 export const serializeContext = (context: ClaudeContext): string => {
@@ -331,6 +417,12 @@ export const serializeContext = (context: ClaudeContext): string => {
     case 'session':
       if (context.data) {
         text += serializeSessionContext(context.data as Record<string, unknown>);
+      }
+      break;
+
+    case 'issue':
+      if (context.data) {
+        text += serializeIssueContext(context.data as Record<string, unknown>);
       }
       break;
 

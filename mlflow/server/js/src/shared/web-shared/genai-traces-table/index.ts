@@ -99,4 +99,6 @@ export type { GetTraceFunction } from './hooks/useGetTrace';
 export { useFetchTraceV4LazyQuery } from './hooks/useFetchTraceV4';
 export { doesTraceSupportV4API } from './utils/TraceLocationUtils';
 export { GenAIChatSessionsTable } from './sessions-table/GenAIChatSessionsTable';
+export { getSessionTableRows } from './sessions-table/utils';
+export type { SessionTableRow } from './sessions-table/types';
 export { useGetTraces } from './hooks/useGetTraces';

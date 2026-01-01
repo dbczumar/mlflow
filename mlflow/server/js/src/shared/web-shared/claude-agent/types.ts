@@ -30,6 +30,7 @@ export type ClaudeContextType =
   | 'runs-list'
   | 'sessions-list'
   | 'session'
+  | 'issue'
   | 'model'
   | 'none';
 

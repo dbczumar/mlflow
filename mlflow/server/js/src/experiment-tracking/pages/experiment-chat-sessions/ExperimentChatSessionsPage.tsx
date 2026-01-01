@@ -12,6 +12,7 @@ import {
   createTraceLocationForUCSchema,
   useSearchMlflowTraces,
   getSessionTableRows,
+  type SessionTableRow,
 } from '@databricks/web-shared/genai-traces-table';
 import { useGlobalClaudeOptional } from '@databricks/web-shared/claude-agent';
 import { MonitoringConfigProvider, useMonitoringConfig } from '../../hooks/useMonitoringConfig';
@@ -73,6 +74,41 @@ const ExperimentChatSessionsPageImpl = () => {
   const traceActions = {
     deleteTracesAction,
   };
+
+  // Set Claude context for sessions list
+  const globalClaude = useGlobalClaudeOptional();
+  const setContext = globalClaude?.setContext;
+  const lastContextKeyRef = useRef<string | null>(null);
+
+  const sessionRows = useMemo(() => {
+    if (!traces || traces.length === 0) return [];
+    return getSessionTableRows(experimentId, traces);
+  }, [experimentId, traces]);
+
+  useEffect(() => {
+    const contextKey = `sessions-list-${experimentId}-${sessionRows.length}`;
+    if (setContext && !isLoading && lastContextKeyRef.current !== contextKey) {
+      lastContextKeyRef.current = contextKey;
+      setContext({
+        type: 'sessions-list',
+        summary: `${sessionRows.length} Chat Sessions`,
+        data: {
+          totalSessions: sessionRows.length,
+          sessions: sessionRows.map((row: SessionTableRow) => ({
+            sessionId: row.sessionId,
+            requestPreview: row.requestPreview,
+            turns: row.turns,
+            tokens: row.tokens,
+            sessionDuration: row.sessionDuration,
+          })),
+        },
+        navigation: {
+          experimentId,
+          page: 'sessions',
+        },
+      });
+    }
+  }, [setContext, experimentId, sessionRows, isLoading]);
 
   return (
     <div css={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
