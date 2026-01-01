@@ -29,7 +29,7 @@ const formatTimestamp = (timestamp: number | string): string => {
 const getSpanDuration = (span: ModelTraceSpan): number => {
   if ('start_time_unix_nano' in span && 'end_time_unix_nano' in span) {
     // V3 format (nanoseconds)
-    return (parseInt(span.end_time_unix_nano) - parseInt(span.start_time_unix_nano)) / 1e6;
+    return (parseInt(span.end_time_unix_nano, 10) - parseInt(span.start_time_unix_nano, 10)) / 1e6;
   }
   // V2 format (milliseconds)
   return span.end_time - span.start_time;
@@ -66,7 +66,13 @@ const getSpanStatus = (span: ModelTraceSpan): { code: string; message?: string }
  * Get parent span ID.
  */
 const getParentSpanId = (span: ModelTraceSpan): string | null => {
-  return span.parent_id ?? span.parent_span_id ?? null;
+  if ('parent_span_id' in span) {
+    return span.parent_span_id ?? null;
+  }
+  if ('parent_id' in span) {
+    return span.parent_id ?? null;
+  }
+  return null;
 };
 
 /**
@@ -108,10 +114,14 @@ const serializeSpan = (span: ModelTraceSpan, indent = ''): string => {
   const parentId = getParentSpanId(span);
   const exceptions = extractExceptions(span.events);
 
-  // Extract inputs/outputs from attributes
-  const inputs = span.attributes?.['mlflow.spanInputs'] ?? span.inputs ?? null;
-  const outputs = span.attributes?.['mlflow.spanOutputs'] ?? span.outputs ?? null;
-  const spanType = span.attributes?.['mlflow.spanType'] ?? span.span_type ?? 'UNKNOWN';
+  // Extract inputs/outputs from attributes (V3 only has attributes, V2 may have direct props)
+  const v2Inputs = 'inputs' in span ? span.inputs : null;
+  const v2Outputs = 'outputs' in span ? span.outputs : null;
+  const v2SpanType = 'span_type' in span ? span.span_type : null;
+
+  const inputs = span.attributes?.['mlflow.spanInputs'] ?? v2Inputs ?? null;
+  const outputs = span.attributes?.['mlflow.spanOutputs'] ?? v2Outputs ?? null;
+  const spanType = span.attributes?.['mlflow.spanType'] ?? v2SpanType ?? 'UNKNOWN';
 
   let text = `${indent}## Span: ${span.name}\n`;
   text += `${indent}- ID: ${spanId}\n`;

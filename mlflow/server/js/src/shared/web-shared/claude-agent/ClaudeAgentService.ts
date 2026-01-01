@@ -76,13 +76,15 @@ export const sendMessageStream = async (
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
+    let reading = true;
 
-    while (true) {
+    while (reading) {
       const { done, value } = await reader.read();
 
       if (done) {
         onDone();
-        break;
+        reading = false;
+        continue;
       }
 
       buffer += decoder.decode(value, { stream: true });
@@ -98,24 +100,36 @@ export const sendMessageStream = async (
         }
         if (line.startsWith('data: ')) {
           const data = line.slice(6);
-          try {
-            const parsed = JSON.parse(data);
-            if ('text' in parsed) {
-              onMessage(parsed.text);
-            } else if ('error' in parsed) {
-              onError(parsed.error);
-            } else if ('status' in parsed && parsed.status === 'complete') {
-              onDone();
-            }
-          } catch {
-            // Non-JSON data, treat as plain text
-            onMessage(data);
-          }
+          parseSSEData(data, onMessage, onError, onDone);
         }
       }
     }
   } catch (error) {
     onError(error instanceof Error ? error.message : 'Unknown error');
+  }
+};
+
+/**
+ * Parse a single SSE data line.
+ */
+const parseSSEData = (
+  data: string,
+  onMessage: (text: string) => void,
+  onError: (error: string) => void,
+  onDone: () => void,
+): void => {
+  try {
+    const parsed = JSON.parse(data);
+    if ('text' in parsed) {
+      onMessage(parsed.text);
+    } else if ('error' in parsed) {
+      onError(parsed.error);
+    } else if ('status' in parsed && parsed.status === 'complete') {
+      onDone();
+    }
+  } catch {
+    // Non-JSON data, treat as plain text
+    onMessage(data);
   }
 };
 

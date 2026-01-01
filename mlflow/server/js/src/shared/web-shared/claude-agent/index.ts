@@ -11,6 +11,7 @@ export { ClaudeAgentProvider, useClaudeAgentContext, useClaudeAgentContextOption
 // Components
 export { ClaudeAgentDrawer } from './ClaudeAgentDrawer';
 export { ClaudeAgentChatPanel } from './ClaudeAgentChatPanel';
+export { AskClaudeButton } from './AskClaudeButton';
 
 // Hooks
 export { useClaudeAgent } from './hooks/useClaudeAgent';

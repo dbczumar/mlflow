@@ -66,7 +66,7 @@ const ChatMessageBubble = ({ message }: { message: ChatMessage }) => {
         {isUser ? (
           <Typography.Text css={{ whiteSpace: 'pre-wrap' }}>{message.content}</Typography.Text>
         ) : (
-          <GenAIMarkdownRenderer markdown={message.content} />
+          <GenAIMarkdownRenderer>{message.content}</GenAIMarkdownRenderer>
         )}
         {message.isStreaming && (
           <span
@@ -141,7 +141,6 @@ const PromptSuggestions = ({ onSelect }: { onSelect: (prompt: string) => void })
             key={suggestion.label}
             componentId={`${COMPONENT_ID_PREFIX}.suggestion`}
             size="small"
-            type="default"
             onClick={() => onSelect(suggestion.prompt)}
           >
             {suggestion.label}
@@ -165,13 +164,13 @@ const ErrorBanner = ({ error, onRetry }: { error: string; onRetry?: () => void }
         alignItems: 'center',
         gap: theme.spacing.sm,
         padding: theme.spacing.md,
-        backgroundColor: theme.colors.tagDangerBackground,
+        backgroundColor: theme.colors.actionDangerPrimaryBackgroundDefault,
         borderRadius: theme.borders.borderRadiusMd,
         marginBottom: theme.spacing.md,
       }}
     >
       <DangerIcon css={{ color: theme.colors.textValidationDanger }} />
-      <Typography.Text css={{ flex: 1 }}>{error}</Typography.Text>
+      <Typography.Text css={{ flex: 1, color: theme.colors.white }}>{error}</Typography.Text>
       {onRetry && (
         <Button componentId={`${COMPONENT_ID_PREFIX}.retry`} size="small" onClick={onRetry}>
           <FormattedMessage defaultMessage="Retry" description="Retry button text" />

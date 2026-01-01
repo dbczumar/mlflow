@@ -45,7 +45,7 @@ export const ClaudeAgentDrawer = () => {
                 borderRadius: theme.borders.borderRadiusSm,
                 background: theme.colors.actionDefaultBackgroundHover,
                 padding: theme.spacing.xs,
-                color: theme.colors.purple500,
+                color: theme.colors.purple,
                 height: 'min-content',
                 display: 'flex',
                 alignItems: 'center',

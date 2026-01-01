@@ -13,6 +13,7 @@ import {
 import { FormattedMessage } from '@databricks/i18n';
 
 import { type ModelTrace, type ModelTraceInfoV3, type ModelTraceState } from './ModelTrace.types';
+import { AskClaudeButton } from '../claude-agent';
 import { createTraceV4LongIdentifier, doesTraceSupportV4API, isV3ModelTraceInfo } from './ModelTraceExplorer.utils';
 import { ModelTraceHeaderMetricSection } from './ModelTraceExplorerMetricSection';
 import { useModelTraceExplorerViewState } from './ModelTraceExplorerViewStateContext';
@@ -26,7 +27,13 @@ import { spanTimeFormatter } from './timeline-tree/TimelineTree.utils';
 
 const BASE_NOTIFICATION_COMPONENT_ID = 'mlflow.model_trace_explorer.header_details.notification';
 
-export const ModelTraceHeaderDetails = ({ modelTraceInfo }: { modelTraceInfo: ModelTrace['info'] }) => {
+export const ModelTraceHeaderDetails = ({
+  modelTraceInfo,
+  modelTrace,
+}: {
+  modelTraceInfo: ModelTrace['info'];
+  modelTrace?: ModelTrace;
+}) => {
   const { theme } = useDesignSystemTheme();
   const [showNotification, setShowNotification] = useState(false);
   const { rootNode } = useModelTraceExplorerViewState();
@@ -143,6 +150,7 @@ export const ModelTraceHeaderDetails = ({ modelTraceInfo }: { modelTraceInfo: Mo
           traceMetadata={(modelTraceInfo as ModelTraceInfoV3)?.trace_metadata}
           getTruncatedLabel={getTruncatedLabel}
         />
+        {modelTrace && <AskClaudeButton trace={modelTrace} />}
         {tags.length > 0 && (
           <div
             css={{

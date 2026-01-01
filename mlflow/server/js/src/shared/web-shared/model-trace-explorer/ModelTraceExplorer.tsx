@@ -13,6 +13,7 @@ import { useGetModelTraceInfo } from './hooks/useGetModelTraceInfo';
 import { useTraceCachedActions } from './hooks/useTraceCachedActions';
 import { ModelTraceExplorerContent } from './ModelTraceExplorerContent';
 import { ModelTraceExplorerComparisonView } from './ModelTraceExplorerComparisonView';
+import { ClaudeAgentProvider, ClaudeAgentDrawer } from '../claude-agent';
 
 const ContextProviders = ({ children }: { traceId: string; children: React.ReactNode }) => {
   return <ErrorBoundary fallbackRender={ModelTraceExplorerErrorState}>{children}</ErrorBoundary>;
@@ -84,29 +85,32 @@ export const ModelTraceExplorerImpl = ({
   }
 
   return (
-    <ContextProviders traceId={traceId}>
-      <ModelTraceExplorerViewStateProvider
-        modelTrace={modelTrace}
-        initialActiveView={initialActiveView}
-        selectedSpanIdOnRender={selectedSpanId}
-        assessmentsPaneEnabled={assessmentsPaneEnabled}
-        isInComparisonView={isInComparisonView}
-        initialAssessmentsPaneCollapsed={collapseAssessmentPane}
-        isTraceInitialLoading={isTraceInitialLoading}
-      >
-        <ModelTraceHeaderDetails modelTraceInfo={modelTrace.info} />
-        {isInComparisonView ? (
-          <ModelTraceExplorerComparisonView modelTraceInfo={modelTrace.info} />
-        ) : (
-          <ModelTraceExplorerContent
-            modelTraceInfo={modelTrace.info}
-            className={className}
-            selectedSpanId={selectedSpanId}
-            onSelectSpan={onSelectSpan}
-          />
-        )}
-      </ModelTraceExplorerViewStateProvider>
-    </ContextProviders>
+    <ClaudeAgentProvider>
+      <ContextProviders traceId={traceId}>
+        <ModelTraceExplorerViewStateProvider
+          modelTrace={modelTrace}
+          initialActiveView={initialActiveView}
+          selectedSpanIdOnRender={selectedSpanId}
+          assessmentsPaneEnabled={assessmentsPaneEnabled}
+          isInComparisonView={isInComparisonView}
+          initialAssessmentsPaneCollapsed={collapseAssessmentPane}
+          isTraceInitialLoading={isTraceInitialLoading}
+        >
+          <ModelTraceHeaderDetails modelTraceInfo={modelTrace.info} modelTrace={modelTrace} />
+          {isInComparisonView ? (
+            <ModelTraceExplorerComparisonView modelTraceInfo={modelTrace.info} />
+          ) : (
+            <ModelTraceExplorerContent
+              modelTraceInfo={modelTrace.info}
+              className={className}
+              selectedSpanId={selectedSpanId}
+              onSelectSpan={onSelectSpan}
+            />
+          )}
+        </ModelTraceExplorerViewStateProvider>
+      </ContextProviders>
+      <ClaudeAgentDrawer />
+    </ClaudeAgentProvider>
   );
 };
 
