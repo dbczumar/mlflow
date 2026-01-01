@@ -95,10 +95,9 @@ class OnlineTraceScoringProcessor:
         if not tasks:
             _logger.info("No traces selected after sampling, skipping")
             # Still need to advance checkpoint to avoid reprocessing the same time window
-            # Use a placeholder request_id since we have no actual traces
             checkpoint = OnlineTraceScoringCheckpoint(
                 timestamp_ms=time_window.max_trace_timestamp_ms,
-                request_id="",
+                request_id=None,
             )
             self._checkpoint_manager.persist_checkpoint(checkpoint)
             return

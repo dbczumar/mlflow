@@ -21,7 +21,7 @@ class OnlineSessionScoringCheckpoint:
     """Checkpoint for session-level online scoring."""
 
     timestamp_ms: int
-    session_id: str
+    session_id: str | None = None
 
     def to_json(self) -> str:
         """Serialize checkpoint to JSON string."""
