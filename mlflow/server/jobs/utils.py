@@ -37,6 +37,9 @@ _logger = logging.getLogger(__name__)
 # Reserved Huey instance key for periodic tasks
 HUEY_PERIODIC_TASKS_INSTANCE_KEY = "periodic_tasks"
 
+# Number of worker threads for the periodic tasks consumer
+PERIODIC_TASKS_WORKER_COUNT = 5
+
 
 def _exponential_backoff_retry(retry_count: int) -> None:
     from huey.exceptions import RetryTask
@@ -420,7 +423,7 @@ def _start_periodic_tasks_consumer_proc():
             shutil.which("huey_consumer.py"),
             "mlflow.server.jobs._periodic_tasks_consumer.huey_instance",
             "-w",
-            "1",  # Only 1 worker needed for periodic scheduler
+            str(PERIODIC_TASKS_WORKER_COUNT),
         ],
         capture_output=False,
         synchronous=False,
