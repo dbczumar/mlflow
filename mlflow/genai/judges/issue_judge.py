@@ -548,6 +548,14 @@ def make_judge_from_issue(
             f"Issue with ID '{issue_id}' not found"
         )
 
+    # Check if a judge already exists for this issue
+    if issue.tags and "mlflow.issue.judge" in issue.tags:
+        existing_scorer_id = issue.tags["mlflow.issue.judge"]
+        raise MlflowException.invalid_parameter_value(
+            f"A judge already exists for issue '{issue_id}' (scorer_id: {existing_scorer_id}). "
+            "Each issue can only have one associated judge."
+        )
+
     # Fetch traces that have this issue (reference traces)
     trace_ids = []
     try:

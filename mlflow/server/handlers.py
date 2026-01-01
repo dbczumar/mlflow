@@ -4031,6 +4031,13 @@ def _create_judge_from_issue():
     store = _get_scorer_store()
     version = store.register_scorer(issue.experiment_id, judge)
 
+    # Record the judge creation on the issue via a special tag
+    if version and version.scorer_id:
+        _get_tracking_store().update_issue(
+            issue_id=request_message.issue_id,
+            tags={"mlflow.issue.judge": version.scorer_id},
+        )
+
     # Build the response with the registered scorer info
     response_message = CreateJudgeFromIssue.Response()
     scorer_proto = Scorer()
