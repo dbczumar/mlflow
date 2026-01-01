@@ -309,7 +309,7 @@ class MlflowTrackingStore(AbstractScorerStore):
 
         self._tracking_store.update_online_scoring_config(
             experiment_id=experiment_id,
-            name=name,
+            scorer_name=name,
             sample_rate=sample_rate,
             filter_string=filter_string,
         )

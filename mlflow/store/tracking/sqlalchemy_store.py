@@ -2465,7 +2465,6 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
         Get all active online scorers across all experiments.
 
         Active online scorers are those with a sample_rate greater than zero.
-        Each OnlineScorer contains the serialized scorer and sampling configuration.
         Gateway endpoint IDs in the serialized scorers are resolved to endpoint names.
 
         Returns:
@@ -2529,7 +2528,7 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
     def update_online_scoring_config(
         self,
         experiment_id: str,
-        name: str,
+        scorer_name: str,
         sample_rate: float,
         filter_string: str | None = None,
     ) -> OnlineScoringConfig:
@@ -2538,7 +2537,7 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
 
         Args:
             experiment_id: The experiment ID.
-            name: The scorer name.
+            scorer_name: The scorer name.
             sample_rate: The sampling rate (0.0 to 1.0).
             filter_string: Optional filter expression for trace selection.
 
@@ -2559,13 +2558,13 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
                 session.query(SqlScorer)
                 .filter(
                     SqlScorer.experiment_id == experiment.experiment_id,
-                    SqlScorer.scorer_name == name,
+                    SqlScorer.scorer_name == scorer_name,
                 )
                 .first()
             )
             if scorer is None:
                 raise MlflowException(
-                    f"Scorer with name '{name}' not found for experiment {experiment_id}.",
+                    f"Scorer with name '{scorer_name}' not found for experiment {experiment_id}.",
                     RESOURCE_DOES_NOT_EXIST,
                 )
 
@@ -2581,7 +2580,7 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
                 model = extract_model_from_serialized_scorer(serialized_data)
                 if not is_gateway_model(model):
                     raise MlflowException(
-                        f"Scorer '{name}' does not use a gateway model. "
+                        f"Scorer '{scorer_name}' does not use a gateway model. "
                         "Online scoring is only supported for scorers that use gateway models.",
                         INVALID_PARAMETER_VALUE,
                     )

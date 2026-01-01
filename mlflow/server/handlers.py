@@ -4049,7 +4049,7 @@ def _update_online_scoring_config():
 
     config = _get_tracking_store().update_online_scoring_config(
         experiment_id=experiment_id,
-        name=name,
+        scorer_name=name,
         sample_rate=float(sample_rate),
         filter_string=filter_string,
     )

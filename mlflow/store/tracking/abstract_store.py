@@ -1469,7 +1469,7 @@ class AbstractStore(GatewayStoreMixin):
     def update_online_scoring_config(
         self,
         experiment_id: str,
-        name: str,
+        scorer_name: str,
         sample_rate: float,
         filter_string: str | None = None,
     ) -> "OnlineScoringConfig":
@@ -1478,7 +1478,7 @@ class AbstractStore(GatewayStoreMixin):
 
         Args:
             experiment_id: The experiment ID.
-            name: The scorer name.
+            scorer_name: The scorer name.
             sample_rate: The sampling rate (0.0 to 1.0).
             filter_string: Optional filter expression for trace selection.
 

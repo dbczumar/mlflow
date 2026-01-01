@@ -1367,7 +1367,7 @@ class RestStore(RestGatewayStoreMixin, AbstractStore):
     def update_online_scoring_config(
         self,
         experiment_id: str,
-        name: str,
+        scorer_name: str,
         sample_rate: float,
         filter_string: str | None = None,
     ) -> "OnlineScoringConfig":
@@ -1376,7 +1376,7 @@ class RestStore(RestGatewayStoreMixin, AbstractStore):
 
         Args:
             experiment_id: String ID of the experiment.
-            name: String name of the scorer.
+            scorer_name: The scorer name.
             sample_rate: The sampling rate (0.0 to 1.0).
             filter_string: Optional filter expression for trace selection.
 
@@ -1387,7 +1387,7 @@ class RestStore(RestGatewayStoreMixin, AbstractStore):
 
         request_body = {
             "experiment_id": experiment_id,
-            "name": name,
+            "name": scorer_name,
             "sample_rate": sample_rate,
         }
         if filter_string is not None:
