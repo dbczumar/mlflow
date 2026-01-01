@@ -124,6 +124,12 @@ class OnlineSessionScoringProcessor:
 
         if not completed_sessions:
             _logger.info("No completed sessions found, skipping")
+            # Still need to advance checkpoint to avoid reprocessing the same time window
+            checkpoint = OnlineSessionScoringCheckpoint(
+                timestamp_ms=time_window.max_last_trace_timestamp_ms,
+                session_id=None,
+            )
+            self._checkpoint_manager.persist_checkpoint(checkpoint)
             return
 
         _logger.info(f"Found {len(completed_sessions)} completed sessions for scoring")
