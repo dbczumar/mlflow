@@ -420,7 +420,6 @@ class AbstractStore(GatewayStoreMixin):
         min_last_trace_timestamp_ms: int,
         max_last_trace_timestamp_ms: int,
         max_results: int | None = None,
-        min_session_id: str | None = None,
     ) -> list["CompletedSession"]:
         """
         Find completed sessions within a time window based on their last trace timestamp.
@@ -442,9 +441,6 @@ class AbstractStore(GatewayStoreMixin):
                 Sessions with any traces after this time are excluded.
             max_results: Maximum number of sessions to return. If None, returns all
                 matching sessions.
-            min_session_id: When min_last_trace_timestamp_ms has ties, only include sessions
-                with session_id > min_session_id. Used for resuming from checkpoints when
-                multiple sessions share the same timestamp.
 
         Returns:
             List of CompletedSession objects sorted by (last_trace_timestamp_ms ASC,
