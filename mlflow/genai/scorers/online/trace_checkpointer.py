@@ -36,7 +36,6 @@ class OnlineTraceScoringTimeWindow:
 
     min_trace_timestamp_ms: int
     max_trace_timestamp_ms: int
-    min_request_id: str | None = None
 
 
 class OnlineTraceCheckpointManager:
@@ -82,12 +81,10 @@ class OnlineTraceCheckpointManager:
         current_time - MAX_LOOKBACK_MS instead to skip over old problematic traces.
 
         Returns:
-            OnlineTraceScoringTimeWindow with min and max trace timestamps and optional
-            min request ID for tiebreaking.
+            OnlineTraceScoringTimeWindow with min and max trace timestamps.
             min_trace_timestamp_ms is the checkpoint if it exists and is within the
             lookback period, otherwise now - MAX_LOOKBACK_MS.
             max_trace_timestamp_ms is the current time.
-            min_request_id is the request ID from checkpoint for handling timestamp ties.
         """
         current_time_ms = int(time.time() * 1000)
         checkpoint = self.get_checkpoint()
@@ -97,13 +94,10 @@ class OnlineTraceCheckpointManager:
 
         if checkpoint is not None:
             min_trace_timestamp_ms = max(checkpoint.timestamp_ms, min_lookback_time_ms)
-            checkpoint_request_id = checkpoint.request_id
         else:
             min_trace_timestamp_ms = min_lookback_time_ms
-            checkpoint_request_id = None
 
         return OnlineTraceScoringTimeWindow(
             min_trace_timestamp_ms=min_trace_timestamp_ms,
             max_trace_timestamp_ms=current_time_ms,
-            min_request_id=checkpoint_request_id,
         )

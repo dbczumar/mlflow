@@ -72,7 +72,13 @@ class OnlineTraceLoader:
                 experiment_ids=[experiment_id],
                 filter_string=combined_filter,
                 max_results=batch_size,
-                order_by=["timestamp_ms ASC"],
+                order_by=[
+                    "timestamp_ms ASC",
+                    # Order by trace ID to ensure that we have a consistent tie-breaker when
+                    # multiple traces have the same timestamp and max_traces is reached in
+                    # the middle of such a group
+                    "request_id ASC",
+                ],
                 page_token=page_token,
             )
 

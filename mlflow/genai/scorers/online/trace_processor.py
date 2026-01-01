@@ -82,13 +82,15 @@ class OnlineTraceScoringProcessor:
             return
 
         time_window = self._checkpoint_manager.calculate_time_window()
+        checkpoint = self._checkpoint_manager.get_checkpoint()
+
         _logger.info(
             f"Online scoring for experiment {self._experiment_id}: "
             f"time window [{time_window.min_trace_timestamp_ms}, "
             f"{time_window.max_trace_timestamp_ms}]"
         )
 
-        tasks = self._fetch_and_sample_traces(time_window)
+        tasks = self._fetch_and_sample_traces(time_window, checkpoint)
 
         if not tasks:
             _logger.info("No traces selected after sampling, skipping")
@@ -124,12 +126,14 @@ class OnlineTraceScoringProcessor:
     def _fetch_and_sample_traces(
         self,
         time_window,
+        checkpoint,
     ) -> dict[str, TraceScoringTask]:
         """
         Fetch traces for each filter and apply sampling.
 
         Args:
-            time_window: OnlineTraceScoringTimeWindow with timestamp bounds and checkpoint ID.
+            time_window: OnlineTraceScoringTimeWindow with timestamp bounds.
+            checkpoint: OnlineTraceScoringCheckpoint with last processed trace info.
 
         Returns:
             Dictionary mapping trace_id to TraceScoringTask.
@@ -158,13 +162,13 @@ class OnlineTraceScoringProcessor:
                 continue
 
             # Filter out traces at checkpoint boundary that have already been processed
-            if time_window.min_request_id is not None:
+            if checkpoint is not None and checkpoint.request_id is not None:
                 trace_infos = [
                     t
                     for t in trace_infos
                     if not (
-                        t.timestamp_ms == time_window.min_trace_timestamp_ms
-                        and t.request_id <= time_window.min_request_id
+                        t.timestamp_ms == checkpoint.timestamp_ms
+                        and t.request_id <= checkpoint.request_id
                     )
                 ]
 

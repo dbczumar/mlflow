@@ -95,6 +95,7 @@ class OnlineSessionScoringProcessor:
             return
 
         time_window = self._checkpoint_manager.calculate_time_window()
+        checkpoint = self._checkpoint_manager.get_checkpoint()
 
         _logger.info(
             f"Session scoring for experiment {self._experiment_id}: "
@@ -111,13 +112,13 @@ class OnlineSessionScoringProcessor:
         )
 
         # Filter out sessions at checkpoint boundary that have already been processed
-        if time_window.min_session_id is not None:
+        if checkpoint is not None and checkpoint.session_id is not None:
             completed_sessions = [
                 s
                 for s in completed_sessions
                 if not (
-                    s.last_trace_timestamp_ms == time_window.min_last_trace_timestamp_ms
-                    and s.session_id <= time_window.min_session_id
+                    s.last_trace_timestamp_ms == checkpoint.timestamp_ms
+                    and s.session_id <= checkpoint.session_id
                 )
             ]
 

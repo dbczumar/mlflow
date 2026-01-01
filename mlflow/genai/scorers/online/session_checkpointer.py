@@ -40,7 +40,6 @@ class OnlineSessionScoringTimeWindow:
 
     min_last_trace_timestamp_ms: int
     max_last_trace_timestamp_ms: int
-    min_session_id: str | None = None
 
 
 class OnlineSessionCheckpointManager:
@@ -86,12 +85,10 @@ class OnlineSessionCheckpointManager:
         current_time - MAX_LOOKBACK_MS instead to skip over old problematic sessions.
 
         Returns:
-            OnlineSessionScoringTimeWindow with min and max last trace timestamps and
-            optional min session ID for tiebreaking.
+            OnlineSessionScoringTimeWindow with min and max last trace timestamps.
             min_last_trace_timestamp_ms is the checkpoint if it exists and is within
             the lookback period, otherwise now - MAX_LOOKBACK_MS.
             max_last_trace_timestamp_ms is current time - session completion buffer.
-            min_session_id is the session ID from checkpoint for handling timestamp ties.
         """
         current_time_ms = int(time.time() * 1000)
         checkpoint = self.get_checkpoint()
@@ -101,15 +98,12 @@ class OnlineSessionCheckpointManager:
 
         if checkpoint is not None:
             min_last_trace_timestamp_ms = max(checkpoint.timestamp_ms, min_lookback_time_ms)
-            checkpoint_session_id = checkpoint.session_id
         else:
             min_last_trace_timestamp_ms = min_lookback_time_ms
-            checkpoint_session_id = None
 
         max_last_trace_timestamp_ms = current_time_ms - SESSION_COMPLETION_BUFFER_MS
 
         return OnlineSessionScoringTimeWindow(
             min_last_trace_timestamp_ms=min_last_trace_timestamp_ms,
             max_last_trace_timestamp_ms=max_last_trace_timestamp_ms,
-            min_session_id=checkpoint_session_id,
         )
