@@ -3158,7 +3158,7 @@ def _calculate_trace_filter_correlation():
 
 def _find_completed_sessions():
     """
-    Internal API handler for finding completed sessions.
+    Internal API handler for finding completed sessions for online scoring.
     Returns sessions based on their last trace timestamp.
     """
     experiment_id = request.args.get("experiment_id")
