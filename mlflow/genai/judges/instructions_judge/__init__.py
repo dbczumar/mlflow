@@ -371,17 +371,17 @@ class InstructionsJudge(Judge):
 
     def _build_user_message(
         self,
+        trace_id: str | None,
         inputs: Any | None,
         outputs: Any | None,
         expectations: dict[str, Any] | None,
         conversation: list[dict[str, str]] | None,
     ) -> str:
         """Build the user message with field values."""
-        template_values = self._build_template_values(inputs, outputs, expectations, conversation)
-
-        field_vars = [
-            var for var in self._ordered_template_variables if var != self._TEMPLATE_VARIABLE_TRACE
-        ]
+        template_values = self._build_template_values(
+            trace_id, inputs, outputs, expectations, conversation
+        )
+        field_vars = list(self._ordered_template_variables)
 
         # Build user message parts in order
         user_message_parts = [
@@ -401,6 +401,7 @@ class InstructionsJudge(Judge):
 
     def _build_template_values(
         self,
+        trace_id: str | None,
         inputs: Any | None,
         outputs: Any | None,
         expectations: dict[str, Any] | None,
@@ -408,6 +409,9 @@ class InstructionsJudge(Judge):
     ) -> dict[str, str]:
         """Build dictionary of template variable values."""
         template_values = {}
+
+        if trace_id is not None:
+            template_values[self._TEMPLATE_VARIABLE_TRACE] = trace_id
 
         if inputs is not None and self._TEMPLATE_VARIABLE_INPUTS in self.template_variables:
             template_values[self._TEMPLATE_VARIABLE_INPUTS] = self._safe_json_dumps(inputs)
@@ -524,7 +528,9 @@ class InstructionsJudge(Judge):
         is_trace_based = self._TEMPLATE_VARIABLE_TRACE in self.template_variables
 
         system_content = self._build_system_message(is_trace_based)
-        user_content = self._build_user_message(inputs, outputs, expectations, conversation)
+        user_content = self._build_user_message(
+            trace.info.trace_id, inputs, outputs, expectations, conversation
+        )
 
         from mlflow.types.llm import ChatMessage
 
@@ -539,7 +545,7 @@ class InstructionsJudge(Judge):
             model_uri=self._model,
             prompt=messages,
             assessment_name=self.name,
-            trace=trace if is_trace_based else None,
+            trace_id=trace.info.trace_id if is_trace_based else None,
             response_format=response_format,
             use_case=USE_CASE_AGENTIC_JUDGE,
             inference_params=self._inference_params,

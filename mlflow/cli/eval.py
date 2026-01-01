@@ -20,9 +20,9 @@ from mlflow.tracking import MlflowClient
 from mlflow.utils.string_utils import _create_table
 
 
-def _gather_traces(trace_ids: str, experiment_id: str) -> list[Trace]:
+def _gather_traces_by_ids(trace_ids: str, experiment_id: str) -> list[Trace]:
     """
-    Gather and validate traces from the tracking store.
+    Gather and validate traces from the tracking store by their IDs.
 
     Args:
         trace_ids: Comma-separated list of trace IDs to gather
@@ -58,10 +58,47 @@ def _gather_traces(trace_ids: str, experiment_id: str) -> list[Trace]:
     return traces
 
 
+def _gather_traces_by_filter(
+    filter_string: str, experiment_id: str, max_results: int
+) -> list[Trace]:
+    """
+    Gather traces from the tracking store using a filter string.
+
+    Args:
+        filter_string: Filter string to search traces
+        experiment_id: Experiment ID to search within
+        max_results: Maximum number of traces to return
+
+    Returns:
+        List of Trace objects
+
+    Raises:
+        click.UsageError: If the search fails
+    """
+    try:
+        traces = mlflow.search_traces(
+            locations=[experiment_id],
+            filter_string=filter_string,
+            max_results=max_results,
+            return_type="list",
+        )
+    except Exception as e:
+        raise click.UsageError(f"Failed to search traces: {e}")
+
+    if not traces:
+        raise click.UsageError(
+            f"No traces found matching filter '{filter_string}' in experiment {experiment_id}"
+        )
+
+    return traces
+
+
 def evaluate_traces(
     experiment_id: str,
-    trace_ids: str,
     scorers: str,
+    trace_ids: str | None = None,
+    filter_string: str | None = None,
+    max_results: int = 100,
     output_format: Literal["table", "json"] = "table",
 ) -> None:
     """
@@ -69,13 +106,20 @@ def evaluate_traces(
 
     Args:
         experiment_id: The experiment ID to use for evaluation
-        trace_ids: Comma-separated list of trace IDs to evaluate
         scorers: Comma-separated list of scorer names
+        trace_ids: Comma-separated list of trace IDs to evaluate (optional)
+        filter_string: Filter string to search traces (optional)
+        max_results: Maximum number of traces when using filter_string
         output_format: Output format ('table' or 'json')
+
+    Either trace_ids or filter_string must be provided.
     """
     mlflow.set_experiment(experiment_id=experiment_id)
 
-    traces = _gather_traces(trace_ids, experiment_id)
+    if trace_ids:
+        traces = _gather_traces_by_ids(trace_ids, experiment_id)
+    else:
+        traces = _gather_traces_by_filter(filter_string, experiment_id, max_results)
     traces_df = pd.DataFrame([{"trace_id": t.info.trace_id, "trace": t} for t in traces])
 
     scorer_names = [name.strip() for name in scorers.split(",")]

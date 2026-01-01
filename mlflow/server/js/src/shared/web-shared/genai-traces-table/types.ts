@@ -284,6 +284,7 @@ export enum TracesTableColumnGroup {
   EXPECTATION = 'EXPECTATION',
   TAG = 'TAG',
   INFO = 'INFO',
+  ISSUE = 'ISSUE',
 }
 
 export const TracesTableColumnGroupToLabelMap = {
@@ -292,6 +293,7 @@ export const TracesTableColumnGroupToLabelMap = {
   [TracesTableColumnGroup.TAG]: 'Tags',
   // We don't show a label for the info column group
   [TracesTableColumnGroup.INFO]: '\u00A0',
+  [TracesTableColumnGroup.ISSUE]: 'Issues',
 };
 
 export interface TracesTableColumn {
@@ -307,6 +309,10 @@ export interface TracesTableColumn {
   // TODO: Remove this field once migration to trace info v3 is complete
   assessmentInfo?: AssessmentInfo;
   expectationName?: string;
+  /** The issue name for individual issue columns in expanded view */
+  issueName?: string;
+  /** Whether this column represents an empty state (e.g., "No Issues") */
+  isEmptyState?: boolean;
 }
 
 export interface TableFilterFormState {

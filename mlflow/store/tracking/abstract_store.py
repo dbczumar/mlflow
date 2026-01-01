@@ -7,6 +7,7 @@ from mlflow.entities import (
     Assessment,
     DatasetInput,
     DatasetRecord,
+    IssueEntity,
     LoggedModel,
     LoggedModelInput,
     LoggedModelOutput,
@@ -1357,6 +1358,45 @@ class AbstractStore(GatewayStoreMixin):
             f"Linking prompts to traces is not implemented for {self.__class__.__name__}."
         )
 
+    def link_run_to_issues(self, run_id: str, issue_ids: list[str]) -> None:
+        """
+        Link an evaluation run to issues by creating entity associations.
+
+        This is called when an evaluation run uses IssueJudge scorers to evaluate
+        traces for specific issues. The association allows tracking which runs
+        have evaluated which issues.
+
+        Args:
+            run_id: ID of the evaluation run.
+            issue_ids: List of issue IDs to link to the run.
+
+        Raises:
+            NotImplementedError: If the operation is not supported by this store.
+        """
+        raise NotImplementedError(
+            f"Linking runs to issues is not implemented for {self.__class__.__name__}."
+        )
+
+    def get_runs_for_issue(self, issue_id: str) -> list[str]:
+        """
+        Get run IDs that are linked to an issue via entity associations.
+
+        This returns IDs of evaluation runs that have evaluated the specified issue
+        using IssueJudge scorers.
+
+        Args:
+            issue_id: The ID of the issue to find linked runs for.
+
+        Returns:
+            List of run IDs linked to the issue.
+
+        Raises:
+            NotImplementedError: If the operation is not supported by this store.
+        """
+        raise NotImplementedError(
+            f"Getting runs for issue is not implemented for {self.__class__.__name__}."
+        )
+
     def calculate_trace_filter_correlation(
         self,
         experiment_ids: list[str],
@@ -1517,5 +1557,183 @@ class AbstractStore(GatewayStoreMixin):
         Returns:
             List of OnlineScorer entities with serialized_scorer, sample_rate,
             and filter_string fields populated.
+        """
+
+    def create_issue(self, issue: IssueEntity) -> IssueEntity:
+        """
+        Create a new issue for an experiment.
+
+        Args:
+            issue: The IssueEntity to create.
+
+        Returns:
+            The created IssueEntity with populated issue_id and timestamps.
+
+        Raises:
+            MlflowException: If experiment does not exist.
+        """
+        raise NotImplementedError(self.__class__.__name__)
+
+    def get_issue(self, issue_id: str) -> IssueEntity:
+        """
+        Get an issue by ID.
+
+        Args:
+            issue_id: The unique identifier of the issue.
+
+        Returns:
+            The IssueEntity.
+
+        Raises:
+            MlflowException: If issue is not found.
+        """
+        raise NotImplementedError(self.__class__.__name__)
+
+    def update_issue(
+        self,
+        issue_id: str,
+        name: str | None = None,
+        description: str | None = None,
+        state: str | None = None,
+        tags: dict[str, str] | None = None,
+    ) -> IssueEntity:
+        """
+        Update an existing issue.
+
+        Args:
+            issue_id: The unique identifier of the issue.
+            name: Updated name (optional).
+            description: Updated description (optional).
+            state: Updated state (optional).
+            tags: Tags to merge with existing tags (optional).
+
+        Returns:
+            The updated IssueEntity.
+
+        Raises:
+            MlflowException: If issue is not found.
+        """
+        raise NotImplementedError(self.__class__.__name__)
+
+    def delete_issue(self, issue_id: str) -> None:
+        """
+        Delete an issue by ID.
+
+        Args:
+            issue_id: The unique identifier of the issue.
+
+        Raises:
+            MlflowException: If issue is not found.
+        """
+        raise NotImplementedError(self.__class__.__name__)
+
+    def search_issues(
+        self,
+        experiment_id: str,
+        states: list[str] | None = None,
+        max_results: int = 100,
+        page_token: str | None = None,
+    ) -> PagedList[IssueEntity]:
+        """
+        Search issues for an experiment.
+
+        Args:
+            experiment_id: The experiment ID to search issues in.
+            states: Filter by states (optional, returns all states if empty).
+            max_results: Maximum number of issues to return (default 100).
+            page_token: Pagination token for fetching next page.
+
+        Returns:
+            PagedList of IssueEntity objects.
+
+        Raises:
+            MlflowException: If experiment does not exist.
+        """
+        raise NotImplementedError(self.__class__.__name__)
+
+    def create_issue_comment(
+        self,
+        issue_id: str,
+        content: str,
+        author: str | None = None,
+    ):
+        """
+        Create a new comment on an issue.
+
+        Args:
+            issue_id: The ID of the issue to add a comment to.
+            content: The comment text content.
+            author: Optional author name or identifier.
+
+        Returns:
+            The created IssueCommentEntity with populated comment_id and timestamps.
+
+        Raises:
+            MlflowException: If issue does not exist.
+        """
+        raise NotImplementedError(self.__class__.__name__)
+
+    def get_issue_comment(self, comment_id: str):
+        """
+        Get a comment by ID.
+
+        Args:
+            comment_id: The unique identifier of the comment.
+
+        Returns:
+            The IssueCommentEntity.
+
+        Raises:
+            MlflowException: If comment is not found.
+        """
+        raise NotImplementedError(self.__class__.__name__)
+
+    def update_issue_comment(self, comment_id: str, content: str):
+        """
+        Update an existing comment.
+
+        Args:
+            comment_id: The unique identifier of the comment.
+            content: The updated content.
+
+        Returns:
+            The updated IssueCommentEntity.
+
+        Raises:
+            MlflowException: If comment is not found.
+        """
+        raise NotImplementedError(self.__class__.__name__)
+
+    def delete_issue_comment(self, comment_id: str) -> None:
+        """
+        Delete a comment.
+
+        Args:
+            comment_id: The unique identifier of the comment.
+
+        Raises:
+            MlflowException: If comment is not found.
+        """
+        raise NotImplementedError(self.__class__.__name__)
+
+    def search_issue_comments(
+        self,
+        issue_id: str,
+        max_results: int = 100,
+        page_token: str | None = None,
+    ):
+        """
+        Search comments for an issue.
+
+        Args:
+            issue_id: The issue ID to search comments for.
+            max_results: Maximum number of comments to return (default 100).
+            page_token: Pagination token for fetching next page.
+
+        Returns:
+            PagedList of IssueCommentEntity objects.
+
+        Raises:
+            MlflowException: If issue does not exist.
         """
         raise NotImplementedError(self.__class__.__name__)

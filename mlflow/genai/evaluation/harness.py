@@ -60,6 +60,48 @@ from mlflow.utils.mlflow_tags import IMMUTABLE_TAGS
 _logger = logging.getLogger(__name__)
 
 
+def _link_evaluation_run_to_issues(run_id: str | None, scorers: list[Scorer] | None) -> None:
+    """
+    Link the evaluation run to any issues being evaluated via IssueJudge scorers.
+
+    This creates entity associations between the run and the issues, allowing the
+    issue detail page to display linked evaluation runs.
+
+    Args:
+        run_id: The ID of the evaluation run. If None, no linking is performed.
+        scorers: List of scorers used in the evaluation.
+    """
+    if run_id is None or not scorers:
+        return
+
+    # Import IssueJudge here to avoid circular imports
+    from mlflow.genai.judges.issue_judge import IssueJudge
+
+    # Extract issue IDs from IssueJudge scorers
+    issue_ids = [
+        scorer.issue_id
+        for scorer in scorers
+        if isinstance(scorer, IssueJudge) and hasattr(scorer, "issue_id")
+    ]
+
+    if not issue_ids:
+        return
+
+    try:
+        from mlflow.tracking._tracking_service.utils import _get_store
+
+        store = _get_store()
+        store.link_run_to_issues(run_id, issue_ids)
+    except NotImplementedError:
+        # Silently skip if the store doesn't support this operation
+        _logger.debug(
+            f"Store {type(store).__name__} does not support linking runs to issues. Skipping."
+        )
+    except Exception as e:
+        # Log but don't fail the evaluation if linking fails
+        _logger.warning(f"Failed to link run {run_id} to issues {issue_ids}: {e}")
+
+
 def _log_multi_turn_assessments_to_traces(
     multi_turn_assessments: dict[str, list[Feedback]],
     eval_results: list[EvalResult],
@@ -91,6 +133,61 @@ def _log_multi_turn_assessments_to_traces(
             eval_result.assessments.extend(assessments_list)
         except Exception as e:
             _logger.warning(f"Failed to log multi-turn assessments for trace {trace_id}: {e}")
+
+
+def _compute_issue_metrics(
+    eval_results: list[EvalResult],
+    scorers: list[Scorer] | None,
+) -> dict[str, float]:
+    """
+    Compute pass/fail metrics for IssueJudge scorers.
+
+    For each IssueJudge scorer, computes:
+    - {issue_id}/pass_count: Number of traces without the issue
+    - {issue_id}/fail_count: Number of traces with the issue
+    - {issue_id}/pass_rate: Ratio of traces without the issue
+
+    Args:
+        eval_results: List of EvalResult objects from evaluation
+        scorers: List of scorers used in the evaluation
+
+    Returns:
+        Dictionary of metric names to values
+    """
+    if not scorers:
+        return {}
+
+    from mlflow.entities.assessment import Issue as IssueAssessment
+    from mlflow.genai.judges.issue_judge import IssueJudge
+
+    # Find all IssueJudge scorers
+    issue_judges = [s for s in scorers if isinstance(s, IssueJudge)]
+    if not issue_judges:
+        return {}
+
+    metrics = {}
+    total_traces = len(eval_results)
+
+    for judge in issue_judges:
+        # Count traces where this judge detected an issue
+        fail_count = 0
+        for eval_result in eval_results:
+            for assessment in eval_result.assessments:
+                if isinstance(assessment, IssueAssessment):
+                    if assessment.issue_id == judge.issue_id and assessment.value is True:
+                        fail_count += 1
+                        break  # Only count once per trace
+
+        pass_count = total_traces - fail_count
+        pass_rate = pass_count / total_traces if total_traces > 0 else 0.0
+
+        # Use issue_id as the metric prefix for easier lookup
+        issue_id = judge.issue_id
+        metrics[f"{issue_id}/pass_count"] = float(pass_count)
+        metrics[f"{issue_id}/fail_count"] = float(fail_count)
+        metrics[f"{issue_id}/pass_rate"] = pass_rate
+
+    return metrics
 
 
 @context.eval_context
@@ -201,12 +298,20 @@ def run(
     # Link traces to the run if the backend support it
     batch_link_traces_to_run(run_id=run_id, eval_results=eval_results)
 
+    # Link the evaluation run to any issues being evaluated via IssueJudge scorers
+    _link_evaluation_run_to_issues(run_id=run_id, scorers=scorers)
+
     # Refresh traces on eval_results to include all logged assessments.
     # This is done once after all assessments (single-turn and multi-turn) are logged to the traces.
     _refresh_eval_result_traces(eval_results)
 
     # Aggregate metrics and log to MLflow run
     aggregated_metrics = compute_aggregated_metrics(eval_results, scorers=scorers)
+
+    # Compute and add issue-specific pass/fail metrics for IssueJudge scorers
+    issue_metrics = _compute_issue_metrics(eval_results, scorers=scorers)
+    aggregated_metrics.update(issue_metrics)
+
     mlflow.log_metrics(aggregated_metrics)
 
     try:

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 
 import { getLargeTraceDisplaySizeThreshold, shouldBlockLargeTraceDisplay } from './FeatureUtils';
@@ -13,6 +13,7 @@ import { useGetModelTraceInfo } from './hooks/useGetModelTraceInfo';
 import { useTraceCachedActions } from './hooks/useTraceCachedActions';
 import { ModelTraceExplorerContent } from './ModelTraceExplorerContent';
 import { ModelTraceExplorerComparisonView } from './ModelTraceExplorerComparisonView';
+import { useGlobalClaudeOptional } from '../claude-agent';
 
 const ContextProviders = ({ children }: { traceId: string; children: React.ReactNode }) => {
   return <ErrorBoundary fallbackRender={ModelTraceExplorerErrorState}>{children}</ErrorBoundary>;
@@ -84,29 +85,111 @@ export const ModelTraceExplorerImpl = ({
   }
 
   return (
-    <ContextProviders traceId={traceId}>
-      <ModelTraceExplorerViewStateProvider
-        modelTrace={modelTrace}
-        initialActiveView={initialActiveView}
-        selectedSpanIdOnRender={selectedSpanId}
-        assessmentsPaneEnabled={assessmentsPaneEnabled}
-        isInComparisonView={isInComparisonView}
-        initialAssessmentsPaneCollapsed={collapseAssessmentPane}
-        isTraceInitialLoading={isTraceInitialLoading}
-      >
-        <ModelTraceHeaderDetails modelTraceInfo={modelTrace.info} />
-        {isInComparisonView ? (
-          <ModelTraceExplorerComparisonView modelTraceInfo={modelTrace.info} />
-        ) : (
-          <ModelTraceExplorerContent
-            modelTraceInfo={modelTrace.info}
-            className={className}
-            selectedSpanId={selectedSpanId}
-            onSelectSpan={onSelectSpan}
-          />
-        )}
-      </ModelTraceExplorerViewStateProvider>
-    </ContextProviders>
+    <ModelTraceExplorerInner
+      traceId={traceId}
+      modelTrace={modelTrace}
+      initialActiveView={initialActiveView}
+      selectedSpanId={selectedSpanId}
+      onSelectSpan={onSelectSpan}
+      assessmentsPaneEnabled={assessmentsPaneEnabled}
+      isInComparisonView={isInComparisonView}
+      collapseAssessmentPane={collapseAssessmentPane}
+      isTraceInitialLoading={isTraceInitialLoading}
+      className={className}
+    />
+  );
+};
+
+/**
+ * Inner component that sets trace context for the global Claude assistant.
+ */
+const ModelTraceExplorerInner = ({
+  traceId,
+  modelTrace,
+  initialActiveView,
+  selectedSpanId,
+  onSelectSpan,
+  assessmentsPaneEnabled,
+  isInComparisonView,
+  collapseAssessmentPane,
+  isTraceInitialLoading,
+  className,
+}: {
+  traceId: string;
+  modelTrace: ModelTrace;
+  initialActiveView?: 'summary' | 'detail';
+  selectedSpanId?: string;
+  onSelectSpan?: (selectedSpanId?: string) => void;
+  assessmentsPaneEnabled: boolean;
+  isInComparisonView?: boolean;
+  collapseAssessmentPane?: boolean | 'force-open';
+  isTraceInitialLoading: boolean;
+  className?: string;
+}) => {
+  const globalClaude = useGlobalClaudeOptional();
+  const setContext = globalClaude?.setContext;
+  const lastSetTraceIdRef = useRef<string | null>(null);
+
+  // Set trace context for global Claude assistant when trace is loaded
+  // Use ref to prevent re-triggering when modelTrace object reference changes
+  useEffect(() => {
+    if (setContext && modelTrace && lastSetTraceIdRef.current !== traceId) {
+      lastSetTraceIdRef.current = traceId;
+      setContext({
+        type: 'trace',
+        summary: `Trace ${traceId}`,
+        data: modelTrace,
+      });
+    }
+  }, [setContext, modelTrace, traceId]);
+
+  // Clean up context when unmounting
+  useEffect(() => {
+    return () => {
+      if (setContext) {
+        setContext({
+          type: 'none',
+          summary: '',
+          data: null,
+        });
+      }
+    };
+  }, [setContext]);
+
+  return (
+    <div
+      css={{
+        position: 'relative',
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100%',
+        overflow: 'hidden',
+      }}
+    >
+      <ContextProviders traceId={traceId}>
+        <ModelTraceExplorerViewStateProvider
+          modelTrace={modelTrace}
+          initialActiveView={initialActiveView}
+          selectedSpanIdOnRender={selectedSpanId}
+          assessmentsPaneEnabled={assessmentsPaneEnabled}
+          isInComparisonView={isInComparisonView}
+          initialAssessmentsPaneCollapsed={collapseAssessmentPane}
+          isTraceInitialLoading={isTraceInitialLoading}
+        >
+          <ModelTraceHeaderDetails modelTraceInfo={modelTrace.info} modelTrace={modelTrace} />
+          {isInComparisonView ? (
+            <ModelTraceExplorerComparisonView modelTraceInfo={modelTrace.info} />
+          ) : (
+            <ModelTraceExplorerContent
+              modelTraceInfo={modelTrace.info}
+              className={className}
+              selectedSpanId={selectedSpanId}
+              onSelectSpan={onSelectSpan}
+            />
+          )}
+        </ModelTraceExplorerViewStateProvider>
+      </ContextProviders>
+    </div>
   );
 };
 

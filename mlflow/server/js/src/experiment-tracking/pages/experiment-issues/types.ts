@@ -1,0 +1,161 @@
+/**
+ * Issue state enum matching backend proto IssueState
+ */
+export type IssueState = 'draft' | 'open' | 'closed';
+
+/**
+ * Issue entity matching backend proto Issue message
+ */
+export interface Issue {
+  issue_id: string;
+  experiment_id: string;
+  name: string;
+  description?: string;
+  state: IssueState;
+  creation_time?: number;
+  last_update_time?: number;
+  tags?: Record<string, string>;
+}
+
+/**
+ * Response from searchIssues API
+ */
+export interface SearchIssuesResponse {
+  issues: Issue[];
+  next_page_token?: string;
+}
+
+/**
+ * Response from createIssue API
+ */
+export interface CreateIssueResponse {
+  issue: Issue;
+}
+
+/**
+ * Response from getIssue API
+ */
+export interface GetIssueResponse {
+  issue: Issue;
+}
+
+/**
+ * Response from updateIssue API
+ */
+export interface UpdateIssueResponse {
+  issue: Issue;
+}
+
+/**
+ * Tab names for the issue detail panel
+ */
+export type IssueDetailTab = 'judge' | 'traces' | 'evaluation-runs' | 'comments';
+
+/**
+ * Metric associated with a run
+ */
+export interface RunMetric {
+  key: string;
+  value: number;
+}
+
+/**
+ * RunInfo matching backend proto RunInfo message (subset of fields we use)
+ */
+export interface LinkedRunInfo {
+  run_id: string;
+  run_name?: string;
+  experiment_id: string;
+  start_time?: number;
+  end_time?: number;
+  status?: string;
+  lifecycle_stage?: string;
+}
+
+/**
+ * Linked evaluation run with metrics
+ */
+export interface LinkedEvaluationRun {
+  info: LinkedRunInfo;
+  metrics: RunMetric[];
+}
+
+/**
+ * Response from getIssueLinkedRuns API
+ */
+export interface GetIssueLinkedRunsResponse {
+  runs: LinkedRunInfo[];
+  linked_runs?: LinkedEvaluationRun[];
+}
+
+/**
+ * Issue comment entity
+ */
+export interface IssueComment {
+  comment_id: string;
+  issue_id: string;
+  content: string;
+  author?: string;
+  creation_time?: number;
+  last_update_time?: number;
+}
+
+/**
+ * Response from searchIssueComments API
+ */
+export interface SearchIssueCommentsResponse {
+  comments: IssueComment[];
+  next_page_token?: string;
+}
+
+/**
+ * Response from createIssueComment API
+ */
+export interface CreateIssueCommentResponse {
+  comment: IssueComment;
+}
+
+/**
+ * Response from getIssueComment API
+ */
+export interface GetIssueCommentResponse {
+  comment: IssueComment;
+}
+
+/**
+ * Response from updateIssueComment API
+ */
+export interface UpdateIssueCommentResponse {
+  comment: IssueComment;
+}
+
+/**
+ * Judge (scorer) entity for issue detection
+ */
+export interface IssueJudge {
+  scorer_id: string;
+  scorer_name: string;
+  scorer_version: number;
+  experiment_id: number;
+  creation_time: number;
+  // Parsed from serialized_scorer
+  issue_id: string;
+  issue_name: string;
+  prompt: string;
+  model: string;
+  description?: string;
+}
+
+/**
+ * Response from createJudgeFromIssue API
+ */
+export interface CreateJudgeFromIssueResponse {
+  scorer: {
+    experiment_id: number;
+    scorer_name: string;
+    scorer_version: number;
+    serialized_scorer: string;
+    creation_time: number;
+    scorer_id?: string;
+  };
+}

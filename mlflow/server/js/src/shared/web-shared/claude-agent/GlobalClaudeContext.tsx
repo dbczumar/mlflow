@@ -1,0 +1,274 @@
+/**
+ * Global React Context for Claude Agent.
+ * Provides Claude assistant functionality accessible from anywhere in MLflow.
+ */
+
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+
+import type { ChatMessage, ClaudeContext, GlobalClaudeAgentContextType } from './types';
+import { serializeContext } from './ContextSerializer';
+import { startAnalysis, sendMessageStream, checkHealth } from './ClaudeAgentService';
+import { useSSEStream } from './hooks/useSSEStream';
+
+const DEFAULT_CONTEXT: ClaudeContext = {
+  type: 'none',
+  summary: '',
+  data: null,
+};
+
+const GlobalClaudeContext = createContext<GlobalClaudeAgentContextType | null>(null);
+
+const generateMessageId = (): string => {
+  return `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+};
+
+/**
+ * Global Claude Agent Provider.
+ * Wrap at the app root level (MlflowRootRoute) to enable Claude assistance everywhere.
+ */
+export const GlobalClaudeProvider = ({ children }: { children: ReactNode }) => {
+  // Panel state
+  const [isPanelOpen, setIsPanelOpen] = useState(false);
+
+  // Context state (set by pages)
+  const [context, setContextState] = useState<ClaudeContext>(DEFAULT_CONTEXT);
+
+  // Chat state (persists across navigation)
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [isClaudeAvailable, setIsClaudeAvailable] = useState<boolean | null>(null);
+  const [currentStatus, setCurrentStatus] = useState<string | null>(null);
+
+  // Use ref to track current streaming message
+  const streamingMessageRef = useRef<string>('');
+
+  const appendToStreamingMessage = useCallback((text: string) => {
+    streamingMessageRef.current += text;
+    setMessages((prev) => {
+      const lastMessage = prev[prev.length - 1];
+      if (lastMessage && lastMessage.role === 'assistant' && lastMessage.isStreaming) {
+        return [...prev.slice(0, -1), { ...lastMessage, content: streamingMessageRef.current }];
+      }
+      return prev;
+    });
+  }, []);
+
+  const finalizeStreamingMessage = useCallback(() => {
+    setMessages((prev) => {
+      const lastMessage = prev[prev.length - 1];
+      if (lastMessage && lastMessage.role === 'assistant' && lastMessage.isStreaming) {
+        return [...prev.slice(0, -1), { ...lastMessage, isStreaming: false }];
+      }
+      return prev;
+    });
+    streamingMessageRef.current = '';
+    setIsStreaming(false);
+    setCurrentStatus(null);
+  }, []);
+
+  const handleStatus = useCallback((status: string) => {
+    setCurrentStatus(status);
+  }, []);
+
+  const handleStreamError = useCallback((errorMsg: string) => {
+    setError(errorMsg);
+    setIsStreaming(false);
+    setCurrentStatus(null);
+    setMessages((prev) => {
+      const lastMessage = prev[prev.length - 1];
+      if (lastMessage && lastMessage.role === 'assistant' && lastMessage.isStreaming) {
+        return [...prev.slice(0, -1), { ...lastMessage, content: `Error: ${errorMsg}`, isStreaming: false }];
+      }
+      return prev;
+    });
+  }, []);
+
+  const { connect: connectSSE, disconnect: disconnectSSE } = useSSEStream({
+    onMessage: appendToStreamingMessage,
+    onError: handleStreamError,
+    onDone: finalizeStreamingMessage,
+    onStatus: handleStatus,
+  });
+
+  // Check Claude availability on mount
+  useEffect(() => {
+    checkHealth()
+      .then((health) => {
+        setIsClaudeAvailable(health.claude_available === 'true' || health.claude_available === 'True');
+      })
+      .catch(() => {
+        setIsClaudeAvailable(false);
+      });
+  }, []);
+
+  // Actions
+  const openPanel = useCallback(() => {
+    setIsPanelOpen(true);
+    setError(null);
+  }, []);
+
+  const closePanel = useCallback(() => {
+    setIsPanelOpen(false);
+    disconnectSSE();
+  }, [disconnectSSE]);
+
+  const setContext = useCallback((newContext: ClaudeContext) => {
+    setContextState(newContext);
+  }, []);
+
+  const reset = useCallback(() => {
+    setSessionId(null);
+    setMessages([]);
+    setIsStreaming(false);
+    setError(null);
+    streamingMessageRef.current = '';
+    disconnectSSE();
+  }, [disconnectSSE]);
+
+  const handleStartAnalysis = useCallback(
+    async (prompt?: string) => {
+      setError(null);
+      setIsStreaming(true);
+
+      // Add user message if prompt provided
+      if (prompt) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: generateMessageId(),
+            role: 'user',
+            content: prompt,
+            timestamp: new Date(),
+          },
+        ]);
+      }
+
+      // Add streaming assistant message placeholder
+      streamingMessageRef.current = '';
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: generateMessageId(),
+          role: 'assistant',
+          content: '',
+          timestamp: new Date(),
+          isStreaming: true,
+        },
+      ]);
+
+      try {
+        const serializedContext = serializeContext(context);
+        const response = await startAnalysis({
+          trace_context: serializedContext,
+          prompt,
+          session_id: sessionId ?? undefined,
+        });
+
+        setSessionId(response.session_id);
+
+        // Connect to SSE stream
+        connectSSE(response.session_id);
+      } catch (err) {
+        handleStreamError(err instanceof Error ? err.message : 'Failed to start analysis');
+      }
+    },
+    [context, sessionId, connectSSE, handleStreamError],
+  );
+
+  const handleSendMessage = useCallback(
+    (message: string) => {
+      if (!sessionId) {
+        // No session yet - start analysis with the message as prompt
+        handleStartAnalysis(message);
+        return;
+      }
+
+      setError(null);
+      setIsStreaming(true);
+
+      // Add user message
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: generateMessageId(),
+          role: 'user',
+          content: message,
+          timestamp: new Date(),
+        },
+      ]);
+
+      // Add streaming assistant message placeholder
+      streamingMessageRef.current = '';
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: generateMessageId(),
+          role: 'assistant',
+          content: '',
+          timestamp: new Date(),
+          isStreaming: true,
+        },
+      ]);
+
+      // Send message and stream response
+      sendMessageStream(
+        { session_id: sessionId, message },
+        appendToStreamingMessage,
+        handleStreamError,
+        finalizeStreamingMessage,
+        handleStatus,
+      );
+    },
+    [
+      sessionId,
+      handleStartAnalysis,
+      appendToStreamingMessage,
+      handleStreamError,
+      finalizeStreamingMessage,
+      handleStatus,
+    ],
+  );
+
+  const value: GlobalClaudeAgentContextType = {
+    // State
+    isPanelOpen,
+    context,
+    sessionId,
+    messages,
+    isStreaming,
+    error,
+    isClaudeAvailable,
+    currentStatus,
+    // Actions
+    openPanel,
+    closePanel,
+    setContext,
+    sendMessage: handleSendMessage,
+    startAnalysis: handleStartAnalysis,
+    reset,
+  };
+
+  return <GlobalClaudeContext.Provider value={value}>{children}</GlobalClaudeContext.Provider>;
+};
+
+/**
+ * Hook to access the global Claude context.
+ * Must be used within a GlobalClaudeProvider.
+ */
+export const useGlobalClaude = (): GlobalClaudeAgentContextType => {
+  const context = useContext(GlobalClaudeContext);
+  if (!context) {
+    throw new Error('useGlobalClaude must be used within a GlobalClaudeProvider');
+  }
+  return context;
+};
+
+/**
+ * Optional hook that returns null if not within a provider.
+ * Useful for components that may or may not be in a global Claude context.
+ */
+export const useGlobalClaudeOptional = (): GlobalClaudeAgentContextType | null => {
+  return useContext(GlobalClaudeContext);
+};

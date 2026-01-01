@@ -26,7 +26,13 @@ import { spanTimeFormatter } from './timeline-tree/TimelineTree.utils';
 
 const BASE_NOTIFICATION_COMPONENT_ID = 'mlflow.model_trace_explorer.header_details.notification';
 
-export const ModelTraceHeaderDetails = ({ modelTraceInfo }: { modelTraceInfo: ModelTrace['info'] }) => {
+export const ModelTraceHeaderDetails = ({
+  modelTraceInfo,
+  modelTrace,
+}: {
+  modelTraceInfo: ModelTrace['info'];
+  modelTrace?: ModelTrace;
+}) => {
   const { theme } = useDesignSystemTheme();
   const [showNotification, setShowNotification] = useState(false);
   const { rootNode } = useModelTraceExplorerViewState();

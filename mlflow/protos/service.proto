@@ -2001,6 +2001,258 @@ service MlflowService {
       rpc_doc_title: "Gateway Delete Endpoint Tag"
     };
   }
+
+  // ========== Issues API ==========
+
+  // Create a new issue for an experiment
+  rpc createIssue(CreateIssue) returns (CreateIssue.Response) {
+    option (rpc) = {
+      endpoints: [
+        {
+          method: "POST"
+          path: "/mlflow/issues/create"
+          since: {
+            major: 3
+            minor: 0
+          }
+        }
+      ]
+      visibility: PUBLIC
+      rpc_doc_title: "Create Issue"
+    };
+  }
+
+  // Get an issue by ID
+  rpc getIssue(GetIssue) returns (GetIssue.Response) {
+    option (rpc) = {
+      endpoints: [
+        {
+          method: "GET"
+          path: "/mlflow/issues/get"
+          since: {
+            major: 3
+            minor: 0
+          }
+        }
+      ]
+      visibility: PUBLIC
+      rpc_doc_title: "Get Issue"
+    };
+  }
+
+  // Update an issue
+  rpc updateIssue(UpdateIssue) returns (UpdateIssue.Response) {
+    option (rpc) = {
+      endpoints: [
+        {
+          method: "PATCH"
+          path: "/mlflow/issues/update"
+          since: {
+            major: 3
+            minor: 0
+          }
+        }
+      ]
+      visibility: PUBLIC
+      rpc_doc_title: "Update Issue"
+    };
+  }
+
+  // Delete an issue
+  rpc deleteIssue(DeleteIssue) returns (DeleteIssue.Response) {
+    option (rpc) = {
+      endpoints: [
+        {
+          method: "DELETE"
+          path: "/mlflow/issues/delete"
+          since: {
+            major: 3
+            minor: 0
+          }
+        }
+      ]
+      visibility: PUBLIC
+      rpc_doc_title: "Delete Issue"
+    };
+  }
+
+  // Search issues for an experiment
+  rpc searchIssues(SearchIssues) returns (SearchIssues.Response) {
+    option (rpc) = {
+      endpoints: [
+        {
+          method: "GET"
+          path: "/mlflow/issues/search"
+          since: {
+            major: 3
+            minor: 0
+          }
+        },
+        {
+          method: "POST"
+          path: "/mlflow/issues/search"
+          since: {
+            major: 3
+            minor: 0
+          }
+        }
+      ]
+      visibility: PUBLIC
+      rpc_doc_title: "Search Issues"
+    };
+  }
+
+  // Create an LLM judge from an issue for detecting that issue in traces
+  rpc createJudgeFromIssue(CreateJudgeFromIssue) returns (CreateJudgeFromIssue.Response) {
+    option (rpc) = {
+      endpoints: [
+        {
+          method: "POST"
+          path: "/mlflow/issues/create-judge"
+          since: {
+            major: 3
+            minor: 0
+          }
+        }
+      ]
+      visibility: PUBLIC
+      rpc_doc_title: "Create Judge From Issue"
+    };
+  }
+
+  // Get evaluation runs linked to an issue
+  rpc getIssueLinkedRuns(GetIssueLinkedRuns) returns (GetIssueLinkedRuns.Response) {
+    option (rpc) = {
+      endpoints: [
+        {
+          method: "GET"
+          path: "/mlflow/issues/linked-runs"
+          since: {
+            major: 3
+            minor: 0
+          }
+        }
+      ]
+      visibility: PUBLIC
+      rpc_doc_title: "Get Issue Linked Runs"
+    };
+  }
+
+  // Link an evaluation run to issues
+  rpc linkRunToIssues(LinkRunToIssues) returns (LinkRunToIssues.Response) {
+    option (rpc) = {
+      endpoints: [
+        {
+          method: "POST"
+          path: "/mlflow/issues/link-run"
+          since: {
+            major: 3
+            minor: 0
+          }
+        }
+      ]
+      visibility: PUBLIC_UNDOCUMENTED
+      rpc_doc_title: "Link Run to Issues"
+    };
+  }
+
+  // Create a new comment on an issue
+  rpc createIssueComment(CreateIssueComment) returns (CreateIssueComment.Response) {
+    option (rpc) = {
+      endpoints: [
+        {
+          method: "POST"
+          path: "/mlflow/issues/comments/create"
+          since: {
+            major: 3
+            minor: 0
+          }
+        }
+      ]
+      visibility: PUBLIC
+      rpc_doc_title: "Create Issue Comment"
+    };
+  }
+
+  // Get a comment by ID
+  rpc getIssueComment(GetIssueComment) returns (GetIssueComment.Response) {
+    option (rpc) = {
+      endpoints: [
+        {
+          method: "GET"
+          path: "/mlflow/issues/comments/get"
+          since: {
+            major: 3
+            minor: 0
+          }
+        }
+      ]
+      visibility: PUBLIC
+      rpc_doc_title: "Get Issue Comment"
+    };
+  }
+
+  // Update a comment
+  rpc updateIssueComment(UpdateIssueComment) returns (UpdateIssueComment.Response) {
+    option (rpc) = {
+      endpoints: [
+        {
+          method: "PATCH"
+          path: "/mlflow/issues/comments/update"
+          since: {
+            major: 3
+            minor: 0
+          }
+        }
+      ]
+      visibility: PUBLIC
+      rpc_doc_title: "Update Issue Comment"
+    };
+  }
+
+  // Delete a comment
+  rpc deleteIssueComment(DeleteIssueComment) returns (DeleteIssueComment.Response) {
+    option (rpc) = {
+      endpoints: [
+        {
+          method: "DELETE"
+          path: "/mlflow/issues/comments/delete"
+          since: {
+            major: 3
+            minor: 0
+          }
+        }
+      ]
+      visibility: PUBLIC
+      rpc_doc_title: "Delete Issue Comment"
+    };
+  }
+
+  // Search comments for an issue
+  rpc searchIssueComments(SearchIssueComments) returns (SearchIssueComments.Response) {
+    option (rpc) = {
+      endpoints: [
+        {
+          method: "GET"
+          path: "/mlflow/issues/comments/search"
+          since: {
+            major: 3
+            minor: 0
+          }
+        },
+        {
+          method: "POST"
+          path: "/mlflow/issues/comments/search"
+          since: {
+            major: 3
+            minor: 0
+          }
+        }
+      ]
+      visibility: PUBLIC
+      rpc_doc_title: "Search Issue Comments"
+    };
+  }
 }
 
 // View type for ListExperiments query.
@@ -4607,5 +4859,284 @@ message GetSecretsConfig {
   message Response {
     // Whether the server is configured to handle secrets (encryption available)
     optional bool secrets_available = 1;
+  }
+}
+
+// ========== Issues API Messages ==========
+
+// State of an issue
+enum IssueState {
+  // Unspecified state
+  ISSUE_STATE_UNSPECIFIED = 0;
+  // Draft state - issue created by analysis, pending review
+  DRAFT = 1;
+  // Open state - user confirmed as valid issue
+  OPEN = 2;
+  // Closed state - issue has been resolved
+  CLOSED = 3;
+}
+
+// An issue represents an identified problem from trace analysis
+message Issue {
+  // Unique identifier for the issue (UUID)
+  optional string issue_id = 1;
+
+  // ID of the experiment this issue belongs to
+  optional string experiment_id = 2;
+
+  // Human-readable name/title of the issue
+  optional string name = 3;
+
+  // Detailed description of the issue
+  optional string description = 4;
+
+  // Current state of the issue
+  optional IssueState state = 5;
+
+  // Creation time in milliseconds since epoch
+  optional int64 creation_time = 6;
+
+  // Last update time in milliseconds since epoch
+  optional int64 last_update_time = 7;
+
+  // Additional metadata as key-value pairs
+  map<string, string> tags = 8;
+}
+
+message CreateIssue {
+  option (scalapb.message).extends = "com.databricks.rpc.RPC[$this.Response]";
+
+  // ID of the experiment to create the issue in
+  optional string experiment_id = 1 [(validate_required) = true];
+
+  // Name/title of the issue
+  optional string name = 2 [(validate_required) = true];
+
+  // Detailed description of the issue
+  optional string description = 3;
+
+  // Initial state (defaults to DRAFT if not specified)
+  optional IssueState state = 4;
+
+  // Additional metadata tags
+  map<string, string> tags = 5;
+
+  message Response {
+    // The created issue
+    optional Issue issue = 1;
+  }
+}
+
+message GetIssue {
+  option (scalapb.message).extends = "com.databricks.rpc.RPC[$this.Response]";
+
+  // ID of the issue to retrieve
+  optional string issue_id = 1 [(validate_required) = true];
+
+  message Response {
+    // The requested issue
+    optional Issue issue = 1;
+  }
+}
+
+message UpdateIssue {
+  option (scalapb.message).extends = "com.databricks.rpc.RPC[$this.Response]";
+
+  // ID of the issue to update
+  optional string issue_id = 1 [(validate_required) = true];
+
+  // Updated name (optional)
+  optional string name = 2;
+
+  // Updated description (optional)
+  optional string description = 3;
+
+  // Updated state (optional)
+  optional IssueState state = 4;
+
+  // Tags to set (will merge with existing tags)
+  map<string, string> tags = 5;
+
+  message Response {
+    // The updated issue
+    optional Issue issue = 1;
+  }
+}
+
+message DeleteIssue {
+  option (scalapb.message).extends = "com.databricks.rpc.RPC[$this.Response]";
+
+  // ID of the issue to delete
+  optional string issue_id = 1 [(validate_required) = true];
+
+  message Response {}
+}
+
+message SearchIssues {
+  option (scalapb.message).extends = "com.databricks.rpc.RPC[$this.Response]";
+
+  // ID of the experiment to search issues in
+  optional string experiment_id = 1 [(validate_required) = true];
+
+  // Filter by states (optional, returns all states if empty)
+  repeated IssueState states = 2;
+
+  // Maximum number of issues to return (default 100)
+  optional int32 max_results = 3;
+
+  // Pagination token for fetching next page
+  optional string page_token = 4;
+
+  message Response {
+    // List of matching issues
+    repeated Issue issues = 1;
+
+    // Token for fetching next page (empty if no more results)
+    optional string next_page_token = 2;
+  }
+}
+
+message CreateJudgeFromIssue {
+  option (scalapb.message).extends = "com.databricks.rpc.RPC[$this.Response]";
+
+  // ID of the issue to create a judge for
+  optional string issue_id = 1 [(validate_required) = true];
+
+  message Response {
+    // The registered scorer information
+    optional Scorer scorer = 1;
+  }
+}
+
+// Information about a linked evaluation run including metrics
+message LinkedEvaluationRun {
+  // Run information
+  optional RunInfo info = 1;
+
+  // Metrics associated with this run (e.g., pass_rate, pass_count, fail_count)
+  repeated Metric metrics = 2;
+}
+
+message GetIssueLinkedRuns {
+  option (scalapb.message).extends = "com.databricks.rpc.RPC[$this.Response]";
+
+  // ID of the issue to get linked evaluation runs for
+  optional string issue_id = 1 [(validate_required) = true];
+
+  message Response {
+    // List of runs linked to this issue (deprecated, use linked_runs instead)
+    repeated RunInfo runs = 1;
+
+    // List of linked evaluation runs with metrics
+    repeated LinkedEvaluationRun linked_runs = 2;
+  }
+}
+
+message LinkRunToIssues {
+  option (scalapb.message).extends = "com.databricks.rpc.RPC[$this.Response]";
+
+  // ID of the evaluation run to link
+  optional string run_id = 1 [(validate_required) = true];
+
+  // List of issue IDs to link the run to
+  repeated string issue_ids = 2;
+
+  message Response {}
+}
+
+// ========== Issue Comments ==========
+
+message IssueComment {
+  // Unique identifier for the comment (UUID)
+  optional string comment_id = 1;
+
+  // ID of the issue this comment belongs to
+  optional string issue_id = 2;
+
+  // Comment content/text
+  optional string content = 3;
+
+  // Author name or identifier (optional)
+  optional string author = 4;
+
+  // Creation time in milliseconds since epoch
+  optional int64 creation_time = 5;
+
+  // Last update time in milliseconds since epoch
+  optional int64 last_update_time = 6;
+}
+
+message CreateIssueComment {
+  option (scalapb.message).extends = "com.databricks.rpc.RPC[$this.Response]";
+
+  // ID of the issue to add a comment to
+  optional string issue_id = 1 [(validate_required) = true];
+
+  // Comment content/text
+  optional string content = 2 [(validate_required) = true];
+
+  // Author name or identifier (optional)
+  optional string author = 3;
+
+  message Response {
+    // The created comment
+    optional IssueComment comment = 1;
+  }
+}
+
+message GetIssueComment {
+  option (scalapb.message).extends = "com.databricks.rpc.RPC[$this.Response]";
+
+  // ID of the comment to retrieve
+  optional string comment_id = 1 [(validate_required) = true];
+
+  message Response {
+    // The requested comment
+    optional IssueComment comment = 1;
+  }
+}
+
+message UpdateIssueComment {
+  option (scalapb.message).extends = "com.databricks.rpc.RPC[$this.Response]";
+
+  // ID of the comment to update
+  optional string comment_id = 1 [(validate_required) = true];
+
+  // Updated content (required)
+  optional string content = 2 [(validate_required) = true];
+
+  message Response {
+    // The updated comment
+    optional IssueComment comment = 1;
+  }
+}
+
+message DeleteIssueComment {
+  option (scalapb.message).extends = "com.databricks.rpc.RPC[$this.Response]";
+
+  // ID of the comment to delete
+  optional string comment_id = 1 [(validate_required) = true];
+
+  message Response {}
+}
+
+message SearchIssueComments {
+  option (scalapb.message).extends = "com.databricks.rpc.RPC[$this.Response]";
+
+  // ID of the issue to search comments for
+  optional string issue_id = 1 [(validate_required) = true];
+
+  // Maximum number of comments to return (default 100)
+  optional int32 max_results = 2;
+
+  // Pagination token for fetching next page
+  optional string page_token = 3;
+
+  message Response {
+    // List of comments
+    repeated IssueComment comments = 1;
+
+    // Token for fetching next page (empty if no more results)
+    optional string next_page_token = 2;
   }
 }

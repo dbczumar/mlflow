@@ -84,6 +84,7 @@ export {
   TOKENS_COLUMN_ID,
   TRACE_ID_COLUMN_ID,
   CUSTOM_METADATA_COLUMN_ID,
+  ISSUES_COLUMN_ID,
 } from './hooks/useTableColumns';
 
 // Test utilities
@@ -99,4 +100,6 @@ export type { GetTraceFunction } from './hooks/useGetTrace';
 export { useFetchTraceV4LazyQuery } from './hooks/useFetchTraceV4';
 export { doesTraceSupportV4API } from './utils/TraceLocationUtils';
 export { GenAIChatSessionsTable } from './sessions-table/GenAIChatSessionsTable';
+export { getSessionTableRows } from './sessions-table/utils';
+export type { SessionTableRow } from './sessions-table/types';
 export { useGetTraces } from './hooks/useGetTraces';

@@ -8,6 +8,8 @@ from mlflow.entities.assessment import (
     AssessmentSource,
     Expectation,
     Feedback,
+    Issue,
+    ISSUE_NAME_METADATA_KEY,
 )
 from mlflow.entities.assessment_source import AssessmentSource, AssessmentSourceType
 from mlflow.exceptions import MlflowException
@@ -635,3 +637,112 @@ def test_log_feedback_ai_judge_deprecation_warning(trace_id, source_type):
     assert assessment.name == "quality"
     assert assessment.feedback.value == 0.8
     assert assessment.rationale == "AI evaluation"
+
+
+def test_log_issue(trace_id):
+    issue = Issue(
+        issue_id="issue-123",
+        issue_name="Hallucination",
+        trace_id=trace_id,
+        rationale="The model generated incorrect information about the topic.",
+        source=_LLM_ASSESSMENT_SOURCE,
+        metadata={"severity": "high"},
+    )
+    mlflow.log_assessment(trace_id=trace_id, assessment=issue)
+
+    trace = mlflow.get_trace(trace_id)
+    assert len(trace.info.assessments) == 1
+    assessment = trace.info.assessments[0]
+    assert isinstance(assessment, Issue)
+    assert assessment.trace_id == trace_id
+    # issue_id is stored as assessment name
+    assert assessment.name == "issue-123"
+    assert assessment.issue_id == "issue-123"
+    # issue_name is stored in metadata
+    assert assessment.issue_name == "Hallucination"
+    assert assessment.metadata[ISSUE_NAME_METADATA_KEY] == "Hallucination"
+    assert assessment.span_id is None
+    assert assessment.source == _LLM_ASSESSMENT_SOURCE
+    assert assessment.create_time_ms is not None
+    assert assessment.last_update_time_ms is not None
+    assert assessment.issue.value is True
+    assert assessment.rationale == "The model generated incorrect information about the topic."
+    # Custom metadata should be preserved alongside issue_name
+    assert assessment.metadata["severity"] == "high"
+    # Should not have feedback or expectation
+    assert assessment.feedback is None
+    assert assessment.expectation is None
+
+
+def test_log_issue_invalid_parameters():
+    with pytest.raises(MlflowException, match=r"The `issue_id` field must be specified."):
+        Issue(issue_id="", issue_name="Hallucination")
+
+    with pytest.raises(MlflowException, match=r"The `issue_name` field must be specified."):
+        Issue(issue_id="issue-123", issue_name="")
+
+
+def test_delete_issue(trace_id):
+    issue = Issue(
+        issue_id="issue-to-delete",
+        issue_name="Temporary Issue",
+        trace_id=trace_id,
+    )
+    logged_issue = mlflow.log_assessment(trace_id=trace_id, assessment=issue)
+    assessment_id = logged_issue.assessment_id
+
+    # Verify issue was logged
+    trace = mlflow.get_trace(trace_id)
+    assert len(trace.info.assessments) == 1
+
+    # Delete the issue
+    mlflow.delete_assessment(trace_id=trace_id, assessment_id=assessment_id)
+
+    # Verify issue was deleted
+    with pytest.raises(MlflowException, match=r"Assessment with ID"):
+        mlflow.get_assessment(trace_id, assessment_id)
+
+    trace = mlflow.get_trace(trace_id)
+    assert len(trace.info.assessments) == 0
+
+
+def test_search_traces_with_issues():
+    # Create a trace with an issue assessment
+    with mlflow.start_span(name="trace_with_issue") as span:
+        issue = Issue(
+            issue_id="search-issue-1",
+            issue_name="Response Too Verbose",
+            trace_id=span.trace_id,
+            rationale="The response is unnecessarily long.",
+        )
+        mlflow.log_assessment(trace_id=span.trace_id, assessment=issue)
+
+        # Also log a regular feedback to verify mixed assessments work
+        mlflow.log_feedback(
+            trace_id=span.trace_id,
+            name="quality",
+            value=0.7,
+        )
+
+    traces = mlflow.search_traces(
+        experiment_ids=["0"],
+        max_results=1,
+        return_type="list",
+    )
+
+    assert len(traces) == 1
+    assert len(traces[0].info.assessments) == 2
+
+    assessments = {a.name: a for a in traces[0].info.assessments}
+    assert "search-issue-1" in assessments
+    assert "quality" in assessments
+
+    issue_assessment = assessments["search-issue-1"]
+    assert isinstance(issue_assessment, Issue)
+    assert issue_assessment.issue_id == "search-issue-1"
+    assert issue_assessment.issue_name == "Response Too Verbose"
+    assert issue_assessment.rationale == "The response is unnecessarily long."
+
+    feedback_assessment = assessments["quality"]
+    assert isinstance(feedback_assessment, Feedback)
+    assert feedback_assessment.value == 0.7

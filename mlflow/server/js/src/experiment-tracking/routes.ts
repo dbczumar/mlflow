@@ -26,6 +26,7 @@ export enum PageId {
   experimentPageTabScorers = 'mlflow.experiment.tab.scorers',
   experimentPageTabPrompts = 'mlflow.experiment.prompts.list',
   experimentPageTabPromptDetails = 'mlflow.experiment.prompt.details',
+  experimentPageTabIssues = 'mlflow.experiment.tab.issues',
   // Child routes for experiment page - end
   experimentPageSearch = 'mlflow.experiment.details.search',
   compareExperimentsSearch = 'mlflow.experiment.compare',
@@ -74,6 +75,9 @@ export class RoutePaths {
   }
   static get experimentPageTabScorers() {
     return createMLflowRoutePath('/experiments/:experimentId/judges');
+  }
+  static get experimentPageTabIssues() {
+    return createMLflowRoutePath('/experiments/:experimentId/issues');
   }
   // Child routes for experiment page - end
   static get experimentLoggedModelDetailsPageTab() {
@@ -172,6 +176,14 @@ class Routes {
 
   static getExperimentPageTracesTabRoute(experimentId: string) {
     return `${Routes.getExperimentPageRoute(experimentId)}/traces`;
+  }
+
+  static getExperimentPageIssuesTabRoute(experimentId: string, issueId?: string) {
+    const basePath = `${Routes.getExperimentPageRoute(experimentId)}/issues`;
+    if (issueId) {
+      return `${basePath}?issueId=${issueId}`;
+    }
+    return basePath;
   }
 
   static getExperimentPageTabRoute(experimentId: string, tabName: ExperimentPageTabName) {

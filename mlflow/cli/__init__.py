@@ -997,6 +997,11 @@ from mlflow.cli import traces
 
 cli.add_command(traces.commands)
 
+# Add issues CLI commands
+from mlflow.cli import issues
+
+cli.add_command(issues.commands)
+
 # Add scorers CLI commands
 from mlflow.cli import scorers
 
@@ -1017,6 +1022,7 @@ try:
     import mlflow.claude_code.cli
 
     cli.add_command(mlflow.claude_code.cli.commands)
+    cli.add_command(mlflow.claude_code.cli.claude_commands)
 except ImportError:
     pass
 

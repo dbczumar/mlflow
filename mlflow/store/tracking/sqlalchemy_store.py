@@ -33,6 +33,7 @@ from mlflow.entities import (
     Expectation,
     Experiment,
     Feedback,
+    Issue,
     Run,
     RunInputs,
     RunOutputs,
@@ -48,6 +49,7 @@ from mlflow.entities import (
 )
 from mlflow.entities.assessment import ExpectationValue, FeedbackValue
 from mlflow.entities.entity_type import EntityAssociationType
+from mlflow.entities.issue import IssueEntity, IssueState
 from mlflow.entities.lifecycle_stage import LifecycleStage
 from mlflow.entities.logged_model import LoggedModel
 from mlflow.entities.logged_model_input import LoggedModelInput
@@ -107,6 +109,7 @@ from mlflow.store.tracking.dbmodels.models import (
     SqlGatewayEndpointBinding,
     SqlInput,
     SqlInputTag,
+    SqlIssue,
     SqlLatestMetric,
     SqlLoggedModel,
     SqlLoggedModelMetric,
@@ -2593,6 +2596,385 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
 
             return config.to_mlflow_entity()
 
+    def create_issue(self, issue: IssueEntity) -> IssueEntity:
+        """
+        Create a new issue for an experiment.
+
+        Args:
+            issue: The IssueEntity to create.
+
+        Returns:
+            The created IssueEntity with populated issue_id and timestamps.
+
+        Raises:
+            MlflowException: If experiment does not exist.
+        """
+        with self.ManagedSessionMaker() as session:
+            # Validate experiment exists
+            experiment = self.get_experiment(issue.experiment_id)
+            self._check_experiment_is_active(experiment)
+
+            # Generate issue_id if not provided
+            issue_id = issue.issue_id or str(uuid.uuid4())
+            current_time = get_current_time_millis()
+
+            # Create the issue with defaults
+            sql_issue = SqlIssue(
+                issue_id=issue_id,
+                experiment_id=int(experiment.experiment_id),
+                name=issue.name,
+                description=issue.description,
+                state=issue.state or IssueState.DRAFT,
+                creation_time=issue.creation_time or current_time,
+                last_update_time=issue.last_update_time or current_time,
+                tags=json.dumps(issue.tags) if issue.tags else None,
+            )
+            session.add(sql_issue)
+            session.flush()
+            return sql_issue.to_mlflow_entity()
+
+    def get_issue(self, issue_id: str) -> IssueEntity:
+        """
+        Get an issue by ID.
+
+        Args:
+            issue_id: The unique identifier of the issue.
+
+        Returns:
+            The IssueEntity.
+
+        Raises:
+            MlflowException: If issue is not found.
+        """
+        with self.ManagedSessionMaker() as session:
+            sql_issue = session.query(SqlIssue).filter(SqlIssue.issue_id == issue_id).first()
+            if sql_issue is None:
+                raise MlflowException(
+                    f"Issue with ID '{issue_id}' not found.",
+                    RESOURCE_DOES_NOT_EXIST,
+                )
+            return sql_issue.to_mlflow_entity()
+
+    def update_issue(
+        self,
+        issue_id: str,
+        name: str | None = None,
+        description: str | None = None,
+        state: str | None = None,
+        tags: dict[str, str] | None = None,
+    ) -> IssueEntity:
+        """
+        Update an existing issue.
+
+        Args:
+            issue_id: The unique identifier of the issue.
+            name: Updated name (optional).
+            description: Updated description (optional).
+            state: Updated state (optional).
+            tags: Tags to merge with existing tags (optional).
+
+        Returns:
+            The updated IssueEntity.
+
+        Raises:
+            MlflowException: If issue is not found or state is invalid.
+        """
+        with self.ManagedSessionMaker() as session:
+            sql_issue = session.query(SqlIssue).filter(SqlIssue.issue_id == issue_id).first()
+            if sql_issue is None:
+                raise MlflowException(
+                    f"Issue with ID '{issue_id}' not found.",
+                    RESOURCE_DOES_NOT_EXIST,
+                )
+
+            # Update fields if provided
+            if name is not None:
+                sql_issue.name = name
+            if description is not None:
+                sql_issue.description = description
+            if state is not None:
+                if not IssueState.is_valid(state):
+                    raise MlflowException(
+                        f"Invalid issue state: '{state}'. Must be one of: draft, open, closed.",
+                        INVALID_PARAMETER_VALUE,
+                    )
+                sql_issue.state = state
+            if tags is not None:
+                # Merge with existing tags
+                existing_tags = json.loads(sql_issue.tags) if sql_issue.tags else {}
+                existing_tags.update(tags)
+                sql_issue.tags = json.dumps(existing_tags)
+
+            sql_issue.last_update_time = get_current_time_millis()
+            session.flush()
+            return sql_issue.to_mlflow_entity()
+
+    def delete_issue(self, issue_id: str) -> None:
+        """
+        Delete an issue by ID.
+
+        Args:
+            issue_id: The unique identifier of the issue.
+
+        Raises:
+            MlflowException: If issue is not found.
+        """
+        with self.ManagedSessionMaker() as session:
+            sql_issue = session.query(SqlIssue).filter(SqlIssue.issue_id == issue_id).first()
+            if sql_issue is None:
+                raise MlflowException(
+                    f"Issue with ID '{issue_id}' not found.",
+                    RESOURCE_DOES_NOT_EXIST,
+                )
+            session.delete(sql_issue)
+
+    def search_issues(
+        self,
+        experiment_id: str,
+        states: list[str] | None = None,
+        max_results: int = 100,
+        page_token: str | None = None,
+    ) -> PagedList[IssueEntity]:
+        """
+        Search issues for an experiment.
+
+        Args:
+            experiment_id: The experiment ID to search issues in.
+            states: Filter by states (optional, returns all states if empty).
+            max_results: Maximum number of issues to return (default 100).
+            page_token: Pagination token for fetching next page.
+
+        Returns:
+            PagedList of IssueEntity objects.
+
+        Raises:
+            MlflowException: If experiment does not exist.
+        """
+        with self.ManagedSessionMaker() as session:
+            # Validate experiment exists
+            experiment = self.get_experiment(experiment_id)
+
+            # Build query
+            query = session.query(SqlIssue).filter(
+                SqlIssue.experiment_id == int(experiment.experiment_id)
+            )
+
+            # Filter by states if provided
+            if states:
+                query = query.filter(SqlIssue.state.in_(states))
+
+            # Order by creation time descending (newest first)
+            query = query.order_by(SqlIssue.creation_time.desc())
+
+            # Handle pagination
+            offset = 0
+            if page_token:
+                offset = int(base64.b64decode(page_token).decode("utf-8"))
+
+            # Get one extra to check if there are more results
+            sql_issues = query.offset(offset).limit(max_results + 1).all()
+
+            # Determine if there's a next page
+            next_page_token = None
+            if len(sql_issues) > max_results:
+                sql_issues = sql_issues[:max_results]
+                next_offset = offset + max_results
+                next_page_token = base64.b64encode(str(next_offset).encode("utf-8")).decode("utf-8")
+
+            issues = [sql_issue.to_mlflow_entity() for sql_issue in sql_issues]
+            return PagedList(issues, next_page_token)
+
+    # ========== Issue Comments ==========
+
+    def create_issue_comment(
+        self,
+        issue_id: str,
+        content: str,
+        author: str | None = None,
+    ):
+        """
+        Create a new comment on an issue.
+
+        Args:
+            issue_id: The ID of the issue to add a comment to.
+            content: The comment text content.
+            author: Optional author name or identifier.
+
+        Returns:
+            The created IssueCommentEntity with populated comment_id and timestamps.
+
+        Raises:
+            MlflowException: If issue does not exist.
+        """
+        from mlflow.store.tracking.dbmodels.models import SqlIssueComment
+
+        with self.ManagedSessionMaker() as session:
+            # Validate issue exists
+            sql_issue = session.query(SqlIssue).filter(SqlIssue.issue_id == issue_id).first()
+            if sql_issue is None:
+                raise MlflowException(
+                    f"Issue with ID '{issue_id}' not found.",
+                    RESOURCE_DOES_NOT_EXIST,
+                )
+
+            comment_id = uuid.uuid4().hex
+            current_time = get_current_time_millis()
+
+            sql_comment = SqlIssueComment(
+                comment_id=comment_id,
+                issue_id=issue_id,
+                content=content,
+                author=author,
+                creation_time=current_time,
+                last_update_time=current_time,
+            )
+            session.add(sql_comment)
+            session.flush()
+            return sql_comment.to_mlflow_entity()
+
+    def get_issue_comment(self, comment_id: str):
+        """
+        Get a comment by ID.
+
+        Args:
+            comment_id: The unique identifier of the comment.
+
+        Returns:
+            The IssueCommentEntity.
+
+        Raises:
+            MlflowException: If comment is not found.
+        """
+        from mlflow.store.tracking.dbmodels.models import SqlIssueComment
+
+        with self.ManagedSessionMaker() as session:
+            sql_comment = (
+                session.query(SqlIssueComment)
+                .filter(SqlIssueComment.comment_id == comment_id)
+                .first()
+            )
+            if sql_comment is None:
+                raise MlflowException(
+                    f"Comment with ID '{comment_id}' not found.",
+                    RESOURCE_DOES_NOT_EXIST,
+                )
+            return sql_comment.to_mlflow_entity()
+
+    def update_issue_comment(self, comment_id: str, content: str):
+        """
+        Update an existing comment.
+
+        Args:
+            comment_id: The unique identifier of the comment.
+            content: The updated content.
+
+        Returns:
+            The updated IssueCommentEntity.
+
+        Raises:
+            MlflowException: If comment is not found.
+        """
+        from mlflow.store.tracking.dbmodels.models import SqlIssueComment
+
+        with self.ManagedSessionMaker() as session:
+            sql_comment = (
+                session.query(SqlIssueComment)
+                .filter(SqlIssueComment.comment_id == comment_id)
+                .first()
+            )
+            if sql_comment is None:
+                raise MlflowException(
+                    f"Comment with ID '{comment_id}' not found.",
+                    RESOURCE_DOES_NOT_EXIST,
+                )
+
+            sql_comment.content = content
+            sql_comment.last_update_time = get_current_time_millis()
+            session.flush()
+            return sql_comment.to_mlflow_entity()
+
+    def delete_issue_comment(self, comment_id: str) -> None:
+        """
+        Delete a comment.
+
+        Args:
+            comment_id: The unique identifier of the comment.
+
+        Raises:
+            MlflowException: If comment is not found.
+        """
+        from mlflow.store.tracking.dbmodels.models import SqlIssueComment
+
+        with self.ManagedSessionMaker() as session:
+            sql_comment = (
+                session.query(SqlIssueComment)
+                .filter(SqlIssueComment.comment_id == comment_id)
+                .first()
+            )
+            if sql_comment is None:
+                raise MlflowException(
+                    f"Comment with ID '{comment_id}' not found.",
+                    RESOURCE_DOES_NOT_EXIST,
+                )
+            session.delete(sql_comment)
+            session.flush()
+
+    def search_issue_comments(
+        self,
+        issue_id: str,
+        max_results: int = 100,
+        page_token: str | None = None,
+    ):
+        """
+        Search comments for an issue.
+
+        Args:
+            issue_id: The issue ID to search comments for.
+            max_results: Maximum number of comments to return (default 100).
+            page_token: Pagination token for fetching next page.
+
+        Returns:
+            PagedList of IssueCommentEntity objects.
+
+        Raises:
+            MlflowException: If issue does not exist.
+        """
+        from mlflow.store.tracking.dbmodels.models import SqlIssueComment
+
+        with self.ManagedSessionMaker() as session:
+            # Validate issue exists
+            sql_issue = session.query(SqlIssue).filter(SqlIssue.issue_id == issue_id).first()
+            if sql_issue is None:
+                raise MlflowException(
+                    f"Issue with ID '{issue_id}' not found.",
+                    RESOURCE_DOES_NOT_EXIST,
+                )
+
+            # Build query - order by creation time descending (newest first)
+            query = (
+                session.query(SqlIssueComment)
+                .filter(SqlIssueComment.issue_id == issue_id)
+                .order_by(SqlIssueComment.creation_time.desc())
+            )
+
+            # Handle pagination
+            offset = 0
+            if page_token:
+                offset = int(base64.b64decode(page_token).decode("utf-8"))
+
+            # Get one extra to check if there are more results
+            sql_comments = query.offset(offset).limit(max_results + 1).all()
+
+            # Determine if there's a next page
+            next_page_token = None
+            if len(sql_comments) > max_results:
+                sql_comments = sql_comments[:max_results]
+                next_offset = offset + max_results
+                next_page_token = base64.b64encode(str(next_offset).encode("utf-8")).decode("utf-8")
+
+            comments = [sql_comment.to_mlflow_entity() for sql_comment in sql_comments]
+            return PagedList(comments, next_page_token)
+
     def _apply_order_by_search_logged_models(
         self,
         models: sqlalchemy.orm.Query,
@@ -3400,6 +3782,12 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
             existing_sql = self._get_sql_assessment(session, trace_id, assessment_id)
             existing = existing_sql.to_mlflow_entity()
 
+            # Issue assessments are immutable and cannot be updated
+            if isinstance(existing, Issue):
+                raise MlflowException.invalid_parameter_value(
+                    "Issue assessments are immutable and cannot be updated."
+                )
+
             if expectation is not None and feedback is not None:
                 raise MlflowException.invalid_parameter_value(
                     "Cannot specify both `expectation` and `feedback` parameters."
@@ -3644,6 +4032,68 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
                 )
                 for prompt_id in prompt_ids_to_add
             )
+
+    def link_run_to_issues(self, run_id: str, issue_ids: list[str]) -> None:
+        """
+        Link an evaluation run to issues by creating entity associations.
+
+        This is called when an evaluation run uses IssueJudge scorers to evaluate
+        traces for specific issues. The association allows tracking which runs
+        have evaluated which issues.
+
+        Args:
+            run_id: ID of the evaluation run.
+            issue_ids: List of issue IDs to link to the run.
+        """
+        if not issue_ids:
+            return
+
+        with self.ManagedSessionMaker() as session:
+            # Check for existing associations to avoid duplicates
+            existing_associations = (
+                session.query(SqlEntityAssociation)
+                .filter(
+                    SqlEntityAssociation.source_type == EntityAssociationType.RUN,
+                    SqlEntityAssociation.source_id == run_id,
+                    SqlEntityAssociation.destination_type == EntityAssociationType.ISSUE,
+                    SqlEntityAssociation.destination_id.in_(issue_ids),
+                )
+                .all()
+            )
+            existing_issue_ids = {a.destination_id for a in existing_associations}
+
+            # Add new associations
+            session.add_all(
+                SqlEntityAssociation(
+                    association_id=uuid.uuid4().hex,
+                    source_type=EntityAssociationType.RUN,
+                    source_id=run_id,
+                    destination_type=EntityAssociationType.ISSUE,
+                    destination_id=issue_id,
+                )
+                for issue_id in issue_ids
+                if issue_id not in existing_issue_ids
+            )
+
+    def get_runs_for_issue(self, issue_id: str) -> list[str]:
+        """
+        Get run IDs that are linked to an issue via entity associations.
+
+        This returns IDs of evaluation runs that have evaluated the specified issue
+        using IssueJudge scorers.
+
+        Args:
+            issue_id: The ID of the issue to find linked runs for.
+
+        Returns:
+            List of run IDs linked to the issue.
+        """
+        run_ids = self.search_entities_by_destination(
+            destination_ids=issue_id,
+            destination_type=EntityAssociationType.ISSUE,
+            source_type=EntityAssociationType.RUN,
+        )
+        return run_ids.to_list()
 
     def calculate_trace_filter_correlation(
         self,

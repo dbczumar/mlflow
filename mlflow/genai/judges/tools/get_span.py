@@ -6,8 +6,7 @@ This module provides a tool for retrieving a specific span by ID.
 
 import json
 
-from mlflow.entities.trace import Trace
-from mlflow.genai.judges.tools.base import JudgeTool
+from mlflow.genai.judges.tools.base import JudgeTool, _get_trace
 from mlflow.genai.judges.tools.constants import ToolNames
 from mlflow.genai.judges.tools.types import SpanResult
 from mlflow.genai.judges.tools.utils import create_page_token, parse_page_token
@@ -41,6 +40,10 @@ class GetSpanTool(JudgeTool):
                 parameters=ToolParamsSchema(
                     type="object",
                     properties={
+                        "trace_id": {
+                            "type": "string",
+                            "description": "The ID of the trace to retrieve span from",
+                        },
                         "span_id": {
                             "type": "string",
                             "description": "The ID of the span to retrieve",
@@ -64,7 +67,7 @@ class GetSpanTool(JudgeTool):
                             "description": "Token to retrieve the next page of content",
                         },
                     },
-                    required=["span_id"],
+                    required=["trace_id", "span_id"],
                 ),
             ),
             type="function",
@@ -72,7 +75,7 @@ class GetSpanTool(JudgeTool):
 
     def invoke(
         self,
-        trace: Trace,
+        trace_id: str,
         span_id: str,
         attributes_to_fetch: list[str] | None = None,
         max_content_length: int = 100000,
@@ -82,7 +85,7 @@ class GetSpanTool(JudgeTool):
         Get a specific span by ID from the trace.
 
         Args:
-            trace: The MLflow trace object to analyze
+            trace_id: The ID of the trace to analyze
             span_id: The ID of the span to retrieve
             attributes_to_fetch: List of specific attributes to fetch (None for all)
             max_content_length: Maximum content size in bytes to return
@@ -91,6 +94,7 @@ class GetSpanTool(JudgeTool):
         Returns:
             SpanResult with the span content as JSON string
         """
+        trace = _get_trace(trace_id)
         if not trace or not trace.data or not trace.data.spans:
             return SpanResult(
                 span_id=None, content=None, content_size_bytes=0, error="Trace has no spans"

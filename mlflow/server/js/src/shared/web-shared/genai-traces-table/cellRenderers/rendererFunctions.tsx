@@ -8,6 +8,7 @@ import { type IntlShape } from '@databricks/i18n';
 import type { ModelTraceInfoV3 } from '@databricks/web-shared/model-trace-explorer';
 import { ExpectationValuePreview } from '@databricks/web-shared/model-trace-explorer';
 
+import { IssuesCellRenderer, SingleIssueCellRenderer } from './IssuesCellRenderer';
 import { LoggedModelCell } from './LoggedModelCell';
 import { NullCell } from './NullCell';
 import { RunName } from './RunName';
@@ -30,6 +31,9 @@ import { RunColorCircle } from '../components/RunColorCircle';
 import {
   CUSTOM_METADATA_COLUMN_ID,
   EXECUTION_DURATION_COLUMN_ID,
+  ISSUES_COLUMN_ID,
+  ISSUE_COLUMN_ID_PREFIX,
+  getIssueNameFromColumnId,
   LINKED_PROMPTS_COLUMN_ID,
   LOGGED_MODEL_COLUMN_ID,
   REQUEST_TIME_COLUMN_ID,
@@ -44,7 +48,7 @@ import {
   TRACE_NAME_COLUMN_ID,
   USER_COLUMN_ID,
 } from '../hooks/useTableColumns';
-import type { AssessmentInfo, EvalTraceComparisonEntry } from '../types';
+import type { AssessmentInfo, EvalTraceComparisonEntry, RunEvaluationResultAssessment } from '../types';
 import { getUniqueValueCountsBySourceId } from '../utils/AggregationUtils';
 import { COMPARE_TO_RUN_COLOR, CURRENT_RUN_COLOR } from '../utils/Colors';
 import { timeSinceStr } from '../utils/DisplayUtils';
@@ -256,6 +260,132 @@ export const assessmentCellRenderer = (
           }}
           type="value"
         />
+      )}
+    </div>
+  );
+};
+
+/**
+ * Renders a single issue column cell using the same EvaluationsReviewAssessmentTag component as assessments.
+ * This ensures consistent True/False rendering between assessments and issues.
+ */
+export const issueCellRenderer = (
+  theme: ThemeType,
+  intl: IntlShape,
+  isComparing: boolean,
+  issueName: string,
+  comparisonEntry: EvalTraceComparisonEntry,
+) => {
+  // Helper to find issue value from trace info
+  const findIssueValue = (traceInfo: ModelTraceInfoV3 | undefined): boolean | undefined => {
+    if (!traceInfo?.assessments) {
+      return undefined;
+    }
+    for (const assessment of traceInfo.assessments) {
+      if ('issue' in assessment && assessment.issue !== undefined) {
+        const name =
+          (assessment.metadata as Record<string, string>)?.['mlflow.issue.name'] || assessment.assessment_name;
+        if (name === issueName) {
+          // Return the actual boolean value (true = issue detected, false = no issue)
+          return assessment.issue?.value;
+        }
+      }
+    }
+    return undefined;
+  };
+
+  const currentValue = findIssueValue(comparisonEntry.currentRunValue?.traceInfo);
+  const otherValue = findIssueValue(comparisonEntry.otherRunValue?.traceInfo);
+
+  // Create a synthetic AssessmentInfo for the issue (boolean type)
+  const issueAssessmentInfo: AssessmentInfo = {
+    name: issueName,
+    displayName: issueName,
+    isKnown: false,
+    isOverall: false,
+    metricName: issueName,
+    isCustomMetric: false,
+    isEditable: false,
+    isRetrievalAssessment: false,
+    dtype: 'boolean',
+    uniqueValues: new Set([true, false]),
+    docsLink: '',
+    missingTooltip: '',
+    description: '',
+  };
+
+  // Create synthetic RunEvaluationResultAssessment objects
+  const createAssessment = (value: boolean | undefined): RunEvaluationResultAssessment | undefined => {
+    if (value === undefined) {
+      return undefined;
+    }
+    return {
+      name: issueName,
+      booleanValue: value,
+      stringValue: null,
+      numericValue: null,
+      rationale: null,
+      source: {
+        sourceId: '',
+        sourceType: 'AI_JUDGE',
+        metadata: {},
+      },
+      metadata: {},
+    };
+  };
+
+  const currentAssessment = createAssessment(currentValue);
+  const otherAssessment = createAssessment(otherValue);
+
+  return (
+    <div
+      css={{
+        display: 'flex',
+        gap: theme.spacing.sm,
+        alignItems: 'center',
+        marginTop: 'auto',
+        marginBottom: 'auto',
+      }}
+    >
+      {isComparing ? (
+        <div
+          css={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: theme.spacing.sm,
+            borderRadius: theme.legacyBorders.borderRadiusMd,
+            marginTop: 'auto',
+            marginBottom: 'auto',
+          }}
+        >
+          <EvaluationsReviewAssessmentTag
+            showRationaleInTooltip
+            disableJudgeTypeIcon
+            hideAssessmentName
+            assessment={currentAssessment}
+            assessmentInfo={issueAssessmentInfo}
+            type="value"
+          />
+          <EvaluationsReviewAssessmentTag
+            showRationaleInTooltip
+            disableJudgeTypeIcon
+            hideAssessmentName
+            assessment={otherAssessment}
+            assessmentInfo={issueAssessmentInfo}
+            type="value"
+          />
+        </div>
+      ) : currentAssessment ? (
+        <EvaluationsReviewAssessmentTag
+          showRationaleInTooltip
+          disableJudgeTypeIcon
+          hideAssessmentName
+          assessment={currentAssessment}
+          assessmentInfo={issueAssessmentInfo}
+          type="value"
+        />
+      ) : (
+        <NullCell isComparing={isComparing} />
       )}
     </div>
   );
@@ -786,6 +916,28 @@ export const traceInfoCellRenderer = (
     );
   } else if (colId === TOKENS_COLUMN_ID) {
     return <TokensCell currentTraceInfo={currentTraceInfo} otherTraceInfo={otherTraceInfo} isComparing={isComparing} />;
+  } else if (colId === ISSUES_COLUMN_ID) {
+    return (
+      <IssuesCellRenderer
+        currentTraceInfo={currentTraceInfo}
+        otherTraceInfo={otherTraceInfo}
+        isComparing={isComparing}
+      />
+    );
+  } else if (colId.startsWith(ISSUE_COLUMN_ID_PREFIX)) {
+    // Handle individual issue columns in expanded view
+    const issueName = getIssueNameFromColumnId(colId);
+    if (!issueName) {
+      return <NullCell isComparing={isComparing} />;
+    }
+    return (
+      <SingleIssueCellRenderer
+        currentTraceInfo={currentTraceInfo}
+        otherTraceInfo={otherTraceInfo}
+        isComparing={isComparing}
+        issueName={issueName}
+      />
+    );
   } else if (colId.startsWith(CUSTOM_METADATA_COLUMN_ID)) {
     const metadataKey = getCustomMetadataKeyFromColumnId(colId);
     if (!metadataKey) {

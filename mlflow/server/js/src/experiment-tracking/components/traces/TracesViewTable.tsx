@@ -13,6 +13,8 @@ import {
   DropdownMenu,
   TableRowAction,
   ColumnsIcon,
+  CheckCircleIcon,
+  XCircleIcon,
 } from '@databricks/design-system';
 import type { SortingState } from '@tanstack/react-table';
 import { flexRender, getCoreRowModel, getSortedRowModel } from '@tanstack/react-table';
@@ -32,7 +34,11 @@ import {
   getTraceTagValue,
 } from './TracesView.utils';
 import { FormattedMessage, useIntl } from 'react-intl';
-import { type ModelTraceInfo } from '@databricks/web-shared/model-trace-explorer';
+import {
+  type ModelTraceInfo,
+  type Assessment,
+  type IssueAssessment,
+} from '@databricks/web-shared/model-trace-explorer';
 import { TracesViewTableTagCell } from './TracesViewTableTagCell';
 import type { ModelTraceInfoWithRunName } from './hooks/useExperimentTraces';
 import { TracesViewTableStatusCell } from './TracesViewTableStatusCell';
@@ -71,12 +77,22 @@ export interface TracesViewTableProps {
   baseComponentId: string;
   toggleHiddenColumn: (columnId: string) => void;
   disabledColumns?: string[];
+  /**
+   * If provided, shows an issue status column for this specific issue ID.
+   */
+  issueId?: string;
+  /**
+   * The display name for the issue column header.
+   */
+  issueName?: string;
 }
 
 type TracesViewTableMeta = {
   baseComponentId: string;
   onTraceClicked?: TracesViewTableProps['onTraceClicked'];
   onTraceTagsEdit?: TracesViewTableProps['onTraceTagsEdit'];
+  issueId?: string;
+  issueName?: string;
 };
 
 const RequestIdCell: TracesColumnDef['cell'] = ({
@@ -158,6 +174,91 @@ const TraceTagsCell: TracesColumnDef['cell'] = ({
   );
 };
 
+// Background colors for pass/fail status
+const PASS_TAG_BACKGROUND = '#02B30214'; // Light green
+const FAIL_TAG_BACKGROUND = '#E5737314'; // Light red
+
+const isIssueAssessment = (assessment: Assessment): assessment is IssueAssessment => {
+  return 'issue' in assessment && assessment.issue !== undefined;
+};
+
+const toBoolean = (value: unknown): boolean => {
+  if (typeof value === 'boolean') {
+    return value;
+  }
+  if (typeof value === 'string') {
+    return value.toLowerCase() === 'true';
+  }
+  return Boolean(value);
+};
+
+const IssueStatusCell: TracesColumnDef['cell'] = ({
+  row: { original },
+  table: {
+    options: { meta },
+  },
+}) => {
+  const { theme } = useDesignSystemTheme();
+  const { issueId } = meta as TracesViewTableMeta;
+
+  // Access assessments from the trace data (requires ModelTraceInfoV3)
+  const assessments = (original as any).assessments as Assessment[] | undefined;
+
+  if (!issueId || !assessments) {
+    return <Typography.Text color="secondary">-</Typography.Text>;
+  }
+
+  // Find the issue assessment for this specific issue ID
+  // Issue ID is stored as assessment_name
+  let latestAssessment: IssueAssessment | undefined;
+  let latestTime = 0;
+
+  for (const assessment of assessments) {
+    if (isIssueAssessment(assessment) && assessment.valid !== false && assessment.assessment_name === issueId) {
+      const assessmentTime = new Date(assessment.last_update_time || assessment.create_time).getTime();
+      if (!latestAssessment || assessmentTime > latestTime) {
+        latestAssessment = assessment;
+        latestTime = assessmentTime;
+      }
+    }
+  }
+
+  if (!latestAssessment) {
+    return <Typography.Text color="secondary">-</Typography.Text>;
+  }
+
+  const issueDetected = toBoolean(latestAssessment.issue?.value);
+  const isPass = !issueDetected;
+  const backgroundColor = isPass ? PASS_TAG_BACKGROUND : FAIL_TAG_BACKGROUND;
+  const textColor = isPass
+    ? theme.isDarkMode
+      ? theme.colors.green400
+      : theme.colors.green600
+    : theme.isDarkMode
+    ? theme.colors.red400
+    : theme.colors.red600;
+
+  return (
+    <div
+      css={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: theme.spacing.sm,
+        padding: '0 8px',
+        height: 20,
+        width: 'fit-content',
+        borderRadius: theme.legacyBorders.borderRadiusMd,
+        backgroundColor,
+        fontSize: theme.typography.fontSizeSm,
+        svg: { width: 12, height: 12 },
+      }}
+    >
+      {isPass ? <CheckCircleIcon css={{ color: textColor }} /> : <XCircleIcon css={{ color: textColor }} />}
+      <span css={{ color: textColor }}>{isPass ? 'Pass' : 'Fail'}</span>
+    </div>
+  );
+};
+
 type ColumnListItem = {
   key: string;
   label: string;
@@ -187,6 +288,8 @@ export const TracesViewTable = React.memo(
     baseComponentId,
     toggleHiddenColumn,
     disabledColumns = [],
+    issueId,
+    issueName,
   }: TracesViewTableProps) => {
     const intl = useIntl();
     const { theme } = useDesignSystemTheme();
@@ -382,6 +485,20 @@ export const TracesViewTable = React.memo(
         },
       );
 
+      // Add Judge column when issueId is provided - insert after Request ID (index 2)
+      if (issueId) {
+        const judgeColumn: TracesColumnDef = {
+          header: 'Judge',
+          enableSorting: false,
+          enableResizing: true,
+          id: 'issue_status',
+          cell: IssueStatusCell,
+          meta: { styles: { minWidth: 80, maxWidth: 100 } },
+        };
+        // Insert after checkbox (0) and requestId (1), so at index 2
+        columns.splice(2, 0, judgeColumn);
+      }
+
       return columns.filter((column) => column.id && !hiddenColumns.includes(column.id));
     }, [
       intl,
@@ -392,6 +509,8 @@ export const TracesViewTable = React.memo(
       baseComponentId,
       useStaticColumnsCells,
       showQuickStart,
+      issueId,
+      issueName,
     ]);
 
     const table = useReactTable<ModelTraceInfoWithRunName>(
@@ -408,7 +527,7 @@ export const TracesViewTable = React.memo(
         enableColumnResizing: true,
         enableRowSelection: true,
         columnResizeMode: 'onChange',
-        meta: { baseComponentId, onTraceClicked, onTraceTagsEdit } satisfies TracesViewTableMeta,
+        meta: { baseComponentId, onTraceClicked, onTraceTagsEdit, issueId, issueName } satisfies TracesViewTableMeta,
       },
     );
 

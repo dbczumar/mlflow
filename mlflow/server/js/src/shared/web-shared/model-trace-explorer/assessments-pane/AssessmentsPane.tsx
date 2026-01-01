@@ -16,10 +16,12 @@ import { AssessmentCreateButton } from './AssessmentCreateButton';
 import { ASSESSMENT_PANE_MIN_WIDTH } from './AssessmentsPane.utils';
 import { ExpectationItem } from './ExpectationItem';
 import { FeedbackGroup } from './FeedbackGroup';
+import { IssuesSection } from './IssuesSection';
 import { shouldUseTracesV4API } from '../FeatureUtils';
-import type { Assessment, FeedbackAssessment } from '../ModelTrace.types';
+import type { Assessment, ExpectationAssessment, FeedbackAssessment } from '../ModelTrace.types';
 import { useModelTraceExplorerViewState } from '../ModelTraceExplorerViewStateContext';
 import { useTraceCachedActions } from '../hooks/useTraceCachedActions';
+import { useParams } from '../RoutingUtils';
 
 type GroupedFeedbacksByValue = { [value: string]: FeedbackAssessment[] };
 
@@ -63,6 +65,7 @@ export const AssessmentsPane = ({
   traceId: string;
   activeSpanId?: string;
 }) => {
+  const { experimentId } = useParams();
   const reconstructAssessments = useTraceCachedActions((state) => state.reconstructAssessments);
   const cachedActions = useTraceCachedActions((state) => state.assessmentActions[traceId]);
 
@@ -78,9 +81,14 @@ export const AssessmentsPane = ({
 
   const { theme } = useDesignSystemTheme();
   const { setAssessmentsPaneExpanded, assessmentsPaneExpanded, isInComparisonView } = useModelTraceExplorerViewState();
-  const [feedbacks, expectations] = useMemo(
+  const [feedbacks, expectationsAndOthers] = useMemo(
     () => partition(allAssessments, (assessment) => 'feedback' in assessment),
     [allAssessments],
+  );
+  const expectations = useMemo(
+    () =>
+      expectationsAndOthers.filter((assessment): assessment is ExpectationAssessment => 'expectation' in assessment),
+    [expectationsAndOthers],
   );
   const groupedFeedbacks = useMemo(() => groupFeedbacks(feedbacks), [feedbacks]);
   const sortedExpectations = expectations.toSorted((left, right) =>
@@ -103,13 +111,25 @@ export const AssessmentsPane = ({
         boxSizing: 'border-box',
       }}
     >
+      {/* Issues section - only show when experimentId is available */}
+      {!isInComparisonView && experimentId && (
+        <IssuesSection
+          traceId={traceId}
+          experimentId={experimentId}
+          assessments={allAssessments}
+          activeSpanId={activeSpanId}
+          onClose={setAssessmentsPaneExpanded ? () => setAssessmentsPaneExpanded(false) : undefined}
+        />
+      )}
+      {/* Assessments section header */}
       <div css={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
         {!isInComparisonView && (
           <Typography.Text bold>
             <FormattedMessage defaultMessage="Assessments" description="Label for the assessments pane" />
           </Typography.Text>
         )}
-        {!isInComparisonView && setAssessmentsPaneExpanded && (
+        {/* Show close button here only if Issues section is not shown */}
+        {!isInComparisonView && !experimentId && setAssessmentsPaneExpanded && (
           <Tooltip
             componentId="shared.model-trace-explorer.close-assessments-pane-tooltip"
             content={

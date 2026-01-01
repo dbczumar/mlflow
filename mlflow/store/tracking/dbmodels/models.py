@@ -48,6 +48,7 @@ from mlflow.entities import (
     GatewayResourceType,
     GatewaySecretInfo,
     InputTag,
+    Issue,
     Metric,
     Param,
     RoutingStrategy,
@@ -61,6 +62,7 @@ from mlflow.entities import (
     ViewType,
 )
 from mlflow.entities.dataset_record import DATASET_RECORD_WRAPPED_OUTPUT_KEY
+from mlflow.entities.issue import IssueEntity, IssueState
 from mlflow.entities.lifecycle_stage import LifecycleStage
 from mlflow.entities.logged_model import LoggedModel
 from mlflow.entities.logged_model_parameter import LoggedModelParameter
@@ -867,7 +869,7 @@ class SqlAssessments(Base):
     """
     assessment_type = Column(String(50), nullable=False)
     """
-    Assessment type: `String` (limit 50 characters). Either "feedback" or "expectation".
+    Assessment type: `String` (limit 50 characters). One of "feedback", "expectation", or "issue".
     """
     value = Column(Text, nullable=False)
     """
@@ -982,6 +984,26 @@ class SqlAssessments(Base):
             )
             assessment.overrides = self.overrides
             assessment.valid = self.valid
+        elif assessment_type_value == "issue":
+            from mlflow.entities.assessment import ISSUE_NAME_METADATA_KEY
+
+            # issue_id is stored as the assessment name
+            # issue_name is stored in metadata under ISSUE_NAME_METADATA_KEY
+            issue_name = parsed_metadata.pop(ISSUE_NAME_METADATA_KEY, "") if parsed_metadata else ""
+            assessment = Issue(
+                issue_id=self.name,
+                issue_name=issue_name,
+                value=parsed_value,
+                source=source,
+                trace_id=self.trace_id,
+                rationale=self.rationale,
+                metadata=parsed_metadata or None,
+                span_id=self.span_id,
+                create_time_ms=self.created_timestamp,
+                last_update_time_ms=self.last_updated_timestamp,
+            )
+            assessment.overrides = self.overrides
+            assessment.valid = self.valid
         else:
             raise ValueError(f"Unknown assessment type: {assessment_type_value}")
 
@@ -1009,9 +1031,15 @@ class SqlAssessments(Base):
             assessment_type = "expectation"
             value_json = json.dumps(assessment.expectation.value)
             error_json = None
+        elif assessment.issue is not None:
+            assessment_type = "issue"
+            # IssueValue contains just a boolean value
+            # issue_id is stored as assessment.name, issue_name is in metadata
+            value_json = json.dumps(assessment.issue.value)
+            error_json = None
         else:
             raise MlflowException.invalid_parameter_value(
-                "Assessment must have either feedback or expectation value"
+                "Assessment must have either feedback, expectation, or issue value"
             )
 
         metadata_json = json.dumps(assessment.metadata) if assessment.metadata else None
@@ -2637,3 +2665,193 @@ class SqlGatewayEndpointTag(Base):
 
     def to_mlflow_entity(self):
         return GatewayEndpointTag(key=self.key, value=self.value)
+
+
+# Valid issue states
+IssueStates = [
+    IssueState.DRAFT,
+    IssueState.OPEN,
+    IssueState.CLOSED,
+]
+
+
+class SqlIssue(Base):
+    """
+    DB model for :py:class:`mlflow.entities.issue.IssueEntity`.
+    These are recorded in the ``issues`` table.
+
+    An issue represents an identified problem from trace analysis.
+    """
+
+    __tablename__ = "issues"
+
+    issue_id = Column(String(36), primary_key=True)
+    """
+    Issue ID: `String` (UUID format, 36 characters). *Primary Key* for ``issues`` table.
+    """
+
+    experiment_id = Column(Integer, ForeignKey("experiments.experiment_id"), nullable=False)
+    """
+    Experiment ID to which this issue belongs: *Foreign Key* into ``experiments`` table.
+    """
+
+    name = Column(String(500), nullable=False)
+    """
+    Human-readable name/title of the issue: `String` (limit 500 characters). *Non null*.
+    """
+
+    description = Column(Text, nullable=True)
+    """
+    Detailed description of the issue: `Text`. Could be *null*.
+    """
+
+    state = Column(String(20), default=IssueState.DRAFT, nullable=False)
+    """
+    Current state of the issue: `String` (limit 20 characters).
+    Can be ``draft`` (default), ``open``, or ``closed``.
+    """
+
+    creation_time = Column(BigInteger(), default=get_current_time_millis, nullable=False)
+    """
+    Creation time of issue in milliseconds since epoch: `BigInteger`.
+    """
+
+    last_update_time = Column(BigInteger(), default=get_current_time_millis, nullable=False)
+    """
+    Last update time of issue in milliseconds since epoch: `BigInteger`.
+    """
+
+    tags = Column(Text, nullable=True)
+    """
+    Additional metadata as JSON-serialized key-value pairs: `Text`. Could be *null*.
+    """
+
+    experiment = relationship("SqlExperiment", backref=backref("issues", cascade="all"))
+    """
+    SQLAlchemy relationship (many:one) with :py:class:`SqlExperiment`.
+    """
+
+    __table_args__ = (
+        CheckConstraint(
+            state.in_(IssueStates),
+            name="issues_state",
+        ),
+        Index("index_issues_experiment_id", "experiment_id"),
+        Index("index_issues_state", "state"),
+    )
+
+    def __repr__(self):
+        return f"<SqlIssue ({self.issue_id}, {self.name}, {self.state})>"
+
+    def to_mlflow_entity(self) -> IssueEntity:
+        """
+        Convert DB model to corresponding MLflow entity.
+
+        Returns:
+            :py:class:`mlflow.entities.issue.IssueEntity`.
+        """
+        return IssueEntity(
+            issue_id=self.issue_id,
+            experiment_id=str(self.experiment_id),
+            name=self.name,
+            description=self.description,
+            state=self.state,
+            creation_time=self.creation_time,
+            last_update_time=self.last_update_time,
+            tags=json.loads(self.tags) if self.tags else None,
+        )
+
+    @classmethod
+    def from_mlflow_entity(cls, issue: IssueEntity) -> "SqlIssue":
+        """
+        Create DB model from corresponding MLflow entity.
+
+        Args:
+            issue: The IssueEntity to convert.
+
+        Returns:
+            SqlIssue instance.
+        """
+        return cls(
+            issue_id=issue.issue_id,
+            experiment_id=int(issue.experiment_id),
+            name=issue.name,
+            description=issue.description,
+            state=issue.state,
+            creation_time=issue.creation_time,
+            last_update_time=issue.last_update_time,
+            tags=json.dumps(issue.tags) if issue.tags else None,
+        )
+
+
+class SqlIssueComment(Base):
+    """
+    DB model for :py:class:`mlflow.entities.issue_comment.IssueCommentEntity`.
+    These are recorded in the ``issue_comments`` table.
+
+    A comment belongs to an issue and contains text content with author and timestamps.
+    """
+
+    __tablename__ = "issue_comments"
+
+    comment_id = Column(String(36), primary_key=True)
+    """
+    Comment ID: `String` (UUID format, 36 characters). *Primary Key* for ``issue_comments`` table.
+    """
+
+    issue_id = Column(String(36), ForeignKey("issues.issue_id", ondelete="CASCADE"), nullable=False)
+    """
+    Issue ID to which this comment belongs: *Foreign Key* into ``issues`` table.
+    Comments are deleted when the parent issue is deleted (CASCADE).
+    """
+
+    content = Column(Text, nullable=False)
+    """
+    Comment text content: `Text`. *Non null*.
+    """
+
+    author = Column(String(255), nullable=True)
+    """
+    Author name or identifier: `String` (limit 255 characters). Could be *null*.
+    """
+
+    creation_time = Column(BigInteger(), default=get_current_time_millis, nullable=False)
+    """
+    Creation time of comment in milliseconds since epoch: `BigInteger`.
+    """
+
+    last_update_time = Column(BigInteger(), default=get_current_time_millis, nullable=False)
+    """
+    Last update time of comment in milliseconds since epoch: `BigInteger`.
+    """
+
+    issue = relationship("SqlIssue", backref=backref("comments", cascade="all, delete-orphan"))
+    """
+    SQLAlchemy relationship (many:one) with :py:class:`SqlIssue`.
+    """
+
+    __table_args__ = (
+        Index("index_issue_comments_issue_id", "issue_id"),
+        Index("index_issue_comments_creation_time", "creation_time"),
+    )
+
+    def __repr__(self):
+        return f"<SqlIssueComment ({self.comment_id}, issue={self.issue_id})>"
+
+    def to_mlflow_entity(self):
+        """
+        Convert DB model to corresponding MLflow entity.
+
+        Returns:
+            :py:class:`mlflow.entities.issue_comment.IssueCommentEntity`.
+        """
+        from mlflow.entities.issue_comment import IssueCommentEntity
+
+        return IssueCommentEntity(
+            comment_id=self.comment_id,
+            issue_id=self.issue_id,
+            content=self.content,
+            author=self.author,
+            creation_time=self.creation_time,
+            last_update_time=self.last_update_time,
+        )

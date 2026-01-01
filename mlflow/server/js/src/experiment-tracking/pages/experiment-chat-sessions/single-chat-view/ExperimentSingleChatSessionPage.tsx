@@ -9,6 +9,7 @@ import {
   useGetTraces,
   useSearchMlflowTraces,
 } from '@databricks/web-shared/genai-traces-table';
+import { useGlobalClaudeOptional } from '@databricks/web-shared/claude-agent';
 
 import { useParams, useLocation } from '@mlflow/mlflow/src/common/utils/RoutingUtils';
 import invariant from 'invariant';
@@ -105,6 +106,43 @@ const ExperimentSingleChatSessionPageImpl = () => {
       }
     }
   }, [selectedTraceIdFromUrl, traces, isLoadingTraceDatas]);
+
+  // Set Claude context for single session
+  const globalClaude = useGlobalClaudeOptional();
+  const setContext = globalClaude?.setContext;
+  const lastContextKeyRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const contextKey = `session-${sessionId}-${traces?.length ?? 0}`;
+    if (setContext && traces && !isLoadingTraceDatas && lastContextKeyRef.current !== contextKey) {
+      lastContextKeyRef.current = contextKey;
+
+      setContext({
+        type: 'session',
+        summary: `Session ${sessionId} (${traces.length} turns)`,
+        data: {
+          sessionId,
+          turns: traces.length,
+          traces: traces.map((trace) => {
+            const info = trace.info;
+            // Check if it's a V3 trace info (has request_preview)
+            const isV3 = 'request_preview' in info;
+            return {
+              trace_id: getModelTraceId(trace),
+              request_time: isV3 ? (info as { request_time?: string }).request_time : undefined,
+              status: isV3 ? (info as { state?: string }).state : (info as { status?: string }).status,
+              request_preview: isV3 ? (info as { request_preview?: string }).request_preview : undefined,
+              response_preview: isV3 ? (info as { response_preview?: string }).response_preview : undefined,
+            };
+          }),
+        },
+        navigation: {
+          experimentId,
+          page: 'session-detail',
+        },
+      });
+    }
+  }, [setContext, sessionId, experimentId, traces, isLoadingTraceDatas]);
 
   return (
     <div css={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>

@@ -34,6 +34,19 @@ export const SPAN_NAME_COLUMN_ID = 'span.name';
 export const SPAN_TYPE_COLUMN_ID = 'span.type';
 export const SPAN_CONTENT_COLUMN_ID = 'span.content';
 export const LINKED_PROMPTS_COLUMN_ID = 'prompt';
+export const ISSUES_COLUMN_ID = 'issues';
+export const ISSUE_COLUMN_ID_PREFIX = 'issue_';
+
+export function createIssueColumnId(issueName: string) {
+  return ISSUE_COLUMN_ID_PREFIX + issueName;
+}
+
+export function getIssueNameFromColumnId(columnId: string): string | undefined {
+  if (columnId.startsWith(ISSUE_COLUMN_ID_PREFIX)) {
+    return columnId.slice(ISSUE_COLUMN_ID_PREFIX.length);
+  }
+  return undefined;
+}
 
 export const SORTABLE_INFO_COLUMNS = [EXECUTION_DURATION_COLUMN_ID, REQUEST_TIME_COLUMN_ID, SESSION_COLUMN_ID];
 // Columns that are sortable by the server. Server-side sorting should be prioritized over client-side sorting.
@@ -60,6 +73,42 @@ export function createAssessmentColumnId(assessmentName: string) {
 
 export function createExpectationColumnId(expectationName: string) {
   return expectationName + EXPECTATION_COLUMN_ID_SUFFIX;
+}
+
+const ISSUE_NAME_METADATA_KEY = 'mlflow.issue.name';
+
+/**
+ * Extracts unique issue names from evaluation results.
+ * Used to generate individual issue columns in expanded view.
+ */
+export function getUniqueIssueNames(evaluationResults: RunEvaluationTracesDataEntry[]): string[] {
+  const issueNames = new Set<string>();
+
+  evaluationResults.forEach((result) => {
+    const assessments = result.traceInfo?.assessments || [];
+    assessments.forEach((assessment) => {
+      // Check if this is an issue assessment
+      if ('issue' in assessment && assessment.issue !== undefined) {
+        const issueName = assessment.metadata?.[ISSUE_NAME_METADATA_KEY] || assessment.assessment_name;
+        issueNames.add(issueName);
+      }
+    });
+  });
+
+  return Array.from(issueNames).sort();
+}
+
+/**
+ * Generates individual issue columns for the expanded view.
+ */
+export function generateIssueColumns(issueNames: string[]): TracesTableColumn[] {
+  return issueNames.map((issueName) => ({
+    id: createIssueColumnId(issueName),
+    label: issueName,
+    type: TracesTableColumnType.TRACE_INFO,
+    group: TracesTableColumnGroup.ISSUE,
+    issueName,
+  }));
 }
 
 export const useTableColumns = (
@@ -237,6 +286,15 @@ export const useTableColumns = (
           }),
           type: TracesTableColumnType.TRACE_INFO,
           group: TracesTableColumnGroup.INFO,
+        },
+        {
+          id: ISSUES_COLUMN_ID,
+          label: intl.formatMessage({
+            defaultMessage: 'Issues',
+            description: 'Column label for issues',
+          }),
+          type: TracesTableColumnType.TRACE_INFO,
+          group: TracesTableColumnGroup.ISSUE,
         },
         // Only show run name column on experiment level traces, where runUuid is not provided
         isNil(runUuid) && {

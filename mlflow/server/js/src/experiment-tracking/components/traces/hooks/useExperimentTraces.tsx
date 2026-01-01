@@ -1,10 +1,11 @@
-import { type ModelTraceInfo } from '@databricks/web-shared/model-trace-explorer';
+import { type ModelTraceInfo, type ModelTraceInfoV3 } from '@databricks/web-shared/model-trace-explorer';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { MlflowService } from '../../../sdk/MlflowService';
 import { EXPERIMENT_TRACES_SORTABLE_COLUMNS, getTraceInfoRunId } from '../TracesView.utils';
 import { ViewType } from '../../../sdk/MlflowEnums';
 import { first, uniq, values } from 'lodash';
 import type { RunEntity } from '../../../types';
+import { postJson } from '../../../../common/utils/FetchUtils';
 
 // A filter expression used to filter traces by run ID
 const RUN_ID_FILTER_EXPRESSION = 'request_metadata.`mlflow.sourceRun`';
@@ -57,8 +58,11 @@ const fetchRunNamesForTraces = async (experimentIds: string[], traces: ModelTrac
   return traceIdsToRunNames;
 };
 
+// Extended type that includes both v2 and v3 fields, plus run name
 export interface ModelTraceInfoWithRunName extends ModelTraceInfo {
   runName?: string;
+  // Include assessments from ModelTraceInfoV3 for issue status display
+  assessments?: ModelTraceInfoV3['assessments'];
 }
 
 export const useExperimentTraces = ({
@@ -135,21 +139,56 @@ export const useExperimentTraces = ({
       setError(undefined);
 
       try {
-        const response = await MlflowService.getExperimentTraces(experimentIds, orderByString, pageToken, filterString);
+        // Use v3 search API to get traces with assessments
+        const locations = experimentIds.map((id) => ({
+          type: 'MLFLOW_EXPERIMENT' as const,
+          mlflow_experiment: { experiment_id: id },
+        }));
+
+        const requestData = {
+          locations,
+          filter: filterString || undefined,
+          max_results: 25,
+          order_by: orderByString ? [orderByString] : undefined,
+          page_token: pageToken,
+        };
+
+        const response = (await postJson({
+          relativeUrl: 'ajax-api/3.0/mlflow/traces/search',
+          data: requestData,
+        })) as { traces?: ModelTraceInfoV3[]; next_page_token?: string };
 
         if (!response.traces) {
           setTraces([]);
           return;
         }
 
-        const runNamesForTraces = await fetchRunNamesForTraces(experimentIds, response.traces);
-        const tracesWithRunNames = response.traces.map((trace) => {
+        // Convert v3 traces to v2 format with run names, preserving assessments
+        const v3Traces = response.traces;
+        const v2StyleTraces: ModelTraceInfo[] = v3Traces.map((trace) => ({
+          request_id: trace.trace_id,
+          experiment_id:
+            trace.trace_location?.type === 'MLFLOW_EXPERIMENT'
+              ? trace.trace_location.mlflow_experiment?.experiment_id
+              : undefined,
+          timestamp_ms: trace.request_time ? new Date(trace.request_time).getTime() : undefined,
+          execution_time_ms: trace.execution_duration ? parseFloat(trace.execution_duration) * 1000 : undefined,
+          status: trace.state === 'OK' ? 'OK' : trace.state === 'ERROR' ? 'ERROR' : 'UNSET',
+          tags: trace.tags ? Object.entries(trace.tags).map(([key, value]) => ({ key, value })) : [],
+          request_metadata: trace.trace_metadata
+            ? Object.entries(trace.trace_metadata).map(([key, value]) => ({ key, value }))
+            : [],
+        }));
+
+        const runNamesForTraces = await fetchRunNamesForTraces(experimentIds, v2StyleTraces);
+        const tracesWithRunNames: ModelTraceInfoWithRunName[] = v2StyleTraces.map((trace, index) => {
           const traceId = trace.request_id;
+          const v3Trace = v3Traces[index];
           if (!traceId) {
-            return { ...trace };
+            return { ...trace, assessments: v3Trace.assessments };
           }
           const runName = runNamesForTraces[traceId];
-          return { ...trace, runName };
+          return { ...trace, runName, assessments: v3Trace.assessments };
         });
 
         setTraces(tracesWithRunNames);
