@@ -32,5 +32,4 @@ threading.Thread(
     daemon=True,
 ).start()
 
-huey_instance_key = os.environ[MLFLOW_HUEY_INSTANCE_KEY]
-huey_instance = _get_or_init_huey_instance(huey_instance_key).instance
+huey_instance = _get_or_init_huey_instance(os.environ[MLFLOW_HUEY_INSTANCE_KEY]).instance
