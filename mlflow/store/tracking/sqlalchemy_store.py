@@ -2450,15 +2450,7 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
                 .all()
             )
 
-            return {
-                config.scorer_id: OnlineScoringConfig(
-                    online_scoring_config_id=config.online_scoring_config_id,
-                    scorer_id=config.scorer_id,
-                    sample_rate=config.sample_rate,
-                    filter_string=config.filter_string,
-                )
-                for config in results
-            }
+            return {config.scorer_id: config.to_mlflow_entity() for config in results}
 
     def get_active_online_scorers(self) -> list["OnlineScorer"]:
         """
@@ -2599,12 +2591,7 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
             session.add(config)
             session.flush()
 
-            return OnlineScoringConfig(
-                online_scoring_config_id=config.online_scoring_config_id,
-                scorer_id=config.scorer_id,
-                sample_rate=config.sample_rate,
-                filter_string=config.filter_string,
-            )
+            return config.to_mlflow_entity()
 
     def _apply_order_by_search_logged_models(
         self,
