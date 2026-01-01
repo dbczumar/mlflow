@@ -1,8 +1,9 @@
 """Checkpoint management for trace-level online scoring."""
 
+import json
 import logging
 import time
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 
 from mlflow.entities.experiment_tag import ExperimentTag
 from mlflow.genai.scorers.online.constants import MAX_LOOKBACK_MS, TRACE_CHECKPOINT_TAG
@@ -12,11 +13,30 @@ _logger = logging.getLogger(__name__)
 
 
 @dataclass
+class OnlineTraceScoringCheckpoint:
+    """Checkpoint for trace-level online scoring."""
+
+    timestamp_ms: int
+    request_id: str
+
+    def to_json(self) -> str:
+        """Serialize checkpoint to JSON string."""
+        return json.dumps(asdict(self))
+
+    @classmethod
+    def from_json(cls, json_str: str) -> "OnlineTraceScoringCheckpoint":
+        """Deserialize checkpoint from JSON string."""
+        data = json.loads(json_str)
+        return cls(**data)
+
+
+@dataclass
 class OnlineTraceScoringTimeWindow:
     """Time window for trace-level online scoring."""
 
     min_trace_timestamp_ms: int
     max_trace_timestamp_ms: int
+    min_request_id: str | None = None
 
 
 class OnlineTraceCheckpointManager:
@@ -26,31 +46,36 @@ class OnlineTraceCheckpointManager:
         self._tracking_store = tracking_store
         self._experiment_id = experiment_id
 
-    def get_checkpoint_timestamp(self) -> int | None:
+    def get_checkpoint(self) -> OnlineTraceScoringCheckpoint | None:
         """
-        Get the last processed trace timestamp from the experiment checkpoint tag.
+        Get the last processed trace checkpoint from the experiment tag.
 
         Returns:
-            The checkpoint timestamp in milliseconds, or None if no checkpoint exists.
+            OnlineTraceScoringCheckpoint, or None if no checkpoint exists.
+            Handles legacy timestamp-only format for backward compatibility.
         """
         try:
             experiment = self._tracking_store.get_experiment(self._experiment_id)
-            if checkpoint := experiment.tags.get(TRACE_CHECKPOINT_TAG):
-                return int(checkpoint)
-        except (TypeError, ValueError):
+            if checkpoint_str := experiment.tags.get(TRACE_CHECKPOINT_TAG):
+                # Try JSON format first
+                if checkpoint_str.startswith("{"):
+                    return OnlineTraceScoringCheckpoint.from_json(checkpoint_str)
+                # Legacy format: just a timestamp integer
+                return None
+        except (TypeError, ValueError, json.JSONDecodeError):
             pass
         return None
 
-    def update_checkpoint_timestamp(self, timestamp_ms: int) -> None:
+    def update_checkpoint(self, checkpoint: OnlineTraceScoringCheckpoint) -> None:
         """
-        Update the checkpoint tag with a new timestamp.
+        Update the checkpoint tag with a new checkpoint.
 
         Args:
-            timestamp_ms: The new checkpoint timestamp in milliseconds.
+            checkpoint: The checkpoint to store.
         """
         self._tracking_store.set_experiment_tag(
             self._experiment_id,
-            ExperimentTag(TRACE_CHECKPOINT_TAG, str(timestamp_ms)),
+            ExperimentTag(TRACE_CHECKPOINT_TAG, checkpoint.to_json()),
         )
 
     def calculate_time_window(self) -> OnlineTraceScoringTimeWindow:
@@ -62,24 +87,28 @@ class OnlineTraceCheckpointManager:
         current_time - MAX_LOOKBACK_MS instead to skip over old problematic traces.
 
         Returns:
-            OnlineTraceScoringTimeWindow with min and max trace timestamps.
+            OnlineTraceScoringTimeWindow with min and max trace timestamps and optional
+            min request ID for tiebreaking.
             min_trace_timestamp_ms is the checkpoint if it exists and is within the
             lookback period, otherwise now - MAX_LOOKBACK_MS.
             max_trace_timestamp_ms is the current time.
+            min_request_id is the request ID from checkpoint for handling timestamp ties.
         """
         current_time_ms = int(time.time() * 1000)
-        current_checkpoint = self.get_checkpoint_timestamp()
+        checkpoint = self.get_checkpoint()
 
         # Start from checkpoint, but never look back more than MAX_LOOKBACK_MS
         min_lookback_time_ms = current_time_ms - MAX_LOOKBACK_MS
 
-        if current_checkpoint is not None:
-            # Use the more recent of: checkpoint or (current_time - MAX_LOOKBACK_MS)
-            min_trace_timestamp_ms = max(current_checkpoint, min_lookback_time_ms)
+        if checkpoint is not None:
+            min_trace_timestamp_ms = max(checkpoint.timestamp_ms, min_lookback_time_ms)
+            checkpoint_request_id = checkpoint.request_id
         else:
             min_trace_timestamp_ms = min_lookback_time_ms
+            checkpoint_request_id = None
 
         return OnlineTraceScoringTimeWindow(
             min_trace_timestamp_ms=min_trace_timestamp_ms,
             max_trace_timestamp_ms=current_time_ms,
+            min_request_id=checkpoint_request_id,
         )

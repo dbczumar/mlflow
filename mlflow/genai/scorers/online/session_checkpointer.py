@@ -1,8 +1,9 @@
 """Checkpoint management for session-level online scoring."""
 
+import json
 import logging
 import time
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 
 from mlflow.entities.experiment_tag import ExperimentTag
 from mlflow.genai.scorers.online.constants import (
@@ -13,6 +14,24 @@ from mlflow.genai.scorers.online.constants import (
 from mlflow.store.tracking.abstract_store import AbstractStore
 
 _logger = logging.getLogger(__name__)
+
+
+@dataclass
+class OnlineSessionScoringCheckpoint:
+    """Checkpoint for session-level online scoring."""
+
+    timestamp_ms: int
+    session_id: str
+
+    def to_json(self) -> str:
+        """Serialize checkpoint to JSON string."""
+        return json.dumps(asdict(self))
+
+    @classmethod
+    def from_json(cls, json_str: str) -> "OnlineSessionScoringCheckpoint":
+        """Deserialize checkpoint from JSON string."""
+        data = json.loads(json_str)
+        return cls(**data)
 
 
 @dataclass
@@ -31,66 +50,36 @@ class OnlineSessionCheckpointManager:
         self._tracking_store = tracking_store
         self._experiment_id = experiment_id
 
-    def get_checkpoint_timestamp(self) -> int | None:
+    def get_checkpoint(self) -> OnlineSessionScoringCheckpoint | None:
         """
-        Get the last processed session timestamp from the experiment checkpoint tag.
+        Get the last processed session checkpoint from the experiment tag.
 
         Returns:
-            The checkpoint timestamp in milliseconds, or None if no checkpoint exists.
+            OnlineSessionScoringCheckpoint, or None if no checkpoint exists.
+            Handles legacy timestamp-only format for backward compatibility.
         """
         try:
             experiment = self._tracking_store.get_experiment(self._experiment_id)
-            if checkpoint := experiment.tags.get(SESSION_CHECKPOINT_TAG):
-                # Parse format: "timestamp_ms:session_id" or just "timestamp_ms" (legacy)
-                parts = checkpoint.split(":", 1)
-                return int(parts[0])
-        except (TypeError, ValueError):
+            if checkpoint_str := experiment.tags.get(SESSION_CHECKPOINT_TAG):
+                # Try JSON format first
+                if checkpoint_str.startswith("{"):
+                    return OnlineSessionScoringCheckpoint.from_json(checkpoint_str)
+                # Legacy format: just a timestamp integer
+                return None
+        except (TypeError, ValueError, json.JSONDecodeError):
             pass
         return None
 
-    def get_checkpoint_session_id(self) -> str | None:
+    def update_checkpoint(self, checkpoint: OnlineSessionScoringCheckpoint) -> None:
         """
-        Get the last processed session ID from the experiment checkpoint tag.
-
-        Returns:
-            The session ID, or None if no checkpoint exists or it's a legacy
-            timestamp-only checkpoint.
-        """
-        try:
-            experiment = self._tracking_store.get_experiment(self._experiment_id)
-            if checkpoint := experiment.tags.get(SESSION_CHECKPOINT_TAG):
-                # Parse format: "timestamp_ms:session_id"
-                parts = checkpoint.split(":", 1)
-                if len(parts) == 2:
-                    return parts[1]
-        except (TypeError, ValueError):
-            pass
-        return None
-
-    def update_checkpoint(self, timestamp_ms: int, session_id: str) -> None:
-        """
-        Update the checkpoint tag with a new timestamp and session ID.
+        Update the checkpoint tag with a new checkpoint.
 
         Args:
-            timestamp_ms: The new checkpoint timestamp in milliseconds.
-            session_id: The session ID of the last processed session.
-        """
-        checkpoint_value = f"{timestamp_ms}:{session_id}"
-        self._tracking_store.set_experiment_tag(
-            self._experiment_id,
-            ExperimentTag(SESSION_CHECKPOINT_TAG, checkpoint_value),
-        )
-
-    def update_checkpoint_timestamp(self, timestamp_ms: int) -> None:
-        """
-        Update the checkpoint tag with a new timestamp (legacy method for backward compatibility).
-
-        Args:
-            timestamp_ms: The new checkpoint timestamp in milliseconds.
+            checkpoint: The checkpoint to store.
         """
         self._tracking_store.set_experiment_tag(
             self._experiment_id,
-            ExperimentTag(SESSION_CHECKPOINT_TAG, str(timestamp_ms)),
+            ExperimentTag(SESSION_CHECKPOINT_TAG, checkpoint.to_json()),
         )
 
     def calculate_time_window(self) -> OnlineSessionScoringTimeWindow:
@@ -110,16 +99,17 @@ class OnlineSessionCheckpointManager:
             min_session_id is the session ID from checkpoint for handling timestamp ties.
         """
         current_time_ms = int(time.time() * 1000)
-        current_checkpoint = self.get_checkpoint_timestamp()
-        checkpoint_session_id = self.get_checkpoint_session_id()
+        checkpoint = self.get_checkpoint()
 
         # Start from checkpoint, but never look back more than MAX_LOOKBACK_MS
         min_lookback_time_ms = current_time_ms - MAX_LOOKBACK_MS
 
-        if current_checkpoint is not None:
-            min_last_trace_timestamp_ms = max(current_checkpoint, min_lookback_time_ms)
+        if checkpoint is not None:
+            min_last_trace_timestamp_ms = max(checkpoint.timestamp_ms, min_lookback_time_ms)
+            checkpoint_session_id = checkpoint.session_id
         else:
             min_last_trace_timestamp_ms = min_lookback_time_ms
+            checkpoint_session_id = None
 
         max_last_trace_timestamp_ms = current_time_ms - SESSION_COMPLETION_BUFFER_MS
 
