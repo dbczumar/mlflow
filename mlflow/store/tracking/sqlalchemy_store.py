@@ -3150,6 +3150,9 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
                 )
                 .order_by(
                     sessions_with_stats.c.last_trace_timestamp_ms.asc(),
+                    # Use session_id as tiebreaker for deterministic ordering when multiple
+                    # sessions have the same timestamp. This ensures checkpoint resume works
+                    # correctly when max_results is hit in the middle of a timestamp group.
                     sessions_with_stats.c.session_id.asc(),
                 )
             )
