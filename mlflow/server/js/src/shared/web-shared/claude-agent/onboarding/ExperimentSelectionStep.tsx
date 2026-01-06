@@ -4,7 +4,7 @@
  * or create a new one via the CreateExperimentModal.
  */
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Button,
   CheckCircleIcon,
@@ -36,10 +36,23 @@ export const ExperimentSelectionStep = () => {
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [experimentSelected, setExperimentSelected] = useState(false);
+  const hasAutoAdvancedRef = useRef(false);
 
   // Check if user is already in an experiment
   const currentExperimentId = globalClaude?.context?.navigation?.experimentId;
   const currentExperimentName = globalClaude?.context?.navigation?.experimentName;
+
+  // Auto-advance to next step when user selects an experiment
+  useEffect(() => {
+    if (experimentSelected && currentExperimentId && !hasAutoAdvancedRef.current) {
+      hasAutoAdvancedRef.current = true;
+      updateState({ experimentSelected: true });
+      // Small delay to show the experiment was detected
+      setTimeout(() => {
+        goToNextStep();
+      }, 800);
+    }
+  }, [currentExperimentId, experimentSelected, goToNextStep, updateState]);
 
   const handleSelectExisting = useCallback(() => {
     // Navigate to experiments page so user can select one
@@ -230,7 +243,7 @@ export const ExperimentSelectionStep = () => {
           </div>
 
           {/* Show message if user selected to navigate to experiments page */}
-          {experimentSelected && (
+          {experimentSelected && !currentExperimentId && (
             <div
               css={{
                 marginTop: theme.spacing.lg,
@@ -247,23 +260,40 @@ export const ExperimentSelectionStep = () => {
               </Typography.Text>
               <Typography.Text size="sm">
                 <FormattedMessage
-                  defaultMessage="Once you've selected an experiment from the list, the assistant will automatically detect it and you can continue with the setup."
+                  defaultMessage="Once you've selected an experiment from the list, the wizard will automatically advance to the next step."
                   description="Instructions for selecting experiment"
                 />
               </Typography.Text>
             </div>
           )}
 
-          {/* Continue button appears once experiment is selected */}
-          {experimentSelected && (
-            <Button
-              componentId={`${COMPONENT_ID_PREFIX}.continue_after_select`}
-              type="primary"
-              onClick={handleContinue}
-              css={{ marginTop: theme.spacing.lg }}
+          {/* Show detecting message when experiment is detected */}
+          {experimentSelected && currentExperimentId && (
+            <div
+              css={{
+                marginTop: theme.spacing.lg,
+                display: 'flex',
+                alignItems: 'center',
+                gap: theme.spacing.sm,
+                padding: theme.spacing.md,
+                backgroundColor: theme.colors.backgroundSecondary,
+                borderRadius: theme.borders.borderRadiusMd,
+                color: theme.colors.textValidationSuccess,
+              }}
             >
-              <FormattedMessage defaultMessage="Continue" description="Continue button" />
-            </Button>
+              <CheckCircleIcon />
+              <div>
+                <Typography.Text bold>
+                  <FormattedMessage
+                    defaultMessage="Experiment detected! Advancing to next step..."
+                    description="Message when experiment is detected"
+                  />
+                </Typography.Text>
+                <Typography.Text color="secondary" size="sm" css={{ display: 'block' }}>
+                  {currentExperimentName || currentExperimentId}
+                </Typography.Text>
+              </div>
+            </div>
           )}
         </div>
       )}
