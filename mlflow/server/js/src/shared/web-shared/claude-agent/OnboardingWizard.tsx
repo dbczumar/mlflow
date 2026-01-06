@@ -171,6 +171,44 @@ const INITIAL_STATE: OnboardingState = {
   completedAt: null,
 };
 
+/**
+ * Get localStorage key for wizard step.
+ */
+const getWizardStepKey = (experimentId?: string): string => {
+  if (experimentId) {
+    return `mlflow.assistant.wizardStep.experiment.${experimentId}`;
+  }
+  return 'mlflow.assistant.wizardStep.global';
+};
+
+/**
+ * Load saved wizard step from localStorage.
+ */
+const loadWizardStep = (experimentId?: string): OnboardingStep | null => {
+  try {
+    const key = getWizardStepKey(experimentId);
+    const stored = localStorage.getItem(key);
+    if (stored && STEP_ORDER.includes(stored as OnboardingStep)) {
+      return stored as OnboardingStep;
+    }
+  } catch {
+    // localStorage not available
+  }
+  return null;
+};
+
+/**
+ * Save wizard step to localStorage.
+ */
+const saveWizardStep = (step: OnboardingStep, experimentId?: string): void => {
+  try {
+    const key = getWizardStepKey(experimentId);
+    localStorage.setItem(key, step);
+  } catch {
+    // localStorage not available
+  }
+};
+
 interface OnboardingWizardProps {
   /** Called when onboarding is complete */
   onComplete: () => void;
@@ -249,6 +287,16 @@ export const OnboardingWizard = ({
   useEffect(() => {
     const checkInitialStep = async () => {
       setIsCheckingInitialStep(true);
+
+      // First check if we have a saved step for this experiment
+      const savedStep = loadWizardStep(currentExperimentId);
+      if (savedStep) {
+        setCurrentStep(savedStep);
+        setIsCheckingInitialStep(false);
+        return;
+      }
+
+      // No saved step - determine based on current state
       const initialStep = await determineInitialStep(currentExperimentId);
       setCurrentStep(initialStep);
       setIsCheckingInitialStep(false);
@@ -256,6 +304,13 @@ export const OnboardingWizard = ({
 
     checkInitialStep();
   }, [currentExperimentId]);
+
+  // Save current step to localStorage whenever it changes
+  useEffect(() => {
+    if (!isCheckingInitialStep) {
+      saveWizardStep(currentStep, currentExperimentId);
+    }
+  }, [currentStep, currentExperimentId, isCheckingInitialStep]);
 
   const goToStep = useCallback((step: OnboardingStep) => {
     setCurrentStep(step);
