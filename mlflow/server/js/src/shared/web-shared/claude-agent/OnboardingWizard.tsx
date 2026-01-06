@@ -247,11 +247,16 @@ export const OnboardingWizard = ({
 
   // Determine initial step based on current context
   useEffect(() => {
+    // eslint-disable-next-line no-console
+    console.log('[OnboardingWizard] currentExperimentId changed to:', currentExperimentId);
     const checkInitialStep = async () => {
       setIsCheckingInitialStep(true);
       const initialStep = await determineInitialStep(currentExperimentId);
-      console.log('[OnboardingWizard] Determined initial step:', initialStep);
+      // eslint-disable-next-line no-console
+      console.log('[OnboardingWizard] Determined initial step:', initialStep, 'for experimentId:', currentExperimentId);
       setCurrentStep(initialStep);
+      // eslint-disable-next-line no-console
+      console.log('[OnboardingWizard] Set currentStep to:', initialStep);
       setIsCheckingInitialStep(false);
     };
 

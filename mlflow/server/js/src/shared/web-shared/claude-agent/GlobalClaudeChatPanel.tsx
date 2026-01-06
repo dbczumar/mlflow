@@ -72,6 +72,10 @@ export const GlobalClaudeChatPanel = () => {
 
   // Show onboarding wizard if needed
   if (showSetupWizard) {
+    const currentExperimentId = context.navigation?.experimentId;
+    // eslint-disable-next-line no-console
+    console.log('[GlobalClaudeChatPanel] Rendering OnboardingWizard with experimentId:', currentExperimentId);
+
     return (
       <div
         css={{
@@ -116,7 +120,7 @@ export const GlobalClaudeChatPanel = () => {
         <div css={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
           <OnboardingWizard
             onComplete={completeSetup}
-            currentExperimentId={context.navigation?.experimentId}
+            currentExperimentId={currentExperimentId}
             assistantAlreadyConfigured={isConfigured}
           />
         </div>
