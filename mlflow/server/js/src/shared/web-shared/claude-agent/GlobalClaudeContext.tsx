@@ -16,8 +16,8 @@ const DEFAULT_CONTEXT: ClaudeContext = {
   data: null,
 };
 
-// localStorage key for setup status
-const SETUP_STATUS_KEY = 'mlflow.assistant.setupStatus';
+// localStorage key for setup status (global or per-experiment)
+const SETUP_STATUS_KEY_PREFIX = 'mlflow.assistant.setupStatus';
 
 const GlobalClaudeContext = createContext<GlobalClaudeAgentContextType | null>(null);
 
@@ -26,11 +26,25 @@ const generateMessageId = (): string => {
 };
 
 /**
- * Load setup status from localStorage.
+ * Get localStorage key for setup status.
+ * If experimentId provided, returns experiment-specific key.
+ * Otherwise returns global key.
  */
-const loadSetupStatus = (): AssistantSetupStatus => {
+const getSetupStatusKey = (experimentId?: string): string => {
+  if (experimentId) {
+    return `${SETUP_STATUS_KEY_PREFIX}.experiment.${experimentId}`;
+  }
+  return `${SETUP_STATUS_KEY_PREFIX}.global`;
+};
+
+/**
+ * Load setup status from localStorage.
+ * If experimentId provided, loads experiment-specific status.
+ */
+const loadSetupStatus = (experimentId?: string): AssistantSetupStatus => {
   try {
-    const stored = localStorage.getItem(SETUP_STATUS_KEY);
+    const key = getSetupStatusKey(experimentId);
+    const stored = localStorage.getItem(key);
     if (stored === 'configured') {
       return stored;
     }
@@ -42,10 +56,12 @@ const loadSetupStatus = (): AssistantSetupStatus => {
 
 /**
  * Save setup status to localStorage.
+ * If experimentId provided, saves experiment-specific status.
  */
-const saveSetupStatus = (status: AssistantSetupStatus): void => {
+const saveSetupStatus = (status: AssistantSetupStatus, experimentId?: string): void => {
   try {
-    localStorage.setItem(SETUP_STATUS_KEY, status);
+    const key = getSetupStatusKey(experimentId);
+    localStorage.setItem(key, status);
   } catch {
     // localStorage not available
   }
@@ -125,9 +141,35 @@ export const GlobalClaudeProvider = ({ children }: { children: ReactNode }) => {
     onStatus: handleStatus,
   });
 
-  // Check Claude availability on mount (but don't auto-configure - rely on localStorage)
+  // Monitor URL to detect navigation away from experiments
   useEffect(() => {
-    const storedStatus = loadSetupStatus();
+    const handleHashChange = () => {
+      const hash = window.location.hash;
+      // If we navigate away from an experiment page, reset to global context
+      if (!hash.includes('/experiments/') && context.navigation?.experimentId) {
+        console.log('[GlobalClaudeContext] Navigated away from experiment, resetting to global context');
+        setContextState(DEFAULT_CONTEXT);
+      }
+    };
+
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, [context.navigation?.experimentId]);
+
+  // Check Claude availability and setup status when context changes
+  useEffect(() => {
+    const experimentId = context.navigation?.experimentId;
+    const storedStatus = loadSetupStatus(experimentId);
+
+    console.log('[GlobalClaudeContext] Context changed, experimentId:', experimentId, 'status:', storedStatus);
+
+    // Reset session when experiment changes (inline to avoid circular dependency)
+    setSessionId(null);
+    setMessages([]);
+    setIsStreaming(false);
+    setError(null);
+    streamingMessageRef.current = '';
+    disconnectSSE();
 
     // If already configured in localStorage, just verify backend is available
     if (storedStatus === 'configured') {
@@ -135,18 +177,24 @@ export const GlobalClaudeProvider = ({ children }: { children: ReactNode }) => {
         .then((health) => {
           const isAvailable = health.claude_available === 'true' || health.claude_available === 'True';
           setIsClaudeAvailable(isAvailable);
-          // Keep configured status from localStorage
+          setSetupStatus('configured');
+          setShowSetupWizard(false); // Hide wizard if already configured
         })
         .catch(() => {
           setIsClaudeAvailable(false);
-          // Keep configured status - user may just need to restart backend
+          setSetupStatus('configured'); // Keep configured status - user may just need to restart backend
+          setShowSetupWizard(false);
         });
     } else {
-      // Not configured yet - mark as not-configured and let user go through setup
+      // Not configured yet - mark as not-configured
       setSetupStatus('not-configured');
       setIsClaudeAvailable(false);
+      // Show wizard if panel is open and not configured
+      if (isPanelOpen) {
+        setShowSetupWizard(true);
+      }
     }
-  }, []);
+  }, [context.navigation?.experimentId, isPanelOpen, disconnectSSE]);
 
   // Actions
   const openPanel = useCallback(() => {
@@ -166,7 +214,12 @@ export const GlobalClaudeProvider = ({ children }: { children: ReactNode }) => {
   const setContext = useCallback((newContext: ClaudeContext) => {
     console.log('[GlobalClaudeContext] setContext called with:', newContext);
     setContextState(newContext);
-  }, []);
+
+    // If switching to global context (no experiment), close the setup wizard
+    if (!newContext.navigation?.experimentId && showSetupWizard) {
+      setShowSetupWizard(false);
+    }
+  }, [showSetupWizard]);
 
   const reset = useCallback(() => {
     setSessionId(null);
@@ -178,11 +231,13 @@ export const GlobalClaudeProvider = ({ children }: { children: ReactNode }) => {
   }, [disconnectSSE]);
 
   const completeSetup = useCallback(() => {
+    const experimentId = context.navigation?.experimentId;
     setSetupStatus('configured');
-    saveSetupStatus('configured');
+    saveSetupStatus('configured', experimentId);
     setShowSetupWizard(false);
     setIsClaudeAvailable(true);
-  }, []);
+    console.log('[GlobalClaudeContext] Setup completed for experimentId:', experimentId);
+  }, [context.navigation?.experimentId]);
 
   const openSetup = useCallback(() => {
     setShowSetupWizard(true);
