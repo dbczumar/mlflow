@@ -55,7 +55,8 @@ const ExperimentPage = () => {
         },
       });
     }
-  }, [experimentIds, globalClaude]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [experimentIds]);
 
   const isComparingExperiments = experimentIds.length > 1;
 
