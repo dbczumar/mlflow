@@ -73,8 +73,6 @@ export const GlobalClaudeChatPanel = () => {
   // Show onboarding wizard if needed
   if (showSetupWizard) {
     const currentExperimentId = context.navigation?.experimentId;
-    // eslint-disable-next-line no-console
-    console.log('[GlobalClaudeChatPanel] Rendering OnboardingWizard with experimentId:', currentExperimentId);
 
     return (
       <div

@@ -146,9 +146,6 @@ export const GlobalClaudeProvider = ({ children }: { children: ReactNode }) => {
     const experimentId = context.navigation?.experimentId;
     const storedStatus = loadSetupStatus(experimentId);
 
-    // eslint-disable-next-line no-console
-    console.log('[GlobalClaudeContext] Context changed, experimentId:', experimentId, 'status:', storedStatus);
-
     // Reset session when experiment changes (inline to avoid circular dependency)
     setSessionId(null);
     setMessages([]);
@@ -198,16 +195,10 @@ export const GlobalClaudeProvider = ({ children }: { children: ReactNode }) => {
   }, [disconnectSSE]);
 
   const setContext = useCallback((newContext: ClaudeContext) => {
-    // eslint-disable-next-line no-console
-    console.log('[GlobalClaudeContext] setContext called with:', newContext);
-    // eslint-disable-next-line no-console
-    console.log('[GlobalClaudeContext] New experimentId will be:', newContext.navigation?.experimentId);
     setContextState(newContext);
 
     // If switching to global context (no experiment), close the setup wizard
     if (!newContext.navigation?.experimentId && showSetupWizard) {
-      // eslint-disable-next-line no-console
-      console.log('[GlobalClaudeContext] Switching to global context, closing setup wizard');
       setShowSetupWizard(false);
     }
   }, [showSetupWizard]);
@@ -227,8 +218,6 @@ export const GlobalClaudeProvider = ({ children }: { children: ReactNode }) => {
     saveSetupStatus('configured', experimentId);
     setShowSetupWizard(false);
     setIsClaudeAvailable(true);
-    // eslint-disable-next-line no-console
-    console.log('[GlobalClaudeContext] Setup completed for experimentId:', experimentId);
   }, [context.navigation?.experimentId]);
 
   const openSetup = useCallback(() => {

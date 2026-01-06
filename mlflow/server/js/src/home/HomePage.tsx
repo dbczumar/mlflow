@@ -43,8 +43,6 @@ const HomePage = () => {
   // Reset global Claude context when viewing home page
   useEffect(() => {
     if (globalClaude) {
-      // eslint-disable-next-line no-console
-      console.log('[HomePage] Resetting global Claude context to global state');
       globalClaude.setContext({
         type: 'none',
         summary: '',
