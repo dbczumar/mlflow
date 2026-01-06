@@ -12,6 +12,7 @@ import { ExperimentView } from './ExperimentView';
 import { LegacySkeleton, PageWrapper, useDesignSystemTheme } from '@databricks/design-system';
 import { useNavigateToExperimentPageTab } from './hooks/useNavigateToExperimentPageTab';
 import { useExperimentIds } from './hooks/useExperimentIds';
+import { useGlobalClaudeOptional } from '../../../shared/web-shared/claude-agent/GlobalClaudeContext';
 
 /**
  * Concrete actions for GetExperiments context
@@ -31,6 +32,7 @@ const ExperimentPage = () => {
   const { formatMessage } = useIntl();
   const { theme } = useDesignSystemTheme();
   const experimentIds = useExperimentIds();
+  const globalClaude = useGlobalClaudeOptional();
 
   useEffect(() => {
     const pageTitle = formatMessage({
@@ -39,6 +41,20 @@ const ExperimentPage = () => {
     });
     Utils.updatePageTitle(pageTitle);
   }, [formatMessage]);
+
+  // Update global Claude context when viewing an experiment
+  useEffect(() => {
+    if (globalClaude && experimentIds.length === 1) {
+      globalClaude.setContext({
+        type: 'experiment',
+        summary: `Experiment ${experimentIds[0]}`,
+        data: null,
+        navigation: {
+          experimentId: experimentIds[0],
+        },
+      });
+    }
+  }, [experimentIds, globalClaude]);
 
   const isComparingExperiments = experimentIds.length > 1;
 
