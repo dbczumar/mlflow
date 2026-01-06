@@ -7,7 +7,7 @@
  * 4. Instrumenting their application with tracing
  */
 
-import { createContext, useCallback, useContext, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import { Button, ChevronLeftIcon, Typography, useDesignSystemTheme } from '@databricks/design-system';
 import { FormattedMessage } from '@databricks/i18n';
 
@@ -16,6 +16,8 @@ import { UseCaseStep } from './onboarding/UseCaseStep';
 import { ScorerSelectionStep } from './onboarding/ScorerSelectionStep';
 import { InstrumentationStep } from './onboarding/InstrumentationStep';
 import { CompletionStep } from './onboarding/CompletionStep';
+import { listScheduledScorers } from '../../../experiment-tracking/pages/experiment-scorers/api';
+import { searchTracesV4 } from '../model-trace-explorer/api';
 
 const COMPONENT_ID_PREFIX = 'mlflow.onboarding';
 
@@ -172,28 +174,89 @@ const INITIAL_STATE: OnboardingState = {
 interface OnboardingWizardProps {
   /** Called when onboarding is complete */
   onComplete: () => void;
-  /** Initial step to show (defaults to 'experiment-selection') */
-  initialStep?: OnboardingStep;
+  /** Current experiment ID if viewing an experiment */
+  currentExperimentId?: string;
   /** Whether assistant is already configured (for instrumentation step) */
   assistantAlreadyConfigured?: boolean;
 }
+
+/**
+ * Determine the appropriate initial step based on current context.
+ * Returns 'experiment-selection' if checking, or the determined step.
+ */
+const determineInitialStep = async (experimentId?: string): Promise<OnboardingStep> => {
+  // If no experiment, start with experiment selection
+  if (!experimentId) {
+    return 'experiment-selection';
+  }
+
+  // Check if experiment has judges configured
+  try {
+    const judgesResponse = await listScheduledScorers(experimentId);
+    const hasJudges = judgesResponse.scorers && judgesResponse.scorers.length > 0;
+
+    // If no judges, skip experiment selection and go to use case
+    if (!hasJudges) {
+      return 'use-case';
+    }
+
+    // Check if experiment has traces
+    const tracesResponse = await searchTracesV4({
+      locations: [
+        {
+          type: 'MLFLOW_EXPERIMENT',
+          mlflow_experiment: { experiment_id: experimentId },
+        },
+      ],
+    });
+    const hasTraces = tracesResponse.length > 0;
+
+    // If has judges but no traces, skip to instrumentation
+    if (!hasTraces) {
+      return 'instrumentation';
+    }
+
+    // If has both judges and traces, everything is set up!
+    return 'completion';
+  } catch (error) {
+    console.error('[OnboardingWizard] Error determining initial step:', error);
+    // On error, default to experiment selection
+    return 'experiment-selection';
+  }
+};
 
 /**
  * Multi-step onboarding wizard for MLflow GenAI.
  */
 export const OnboardingWizard = ({
   onComplete,
-  initialStep = 'experiment-selection',
+  currentExperimentId,
   assistantAlreadyConfigured = false,
 }: OnboardingWizardProps) => {
   const { theme } = useDesignSystemTheme();
 
-  const [currentStep, setCurrentStep] = useState<OnboardingStep>(initialStep);
+  const [currentStep, setCurrentStep] = useState<OnboardingStep>('experiment-selection');
+  const [isCheckingInitialStep, setIsCheckingInitialStep] = useState(true);
 
   const [state, setState] = useState<OnboardingState>({
     ...INITIAL_STATE,
     assistantConfigured: assistantAlreadyConfigured,
+    // If we have an experimentId, mark it as selected
+    experimentSelected: Boolean(currentExperimentId),
   });
+
+  // Determine initial step based on current context
+  useEffect(() => {
+    const checkInitialStep = async () => {
+      setIsCheckingInitialStep(true);
+      const initialStep = await determineInitialStep(currentExperimentId);
+      console.log('[OnboardingWizard] Determined initial step:', initialStep);
+      setCurrentStep(initialStep);
+      setIsCheckingInitialStep(false);
+    };
+
+    checkInitialStep();
+  }, [currentExperimentId]);
 
   const goToStep = useCallback((step: OnboardingStep) => {
     setCurrentStep(step);
@@ -235,6 +298,28 @@ export const OnboardingWizard = ({
   const stepInfo = STEP_INFO[currentStep];
   const currentStepIndex = STEP_ORDER.indexOf(currentStep);
   const showBackButton = currentStepIndex > 0 && currentStep !== 'completion';
+
+  // Show loading state while checking initial step
+  if (isCheckingInitialStep) {
+    return (
+      <OnboardingContext.Provider value={contextValue}>
+        <div
+          css={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            height: '100%',
+            padding: theme.spacing.lg,
+          }}
+        >
+          <Typography.Text color="secondary">
+            <FormattedMessage defaultMessage="Checking setup status..." description="Loading message while determining onboarding step" />
+          </Typography.Text>
+        </div>
+      </OnboardingContext.Provider>
+    );
+  }
 
   return (
     <OnboardingContext.Provider value={contextValue}>
