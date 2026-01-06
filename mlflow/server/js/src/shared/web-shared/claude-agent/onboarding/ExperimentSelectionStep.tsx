@@ -21,6 +21,7 @@ import { useOnboarding } from '../OnboardingWizard';
 import { useGlobalClaudeOptional } from '../GlobalClaudeContext';
 import { CreateExperimentModal } from '../../../../experiment-tracking/components/modals/CreateExperimentModal';
 import Routes from '../../../../experiment-tracking/routes';
+import { searchTracesV4 } from '../../model-trace-explorer/api';
 
 const COMPONENT_ID_PREFIX = 'mlflow.onboarding.experiment';
 
@@ -36,15 +37,55 @@ export const ExperimentSelectionStep = () => {
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [experimentSelected, setExperimentSelected] = useState(false);
+  const [hasTraces, setHasTraces] = useState<boolean | null>(null);
+  const [checkingTraces, setCheckingTraces] = useState(false);
   const hasAutoAdvancedRef = useRef(false);
 
   // Check if user is already in an experiment
   const currentExperimentId = globalClaude?.context?.navigation?.experimentId;
   const currentExperimentName = globalClaude?.context?.navigation?.experimentName;
 
-  // Auto-advance to next step when an experiment is detected (regardless of how user got there)
+  // Check if current experiment has traces
   useEffect(() => {
-    if (currentExperimentId && !hasAutoAdvancedRef.current) {
+    if (!currentExperimentId || checkingTraces || hasTraces !== null) {
+      return;
+    }
+
+    const checkForTraces = async () => {
+      setCheckingTraces(true);
+      try {
+        const traces = await searchTracesV4({
+          locations: [
+            {
+              type: 'MLFLOW_EXPERIMENT',
+              mlflow_experiment: { experiment_id: currentExperimentId },
+            },
+          ],
+        });
+        setHasTraces(traces.length > 0);
+      } catch {
+        setHasTraces(false);
+      } finally {
+        setCheckingTraces(false);
+      }
+    };
+
+    checkForTraces();
+  }, [currentExperimentId, checkingTraces, hasTraces]);
+
+  // Auto-advance to next step ONLY if experiment has traces
+  useEffect(() => {
+    if (!currentExperimentId || hasAutoAdvancedRef.current) {
+      return;
+    }
+
+    // Still checking for traces - wait for result
+    if (hasTraces === null) {
+      return;
+    }
+
+    // Only auto-advance if experiment has traces
+    if (hasTraces === true) {
       hasAutoAdvancedRef.current = true;
       updateState({ experimentSelected: true });
       // Small delay to show the experiment was detected
@@ -52,7 +93,7 @@ export const ExperimentSelectionStep = () => {
         goToNextStep();
       }, 800);
     }
-  }, [currentExperimentId, goToNextStep, updateState]);
+  }, [currentExperimentId, hasTraces, goToNextStep, updateState]);
 
   const handleSelectExisting = useCallback(() => {
     // Navigate to experiments page so user can select one
@@ -81,8 +122,36 @@ export const ExperimentSelectionStep = () => {
 
   return (
     <div css={{ padding: theme.spacing.lg }}>
-      {/* If already in an experiment, show confirmation */}
-      {currentExperimentId ? (
+      {/* If already in an experiment with traces, show detection message (will auto-advance) */}
+      {currentExperimentId && hasTraces === true && (
+        <div
+          css={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: theme.spacing.sm,
+            padding: theme.spacing.md,
+            backgroundColor: theme.colors.backgroundSecondary,
+            borderRadius: theme.borders.borderRadiusMd,
+            color: theme.colors.textValidationSuccess,
+          }}
+        >
+          <CheckCircleIcon />
+          <div>
+            <Typography.Text bold>
+              <FormattedMessage
+                defaultMessage="Experiment with traces detected! Advancing..."
+                description="Message when experiment with traces is detected"
+              />
+            </Typography.Text>
+            <Typography.Text color="secondary" size="sm" css={{ display: 'block' }}>
+              {currentExperimentName || currentExperimentId}
+            </Typography.Text>
+          </div>
+        </div>
+      )}
+
+      {/* If already in an experiment without traces, show confirmation and allow continue */}
+      {currentExperimentId && hasTraces === false && (
         <div>
           <div
             css={{
@@ -114,7 +183,32 @@ export const ExperimentSelectionStep = () => {
             <FormattedMessage defaultMessage="Continue" description="Continue button" />
           </Button>
         </div>
-      ) : (
+      )}
+
+      {/* If checking for traces, show loading state */}
+      {currentExperimentId && hasTraces === null && (
+        <div
+          css={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: theme.spacing.sm,
+            padding: theme.spacing.md,
+            backgroundColor: theme.colors.backgroundSecondary,
+            borderRadius: theme.borders.borderRadiusMd,
+          }}
+        >
+          <Typography.Text>
+            <FormattedMessage
+              defaultMessage="Checking for traces in {experimentName}..."
+              description="Checking for traces message"
+              values={{ experimentName: currentExperimentName || currentExperimentId }}
+            />
+          </Typography.Text>
+        </div>
+      )}
+
+      {/* If not in an experiment, show selection options */}
+      {!currentExperimentId && (
         <div>
           <Typography.Text bold css={{ display: 'block', marginBottom: theme.spacing.md }}>
             <FormattedMessage
