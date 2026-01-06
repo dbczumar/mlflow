@@ -42,9 +42,9 @@ export const ExperimentSelectionStep = () => {
   const currentExperimentId = globalClaude?.context?.navigation?.experimentId;
   const currentExperimentName = globalClaude?.context?.navigation?.experimentName;
 
-  // Auto-advance to next step when user selects an experiment
+  // Auto-advance to next step when an experiment is detected (regardless of how user got there)
   useEffect(() => {
-    if (experimentSelected && currentExperimentId && !hasAutoAdvancedRef.current) {
+    if (currentExperimentId && !hasAutoAdvancedRef.current) {
       hasAutoAdvancedRef.current = true;
       updateState({ experimentSelected: true });
       // Small delay to show the experiment was detected
@@ -52,7 +52,7 @@ export const ExperimentSelectionStep = () => {
         goToNextStep();
       }, 800);
     }
-  }, [currentExperimentId, experimentSelected, goToNextStep, updateState]);
+  }, [currentExperimentId, goToNextStep, updateState]);
 
   const handleSelectExisting = useCallback(() => {
     // Navigate to experiments page so user can select one
