@@ -51,7 +51,8 @@ const HomePage = () => {
         data: null,
       });
     }
-  }, [globalClaude]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleOpenCreateModal = () => setIsCreateModalOpen(true);
   const handleCloseCreateModal = () => setIsCreateModalOpen(false);
