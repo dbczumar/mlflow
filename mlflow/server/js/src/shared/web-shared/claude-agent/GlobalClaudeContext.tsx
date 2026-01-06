@@ -1,11 +1,11 @@
 /**
- * Global React Context for Claude Agent.
- * Provides Claude assistant functionality accessible from anywhere in MLflow.
+ * Global React Context for MLflow Assistant (formerly Claude Agent).
+ * Provides AI assistant functionality accessible from anywhere in MLflow.
  */
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 
-import type { ChatMessage, ClaudeContext, GlobalClaudeAgentContextType } from './types';
+import type { AssistantSetupStatus, ChatMessage, ClaudeContext, GlobalClaudeAgentContextType } from './types';
 import { serializeContext } from './ContextSerializer';
 import { startAnalysis, sendMessageStream, checkHealth } from './ClaudeAgentService';
 import { useSSEStream } from './hooks/useSSEStream';
@@ -16,6 +16,9 @@ const DEFAULT_CONTEXT: ClaudeContext = {
   data: null,
 };
 
+// localStorage key for setup status
+const SETUP_STATUS_KEY = 'mlflow.assistant.setupStatus';
+
 const GlobalClaudeContext = createContext<GlobalClaudeAgentContextType | null>(null);
 
 const generateMessageId = (): string => {
@@ -23,8 +26,34 @@ const generateMessageId = (): string => {
 };
 
 /**
- * Global Claude Agent Provider.
- * Wrap at the app root level (MlflowRootRoute) to enable Claude assistance everywhere.
+ * Load setup status from localStorage.
+ */
+const loadSetupStatus = (): AssistantSetupStatus => {
+  try {
+    const stored = localStorage.getItem(SETUP_STATUS_KEY);
+    if (stored === 'configured') {
+      return stored;
+    }
+  } catch {
+    // localStorage not available
+  }
+  return 'unknown';
+};
+
+/**
+ * Save setup status to localStorage.
+ */
+const saveSetupStatus = (status: AssistantSetupStatus): void => {
+  try {
+    localStorage.setItem(SETUP_STATUS_KEY, status);
+  } catch {
+    // localStorage not available
+  }
+};
+
+/**
+ * Global MLflow Assistant Provider.
+ * Wrap at the app root level (MlflowRootRoute) to enable assistant functionality everywhere.
  */
 export const GlobalClaudeProvider = ({ children }: { children: ReactNode }) => {
   // Panel state
@@ -40,6 +69,10 @@ export const GlobalClaudeProvider = ({ children }: { children: ReactNode }) => {
   const [error, setError] = useState<string | null>(null);
   const [isClaudeAvailable, setIsClaudeAvailable] = useState<boolean | null>(null);
   const [currentStatus, setCurrentStatus] = useState<string | null>(null);
+
+  // Setup state
+  const [setupStatus, setSetupStatus] = useState<AssistantSetupStatus>(loadSetupStatus);
+  const [showSetupWizard, setShowSetupWizard] = useState(false);
 
   // Use ref to track current streaming message
   const streamingMessageRef = useRef<string>('');
@@ -92,22 +125,38 @@ export const GlobalClaudeProvider = ({ children }: { children: ReactNode }) => {
     onStatus: handleStatus,
   });
 
-  // Check Claude availability on mount
+  // Check Claude availability on mount (but don't auto-configure - rely on localStorage)
   useEffect(() => {
-    checkHealth()
-      .then((health) => {
-        setIsClaudeAvailable(health.claude_available === 'true' || health.claude_available === 'True');
-      })
-      .catch(() => {
-        setIsClaudeAvailable(false);
-      });
+    const storedStatus = loadSetupStatus();
+
+    // If already configured in localStorage, just verify backend is available
+    if (storedStatus === 'configured') {
+      checkHealth()
+        .then((health) => {
+          const isAvailable = health.claude_available === 'true' || health.claude_available === 'True';
+          setIsClaudeAvailable(isAvailable);
+          // Keep configured status from localStorage
+        })
+        .catch(() => {
+          setIsClaudeAvailable(false);
+          // Keep configured status - user may just need to restart backend
+        });
+    } else {
+      // Not configured yet - mark as not-configured and let user go through setup
+      setSetupStatus('not-configured');
+      setIsClaudeAvailable(false);
+    }
   }, []);
 
   // Actions
   const openPanel = useCallback(() => {
     setIsPanelOpen(true);
     setError(null);
-  }, []);
+    // Show setup wizard if not configured
+    if (setupStatus === 'not-configured' || setupStatus === 'unknown') {
+      setShowSetupWizard(true);
+    }
+  }, [setupStatus]);
 
   const closePanel = useCallback(() => {
     setIsPanelOpen(false);
@@ -115,6 +164,7 @@ export const GlobalClaudeProvider = ({ children }: { children: ReactNode }) => {
   }, [disconnectSSE]);
 
   const setContext = useCallback((newContext: ClaudeContext) => {
+    console.log('[GlobalClaudeContext] setContext called with:', newContext);
     setContextState(newContext);
   }, []);
 
@@ -126,6 +176,17 @@ export const GlobalClaudeProvider = ({ children }: { children: ReactNode }) => {
     streamingMessageRef.current = '';
     disconnectSSE();
   }, [disconnectSSE]);
+
+  const completeSetup = useCallback(() => {
+    setSetupStatus('configured');
+    saveSetupStatus('configured');
+    setShowSetupWizard(false);
+    setIsClaudeAvailable(true);
+  }, []);
+
+  const openSetup = useCallback(() => {
+    setShowSetupWizard(true);
+  }, []);
 
   const handleStartAnalysis = useCallback(
     async (prompt?: string) => {
@@ -241,6 +302,8 @@ export const GlobalClaudeProvider = ({ children }: { children: ReactNode }) => {
     error,
     isClaudeAvailable,
     currentStatus,
+    setupStatus,
+    showSetupWizard,
     // Actions
     openPanel,
     closePanel,
@@ -248,6 +311,8 @@ export const GlobalClaudeProvider = ({ children }: { children: ReactNode }) => {
     sendMessage: handleSendMessage,
     startAnalysis: handleStartAnalysis,
     reset,
+    completeSetup,
+    openSetup,
   };
 
   return <GlobalClaudeContext.Provider value={value}>{children}</GlobalClaudeContext.Provider>;

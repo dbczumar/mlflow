@@ -73,19 +73,11 @@ export const ExperimentSelectionStep = () => {
     checkForTraces();
   }, [currentExperimentId, checkingTraces, hasTraces]);
 
-  // Auto-advance to next step ONLY if experiment has traces
+  // Auto-advance to next step when an experiment is detected (regardless of traces)
   useEffect(() => {
-    if (!currentExperimentId || hasAutoAdvancedRef.current) {
-      return;
-    }
-
-    // Still checking for traces - wait for result
-    if (hasTraces === null) {
-      return;
-    }
-
-    // Only auto-advance if experiment has traces
-    if (hasTraces === true) {
+    console.log('[ExperimentSelectionStep] currentExperimentId:', currentExperimentId, 'hasAutoAdvanced:', hasAutoAdvancedRef.current);
+    if (currentExperimentId && !hasAutoAdvancedRef.current) {
+      console.log('[ExperimentSelectionStep] Auto-advancing to next step!');
       hasAutoAdvancedRef.current = true;
       updateState({ experimentSelected: true });
       // Small delay to show the experiment was detected
@@ -93,7 +85,7 @@ export const ExperimentSelectionStep = () => {
         goToNextStep();
       }, 800);
     }
-  }, [currentExperimentId, hasTraces, goToNextStep, updateState]);
+  }, [currentExperimentId, goToNextStep, updateState]);
 
   const handleSelectExisting = useCallback(() => {
     // Navigate to experiments page so user can select one
@@ -122,36 +114,8 @@ export const ExperimentSelectionStep = () => {
 
   return (
     <div css={{ padding: theme.spacing.lg }}>
-      {/* If already in an experiment with traces, show detection message (will auto-advance) */}
-      {currentExperimentId && hasTraces === true && (
-        <div
-          css={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: theme.spacing.sm,
-            padding: theme.spacing.md,
-            backgroundColor: theme.colors.backgroundSecondary,
-            borderRadius: theme.borders.borderRadiusMd,
-            color: theme.colors.textValidationSuccess,
-          }}
-        >
-          <CheckCircleIcon />
-          <div>
-            <Typography.Text bold>
-              <FormattedMessage
-                defaultMessage="Experiment with traces detected! Advancing..."
-                description="Message when experiment with traces is detected"
-              />
-            </Typography.Text>
-            <Typography.Text color="secondary" size="sm" css={{ display: 'block' }}>
-              {currentExperimentName || currentExperimentId}
-            </Typography.Text>
-          </div>
-        </div>
-      )}
-
-      {/* If already in an experiment without traces, show confirmation and allow continue */}
-      {currentExperimentId && hasTraces === false && (
+      {/* If already in an experiment, show confirmation */}
+      {currentExperimentId && (
         <div>
           <div
             css={{

@@ -45,6 +45,7 @@ const ExperimentPage = () => {
   // Update global Claude context when viewing an experiment
   useEffect(() => {
     if (globalClaude && experimentIds.length === 1) {
+      console.log('[ExperimentPage] Setting context with experimentId:', experimentIds[0]);
       globalClaude.setContext({
         type: 'experiment',
         summary: `Experiment ${experimentIds[0]}`,
