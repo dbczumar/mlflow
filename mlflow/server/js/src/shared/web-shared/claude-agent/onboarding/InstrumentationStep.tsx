@@ -1,14 +1,16 @@
 /**
- * Step 2: Instrument your application with MLflow tracing.
+ * Step 4: Instrument your application with MLflow tracing.
  * Two options:
- * - Let the assistant instrument directly (sends task to Claude)
+ * - Let the assistant instrument directly (sends task to Claude) - requires assistant setup
  * - Copy instructions for Claude Code CLI
  */
 
 import { useCallback, useState } from 'react';
 import {
+  Alert,
   Button,
   CheckCircleIcon,
+  ChevronLeftIcon,
   ChevronRightIcon,
   CopyIcon,
   Input,
@@ -20,6 +22,7 @@ import { FormattedMessage } from '@databricks/i18n';
 
 import { useOnboarding } from '../OnboardingWizard';
 import { useGlobalClaudeOptional } from '../GlobalClaudeContext';
+import { AssistantBackendStep } from './AssistantBackendStep';
 
 const COMPONENT_ID_PREFIX = 'mlflow.onboarding.instrumentation';
 
@@ -56,7 +59,7 @@ Please analyze my code and add the appropriate tracing instrumentation.`;
 };
 
 /**
- * Step 2: Add tracing to the user's application.
+ * Step 4: Add tracing to the user's application.
  */
 export const InstrumentationStep = () => {
   const { theme } = useDesignSystemTheme();
@@ -71,17 +74,37 @@ export const InstrumentationStep = () => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisComplete, setAnalysisComplete] = useState(state.instrumentationApplied);
   const [copied, setCopied] = useState(false);
+  const [showAssistantSetup, setShowAssistantSetup] = useState(false);
 
   // Default tracking URI (current MLflow server)
   const trackingUri = window.location.origin;
 
+  // Check if assistant is configured
+  const isAssistantConfigured = state.assistantConfigured || globalClaude?.isClaudeAvailable;
+
   const handleMethodSelect = useCallback(
     (method: InstrumentationMethod) => {
+      // If user wants assistant to do it but assistant is not configured, show setup
+      if (method === 'assistant-direct' && !isAssistantConfigured) {
+        setShowAssistantSetup(true);
+        return;
+      }
       setSelectedMethod(method);
       updateState({ instrumentationMethod: method });
     },
-    [updateState],
+    [isAssistantConfigured, updateState],
   );
+
+  const handleAssistantConfigured = useCallback(() => {
+    updateState({ assistantConfigured: true });
+    setShowAssistantSetup(false);
+    setSelectedMethod('assistant-direct');
+    updateState({ instrumentationMethod: 'assistant-direct' });
+  }, [updateState]);
+
+  const handleBackFromAssistantSetup = useCallback(() => {
+    setShowAssistantSetup(false);
+  }, []);
 
   const handleAnalyzeAndInstrument = useCallback(async () => {
     if (!codePath.trim()) return;
@@ -161,8 +184,37 @@ mlflow.set_experiment("${experimentName}")
 
   return (
     <div css={{ padding: theme.spacing.lg }}>
+      {/* Show assistant setup when user wants to use assistant but it's not configured */}
+      {showAssistantSetup && (
+        <div>
+          <Alert
+            type="info"
+            closable={false}
+            componentId={`${COMPONENT_ID_PREFIX}.assistant_required`}
+            css={{ marginBottom: theme.spacing.lg }}
+            message={
+              <FormattedMessage
+                defaultMessage="To let the assistant instrument your code, you need to set up the AI assistant first."
+                description="Message explaining assistant setup is needed"
+              />
+            }
+          />
+
+          <AssistantBackendStep onConfigured={handleAssistantConfigured} />
+
+          <Button
+            componentId={`${COMPONENT_ID_PREFIX}.back_from_assistant`}
+            onClick={handleBackFromAssistantSetup}
+            icon={<ChevronLeftIcon />}
+            css={{ marginTop: theme.spacing.lg }}
+          >
+            <FormattedMessage defaultMessage="Back to options" description="Back button" />
+          </Button>
+        </div>
+      )}
+
       {/* Method selection */}
-      {!selectedMethod && (
+      {!selectedMethod && !showAssistantSetup && (
         <div>
           <Typography.Text bold css={{ display: 'block', marginBottom: theme.spacing.md }}>
             <FormattedMessage

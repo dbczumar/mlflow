@@ -1,33 +1,34 @@
 /**
  * Multi-step onboarding wizard for MLflow GenAI.
  * Guides users through:
- * 1. Setting up the AI assistant backend
- * 2. Instrumenting their application with tracing
- * 3. Setting up online scoring with LLM judges
+ * 1. Selecting or creating an experiment
+ * 2. Defining their use case for judge recommendations
+ * 3. Configuring LLM judges for evaluation
+ * 4. Instrumenting their application with tracing
  */
 
 import { createContext, useCallback, useContext, useState, type ReactNode } from 'react';
 import { Button, ChevronLeftIcon, Typography, useDesignSystemTheme } from '@databricks/design-system';
 import { FormattedMessage } from '@databricks/i18n';
 
-import { AssistantBackendStep } from './onboarding/AssistantBackendStep';
 import { ExperimentSelectionStep } from './onboarding/ExperimentSelectionStep';
-import { InstrumentationStep } from './onboarding/InstrumentationStep';
 import { UseCaseStep } from './onboarding/UseCaseStep';
 import { ScorerSelectionStep } from './onboarding/ScorerSelectionStep';
+import { InstrumentationStep } from './onboarding/InstrumentationStep';
 import { CompletionStep } from './onboarding/CompletionStep';
 
 const COMPONENT_ID_PREFIX = 'mlflow.onboarding';
 
 /**
  * Onboarding wizard steps.
+ * Note: 'assistant-backend' is not in the main flow but can be shown conditionally
+ * within the instrumentation step if user chooses "Let Assistant Do It".
  */
 export type OnboardingStep =
-  | 'assistant-backend'
   | 'experiment-selection'
-  | 'instrumentation'
   | 'use-case'
   | 'scorer-selection'
+  | 'instrumentation'
   | 'completion';
 
 /**
@@ -60,29 +61,29 @@ export interface ScorerConfig {
  * Onboarding state shared across all steps.
  */
 export interface OnboardingState {
-  // Step 1: Assistant Backend
-  assistantConfigured: boolean;
-
-  // Step 2: Experiment Selection
+  // Step 1: Experiment Selection
   experimentSelected: boolean;
 
-  // Step 3: Instrumentation
+  // Step 2: Use Case
+  useCase: UseCaseType | null;
+  useCaseDescription?: string;
+
+  // Step 3: Scorer Selection
+  selectedScorers: ScorerConfig[];
+  samplingMode: 'all' | 'sample';
+  samplingRate: number;
+  onlineScoringEnabled: boolean;
+  judgeEndpointName?: string;
+
+  // Step 4: Instrumentation
   instrumentationMethod: 'assistant-direct' | 'copy-instructions' | null;
   codePath?: string;
   detectedFrameworks?: string[];
   instrumentationApplied: boolean;
   tracingVerified: boolean;
 
-  // Step 4: Use Case
-  useCase: UseCaseType | null;
-  useCaseDescription?: string;
-
-  // Step 5: Scorer Selection
-  selectedScorers: ScorerConfig[];
-  samplingMode: 'all' | 'sample';
-  samplingRate: number;
-  onlineScoringEnabled: boolean;
-  judgeEndpointName?: string;
+  // Assistant configuration (used conditionally in instrumentation step)
+  assistantConfigured: boolean;
 
   // Completion
   completedAt: Date | null;
@@ -118,11 +119,10 @@ export const useOnboarding = (): OnboardingContextType => {
  * Step order for navigation.
  */
 const STEP_ORDER: OnboardingStep[] = [
-  'assistant-backend',
   'experiment-selection',
-  'instrumentation',
   'use-case',
   'scorer-selection',
+  'instrumentation',
   'completion',
 ];
 
@@ -130,17 +130,9 @@ const STEP_ORDER: OnboardingStep[] = [
  * Step metadata for display.
  */
 const STEP_INFO: Record<OnboardingStep, { title: string; subtitle: string }> = {
-  'assistant-backend': {
-    title: 'Set Up Assistant',
-    subtitle: 'Configure the AI assistant to help you analyze traces and debug issues.',
-  },
   'experiment-selection': {
     title: 'Select Experiment',
     subtitle: 'Choose or create an experiment to organize your traces.',
-  },
-  instrumentation: {
-    title: 'Add Tracing',
-    subtitle: 'Instrument your GenAI application to capture traces.',
   },
   'use-case': {
     title: 'Select Use Case',
@@ -149,6 +141,10 @@ const STEP_INFO: Record<OnboardingStep, { title: string; subtitle: string }> = {
   'scorer-selection': {
     title: 'Configure Judges',
     subtitle: 'Select LLM judges to automatically evaluate your traces.',
+  },
+  instrumentation: {
+    title: 'Add Tracing',
+    subtitle: 'Instrument your GenAI application to capture traces.',
   },
   completion: {
     title: 'All Set!',
@@ -160,25 +156,25 @@ const STEP_INFO: Record<OnboardingStep, { title: string; subtitle: string }> = {
  * Initial onboarding state.
  */
 const INITIAL_STATE: OnboardingState = {
-  assistantConfigured: false,
   experimentSelected: false,
-  instrumentationMethod: null,
-  instrumentationApplied: false,
-  tracingVerified: false,
   useCase: null,
   selectedScorers: [],
   samplingMode: 'all',
   samplingRate: 25,
   onlineScoringEnabled: false,
+  instrumentationMethod: null,
+  instrumentationApplied: false,
+  tracingVerified: false,
+  assistantConfigured: false,
   completedAt: null,
 };
 
 interface OnboardingWizardProps {
   /** Called when onboarding is complete */
   onComplete: () => void;
-  /** Initial step to show (defaults to 'assistant-backend') */
+  /** Initial step to show (defaults to 'experiment-selection') */
   initialStep?: OnboardingStep;
-  /** Whether assistant is already configured (skip step 1) */
+  /** Whether assistant is already configured (for instrumentation step) */
   assistantAlreadyConfigured?: boolean;
 }
 
@@ -187,14 +183,12 @@ interface OnboardingWizardProps {
  */
 export const OnboardingWizard = ({
   onComplete,
-  initialStep = 'assistant-backend',
+  initialStep = 'experiment-selection',
   assistantAlreadyConfigured = false,
 }: OnboardingWizardProps) => {
   const { theme } = useDesignSystemTheme();
 
-  const [currentStep, setCurrentStep] = useState<OnboardingStep>(
-    assistantAlreadyConfigured ? 'experiment-selection' : initialStep,
-  );
+  const [currentStep, setCurrentStep] = useState<OnboardingStep>(initialStep);
 
   const [state, setState] = useState<OnboardingState>({
     ...INITIAL_STATE,
@@ -336,16 +330,14 @@ export const OnboardingWizard = ({
  */
 const StepContent = ({ step }: { step: OnboardingStep }) => {
   switch (step) {
-    case 'assistant-backend':
-      return <AssistantBackendStep />;
     case 'experiment-selection':
       return <ExperimentSelectionStep />;
-    case 'instrumentation':
-      return <InstrumentationStep />;
     case 'use-case':
       return <UseCaseStep />;
     case 'scorer-selection':
       return <ScorerSelectionStep />;
+    case 'instrumentation':
+      return <InstrumentationStep />;
     case 'completion':
       return <CompletionStep />;
     default:

@@ -1,6 +1,6 @@
 /**
- * Step 1: Set up the AI assistant backend (Claude Code).
- * Extracted from the original AssistantSetupWizard.
+ * Set up the AI assistant backend (Claude Code).
+ * Can be used standalone or embedded in InstrumentationStep.
  */
 
 import { useCallback, useState } from 'react';
@@ -14,7 +14,6 @@ import {
 } from '@databricks/design-system';
 import { FormattedMessage } from '@databricks/i18n';
 
-import { useOnboarding } from '../OnboardingWizard';
 import { checkHealth } from '../ClaudeAgentService';
 import ClaudeLogo from '../../../../common/static/logos/claude.svg';
 
@@ -47,12 +46,17 @@ const BACKEND_OPTIONS: BackendOption[] = [
 
 type BackendSetupStep = 'select-backend' | 'install';
 
+interface AssistantBackendStepProps {
+  /** Called when assistant is successfully configured. If not provided, component is standalone. */
+  onConfigured?: () => void;
+}
+
 /**
- * Step 1: Configure the AI assistant backend.
+ * Configure the AI assistant backend.
+ * Can be used embedded in InstrumentationStep (with onConfigured callback).
  */
-export const AssistantBackendStep = () => {
+export const AssistantBackendStep = ({ onConfigured }: AssistantBackendStepProps) => {
   const { theme } = useDesignSystemTheme();
-  const { goToNextStep, updateState } = useOnboarding();
 
   const [currentSubStep, setCurrentSubStep] = useState<BackendSetupStep>('select-backend');
   const [selectedBackend, setSelectedBackend] = useState<BackendOption | null>(null);
@@ -76,10 +80,9 @@ export const AssistantBackendStep = () => {
 
       if (isAvailable) {
         setVerificationSuccess(true);
-        updateState({ assistantConfigured: true });
-        // Auto-advance after showing success
+        // Call the callback after showing success
         setTimeout(() => {
-          goToNextStep();
+          onConfigured?.();
         }, 1500);
       } else {
         setVerificationError('Claude CLI is installed but not authenticated. Please run the authentication command.');
@@ -91,7 +94,7 @@ export const AssistantBackendStep = () => {
     } finally {
       setIsVerifying(false);
     }
-  }, [goToNextStep, updateState]);
+  }, [onConfigured]);
 
   const handleBack = useCallback(() => {
     setCurrentSubStep('select-backend');
