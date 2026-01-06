@@ -141,28 +141,6 @@ export const GlobalClaudeProvider = ({ children }: { children: ReactNode }) => {
     onStatus: handleStatus,
   });
 
-  // Monitor URL to detect navigation away from experiments
-  useEffect(() => {
-    const handleHashChange = () => {
-      const hash = window.location.hash;
-      // eslint-disable-next-line no-console
-      console.log('[GlobalClaudeContext] Hash changed to:', hash);
-      // eslint-disable-next-line no-console
-      console.log('[GlobalClaudeContext] Current experimentId:', context.navigation?.experimentId);
-      // If we navigate away from an experiment page, reset to global context
-      if (!hash.includes('/experiments/') && context.navigation?.experimentId) {
-        // eslint-disable-next-line no-console
-        console.log('[GlobalClaudeContext] Navigated away from experiment, resetting to global context');
-        setContextState(DEFAULT_CONTEXT);
-        // eslint-disable-next-line no-console
-        console.log('[GlobalClaudeContext] Context reset to DEFAULT_CONTEXT (experimentId should now be undefined)');
-      }
-    };
-
-    window.addEventListener('hashchange', handleHashChange);
-    return () => window.removeEventListener('hashchange', handleHashChange);
-  }, [context.navigation?.experimentId]);
-
   // Check Claude availability and setup status when context changes
   useEffect(() => {
     const experimentId = context.navigation?.experimentId;

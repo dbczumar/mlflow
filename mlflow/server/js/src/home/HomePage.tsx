@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Alert, Button, Header, useDesignSystemTheme } from '@databricks/design-system';
 import { FormattedMessage } from 'react-intl';
 import { ScrollablePageWrapper } from '../common/components/ScrollablePageWrapper';
@@ -12,6 +12,7 @@ import { ExperimentsHomeView } from './components/ExperimentsHomeView';
 import { DiscoverNews } from './components/DiscoverNews';
 import { LogTracesDrawer } from './components/LogTracesDrawer';
 import { TelemetryInfoAlert } from '../telemetry/TelemetryInfoAlert';
+import { useGlobalClaudeOptional } from '../shared/web-shared/claude-agent/GlobalClaudeContext';
 
 type ExperimentQueryKey = ['home', 'recent-experiments'];
 
@@ -21,6 +22,7 @@ const HomePage = () => {
   const { theme } = useDesignSystemTheme();
   const invalidateExperiments = useInvalidateExperimentList();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const globalClaude = useGlobalClaudeOptional();
 
   const { data, error, isLoading, refetch } = useQuery<
     SearchExperimentsApiResponse,
@@ -37,6 +39,19 @@ const HomePage = () => {
   });
 
   const experiments = data?.experiments;
+
+  // Reset global Claude context when viewing home page
+  useEffect(() => {
+    if (globalClaude) {
+      // eslint-disable-next-line no-console
+      console.log('[HomePage] Resetting global Claude context to global state');
+      globalClaude.setContext({
+        type: 'none',
+        summary: '',
+        data: null,
+      });
+    }
+  }, [globalClaude]);
 
   const handleOpenCreateModal = () => setIsCreateModalOpen(true);
   const handleCloseCreateModal = () => setIsCreateModalOpen(false);
