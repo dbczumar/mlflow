@@ -1,5 +1,5 @@
 /**
- * Chat panel component for Claude Agent interaction.
+ * Chat panel component for MLflow Assistant interaction.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -18,6 +18,7 @@ import { FormattedMessage } from '@databricks/i18n';
 import { useClaudeAgentContextOptional } from './ClaudeAgentContext';
 import type { ChatMessage } from './types';
 import { GenAIMarkdownRenderer } from '../genai-markdown-renderer';
+import ClaudeLogo from '../../../common/static/logos/claude.svg';
 
 const COMPONENT_ID_PREFIX = 'mlflow.claude_agent.chat_panel';
 
@@ -46,9 +47,19 @@ const ChatMessageBubble = ({ message }: { message: ChatMessage }) => {
         }}
       >
         {isUser ? (
-          <UserIcon css={{ fontSize: 14, color: theme.colors.textSecondary }} />
+          <UserIcon css={{ fontSize: theme.typography.fontSizeSm, color: theme.colors.textSecondary }} />
         ) : (
-          <span css={{ fontSize: 14 }}>Claude</span>
+          <span
+            css={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 3,
+              fontSize: theme.typography.fontSizeSm,
+            }}
+          >
+            Assistant (Claude{' '}
+            <img src={ClaudeLogo} width={12} height={12} alt="" aria-hidden css={{ verticalAlign: 'middle' }} />)
+          </span>
         )}
         <Typography.Text size="sm" color="secondary">
           {message.timestamp.toLocaleTimeString()}
@@ -228,24 +239,8 @@ const SetupRequiredBanner = () => {
       </Typography.Title>
       <Typography.Text color="secondary">
         <FormattedMessage
-          defaultMessage="Claude Code needs to be configured to use this feature. Please run the following command in your terminal:"
-          description="Setup instructions for Claude agent"
-        />
-      </Typography.Text>
-      <code
-        css={{
-          padding: theme.spacing.md,
-          backgroundColor: theme.colors.backgroundPrimary,
-          borderRadius: theme.borders.borderRadiusMd,
-          fontFamily: 'monospace',
-        }}
-      >
-        mlflow claude init
-      </code>
-      <Typography.Text size="sm" color="secondary">
-        <FormattedMessage
-          defaultMessage="This will configure Claude CLI and install the necessary skills for trace analysis."
-          description="Additional setup info"
+          defaultMessage="The MLflow Assistant needs to be configured. Click the 'MLflow Assistant' button to start setup."
+          description="Setup instructions for MLflow Assistant"
         />
       </Typography.Text>
     </div>

@@ -1,6 +1,6 @@
 /**
- * Global Claude Layout component.
- * Wraps main content with split-view layout when Claude panel is open.
+ * Global MLflow Assistant Layout component.
+ * Wraps main content with split-view layout when assistant panel is open.
  */
 
 import { Global } from '@emotion/react';
@@ -19,9 +19,9 @@ const MAX_PANEL_WIDTH_PERCENT = 60;
 const DEFAULT_PANEL_WIDTH_PERCENT = 34;
 
 /**
- * Layout wrapper that provides split-view when Claude panel is open.
+ * Layout wrapper that provides split-view when assistant panel is open.
  * - Main content takes remaining space when panel is open, 100% otherwise
- * - Claude panel is resizable on the right side (fixed position to appear above modals)
+ * - Assistant panel is resizable on the right side (fixed position to appear above modals)
  */
 export const GlobalClaudeLayout = ({ children }: GlobalClaudeLayoutProps) => {
   const { theme } = useDesignSystemTheme();
@@ -30,10 +30,9 @@ export const GlobalClaudeLayout = ({ children }: GlobalClaudeLayoutProps) => {
   const isDraggingRef = useRef(false);
 
   const isPanelOpen = globalClaude?.isPanelOpen ?? false;
-  const isClaudeAvailable = globalClaude?.isClaudeAvailable ?? false;
 
-  // Don't show panel if Claude is not available
-  const showPanel = isPanelOpen && isClaudeAvailable;
+  // Show panel when open - setup wizard will be displayed if not configured
+  const showPanel = isPanelOpen;
   const contentWidth = 100 - panelWidth;
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {

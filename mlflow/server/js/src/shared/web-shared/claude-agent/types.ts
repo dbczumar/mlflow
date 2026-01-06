@@ -58,6 +58,11 @@ export interface ClaudeContext {
 }
 
 /**
+ * Setup status for the assistant.
+ */
+export type AssistantSetupStatus = 'unknown' | 'not-configured' | 'configured';
+
+/**
  * Global Claude Agent state.
  */
 export interface GlobalClaudeAgentState {
@@ -77,6 +82,10 @@ export interface GlobalClaudeAgentState {
   isClaudeAvailable: boolean | null;
   /** Current tool usage status (e.g., "Reading file...", "Searching...") */
   currentStatus: string | null;
+  /** Setup status for the assistant */
+  setupStatus: AssistantSetupStatus;
+  /** Whether to show the setup wizard */
+  showSetupWizard: boolean;
 }
 
 /**
@@ -95,6 +104,10 @@ export interface GlobalClaudeAgentActions {
   startAnalysis: (prompt?: string) => Promise<void>;
   /** Reset the conversation */
   reset: () => void;
+  /** Complete the setup wizard */
+  completeSetup: () => void;
+  /** Show the setup wizard again */
+  openSetup: () => void;
 }
 
 /**

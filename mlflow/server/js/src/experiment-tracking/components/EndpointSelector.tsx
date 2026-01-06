@@ -113,8 +113,14 @@ export const EndpointSelector: React.FC<EndpointSelectorProps> = ({
     return (
       <Alert
         componentId={`${componentIdPrefix}.endpoints-error`}
-        type="error"
-        message={error.message || 'Failed to load endpoints'}
+        type="warning"
+        message={
+          <FormattedMessage
+            defaultMessage="Unable to load endpoints. You can skip this step and configure judges later from the experiment's Judges tab."
+            description="Warning message when endpoints fail to load"
+          />
+        }
+        closable
       />
     );
   }
@@ -168,7 +174,7 @@ export const EndpointSelector: React.FC<EndpointSelectorProps> = ({
           }}
         />
         {!disabled && (
-          <DialogComboboxContent maxHeight={350}>
+          <DialogComboboxContent maxHeight={350} style={{ zIndex: theme.options.zIndexBase + 1300 }}>
             <DialogComboboxOptionList>
               {endpointOptions.map((option) => (
                 <DialogComboboxOptionListSelectItem

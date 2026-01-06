@@ -253,6 +253,11 @@ const serializeSessionContext = (data: Record<string, unknown>): string => {
       const trace = traces[i];
       text += `### Turn ${i + 1}\n`;
 
+      // Include trace_id so Claude can fetch full details for this turn
+      if (trace['trace_id']) {
+        text += `- Trace ID: ${trace['trace_id']}\n`;
+      }
+
       if (trace['request_time']) {
         text += `- Time: ${trace['request_time']}\n`;
       }

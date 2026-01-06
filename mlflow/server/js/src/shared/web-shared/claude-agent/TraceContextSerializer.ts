@@ -5,23 +5,14 @@
 import type {
   ModelTrace,
   ModelTraceSpan,
-  ModelTraceSpanNode,
   ModelTraceEvent,
   ModelTraceInfoV3,
+  Assessment,
+  FeedbackAssessment,
+  ExpectationAssessment,
+  IssueAssessment,
 } from '../model-trace-explorer/ModelTrace.types';
 import { isV3ModelTraceInfo } from '../model-trace-explorer/ModelTraceExplorer.utils';
-
-/**
- * Format a timestamp to a readable string.
- */
-const formatTimestamp = (timestamp: number | string): string => {
-  if (typeof timestamp === 'string') {
-    return timestamp;
-  }
-  // Nanoseconds to milliseconds conversion for V3 spans
-  const ms = timestamp > 1e15 ? timestamp / 1e6 : timestamp;
-  return new Date(ms).toISOString();
-};
 
 /**
  * Get duration in milliseconds from span.
@@ -105,9 +96,115 @@ const serializeValue = (value: unknown, maxLength = 2000): string => {
 };
 
 /**
- * Serialize a single span to text.
+ * Type guards for assessment types.
  */
-const serializeSpan = (span: ModelTraceSpan, indent = ''): string => {
+const isFeedbackAssessment = (assessment: Assessment): assessment is FeedbackAssessment => {
+  return 'feedback' in assessment;
+};
+
+const isExpectationAssessment = (assessment: Assessment): assessment is ExpectationAssessment => {
+  return 'expectation' in assessment;
+};
+
+const isIssueAssessment = (assessment: Assessment): assessment is IssueAssessment => {
+  return 'issue' in assessment;
+};
+
+/**
+ * Get the value from an assessment, handling different assessment types.
+ */
+const getAssessmentValue = (assessment: Assessment): string => {
+  if (isFeedbackAssessment(assessment)) {
+    if (assessment.feedback.error) {
+      return `ERROR - ${assessment.feedback.error.error_message ?? assessment.feedback.error.error_code}`;
+    }
+    const value = assessment.feedback.value;
+    if (value === null || value === undefined) {
+      return 'null';
+    }
+    if (Array.isArray(value)) {
+      return JSON.stringify(value);
+    }
+    return String(value);
+  }
+  if (isExpectationAssessment(assessment)) {
+    const expectation = assessment.expectation;
+    if ('serialized_value' in expectation) {
+      return expectation.serialized_value.value;
+    }
+    const value = expectation.value;
+    if (value === null || value === undefined) {
+      return 'null';
+    }
+    if (Array.isArray(value)) {
+      return JSON.stringify(value);
+    }
+    return String(value);
+  }
+  if (isIssueAssessment(assessment)) {
+    return assessment.issue.value ? 'true' : 'false';
+  }
+  return 'unknown';
+};
+
+/**
+ * Get the assessment type label.
+ */
+const getAssessmentTypeLabel = (assessment: Assessment): string => {
+  if (isFeedbackAssessment(assessment)) return 'feedback';
+  if (isExpectationAssessment(assessment)) return 'expectation';
+  if (isIssueAssessment(assessment)) return 'issue';
+  return 'unknown';
+};
+
+/**
+ * Serialize a single assessment to text.
+ */
+const serializeAssessment = (assessment: Assessment, indent = ''): string => {
+  const sourceType = assessment.source.source_type;
+  const sourceId = assessment.source.source_id;
+  const value = getAssessmentValue(assessment);
+  const typeLabel = getAssessmentTypeLabel(assessment);
+
+  let text = `${indent}- **${assessment.assessment_name}** (${sourceType}: ${sourceId}): ${value}\n`;
+  text += `${indent}  - Type: ${typeLabel}\n`;
+
+  if (assessment.rationale) {
+    // Truncate long rationales
+    const rationale =
+      assessment.rationale.length > 500
+        ? assessment.rationale.substring(0, 500) + '... (truncated)'
+        : assessment.rationale;
+    text += `${indent}  - Rationale: ${rationale}\n`;
+  }
+
+  if (assessment.error) {
+    text += `${indent}  - Error: ${assessment.error.error_message ?? assessment.error.error_code}\n`;
+  }
+
+  return text;
+};
+
+/**
+ * Serialize multiple assessments to text.
+ */
+const serializeAssessments = (assessments: Assessment[], indent = '', heading = '## Assessments'): string => {
+  if (!assessments || assessments.length === 0) {
+    return '';
+  }
+
+  let text = `${indent}${heading}\n`;
+  for (const assessment of assessments) {
+    text += serializeAssessment(assessment, indent);
+  }
+  return text;
+};
+
+/**
+ * Serialize a single span to text.
+ * @param spanAssessments - Optional assessments specifically for this span
+ */
+const serializeSpan = (span: ModelTraceSpan, indent = '', spanAssessments?: Assessment[]): string => {
   const spanId = getSpanId(span);
   const status = getSpanStatus(span);
   const duration = getSpanDuration(span);
@@ -166,7 +263,27 @@ const serializeSpan = (span: ModelTraceSpan, indent = ''): string => {
     }
   }
 
+  // Add span-level assessments
+  if (spanAssessments && spanAssessments.length > 0) {
+    text += serializeAssessments(spanAssessments, indent, '### Assessments');
+  }
+
   return text;
+};
+
+/**
+ * Build a map of span_id to assessments for quick lookup.
+ */
+const buildSpanAssessmentsMap = (assessments: Assessment[]): Map<string, Assessment[]> => {
+  const map = new Map<string, Assessment[]>();
+  for (const assessment of assessments) {
+    if (assessment.span_id) {
+      const existing = map.get(assessment.span_id) ?? [];
+      existing.push(assessment);
+      map.set(assessment.span_id, existing);
+    }
+  }
+  return map;
 };
 
 /**
@@ -197,6 +314,14 @@ const serializeTraceInfo = (info: ModelTrace['info']): string => {
       text += '\n## Metadata\n';
       for (const [key, value] of Object.entries(v3Info.trace_metadata)) {
         text += `- ${key}: ${value}\n`;
+      }
+    }
+
+    // Add trace-level assessments (only those without span_id)
+    if (v3Info.assessments && v3Info.assessments.length > 0) {
+      const traceLevelAssessments = v3Info.assessments.filter((a) => !a.span_id);
+      if (traceLevelAssessments.length > 0) {
+        text += '\n' + serializeAssessments(traceLevelAssessments);
       }
     }
   } else {
@@ -235,6 +360,7 @@ const buildSpanHierarchy = (spans: ModelTraceSpan[]): Map<string | null, ModelTr
  */
 const serializeSpansRecursive = (
   hierarchy: Map<string | null, ModelTraceSpan[]>,
+  spanAssessmentsMap: Map<string, Assessment[]>,
   parentId: string | null,
   level = 0,
 ): string => {
@@ -243,10 +369,12 @@ const serializeSpansRecursive = (
   let text = '';
 
   for (const span of children) {
-    text += serializeSpan(span, indent);
+    const spanId = getSpanId(span);
+    const spanAssessments = spanAssessmentsMap.get(spanId);
+    text += serializeSpan(span, indent, spanAssessments);
     text += '\n';
     // Recursively serialize children
-    text += serializeSpansRecursive(hierarchy, getSpanId(span), level + 1);
+    text += serializeSpansRecursive(hierarchy, spanAssessmentsMap, spanId, level + 1);
   }
 
   return text;
@@ -270,7 +398,17 @@ export const serializeTraceContext = (trace: ModelTrace): string => {
     text += 'No span data available.\n';
   } else {
     const hierarchy = buildSpanHierarchy(spans);
-    text += serializeSpansRecursive(hierarchy, null);
+
+    // Build span assessments map for V3 traces
+    let spanAssessmentsMap = new Map<string, Assessment[]>();
+    if (isV3ModelTraceInfo(trace.info)) {
+      const v3Info = trace.info as ModelTraceInfoV3;
+      if (v3Info.assessments) {
+        spanAssessmentsMap = buildSpanAssessmentsMap(v3Info.assessments);
+      }
+    }
+
+    text += serializeSpansRecursive(hierarchy, spanAssessmentsMap, null);
   }
 
   return text;

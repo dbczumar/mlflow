@@ -1,15 +1,17 @@
 /**
- * Claude Agent integration for MLflow UI.
+ * MLflow Assistant integration for MLflow UI.
  *
  * This module provides components for AI-powered trace analysis
- * using Claude Code Agent SDK.
+ * and debugging assistance. Supports multiple backends including
+ * Claude Code Agent SDK.
  */
 
-// Global Claude Context and Provider (New - recommended)
+// Global Assistant Context and Provider (Recommended)
 export { GlobalClaudeProvider, useGlobalClaude, useGlobalClaudeOptional } from './GlobalClaudeContext';
 export { GlobalClaudeLayout } from './GlobalClaudeLayout';
 export { GlobalClaudeChatPanel } from './GlobalClaudeChatPanel';
 export { GlobalClaudeButton } from './GlobalClaudeButton';
+export { AssistantSetupWizard } from './AssistantSetupWizard';
 export { serializeContext } from './ContextSerializer';
 
 // Legacy Context and Provider (for backward compatibility)
@@ -40,10 +42,11 @@ export type {
   ClaudeAgentState,
   ClaudeAgentActions,
   ClaudeAgentContextType,
-  // New global types
+  // Global assistant types
   ClaudeContextType,
   ClaudeContext,
   GlobalClaudeAgentState,
   GlobalClaudeAgentActions,
   GlobalClaudeAgentContextType,
+  AssistantSetupStatus,
 } from './types';

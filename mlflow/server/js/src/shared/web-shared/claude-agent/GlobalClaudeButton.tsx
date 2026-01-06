@@ -1,5 +1,5 @@
 /**
- * Global floating Ask Claude button component.
+ * Global floating MLflow Assistant button component.
  * Positioned at bottom-right of the screen, always visible.
  */
 
@@ -8,11 +8,12 @@ import { FormattedMessage } from '@databricks/i18n';
 
 import { useGlobalClaudeOptional } from './GlobalClaudeContext';
 import ClaudeLogo from '../../../common/static/logos/claude.svg';
+import AssistantSparklesLogo from '../../../common/static/logos/assistant-sparkles.svg';
 
-const COMPONENT_ID = 'mlflow.global_claude.button';
+const COMPONENT_ID = 'mlflow.assistant.button';
 
-// Rainbow gradient for modern button styling (matches IssueCard)
-const RAINBOW_GRADIENT = 'linear-gradient(90deg, #64B5F6, #BA68C8, #E57373)';
+// Gradient using MLflow brand colors
+const ASSISTANT_GRADIENT = 'linear-gradient(90deg, #0194E2, #43C9ED, #0194E2)';
 
 /**
  * Get a short label for the context type.
@@ -43,11 +44,11 @@ const getContextLabel = (type: string): string | null => {
 };
 
 /**
- * Global floating button that opens the Claude assistant panel.
+ * Global floating button that opens the MLflow Assistant panel.
  * - Positioned at bottom-right corner
  * - Shows current context type as a badge
- * - Hidden when Claude panel is already open
- * - Hidden if Claude is not available
+ * - Hidden when panel is already open
+ * - Always visible (shows setup wizard if not configured)
  */
 export const GlobalClaudeButton = () => {
   const { theme } = useDesignSystemTheme();
@@ -58,10 +59,10 @@ export const GlobalClaudeButton = () => {
     return null;
   }
 
-  const { openPanel, isPanelOpen, isClaudeAvailable, context } = globalClaude;
+  const { openPanel, isPanelOpen, context, setupStatus } = globalClaude;
 
-  // Don't render if Claude is not available or panel is already open
-  if (!isClaudeAvailable || isPanelOpen) {
+  // Don't render if panel is already open
+  if (isPanelOpen) {
     return null;
   }
 
@@ -72,6 +73,7 @@ export const GlobalClaudeButton = () => {
   };
 
   const borderRadius = 24; // More rounded for modern look
+  const isConfigured = setupStatus === 'configured';
 
   return (
     <div
@@ -85,13 +87,13 @@ export const GlobalClaudeButton = () => {
       <Tooltip
         componentId={`${COMPONENT_ID}.tooltip`}
         content={
-          <FormattedMessage defaultMessage="Ask Claude for help" description="Tooltip for global Ask Claude button" />
+          <FormattedMessage defaultMessage="Assistant - AI-powered help" description="Tooltip for Assistant button" />
         }
       >
-        {/* Rainbow gradient border wrapper */}
+        {/* Gradient border wrapper */}
         <div
           css={{
-            background: RAINBOW_GRADIENT,
+            background: ASSISTANT_GRADIENT,
             borderRadius: borderRadius,
             padding: 2, // Border width
             boxShadow: '0 4px 16px rgba(0, 0, 0, 0.15)',
@@ -106,7 +108,13 @@ export const GlobalClaudeButton = () => {
         >
           <Button
             componentId={COMPONENT_ID}
-            icon={<img src={ClaudeLogo} width={20} height={20} alt="" aria-hidden css={{ display: 'block' }} />}
+            icon={
+              isConfigured ? (
+                <img src={ClaudeLogo} width={20} height={20} alt="" aria-hidden />
+              ) : (
+                <img src={AssistantSparklesLogo} width={20} height={20} alt="" aria-hidden />
+              )
+            }
             css={{
               backgroundColor: '#ffffff !important',
               border: 'none !important',
@@ -123,8 +131,15 @@ export const GlobalClaudeButton = () => {
               },
             }}
           >
-            <FormattedMessage defaultMessage="Ask Claude" description="Label for global Ask Claude button" />
-            {contextLabel && (
+            {isConfigured ? (
+              <FormattedMessage
+                defaultMessage="Assistant (Claude)"
+                description="Label for Assistant button when configured with Claude"
+              />
+            ) : (
+              <FormattedMessage defaultMessage="Assistant" description="Label for Assistant button" />
+            )}
+            {isConfigured && contextLabel && (
               <Tag componentId={`${COMPONENT_ID}.context_tag`} color="turquoise" css={{ marginLeft: theme.spacing.xs }}>
                 {contextLabel}
               </Tag>

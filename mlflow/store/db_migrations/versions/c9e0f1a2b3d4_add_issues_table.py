@@ -12,7 +12,7 @@ from mlflow.store.tracking.dbmodels.models import SqlIssue
 
 # revision identifiers, used by Alembic.
 revision = "c9e0f1a2b3d4"
-down_revision = "5d2d30f0abce"
+down_revision = "2c33131f4dae"
 branch_labels = None
 depends_on = None
 

@@ -380,23 +380,32 @@ export const ScorerSelectionStep = () => {
         </Typography.Text>
       </div>
 
-      {/* Enable Button */}
-      <Button
-        componentId={`${COMPONENT_ID_PREFIX}.enable`}
-        type="primary"
-        onClick={handleEnableOnlineScoring}
-        disabled={!isFormValid || isEnabling}
-        css={{ width: '100%' }}
-      >
-        {isEnabling ? (
-          <>
-            <Spinner size="small" css={{ marginRight: theme.spacing.sm }} />
-            <FormattedMessage defaultMessage="Enabling Online Scoring..." description="Enabling button text" />
-          </>
-        ) : (
-          <FormattedMessage defaultMessage="Enable Online Scoring" description="Enable button text" />
-        )}
-      </Button>
+      {/* Action Buttons */}
+      <div css={{ display: 'flex', gap: theme.spacing.sm }}>
+        <Button
+          componentId={`${COMPONENT_ID_PREFIX}.skip`}
+          onClick={goToNextStep}
+          css={{ flex: 1 }}
+        >
+          <FormattedMessage defaultMessage="Skip for Now" description="Skip button text" />
+        </Button>
+        <Button
+          componentId={`${COMPONENT_ID_PREFIX}.enable`}
+          type="primary"
+          onClick={handleEnableOnlineScoring}
+          disabled={!isFormValid || isEnabling}
+          css={{ flex: 1 }}
+        >
+          {isEnabling ? (
+            <>
+              <Spinner size="small" css={{ marginRight: theme.spacing.sm }} />
+              <FormattedMessage defaultMessage="Enabling..." description="Enabling button text" />
+            </>
+          ) : (
+            <FormattedMessage defaultMessage="Enable Online Scoring" description="Enable button text" />
+          )}
+        </Button>
+      </div>
     </div>
   );
 };
