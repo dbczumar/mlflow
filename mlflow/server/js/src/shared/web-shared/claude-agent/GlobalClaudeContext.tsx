@@ -144,7 +144,17 @@ export const GlobalClaudeProvider = ({ children }: { children: ReactNode }) => {
   // Check Claude availability and setup status when context changes
   useEffect(() => {
     const experimentId = context.navigation?.experimentId;
-    const storedStatus = loadSetupStatus(experimentId);
+    // Check experiment-specific status if in experiment, otherwise check global
+    let storedStatus = loadSetupStatus(experimentId);
+
+    // If not in experiment and experiment-specific is not configured, check global
+    // This ensures global configuration is respected outside experiments
+    if (!experimentId && storedStatus !== 'configured') {
+      const globalStatus = loadSetupStatus();
+      if (globalStatus === 'configured') {
+        storedStatus = 'configured';
+      }
+    }
 
     // Reset session when experiment changes (inline to avoid circular dependency)
     setSessionId(null);
@@ -218,7 +228,12 @@ export const GlobalClaudeProvider = ({ children }: { children: ReactNode }) => {
   const completeSetup = useCallback(() => {
     const experimentId = context.navigation?.experimentId;
     setSetupStatus('configured');
-    saveSetupStatus('configured', experimentId);
+    // ALWAYS save to global when assistant backend is configured
+    saveSetupStatus('configured');
+    // ALSO save to experiment-specific if in an experiment
+    if (experimentId) {
+      saveSetupStatus('configured', experimentId);
+    }
     setShowSetupWizard(false);
     setIsClaudeAvailable(true);
   }, [context.navigation?.experimentId]);
