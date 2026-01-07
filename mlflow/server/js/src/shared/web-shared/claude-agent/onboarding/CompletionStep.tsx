@@ -2,6 +2,7 @@
  * Step 5: Completion - All set! Show summary and next steps.
  */
 
+import { useEffect, useState } from 'react';
 import { Button, CheckCircleIcon, Typography, useDesignSystemTheme } from '@databricks/design-system';
 import { FormattedMessage } from '@databricks/i18n';
 
@@ -17,6 +18,23 @@ export const CompletionStep = () => {
   const { state, completeOnboarding } = useOnboarding();
 
   const enabledScorersCount = state.selectedScorers.filter((s) => s.enabled).length;
+  const [countdown, setCountdown] = useState(5);
+
+  // Auto-redirect after 5 seconds
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          completeOnboarding();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [completeOnboarding]);
 
   return (
     <div
@@ -181,23 +199,19 @@ export const CompletionStep = () => {
         </ul>
       </div>
 
-      {/* Action Buttons */}
-      <div css={{ display: 'flex', gap: theme.spacing.md }}>
-        <Button
-          componentId={`${COMPONENT_ID_PREFIX}.go_to_traces`}
-          type="primary"
-          onClick={() => {
-            completeOnboarding();
-            // Navigate to traces tab - in real implementation, this would use router
-            window.location.hash = '#/traces';
-          }}
-        >
-          <FormattedMessage defaultMessage="Go to Traces" description="Go to traces button" />
-        </Button>
-        <Button componentId={`${COMPONENT_ID_PREFIX}.open_assistant`} onClick={completeOnboarding}>
-          <FormattedMessage defaultMessage="Open Assistant" description="Open assistant button" />
-        </Button>
-      </div>
+      {/* Auto-redirect countdown */}
+      <Typography.Text color="secondary" size="sm" css={{ marginBottom: theme.spacing.md }}>
+        <FormattedMessage
+          defaultMessage="Opening assistant in {seconds}..."
+          description="Auto-redirect countdown message"
+          values={{ seconds: countdown }}
+        />
+      </Typography.Text>
+
+      {/* Action Button */}
+      <Button componentId={`${COMPONENT_ID_PREFIX}.open_assistant`} type="primary" onClick={completeOnboarding}>
+        <FormattedMessage defaultMessage="Open Assistant Now" description="Open assistant button" />
+      </Button>
     </div>
   );
 };
