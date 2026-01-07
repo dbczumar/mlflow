@@ -4,6 +4,7 @@
 
 import { useCallback, useState } from 'react';
 import {
+  Alert,
   Button,
   Checkbox,
   Input,
@@ -94,6 +95,7 @@ export const ScorerSelectionStep = () => {
   const [samplingRate, setSamplingRate] = useState(state.samplingRate || 25);
   const [isEnabling, setIsEnabling] = useState(false);
   const [selectedEndpoint, setSelectedEndpoint] = useState<string | undefined>(state.judgeEndpointName);
+  const [showEndpointRequired, setShowEndpointRequired] = useState(false);
 
   const handleToggleScorer = useCallback((scorerId: string) => {
     setScorers((prev) => prev.map((s) => (s.id === scorerId ? { ...s, enabled: !s.enabled } : s)));
@@ -113,9 +115,16 @@ export const ScorerSelectionStep = () => {
 
   const handleEndpointSelect = useCallback((endpointName: string) => {
     setSelectedEndpoint(endpointName);
+    setShowEndpointRequired(false); // Hide warning once endpoint is selected
   }, []);
 
   const handleEnableOnlineScoring = useCallback(async () => {
+    // Check if endpoint is selected
+    if (!selectedEndpoint) {
+      setShowEndpointRequired(true);
+      return;
+    }
+
     setIsEnabling(true);
 
     // In a real implementation, this would call the API to create scheduled scorers
@@ -137,8 +146,6 @@ export const ScorerSelectionStep = () => {
   const enabledScorers = scorers.filter((s) => s.enabled);
   const availableToAdd = AVAILABLE_SCORERS.filter((available) => !scorers.some((s) => s.id === available.id));
 
-  const isFormValid = enabledScorers.length > 0 && !!selectedEndpoint;
-
   return (
     <div css={{ padding: theme.spacing.lg }}>
       {/* Endpoint Selection */}
@@ -158,6 +165,23 @@ export const ScorerSelectionStep = () => {
           componentIdPrefix={`${COMPONENT_ID_PREFIX}.endpoint`}
           placeholder="Select or create an endpoint..."
         />
+
+        {/* Show alert when user tries to enable without selecting endpoint */}
+        {showEndpointRequired && (
+          <Alert
+            type="warning"
+            closable
+            onClose={() => setShowEndpointRequired(false)}
+            componentId={`${COMPONENT_ID_PREFIX}.endpoint_required`}
+            css={{ marginTop: theme.spacing.md }}
+            message={
+              <FormattedMessage
+                defaultMessage="Please select an endpoint above to power your judges before enabling online scoring."
+                description="Warning when endpoint is not selected"
+              />
+            }
+          />
+        )}
       </div>
 
       {/* Recommended Judges */}
@@ -381,7 +405,7 @@ export const ScorerSelectionStep = () => {
           componentId={`${COMPONENT_ID_PREFIX}.enable`}
           type="primary"
           onClick={handleEnableOnlineScoring}
-          disabled={!isFormValid || isEnabling}
+          disabled={isEnabling}
         >
           {isEnabling ? (
             <>
