@@ -4,7 +4,6 @@
 
 import { useCallback, useState } from 'react';
 import {
-  Alert,
   Button,
   Checkbox,
   Input,
@@ -17,6 +16,7 @@ import { FormattedMessage } from '@databricks/i18n';
 
 import { useOnboarding, type ScorerConfig } from '../OnboardingWizard';
 import { EndpointSelector } from '../../../../experiment-tracking/components/EndpointSelector';
+import { EndpointSelectionModal } from './EndpointSelectionModal';
 
 const COMPONENT_ID_PREFIX = 'mlflow.onboarding.scorers';
 
@@ -95,7 +95,7 @@ export const ScorerSelectionStep = () => {
   const [samplingRate, setSamplingRate] = useState(state.samplingRate || 25);
   const [isEnabling, setIsEnabling] = useState(false);
   const [selectedEndpoint, setSelectedEndpoint] = useState<string | undefined>(state.judgeEndpointName);
-  const [showEndpointRequired, setShowEndpointRequired] = useState(false);
+  const [isEndpointModalOpen, setIsEndpointModalOpen] = useState(false);
 
   const handleToggleScorer = useCallback((scorerId: string) => {
     setScorers((prev) => prev.map((s) => (s.id === scorerId ? { ...s, enabled: !s.enabled } : s)));
@@ -115,13 +115,12 @@ export const ScorerSelectionStep = () => {
 
   const handleEndpointSelect = useCallback((endpointName: string) => {
     setSelectedEndpoint(endpointName);
-    setShowEndpointRequired(false); // Hide warning once endpoint is selected
   }, []);
 
   const handleEnableOnlineScoring = useCallback(async () => {
-    // Check if endpoint is selected
+    // Check if endpoint is selected - if not, open the modal
     if (!selectedEndpoint) {
-      setShowEndpointRequired(true);
+      setIsEndpointModalOpen(true);
       return;
     }
 
@@ -165,23 +164,6 @@ export const ScorerSelectionStep = () => {
           componentIdPrefix={`${COMPONENT_ID_PREFIX}.endpoint`}
           placeholder="Select or create an endpoint..."
         />
-
-        {/* Show alert when user tries to enable without selecting endpoint */}
-        {showEndpointRequired && (
-          <Alert
-            type="warning"
-            closable
-            onClose={() => setShowEndpointRequired(false)}
-            componentId={`${COMPONENT_ID_PREFIX}.endpoint_required`}
-            css={{ marginTop: theme.spacing.md }}
-            message={
-              <FormattedMessage
-                defaultMessage="Please select an endpoint above to power your judges before enabling online scoring."
-                description="Warning when endpoint is not selected"
-              />
-            }
-          />
-        )}
       </div>
 
       {/* Recommended Judges */}
@@ -420,6 +402,14 @@ export const ScorerSelectionStep = () => {
           <FormattedMessage defaultMessage="Skip this step" description="Skip button text" />
         </Button>
       </div>
+
+      {/* Endpoint Selection Modal */}
+      <EndpointSelectionModal
+        open={isEndpointModalOpen}
+        onClose={() => setIsEndpointModalOpen(false)}
+        onEndpointSelect={handleEndpointSelect}
+        currentEndpointName={selectedEndpoint}
+      />
     </div>
   );
 };

@@ -41,6 +41,8 @@ export interface EndpointSelectorProps {
   componentIdPrefix?: string;
   /** Called when a new endpoint is created */
   onEndpointCreated?: (endpoint: Endpoint) => void;
+  /** Ref to trigger the dropdown programmatically */
+  triggerRef?: React.RefObject<HTMLButtonElement>;
 }
 
 export const EndpointSelector: React.FC<EndpointSelectorProps> = ({
@@ -50,6 +52,7 @@ export const EndpointSelector: React.FC<EndpointSelectorProps> = ({
   placeholder,
   componentIdPrefix = 'mlflow.endpoint-selector',
   onEndpointCreated,
+  triggerRef,
 }) => {
   const { theme } = useDesignSystemTheme();
   const intl = useIntl();
@@ -133,6 +136,7 @@ export const EndpointSelector: React.FC<EndpointSelectorProps> = ({
         value={currentEndpointName ? [currentEndpointName] : []}
       >
         <DialogComboboxTrigger
+          ref={triggerRef}
           withInlineLabel={false}
           allowClear={false}
           disabled={disabled}
