@@ -350,18 +350,18 @@ export const ScorerSelectionStep = () => {
         </div>
       </div>
 
-      {/* Summary */}
-      <div
-        css={{
-          padding: theme.spacing.md,
-          backgroundColor: theme.colors.backgroundSecondary,
-          borderRadius: theme.borders.borderRadiusMd,
-          marginBottom: theme.spacing.lg,
-          border: `1px solid ${theme.colors.border}`,
-        }}
-      >
-        <Typography.Text color="secondary" size="sm">
-          {selectedEndpoint ? (
+      {/* Summary - only show when endpoint is selected */}
+      {selectedEndpoint && (
+        <div
+          css={{
+            padding: theme.spacing.md,
+            backgroundColor: theme.colors.backgroundSecondary,
+            borderRadius: theme.borders.borderRadiusMd,
+            marginBottom: theme.spacing.lg,
+            border: `1px solid ${theme.colors.border}`,
+          }}
+        >
+          <Typography.Text color="secondary" size="sm">
             <FormattedMessage
               defaultMessage="{count} {count, plural, one {judge} other {judges}} using {endpoint} will evaluate {scope} of your traces."
               description="Summary of online scoring configuration with endpoint"
@@ -371,26 +371,17 @@ export const ScorerSelectionStep = () => {
                 scope: samplingMode === 'all' ? 'all' : `${samplingRate}%`,
               }}
             />
-          ) : (
-            <FormattedMessage
-              defaultMessage="Select an endpoint to power your judges."
-              description="Summary when no endpoint selected"
-            />
-          )}
-        </Typography.Text>
-      </div>
+          </Typography.Text>
+        </div>
+      )}
 
       {/* Action Buttons */}
-      <div css={{ display: 'flex', gap: theme.spacing.sm }}>
-        <Button componentId={`${COMPONENT_ID_PREFIX}.skip`} onClick={goToNextStep} css={{ flex: 1 }}>
-          <FormattedMessage defaultMessage="Skip for Now" description="Skip button text" />
-        </Button>
+      <div css={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Button
           componentId={`${COMPONENT_ID_PREFIX}.enable`}
           type="primary"
           onClick={handleEnableOnlineScoring}
           disabled={!isFormValid || isEnabling}
-          css={{ flex: 1 }}
         >
           {isEnabling ? (
             <>
@@ -400,6 +391,9 @@ export const ScorerSelectionStep = () => {
           ) : (
             <FormattedMessage defaultMessage="Enable Online Scoring" description="Enable button text" />
           )}
+        </Button>
+        <Button componentId={`${COMPONENT_ID_PREFIX}.skip`} size="small" onClick={goToNextStep} css={{ opacity: 0.7 }}>
+          <FormattedMessage defaultMessage="Skip this step" description="Skip button text" />
         </Button>
       </div>
     </div>
