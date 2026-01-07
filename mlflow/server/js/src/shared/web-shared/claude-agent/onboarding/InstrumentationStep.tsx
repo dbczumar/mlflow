@@ -26,7 +26,7 @@ import { AssistantBackendStep } from './AssistantBackendStep';
 
 const COMPONENT_ID_PREFIX = 'mlflow.onboarding.instrumentation';
 
-type InstrumentationMethod = 'assistant-direct' | 'copy-instructions';
+type InstrumentationMethod = 'assistant-direct' | 'copy-instructions' | 'manual';
 
 /**
  * Generate the Claude prompt for instrumenting an application.
@@ -224,72 +224,74 @@ mlflow.set_experiment("${experimentName}")
           </Typography.Text>
 
           <div css={{ display: 'flex', flexDirection: 'column', gap: theme.spacing.md }}>
-            {/* Option A: Let Assistant Do It */}
-            <button
-              onClick={() => handleMethodSelect('assistant-direct')}
-              css={{
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: theme.spacing.md,
-                padding: theme.spacing.lg,
-                backgroundColor: theme.colors.backgroundSecondary,
-                border: `1px solid ${theme.colors.border}`,
-                borderRadius: theme.borders.borderRadiusLg,
-                cursor: 'pointer',
-                textAlign: 'left',
-                transition: 'border-color 0.2s, background-color 0.2s',
-                '&:hover': {
-                  borderColor: theme.colors.actionPrimaryBackgroundDefault,
-                  backgroundColor: theme.colors.backgroundPrimary,
-                },
-              }}
-            >
-              <div
+            {/* Option A: Let Assistant Do It - only show if assistant is configured */}
+            {isAssistantConfigured && (
+              <button
+                onClick={() => handleMethodSelect('assistant-direct')}
                 css={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: theme.borders.borderRadiusMd,
-                  backgroundColor: theme.colors.actionPrimaryBackgroundDefault,
                   display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0,
-                  fontSize: 20,
+                  alignItems: 'flex-start',
+                  gap: theme.spacing.md,
+                  padding: theme.spacing.lg,
+                  backgroundColor: theme.colors.backgroundSecondary,
+                  border: `1px solid ${theme.colors.border}`,
+                  borderRadius: theme.borders.borderRadiusLg,
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  transition: 'border-color 0.2s, background-color 0.2s',
+                  '&:hover': {
+                    borderColor: theme.colors.actionPrimaryBackgroundDefault,
+                    backgroundColor: theme.colors.backgroundPrimary,
+                  },
                 }}
               >
-                <span role="img" aria-hidden>
-                  AI
-                </span>
-              </div>
-              <div css={{ flex: 1 }}>
-                <div css={{ display: 'flex', alignItems: 'center', gap: theme.spacing.sm }}>
-                  <Typography.Text bold>
-                    <FormattedMessage
-                      defaultMessage="Let Assistant Do It"
-                      description="Option to let assistant instrument code"
-                    />
-                  </Typography.Text>
-                  <span
-                    css={{
-                      fontSize: theme.typography.fontSizeSm,
-                      padding: `2px ${theme.spacing.xs}px`,
-                      backgroundColor: theme.colors.tagTurquoise,
-                      borderRadius: theme.borders.borderRadiusSm,
-                      color: theme.colors.textPrimary,
-                    }}
-                  >
-                    <FormattedMessage defaultMessage="Recommended" description="Recommended label" />
+                <div
+                  css={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: theme.borders.borderRadiusMd,
+                    backgroundColor: theme.colors.actionPrimaryBackgroundDefault,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                    fontSize: 20,
+                  }}
+                >
+                  <span role="img" aria-hidden>
+                    ✨
                   </span>
                 </div>
-                <Typography.Text color="secondary" size="sm">
-                  <FormattedMessage
-                    defaultMessage="Point to your code and the assistant will automatically add MLflow tracing."
-                    description="Description for assistant instrumentation"
-                  />
-                </Typography.Text>
-              </div>
-              <ChevronRightIcon css={{ color: theme.colors.textSecondary, flexShrink: 0 }} />
-            </button>
+                <div css={{ flex: 1 }}>
+                  <div css={{ display: 'flex', alignItems: 'center', gap: theme.spacing.sm }}>
+                    <Typography.Text bold>
+                      <FormattedMessage
+                        defaultMessage="Let Assistant Do It"
+                        description="Option to let assistant instrument code"
+                      />
+                    </Typography.Text>
+                    <span
+                      css={{
+                        fontSize: theme.typography.fontSizeSm,
+                        padding: `2px ${theme.spacing.xs}px`,
+                        backgroundColor: theme.colors.tagTurquoise,
+                        borderRadius: theme.borders.borderRadiusSm,
+                        color: theme.colors.textPrimary,
+                      }}
+                    >
+                      <FormattedMessage defaultMessage="Recommended" description="Recommended label" />
+                    </span>
+                  </div>
+                  <Typography.Text color="secondary" size="sm">
+                    <FormattedMessage
+                      defaultMessage="Point to your code and the assistant will automatically add MLflow tracing."
+                      description="Description for assistant instrumentation"
+                    />
+                  </Typography.Text>
+                </div>
+                <ChevronRightIcon css={{ color: theme.colors.textSecondary, flexShrink: 0 }} />
+              </button>
+            )}
 
             {/* Option B: Copy Instructions */}
             <button
@@ -337,6 +339,58 @@ mlflow.set_experiment("${experimentName}")
                   <FormattedMessage
                     defaultMessage="Copy instructions to use with Claude Code CLI in your terminal."
                     description="Description for copy instructions option"
+                  />
+                </Typography.Text>
+              </div>
+              <ChevronRightIcon css={{ color: theme.colors.textSecondary, flexShrink: 0 }} />
+            </button>
+
+            {/* Option C: Manual / Read the Docs - always available */}
+            <button
+              onClick={() => handleMethodSelect('manual')}
+              css={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: theme.spacing.md,
+                padding: theme.spacing.lg,
+                backgroundColor: theme.colors.backgroundSecondary,
+                border: `1px solid ${theme.colors.border}`,
+                borderRadius: theme.borders.borderRadiusLg,
+                cursor: 'pointer',
+                textAlign: 'left',
+                transition: 'border-color 0.2s, background-color 0.2s',
+                '&:hover': {
+                  borderColor: theme.colors.actionPrimaryBackgroundDefault,
+                  backgroundColor: theme.colors.backgroundPrimary,
+                },
+              }}
+            >
+              <div
+                css={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: theme.borders.borderRadiusMd,
+                  backgroundColor: theme.colors.backgroundSecondary,
+                  border: `1px solid ${theme.colors.border}`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                }}
+              >
+                📖
+              </div>
+              <div css={{ flex: 1 }}>
+                <Typography.Text bold css={{ display: 'block', marginBottom: theme.spacing.xs }}>
+                  <FormattedMessage
+                    defaultMessage="Manual / Read the Docs"
+                    description="Option to manually set up tracing"
+                  />
+                </Typography.Text>
+                <Typography.Text color="secondary" size="sm">
+                  <FormattedMessage
+                    defaultMessage="Follow our documentation to manually add MLflow tracing to your application."
+                    description="Description for manual setup option"
                   />
                 </Typography.Text>
               </div>
@@ -517,6 +571,115 @@ mlflow.set_experiment("${experimentName}")
               <FormattedMessage defaultMessage="Back" description="Back button" />
             </Button>
             <Button componentId={`${COMPONENT_ID_PREFIX}.skip`} type="primary" onClick={handleSkipToNext}>
+              <FormattedMessage defaultMessage="Continue" description="Continue button" />
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Manual / Docs Method */}
+      {selectedMethod === 'manual' && (
+        <div>
+          <div
+            css={{
+              padding: theme.spacing.lg,
+              backgroundColor: theme.colors.backgroundSecondary,
+              borderRadius: theme.borders.borderRadiusLg,
+              marginBottom: theme.spacing.lg,
+            }}
+          >
+            <Typography.Text bold css={{ display: 'block', marginBottom: theme.spacing.md }}>
+              <FormattedMessage
+                defaultMessage="Follow the MLflow Tracing documentation"
+                description="Manual setup heading"
+              />
+            </Typography.Text>
+
+            <Typography.Text css={{ display: 'block', marginBottom: theme.spacing.md }}>
+              <FormattedMessage
+                defaultMessage="Our documentation provides step-by-step instructions for adding MLflow tracing to your application:"
+                description="Manual setup description"
+              />
+            </Typography.Text>
+
+            <ul css={{ marginBottom: theme.spacing.md, paddingLeft: theme.spacing.lg }}>
+              <li css={{ marginBottom: theme.spacing.sm }}>
+                <Typography.Text>
+                  <a
+                    href="https://mlflow.org/docs/latest/llms/tracing/index.html"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    css={{
+                      color: theme.colors.actionPrimaryBackgroundDefault,
+                      textDecoration: 'underline',
+                      '&:hover': { opacity: 0.8 },
+                    }}
+                  >
+                    <FormattedMessage
+                      defaultMessage="MLflow Tracing Overview"
+                      description="Link to tracing overview docs"
+                    />
+                  </a>
+                </Typography.Text>
+              </li>
+              <li css={{ marginBottom: theme.spacing.sm }}>
+                <Typography.Text>
+                  <a
+                    href="https://mlflow.org/docs/latest/llms/tracing/index.html#automatic-tracing"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    css={{
+                      color: theme.colors.actionPrimaryBackgroundDefault,
+                      textDecoration: 'underline',
+                      '&:hover': { opacity: 0.8 },
+                    }}
+                  >
+                    <FormattedMessage
+                      defaultMessage="Automatic Tracing (OpenAI, Anthropic, LangChain, etc.)"
+                      description="Link to autologging docs"
+                    />
+                  </a>
+                </Typography.Text>
+              </li>
+              <li>
+                <Typography.Text>
+                  <a
+                    href="https://mlflow.org/docs/latest/llms/tracing/index.html#manual-tracing"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    css={{
+                      color: theme.colors.actionPrimaryBackgroundDefault,
+                      textDecoration: 'underline',
+                      '&:hover': { opacity: 0.8 },
+                    }}
+                  >
+                    <FormattedMessage
+                      defaultMessage="Manual Tracing with @mlflow.trace decorator"
+                      description="Link to manual tracing docs"
+                    />
+                  </a>
+                </Typography.Text>
+              </li>
+            </ul>
+
+            <Alert
+              type="info"
+              closable={false}
+              componentId={`${COMPONENT_ID_PREFIX}.manual_info`}
+              message={
+                <FormattedMessage
+                  defaultMessage="Once you've added tracing to your code and run your application, traces will appear in this experiment automatically."
+                  description="Info about traces appearing after setup"
+                />
+              }
+            />
+          </div>
+
+          <div css={{ display: 'flex', justifyContent: 'space-between' }}>
+            <Button componentId={`${COMPONENT_ID_PREFIX}.back_manual`} onClick={() => setSelectedMethod(null)}>
+              <FormattedMessage defaultMessage="Back" description="Back button" />
+            </Button>
+            <Button componentId={`${COMPONENT_ID_PREFIX}.continue_manual`} type="primary" onClick={handleSkipToNext}>
               <FormattedMessage defaultMessage="Continue" description="Continue button" />
             </Button>
           </div>

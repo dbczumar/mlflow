@@ -31,7 +31,7 @@ const COMPONENT_ID_PREFIX = 'mlflow.onboarding.experiment';
  */
 export const ExperimentSelectionStep = () => {
   const { theme } = useDesignSystemTheme();
-  const { goToNextStep, updateState } = useOnboarding();
+  const { goToNextStep, updateState, currentStep, isCheckingInitialStep } = useOnboarding();
   const globalClaude = useGlobalClaudeOptional();
   const navigate = useNavigate();
 
@@ -40,6 +40,7 @@ export const ExperimentSelectionStep = () => {
   const [hasTraces, setHasTraces] = useState<boolean | null>(null);
   const [checkingTraces, setCheckingTraces] = useState(false);
   const hasAutoAdvancedRef = useRef(false);
+  const autoAdvanceTimeoutRef = useRef<number | null>(null);
 
   // Check if user is already in an experiment
   const currentExperimentId = globalClaude?.context?.navigation?.experimentId;
@@ -73,19 +74,40 @@ export const ExperimentSelectionStep = () => {
     checkForTraces();
   }, [currentExperimentId, checkingTraces, hasTraces]);
 
-  // Auto-advance to next step when an experiment is detected (regardless of traces)
+  // Reset auto-advance ref when experiment ID changes
   useEffect(() => {
-    console.log('[ExperimentSelectionStep] currentExperimentId:', currentExperimentId, 'hasAutoAdvanced:', hasAutoAdvancedRef.current);
-    if (currentExperimentId && !hasAutoAdvancedRef.current) {
-      console.log('[ExperimentSelectionStep] Auto-advancing to next step!');
+    hasAutoAdvancedRef.current = false;
+  }, [currentExperimentId]);
+
+  // Clear any pending auto-advance timeout when step or experiment changes
+  useEffect(() => {
+    return () => {
+      if (autoAdvanceTimeoutRef.current !== null) {
+        clearTimeout(autoAdvanceTimeoutRef.current);
+        autoAdvanceTimeoutRef.current = null;
+      }
+    };
+  }, [currentStep, currentExperimentId]);
+
+  // Auto-advance to next step when an experiment is detected (regardless of traces)
+  // Only auto-advance if we're actually on the experiment-selection step and not checking initial step
+  useEffect(() => {
+    if (
+      currentExperimentId &&
+      !hasAutoAdvancedRef.current &&
+      !isCheckingInitialStep &&
+      currentStep === 'experiment-selection'
+    ) {
       hasAutoAdvancedRef.current = true;
       updateState({ experimentSelected: true });
       // Small delay to show the experiment was detected
-      setTimeout(() => {
+      // Store timeout ID so it can be cleared if step changes before it fires
+      autoAdvanceTimeoutRef.current = window.setTimeout(() => {
         goToNextStep();
+        autoAdvanceTimeoutRef.current = null;
       }, 800);
     }
-  }, [currentExperimentId, goToNextStep, updateState]);
+  }, [currentExperimentId, currentStep, isCheckingInitialStep, goToNextStep, updateState]);
 
   const handleSelectExisting = useCallback(() => {
     // Navigate to experiments page so user can select one

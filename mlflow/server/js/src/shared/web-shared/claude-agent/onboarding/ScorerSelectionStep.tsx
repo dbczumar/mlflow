@@ -382,11 +382,7 @@ export const ScorerSelectionStep = () => {
 
       {/* Action Buttons */}
       <div css={{ display: 'flex', gap: theme.spacing.sm }}>
-        <Button
-          componentId={`${COMPONENT_ID_PREFIX}.skip`}
-          onClick={goToNextStep}
-          css={{ flex: 1 }}
-        >
+        <Button componentId={`${COMPONENT_ID_PREFIX}.skip`} onClick={goToNextStep} css={{ flex: 1 }}>
           <FormattedMessage defaultMessage="Skip for Now" description="Skip button text" />
         </Button>
         <Button

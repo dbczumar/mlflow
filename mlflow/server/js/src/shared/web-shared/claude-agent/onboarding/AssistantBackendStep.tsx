@@ -49,13 +49,15 @@ type BackendSetupStep = 'select-backend' | 'install';
 interface AssistantBackendStepProps {
   /** Called when assistant is successfully configured. If not provided, component is standalone. */
   onConfigured?: () => void;
+  /** Called when user skips setup. If not provided, skip button is not shown. */
+  onSkip?: () => void;
 }
 
 /**
  * Configure the AI assistant backend.
  * Can be used embedded in InstrumentationStep (with onConfigured callback).
  */
-export const AssistantBackendStep = ({ onConfigured }: AssistantBackendStepProps) => {
+export const AssistantBackendStep = ({ onConfigured, onSkip }: AssistantBackendStepProps) => {
   const { theme } = useDesignSystemTheme();
 
   const [currentSubStep, setCurrentSubStep] = useState<BackendSetupStep>('select-backend');
@@ -293,10 +295,15 @@ export const AssistantBackendStep = ({ onConfigured }: AssistantBackendStepProps
           </div>
 
           {/* Navigation */}
-          <div css={{ display: 'flex', justifyContent: 'flex-start' }}>
+          <div css={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <Button componentId={`${COMPONENT_ID_PREFIX}.back`} onClick={handleBack}>
               <FormattedMessage defaultMessage="Back" description="Back button" />
             </Button>
+            {onSkip && (
+              <Button componentId={`${COMPONENT_ID_PREFIX}.skip`} size="small" onClick={onSkip} css={{ opacity: 0.7 }}>
+                <FormattedMessage defaultMessage="Skip this step" description="Skip button" />
+              </Button>
+            )}
           </div>
         </div>
       )}

@@ -3,6 +3,7 @@
  * Displays the chat interface for the MLflow AI assistant.
  */
 
+import { useState } from 'react';
 import {
   Button,
   GearIcon,
@@ -16,6 +17,7 @@ import { FormattedMessage } from '@databricks/i18n';
 import { useGlobalClaude } from './GlobalClaudeContext';
 import { ClaudeAgentChatPanel } from './ClaudeAgentChatPanel';
 import { OnboardingWizard } from './OnboardingWizard';
+import { AssistantBackendStep } from './onboarding/AssistantBackendStep';
 import ClaudeLogo from '../../../common/static/logos/claude.svg';
 import AssistantSparklesLogo from '../../../common/static/logos/assistant-sparkles.svg';
 
@@ -57,6 +59,7 @@ const getContextTypeLabel = (type: string): string => {
 export const GlobalClaudeChatPanel = () => {
   const { theme } = useDesignSystemTheme();
   const { closePanel, context, reset, showSetupWizard, completeSetup, openSetup, setupStatus } = useGlobalClaude();
+  const [showBackendConfig, setShowBackendConfig] = useState(false);
 
   const isConfigured = setupStatus === 'configured';
 
@@ -69,6 +72,78 @@ export const GlobalClaudeChatPanel = () => {
   const handleReset = () => {
     reset();
   };
+
+  const handleOpenSettings = () => {
+    if (isConfigured) {
+      // If already configured, show backend configuration
+      setShowBackendConfig(true);
+    } else {
+      // If not configured, show the full onboarding wizard
+      openSetup();
+    }
+  };
+
+  const handleBackendConfigured = () => {
+    setShowBackendConfig(false);
+    completeSetup();
+  };
+
+  const handleCloseBackendConfig = () => {
+    setShowBackendConfig(false);
+  };
+
+  // Show assistant backend configuration if requested
+  if (showBackendConfig) {
+    return (
+      <div
+        css={{
+          display: 'flex',
+          flexDirection: 'column',
+          height: '100%',
+          overflow: 'hidden',
+        }}
+      >
+        {/* Header for backend config */}
+        <div
+          css={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: theme.spacing.md,
+            borderBottom: `1px solid ${theme.colors.border}`,
+            flexShrink: 0,
+          }}
+        >
+          <span
+            css={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: theme.spacing.sm,
+              fontWeight: theme.typography.typographyBoldFontWeight,
+            }}
+          >
+            <img src={AssistantSparklesLogo} width={18} height={18} alt="" aria-hidden />
+            <FormattedMessage
+              defaultMessage="Assistant Configuration"
+              description="Title for assistant backend configuration"
+            />
+          </span>
+          <Button
+            componentId={`${COMPONENT_ID}.close_backend_config`}
+            size="small"
+            icon={<SidebarCollapseIcon css={{ transform: 'rotate(180deg)' }} />}
+            onClick={handleCloseBackendConfig}
+            aria-label="Close configuration"
+          />
+        </div>
+
+        {/* Assistant backend configuration */}
+        <div css={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
+          <AssistantBackendStep onConfigured={handleBackendConfigured} />
+        </div>
+      </div>
+    );
+  }
 
   // Show onboarding wizard if needed
   if (showSetupWizard) {
@@ -175,12 +250,12 @@ export const GlobalClaudeChatPanel = () => {
           )}
         </span>
         <div css={{ display: 'flex', gap: theme.spacing.xs }}>
-          {/* Settings button - allows re-running setup */}
+          {/* Settings button - allows re-running setup or configuring backend */}
           <Button
             componentId={`${COMPONENT_ID}.settings`}
             size="small"
             icon={<GearIcon />}
-            onClick={openSetup}
+            onClick={handleOpenSettings}
             aria-label="Assistant settings"
           />
           <Button

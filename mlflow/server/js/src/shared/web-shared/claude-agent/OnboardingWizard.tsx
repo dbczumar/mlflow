@@ -14,6 +14,7 @@ import { FormattedMessage } from '@databricks/i18n';
 import { ExperimentSelectionStep } from './onboarding/ExperimentSelectionStep';
 import { UseCaseStep } from './onboarding/UseCaseStep';
 import { ScorerSelectionStep } from './onboarding/ScorerSelectionStep';
+import { AssistantBackendStep } from './onboarding/AssistantBackendStep';
 import { InstrumentationStep } from './onboarding/InstrumentationStep';
 import { CompletionStep } from './onboarding/CompletionStep';
 import { listScheduledScorers } from '../../../experiment-tracking/pages/experiment-scorers/api';
@@ -23,13 +24,12 @@ const COMPONENT_ID_PREFIX = 'mlflow.onboarding';
 
 /**
  * Onboarding wizard steps.
- * Note: 'assistant-backend' is not in the main flow but can be shown conditionally
- * within the instrumentation step if user chooses "Let Assistant Do It".
  */
 export type OnboardingStep =
   | 'experiment-selection'
   | 'use-case'
   | 'scorer-selection'
+  | 'assistant-backend'
   | 'instrumentation'
   | 'completion';
 
@@ -78,7 +78,7 @@ export interface OnboardingState {
   judgeEndpointName?: string;
 
   // Step 4: Instrumentation
-  instrumentationMethod: 'assistant-direct' | 'copy-instructions' | null;
+  instrumentationMethod: 'assistant-direct' | 'copy-instructions' | 'manual' | null;
   codePath?: string;
   detectedFrameworks?: string[];
   instrumentationApplied: boolean;
@@ -97,6 +97,7 @@ export interface OnboardingState {
 interface OnboardingContextType {
   state: OnboardingState;
   currentStep: OnboardingStep;
+  isCheckingInitialStep: boolean;
   goToStep: (step: OnboardingStep) => void;
   goToNextStep: () => void;
   goToPreviousStep: () => void;
@@ -124,6 +125,7 @@ const STEP_ORDER: OnboardingStep[] = [
   'experiment-selection',
   'use-case',
   'scorer-selection',
+  'assistant-backend',
   'instrumentation',
   'completion',
 ];
@@ -143,6 +145,10 @@ const STEP_INFO: Record<OnboardingStep, { title: string; subtitle: string }> = {
   'scorer-selection': {
     title: 'Configure Judges',
     subtitle: 'Select LLM judges to automatically evaluate your traces.',
+  },
+  'assistant-backend': {
+    title: 'Configure Assistant',
+    subtitle: 'Set up the AI assistant backend to help with tracing.',
   },
   instrumentation: {
     title: 'Add Tracing',
@@ -286,9 +292,11 @@ export const OnboardingWizard = ({
   // Determine initial step based on current context
   useEffect(() => {
     const checkInitialStep = async () => {
+      // Set checking flag at the start to prevent race conditions with child component effects
       setIsCheckingInitialStep(true);
 
-      // First check if we have a saved step for this experiment
+      // Check for saved step (note: useState initializer only runs on first mount,
+      // so we need to check again when experimentId changes)
       const savedStep = loadWizardStep(currentExperimentId);
       if (savedStep) {
         setCurrentStep(savedStep);
@@ -306,11 +314,13 @@ export const OnboardingWizard = ({
   }, [currentExperimentId]);
 
   // Save current step to localStorage whenever it changes
+  // NOTE: We DON'T include currentExperimentId in dependencies to avoid saving the old step
+  // to a new experiment key when navigating between experiments
   useEffect(() => {
     if (!isCheckingInitialStep) {
       saveWizardStep(currentStep, currentExperimentId);
     }
-  }, [currentStep, currentExperimentId, isCheckingInitialStep]);
+  }, [currentStep, isCheckingInitialStep, currentExperimentId]);
 
   const goToStep = useCallback((step: OnboardingStep) => {
     setCurrentStep(step);
@@ -342,6 +352,7 @@ export const OnboardingWizard = ({
   const contextValue: OnboardingContextType = {
     state,
     currentStep,
+    isCheckingInitialStep,
     goToStep,
     goToNextStep,
     goToPreviousStep,
@@ -368,7 +379,10 @@ export const OnboardingWizard = ({
           }}
         >
           <Typography.Text color="secondary">
-            <FormattedMessage defaultMessage="Checking setup status..." description="Loading message while determining onboarding step" />
+            <FormattedMessage
+              defaultMessage="Checking setup status..."
+              description="Loading message while determining onboarding step"
+            />
           </Typography.Text>
         </div>
       </OnboardingContext.Provider>
@@ -457,7 +471,7 @@ export const OnboardingWizard = ({
 
         {/* Step content */}
         <div css={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
-          <StepContent step={currentStep} />
+          {!isCheckingInitialStep && <StepContent step={currentStep} />}
         </div>
       </div>
     </OnboardingContext.Provider>
@@ -468,6 +482,18 @@ export const OnboardingWizard = ({
  * Renders the content for the current step.
  */
 const StepContent = ({ step }: { step: OnboardingStep }) => {
+  const { goToNextStep, updateState } = useOnboarding();
+
+  const handleAssistantConfigured = () => {
+    updateState({ assistantConfigured: true });
+    goToNextStep();
+  };
+
+  const handleAssistantSkipped = () => {
+    // User skipped assistant setup - continue without marking as configured
+    goToNextStep();
+  };
+
   switch (step) {
     case 'experiment-selection':
       return <ExperimentSelectionStep />;
@@ -475,6 +501,8 @@ const StepContent = ({ step }: { step: OnboardingStep }) => {
       return <UseCaseStep />;
     case 'scorer-selection':
       return <ScorerSelectionStep />;
+    case 'assistant-backend':
+      return <AssistantBackendStep onConfigured={handleAssistantConfigured} onSkip={handleAssistantSkipped} />;
     case 'instrumentation':
       return <InstrumentationStep />;
     case 'completion':

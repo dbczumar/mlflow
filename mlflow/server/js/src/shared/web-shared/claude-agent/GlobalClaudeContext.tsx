@@ -194,14 +194,17 @@ export const GlobalClaudeProvider = ({ children }: { children: ReactNode }) => {
     disconnectSSE();
   }, [disconnectSSE]);
 
-  const setContext = useCallback((newContext: ClaudeContext) => {
-    setContextState(newContext);
+  const setContext = useCallback(
+    (newContext: ClaudeContext) => {
+      setContextState(newContext);
 
-    // If switching to global context (no experiment), close the setup wizard
-    if (!newContext.navigation?.experimentId && showSetupWizard) {
-      setShowSetupWizard(false);
-    }
-  }, [showSetupWizard]);
+      // If switching to global context (no experiment), close the setup wizard
+      if (!newContext.navigation?.experimentId && showSetupWizard) {
+        setShowSetupWizard(false);
+      }
+    },
+    [showSetupWizard],
+  );
 
   const reset = useCallback(() => {
     setSessionId(null);

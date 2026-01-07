@@ -332,6 +332,16 @@ export const UseCaseStep = () => {
     goToNextStep();
   }, [goToNextStep, otherDescription, updateState]);
 
+  const handleSkip = useCallback(() => {
+    // Skip use case selection - use default scorers
+    const recommendedScorers = USE_CASE_SCORERS.other;
+    updateState({
+      useCase: null,
+      selectedScorers: recommendedScorers,
+    });
+    goToNextStep();
+  }, [goToNextStep, updateState]);
+
   return (
     <div css={{ padding: theme.spacing.lg }}>
       {/* Use case selection */}
@@ -349,6 +359,7 @@ export const UseCaseStep = () => {
               display: 'grid',
               gridTemplateColumns: 'repeat(2, 1fr)',
               gap: theme.spacing.md,
+              marginBottom: theme.spacing.md,
             }}
           >
             {USE_CASE_OPTIONS.map((option) => (
@@ -382,6 +393,18 @@ export const UseCaseStep = () => {
                 </Typography.Text>
               </button>
             ))}
+          </div>
+
+          {/* Small skip button */}
+          <div css={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <Button
+              componentId={`${COMPONENT_ID_PREFIX}.skip`}
+              size="small"
+              onClick={handleSkip}
+              css={{ opacity: 0.7 }}
+            >
+              <FormattedMessage defaultMessage="Skip this step" description="Skip button" />
+            </Button>
           </div>
         </div>
       )}
