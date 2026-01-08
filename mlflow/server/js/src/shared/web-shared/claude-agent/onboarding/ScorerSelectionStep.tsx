@@ -165,7 +165,6 @@ function convertToAPIScorerConfig(scorer: ScorerConfig, samplingRate: number, en
 export const ScorerSelectionStep = () => {
   const { theme } = useDesignSystemTheme();
   const { goToNextStep, updateState, state } = useOnboarding();
-  const navigate = useNavigate();
   const globalClaude = useGlobalClaudeOptional();
 
   const [scorers, setScorers] = useState<ScorerConfig[]>(state.selectedScorers);
