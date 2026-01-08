@@ -193,27 +193,15 @@ export const GlobalClaudeProvider = ({ children }: { children: ReactNode }) => {
         // This GenAI experiment's wizard is not complete - auto-open panel
         setIsPanelOpen(true);
         setShowSetupWizard(true);
-      }
-    }
-
-    // Wizard visibility based on EXPERIMENT-SPECIFIC completion
-    if (experimentSpecificStatus === 'configured') {
-      // This experiment's wizard is fully complete
-      setShowSetupWizard(false);
-    } else {
-      // Wizard not complete for this experiment
-      if (isPanelOpen && isGenAIExp) {
-        // Show wizard if panel is open AND it's a GenAI experiment
-        setShowSetupWizard(true);
-      } else {
-        // Hide wizard if panel is not open OR it's not a GenAI experiment
+      } else if (!isGenAIExp) {
+        // Non-GenAI experiment - make sure wizard is hidden
         setShowSetupWizard(false);
       }
     }
 
     // Update ref with current experiment ID
     previousExperimentIdRef.current = experimentId;
-  }, [context.navigation?.experimentId, context.navigation?.experimentKind, isPanelOpen, disconnectSSE]);
+  }, [context.navigation?.experimentId, context.navigation?.experimentKind, disconnectSSE]);
 
   // Actions
   const openPanel = useCallback(() => {
