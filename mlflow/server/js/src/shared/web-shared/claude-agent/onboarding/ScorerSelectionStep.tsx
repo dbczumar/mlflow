@@ -356,31 +356,6 @@ export const ScorerSelectionStep = () => {
         </div>
       </div>
 
-      {/* Summary - only show when endpoint is selected */}
-      {selectedEndpoint && (
-        <div
-          css={{
-            padding: theme.spacing.md,
-            backgroundColor: theme.colors.backgroundSecondary,
-            borderRadius: theme.borders.borderRadiusMd,
-            marginBottom: theme.spacing.lg,
-            border: `1px solid ${theme.colors.border}`,
-          }}
-        >
-          <Typography.Text color="secondary" size="sm">
-            <FormattedMessage
-              defaultMessage="{count} {count, plural, one {judge} other {judges}} using {endpoint} will evaluate {scope} of your traces."
-              description="Summary of online scoring configuration with endpoint"
-              values={{
-                count: enabledScorers.length,
-                endpoint: selectedEndpoint,
-                scope: samplingMode === 'all' ? 'all' : `${samplingRate}%`,
-              }}
-            />
-          </Typography.Text>
-        </div>
-      )}
-
       {/* Action Buttons */}
       <div css={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Button
