@@ -182,7 +182,7 @@ export const ScorerSelectionStep = () => {
     const experimentId = globalClaude?.context?.navigation?.experimentId;
     if (experimentId) {
       const judgesUrl = generatePath(RoutePaths.experimentPageTabScorers, { experimentId });
-      window.location.href = judgesUrl;
+      window.location.href = `/#${judgesUrl}`;
     }
   }, [globalClaude]);
 
@@ -281,7 +281,7 @@ export const ScorerSelectionStep = () => {
 
         // Navigate to judges tab
         const judgesUrl = generatePath(RoutePaths.experimentPageTabScorers, { experimentId });
-        window.location.href = judgesUrl;
+        window.location.href = `/#${judgesUrl}`;
       } catch (error) {
         console.error('Failed to register scorers:', error);
         console.error('Error details:', {
