@@ -197,14 +197,6 @@ export const ScorerSelectionStep = () => {
     setSelectedEndpoint(endpointName);
   }, []);
 
-  const handleViewJudges = useCallback(() => {
-    const experimentId = globalClaude?.context?.navigation?.experimentId;
-    if (experimentId) {
-      const judgesUrl = generatePath(RoutePaths.experimentPageTabScorers, { experimentId });
-      window.open(judgesUrl, '_blank');
-    }
-  }, [globalClaude]);
-
   const handleEnableOnlineScoring = useCallback(
     /* eslint-disable no-console, no-alert */
     async () => {
@@ -276,10 +268,11 @@ export const ScorerSelectionStep = () => {
         // Reset loading state
         setIsEnabling(false);
 
-        console.log('Judges created successfully, advancing to next step');
+        console.log('Judges created successfully, navigating to judges tab');
 
-        // Advance wizard to next step
-        goToNextStep();
+        // Navigate to judges tab
+        const judgesUrl = generatePath(RoutePaths.experimentPageTabScorers, { experimentId });
+        window.location.href = judgesUrl;
       } catch (error) {
         console.error('Failed to register scorers:', error);
         console.error('Error details:', {
@@ -290,7 +283,7 @@ export const ScorerSelectionStep = () => {
         setIsEnabling(false);
       }
     } /* eslint-enable no-console, no-alert */,
-    [globalClaude, goToNextStep, samplingMode, samplingRate, scorers, selectedEndpoint, updateState],
+    [globalClaude, samplingMode, samplingRate, scorers, selectedEndpoint, updateState],
   );
 
   const enabledScorers = scorers.filter((s) => s.enabled);
@@ -524,14 +517,9 @@ export const ScorerSelectionStep = () => {
             <FormattedMessage defaultMessage="Enable Judges" description="Enable button text" />
           )}
         </Button>
-        <div css={{ display: 'flex', gap: theme.spacing.sm }}>
-          <Button componentId={`${COMPONENT_ID_PREFIX}.view_judges`} onClick={handleViewJudges}>
-            <FormattedMessage defaultMessage="View Judges" description="View judges button text" />
-          </Button>
-          <Button componentId={`${COMPONENT_ID_PREFIX}.skip`} size="small" onClick={goToNextStep} css={{ opacity: 0.7 }}>
-            <FormattedMessage defaultMessage="Skip this step" description="Skip button text" />
-          </Button>
-        </div>
+        <Button componentId={`${COMPONENT_ID_PREFIX}.skip`} size="small" onClick={goToNextStep} css={{ opacity: 0.7 }}>
+          <FormattedMessage defaultMessage="Skip this step" description="Skip button text" />
+        </Button>
       </div>
 
       {/* Endpoint Selection Modal */}
