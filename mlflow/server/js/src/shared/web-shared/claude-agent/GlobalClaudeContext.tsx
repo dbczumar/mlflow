@@ -194,7 +194,7 @@ export const GlobalClaudeProvider = ({ children }: { children: ReactNode }) => {
         setIsClaudeAvailable(false);
       }
 
-      // Auto-open panel when navigating to a NEW GenAI experiment (experimentId changed)
+      // Auto-open panel when navigating to a NEW GenAI experiment
       if (experimentId && experimentId !== previousExperimentId) {
         // Experiment ID changed - user navigated to a different experiment
         if (experimentSpecificStatus !== 'configured' && isGenAIExp) {
@@ -205,9 +205,16 @@ export const GlobalClaudeProvider = ({ children }: { children: ReactNode }) => {
           // Non-GenAI experiment - make sure wizard is hidden
           setShowSetupWizard(false);
         }
-      } else if (experimentKind !== previousExperimentKind && !isGenAIExp) {
-        // Only experimentKind changed (data loaded) and it's NOT GenAI - hide wizard
-        setShowSetupWizard(false);
+      } else if (experimentKind !== previousExperimentKind) {
+        // ExperimentKind changed (data loaded)
+        if (isGenAIExp && experimentId && experimentSpecificStatus !== 'configured') {
+          // Just learned it's a GenAI experiment that's not configured - auto-open
+          setIsPanelOpen(true);
+          setShowSetupWizard(true);
+        } else if (!isGenAIExp) {
+          // Not a GenAI experiment - hide wizard
+          setShowSetupWizard(false);
+        }
       }
     }
 
