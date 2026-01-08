@@ -109,11 +109,14 @@ function mapBuiltinTypeToScorerClass(builtinType: string): string {
 /**
  * Convert onboarding ScorerConfig to API ScorerConfig format.
  */
-function convertToAPIScorerConfig(scorer: ScorerConfig, samplingRate: number, model?: string): APIScorerConfig {
+function convertToAPIScorerConfig(scorer: ScorerConfig, samplingRate: number, endpoint?: string): APIScorerConfig {
   const config: APIScorerConfig = {
     name: scorer.name,
     serialized_scorer: '',
   };
+
+  // Format the model as gateway:/endpoint-name if endpoint is provided
+  const model = endpoint ? `gateway:/${endpoint}` : undefined;
 
   // Build the serialized_scorer JSON
   if (scorer.type === 'builtin') {
@@ -262,12 +265,19 @@ export const ScorerSelectionStep = () => {
           judgeEndpointName: selectedEndpoint,
         });
 
+        // Reset loading state
+        setIsEnabling(false);
+
         // Navigate to the judges tab
         const judgesUrl = generatePath(RoutePaths.experimentPageTabScorers, { experimentId });
         console.log('Navigating to:', judgesUrl);
-        navigate(judgesUrl);
+
+        // Use a small delay to ensure state updates are processed
+        setTimeout(() => {
+          navigate(judgesUrl);
+        }, 100);
       } catch (error) {
-        console.error('Failed to create scheduled scorers:', error);
+        console.error('Failed to register scorers:', error);
         console.error('Error details:', {
           message: error instanceof Error ? error.message : String(error),
           stack: error instanceof Error ? error.stack : undefined,
