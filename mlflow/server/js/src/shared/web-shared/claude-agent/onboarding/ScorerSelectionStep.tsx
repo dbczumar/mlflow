@@ -166,7 +166,7 @@ function convertToAPIScorerConfig(scorer: ScorerConfig, samplingRate: number, en
  */
 export const ScorerSelectionStep = () => {
   const { theme } = useDesignSystemTheme();
-  const { goToNextStep, updateState, state } = useOnboarding();
+  const { goToNextStep, updateState, state, currentExperimentId } = useOnboarding();
   const globalClaude = useGlobalClaudeOptional();
 
   const [scorers, setScorers] = useState<ScorerConfig[]>(state.selectedScorers);
@@ -178,26 +178,23 @@ export const ScorerSelectionStep = () => {
 
   // Navigate to judges tab when this step is entered (only once)
   useEffect(() => {
-    if (!hasNavigatedRef.current) {
-      const experimentId = globalClaude?.context?.navigation?.experimentId;
-      if (experimentId) {
-        // Only navigate if we're not already on the judges page for this experiment
-        const currentPath = window.location.hash;
-        const judgesUrl = generatePath(RoutePaths.experimentPageTabScorers, { experimentId });
-        const targetHash = `#${judgesUrl}`;
+    if (!hasNavigatedRef.current && currentExperimentId) {
+      // Only navigate if we're not already on the judges page for this experiment
+      const currentPath = window.location.hash;
+      const judgesUrl = generatePath(RoutePaths.experimentPageTabScorers, { experimentId: currentExperimentId });
+      const targetHash = `#${judgesUrl}`;
 
-        if (currentPath !== targetHash) {
-          hasNavigatedRef.current = true;
-          window.location.href = targetHash;
-        } else {
-          // Already on the correct page
-          hasNavigatedRef.current = true;
-        }
+      if (currentPath !== targetHash) {
+        hasNavigatedRef.current = true;
+        window.location.href = targetHash;
+      } else {
+        // Already on the correct page
+        hasNavigatedRef.current = true;
       }
     }
-    // Empty dependency array ensures this only runs once on mount
+    // Include currentExperimentId to ensure we navigate to the correct experiment
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [currentExperimentId]);
 
   const handleToggleScorer = useCallback((scorerId: string) => {
     setScorers((prev) => prev.map((s) => (s.id === scorerId ? { ...s, enabled: !s.enabled } : s)));
@@ -232,13 +229,11 @@ export const ScorerSelectionStep = () => {
       }
       console.log('Selected endpoint:', selectedEndpoint);
 
-      // Get experiment ID from global context
-      const experimentId = globalClaude?.context?.navigation?.experimentId;
-      console.log('Experiment ID:', experimentId);
-      console.log('Global Claude context:', globalClaude?.context);
+      // Get experiment ID from onboarding context (not global context to avoid stale values)
+      console.log('Experiment ID:', currentExperimentId);
 
-      if (!experimentId) {
-        console.error('No experiment ID found in global context');
+      if (!currentExperimentId) {
+        console.error('No experiment ID found in onboarding context');
         alert('No experiment ID found. Please ensure you are in an experiment.');
         return;
       }
@@ -271,7 +266,7 @@ export const ScorerSelectionStep = () => {
         console.log('Registering scorers...');
         const registrationPromises = apiScorers.map((scorer) => {
           console.log(`Registering scorer: ${scorer.name}`);
-          return registerScorer(experimentId, scorer);
+          return registerScorer(currentExperimentId, scorer);
         });
 
         const responses = await Promise.all(registrationPromises);
@@ -293,7 +288,7 @@ export const ScorerSelectionStep = () => {
         console.log('Judges created successfully, navigating to judges tab');
 
         // Navigate to judges tab
-        const judgesUrl = generatePath(RoutePaths.experimentPageTabScorers, { experimentId });
+        const judgesUrl = generatePath(RoutePaths.experimentPageTabScorers, { experimentId: currentExperimentId });
         window.location.href = `/#${judgesUrl}`;
       } catch (error) {
         console.error('Failed to register scorers:', error);
@@ -305,7 +300,7 @@ export const ScorerSelectionStep = () => {
         setIsEnabling(false);
       }
     } /* eslint-enable no-console, no-alert */,
-    [globalClaude, scorers, selectedEndpoint, updateState],
+    [currentExperimentId, scorers, selectedEndpoint, updateState],
   );
 
   const enabledScorers = scorers.filter((s) => s.enabled);

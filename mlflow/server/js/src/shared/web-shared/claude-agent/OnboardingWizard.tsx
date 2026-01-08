@@ -111,6 +111,7 @@ interface OnboardingContextType {
   state: OnboardingState;
   currentStep: OnboardingStep;
   isCheckingInitialStep: boolean;
+  currentExperimentId?: string;
   goToStep: (step: OnboardingStep) => void;
   goToNextStep: () => void;
   goToPreviousStep: () => void;
@@ -543,6 +544,7 @@ export const OnboardingWizard = ({
     state,
     currentStep,
     isCheckingInitialStep,
+    currentExperimentId,
     goToStep,
     goToNextStep,
     goToPreviousStep,
