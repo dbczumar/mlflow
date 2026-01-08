@@ -263,6 +263,7 @@ export const ScorerSelectionStep = () => {
           samplingRate,
           onlineScoringEnabled: true,
           judgeEndpointName: selectedEndpoint,
+          judgesConfigured: true,
         });
 
         // Reset loading state
