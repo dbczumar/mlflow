@@ -339,6 +339,8 @@ export const OnboardingWizard = ({
 }: OnboardingWizardProps) => {
   const { theme } = useDesignSystemTheme();
 
+  console.log('[OnboardingWizard] Rendering with currentExperimentId:', currentExperimentId);
+
   const [currentStep, setCurrentStep] = useState<OnboardingStep>('experiment-selection');
   const [isCheckingInitialStep, setIsCheckingInitialStep] = useState(true);
 

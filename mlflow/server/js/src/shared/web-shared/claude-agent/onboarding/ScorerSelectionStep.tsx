@@ -178,17 +178,30 @@ export const ScorerSelectionStep = () => {
 
   // Navigate to judges tab when this step is entered (only once)
   useEffect(() => {
+    console.log('[ScorerSelectionStep] Navigation useEffect triggered', {
+      hasNavigated: hasNavigatedRef.current,
+      currentExperimentId,
+      currentPath: window.location.hash,
+    });
     if (!hasNavigatedRef.current && currentExperimentId) {
       // Only navigate if we're not already on the judges page for this experiment
       const currentPath = window.location.hash;
       const judgesUrl = generatePath(RoutePaths.experimentPageTabScorers, { experimentId: currentExperimentId });
       const targetHash = `#${judgesUrl}`;
 
+      console.log('[ScorerSelectionStep] Checking navigation', {
+        currentPath,
+        targetHash,
+        needsNavigation: currentPath !== targetHash,
+      });
+
       if (currentPath !== targetHash) {
+        console.log('[ScorerSelectionStep] Navigating to:', targetHash);
         hasNavigatedRef.current = true;
         window.location.href = targetHash;
       } else {
         // Already on the correct page
+        console.log('[ScorerSelectionStep] Already on correct page, skipping navigation');
         hasNavigatedRef.current = true;
       }
     }

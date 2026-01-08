@@ -6,7 +6,6 @@ import { Button, CheckCircleIcon, Typography, useDesignSystemTheme } from '@data
 import { FormattedMessage } from '@databricks/i18n';
 
 import { useOnboarding } from '../OnboardingWizard';
-import { useGlobalClaude } from '../GlobalClaudeContext';
 
 const COMPONENT_ID_PREFIX = 'mlflow.onboarding.completion';
 
@@ -16,14 +15,8 @@ const COMPONENT_ID_PREFIX = 'mlflow.onboarding.completion';
 export const CompletionStep = () => {
   const { theme } = useDesignSystemTheme();
   const { state, completeOnboarding } = useOnboarding();
-  const { closePanel } = useGlobalClaude();
 
   const enabledScorersCount = state.selectedScorers.filter((s) => s.enabled).length;
-
-  const handleGoBack = () => {
-    completeOnboarding();
-    closePanel();
-  };
 
   const isAssistantConfigured = state.assistantConfigured;
 
@@ -196,9 +189,6 @@ export const CompletionStep = () => {
 
       {/* Action Buttons */}
       <div css={{ display: 'flex', gap: theme.spacing.md }}>
-        <Button componentId={`${COMPONENT_ID_PREFIX}.go_back`} onClick={handleGoBack}>
-          <FormattedMessage defaultMessage="Go Back" description="Go back button" />
-        </Button>
         {isAssistantConfigured && (
           <Button componentId={`${COMPONENT_ID_PREFIX}.open_assistant`} type="primary" onClick={completeOnboarding}>
             <FormattedMessage defaultMessage="Open Assistant" description="Open assistant button" />
