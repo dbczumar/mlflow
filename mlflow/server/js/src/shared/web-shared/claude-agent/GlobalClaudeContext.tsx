@@ -212,10 +212,13 @@ export const GlobalClaudeProvider = ({ children }: { children: ReactNode }) => {
     setError(null);
     // Show setup wizard if not configured OR if in an experiment context
     // (The wizard itself will determine the appropriate starting step based on experiment state)
-    if (setupStatus === 'not-configured' || setupStatus === 'unknown' || context.navigation?.experimentId) {
-      setShowSetupWizard(true);
-    }
-  }, [setupStatus, context.navigation?.experimentId]);
+    setContextState((currentContext) => {
+      if (setupStatus === 'not-configured' || setupStatus === 'unknown' || currentContext.navigation?.experimentId) {
+        setShowSetupWizard(true);
+      }
+      return currentContext;
+    });
+  }, [setupStatus]);
 
   const closePanel = useCallback(() => {
     setIsPanelOpen(false);
@@ -227,11 +230,16 @@ export const GlobalClaudeProvider = ({ children }: { children: ReactNode }) => {
       setContextState(newContext);
 
       // If switching to global context (no experiment), close the setup wizard
-      if (!newContext.navigation?.experimentId && showSetupWizard) {
-        setShowSetupWizard(false);
+      if (!newContext.navigation?.experimentId) {
+        setShowSetupWizard((prev) => {
+          if (prev) {
+            return false;
+          }
+          return prev;
+        });
       }
     },
-    [showSetupWizard],
+    [],
   );
 
   const reset = useCallback(() => {
