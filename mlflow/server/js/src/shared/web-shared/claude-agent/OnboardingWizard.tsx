@@ -370,9 +370,17 @@ export const OnboardingWizard = ({
           nextStep = STEP_ORDER[nextIndex];
         } else if (
           !currentExperimentId &&
-          (nextStep === 'use-case' || nextStep === 'scorer-selection' || nextStep === 'instrumentation')
+          (nextStep === 'use-case' ||
+            nextStep === 'scorer-selection' ||
+            nextStep === 'instrumentation' ||
+            nextStep === 'completion')
         ) {
-          // Skip experiment-specific steps when not in an experiment
+          // Skip experiment-specific steps when not in an experiment (including completion)
+          // When skipping completion from home page, just complete the onboarding
+          if (nextStep === 'completion') {
+            completeOnboarding();
+            return;
+          }
           nextIndex += 1;
           if (nextIndex < STEP_ORDER.length) {
             nextStep = STEP_ORDER[nextIndex];
@@ -384,7 +392,14 @@ export const OnboardingWizard = ({
 
       setCurrentStep(nextStep);
     }
-  }, [currentStep, currentExperimentId, state.assistantConfigured, state.experimentSelected, state.judgesConfigured]);
+  }, [
+    currentStep,
+    currentExperimentId,
+    state.assistantConfigured,
+    state.experimentSelected,
+    state.judgesConfigured,
+    completeOnboarding,
+  ]);
 
   const goToPreviousStep = useCallback(() => {
     const currentIndex = STEP_ORDER.indexOf(currentStep);
@@ -411,9 +426,12 @@ export const OnboardingWizard = ({
           }
         } else if (
           !currentExperimentId &&
-          (prevStep === 'use-case' || prevStep === 'scorer-selection' || prevStep === 'instrumentation')
+          (prevStep === 'use-case' ||
+            prevStep === 'scorer-selection' ||
+            prevStep === 'instrumentation' ||
+            prevStep === 'completion')
         ) {
-          // Skip experiment-specific steps when not in an experiment
+          // Skip experiment-specific steps when not in an experiment (including completion)
           prevIndex -= 1;
           if (prevIndex >= 0) {
             prevStep = STEP_ORDER[prevIndex];
@@ -461,8 +479,11 @@ export const OnboardingWizard = ({
     if ((step === 'use-case' || step === 'scorer-selection') && state.judgesConfigured) {
       return false; // Skip judge setup steps if configured
     }
-    // Skip experiment-specific steps when not in an experiment
-    if (!currentExperimentId && (step === 'use-case' || step === 'scorer-selection' || step === 'instrumentation')) {
+    // Skip experiment-specific steps when not in an experiment (including completion)
+    if (
+      !currentExperimentId &&
+      (step === 'use-case' || step === 'scorer-selection' || step === 'instrumentation' || step === 'completion')
+    ) {
       return false;
     }
     return true;
