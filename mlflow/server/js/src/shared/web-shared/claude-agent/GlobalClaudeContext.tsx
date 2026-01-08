@@ -181,11 +181,16 @@ export const GlobalClaudeProvider = ({ children }: { children: ReactNode }) => {
       setIsClaudeAvailable(false);
     }
 
-    // Auto-open panel when experiment is opened but not set up yet
+    // Check if this is a GenAI experiment
+    const experimentKind = context.navigation?.experimentKind;
+    const isGenAIExp =
+      experimentKind === 'GENAI_DEVELOPMENT' || experimentKind === 'GENAI_DEVELOPMENT_INFERRED';
+
+    // Auto-open panel when GenAI experiment is opened but not set up yet
     if (experimentId && experimentId !== previousExperimentId) {
       // Experiment changed to a new one
-      if (experimentSpecificStatus !== 'configured') {
-        // This experiment's wizard is not complete - auto-open panel
+      if (experimentSpecificStatus !== 'configured' && isGenAIExp) {
+        // This GenAI experiment's wizard is not complete - auto-open panel
         setIsPanelOpen(true);
         setShowSetupWizard(true);
       }
@@ -196,15 +201,19 @@ export const GlobalClaudeProvider = ({ children }: { children: ReactNode }) => {
       // This experiment's wizard is fully complete
       setShowSetupWizard(false);
     } else {
-      // Wizard not complete for this experiment - show it if panel is open
-      if (isPanelOpen) {
+      // Wizard not complete for this experiment
+      if (isPanelOpen && isGenAIExp) {
+        // Show wizard if panel is open AND it's a GenAI experiment
         setShowSetupWizard(true);
+      } else {
+        // Hide wizard if panel is not open OR it's not a GenAI experiment
+        setShowSetupWizard(false);
       }
     }
 
     // Update ref with current experiment ID
     previousExperimentIdRef.current = experimentId;
-  }, [context.navigation?.experimentId, isPanelOpen, disconnectSSE]);
+  }, [context.navigation?.experimentId, context.navigation?.experimentKind, isPanelOpen, disconnectSSE]);
 
   // Actions
   const openPanel = useCallback(() => {
