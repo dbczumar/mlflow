@@ -19,8 +19,6 @@ import { EndpointSelector } from '../../../../experiment-tracking/components/End
 import { EndpointSelectionModal } from './EndpointSelectionModal';
 import { registerScorer } from '../../../../experiment-tracking/pages/experiment-scorers/api';
 import type { ScorerConfig as APIScorerConfig } from '../../../../experiment-tracking/pages/experiment-scorers/types';
-import { useNavigate, generatePath } from '../../../../common/utils/RoutingUtils';
-import { RoutePaths } from '../../../../experiment-tracking/routes';
 import { useGlobalClaudeOptional } from '../GlobalClaudeContext';
 
 const COMPONENT_ID_PREFIX = 'mlflow.onboarding.scorers';
@@ -269,14 +267,10 @@ export const ScorerSelectionStep = () => {
         // Reset loading state
         setIsEnabling(false);
 
-        // Navigate to the judges tab
-        const judgesUrl = generatePath(RoutePaths.experimentPageTabScorers, { experimentId });
-        console.log('Navigating to:', judgesUrl);
+        console.log('Judges created successfully, advancing to next step');
 
-        // Use a small delay to ensure state updates are processed
-        setTimeout(() => {
-          navigate(judgesUrl);
-        }, 100);
+        // Advance wizard to next step
+        goToNextStep();
       } catch (error) {
         console.error('Failed to register scorers:', error);
         console.error('Error details:', {
@@ -287,7 +281,7 @@ export const ScorerSelectionStep = () => {
         setIsEnabling(false);
       }
     } /* eslint-enable no-console, no-alert */,
-    [globalClaude, navigate, samplingMode, samplingRate, scorers, selectedEndpoint, updateState],
+    [globalClaude, goToNextStep, samplingMode, samplingRate, scorers, selectedEndpoint, updateState],
   );
 
   const enabledScorers = scorers.filter((s) => s.enabled);
