@@ -332,9 +332,8 @@ export const ExperimentSelectionStep = () => {
               css={{
                 marginTop: theme.spacing.lg,
                 padding: theme.spacing.md,
-                backgroundColor: theme.colors.tagTurquoise,
+                backgroundColor: theme.colors.backgroundSecondary,
                 borderRadius: theme.borders.borderRadiusMd,
-                color: theme.colors.white,
               }}
             >
               <Typography.Text size="sm" bold css={{ display: 'block', marginBottom: theme.spacing.xs }}>
