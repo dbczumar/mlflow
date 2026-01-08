@@ -20,6 +20,8 @@ import { EndpointSelectionModal } from './EndpointSelectionModal';
 import { registerScorer } from '../../../../experiment-tracking/pages/experiment-scorers/api';
 import type { ScorerConfig as APIScorerConfig } from '../../../../experiment-tracking/pages/experiment-scorers/types';
 import { useGlobalClaudeOptional } from '../GlobalClaudeContext';
+import { generatePath } from '../../../../common/utils/RoutingUtils';
+import { RoutePaths } from '../../../../experiment-tracking/routes';
 
 const COMPONENT_ID_PREFIX = 'mlflow.onboarding.scorers';
 
@@ -194,6 +196,14 @@ export const ScorerSelectionStep = () => {
   const handleEndpointSelect = useCallback((endpointName: string) => {
     setSelectedEndpoint(endpointName);
   }, []);
+
+  const handleViewJudges = useCallback(() => {
+    const experimentId = globalClaude?.context?.navigation?.experimentId;
+    if (experimentId) {
+      const judgesUrl = generatePath(RoutePaths.experimentPageTabScorers, { experimentId });
+      window.open(judgesUrl, '_blank');
+    }
+  }, [globalClaude]);
 
   const handleEnableOnlineScoring = useCallback(
     /* eslint-disable no-console, no-alert */
@@ -514,9 +524,14 @@ export const ScorerSelectionStep = () => {
             <FormattedMessage defaultMessage="Enable Judges" description="Enable button text" />
           )}
         </Button>
-        <Button componentId={`${COMPONENT_ID_PREFIX}.skip`} size="small" onClick={goToNextStep} css={{ opacity: 0.7 }}>
-          <FormattedMessage defaultMessage="Skip this step" description="Skip button text" />
-        </Button>
+        <div css={{ display: 'flex', gap: theme.spacing.sm }}>
+          <Button componentId={`${COMPONENT_ID_PREFIX}.view_judges`} onClick={handleViewJudges}>
+            <FormattedMessage defaultMessage="View Judges" description="View judges button text" />
+          </Button>
+          <Button componentId={`${COMPONENT_ID_PREFIX}.skip`} size="small" onClick={goToNextStep} css={{ opacity: 0.7 }}>
+            <FormattedMessage defaultMessage="Skip this step" description="Skip button text" />
+          </Button>
+        </div>
       </div>
 
       {/* Endpoint Selection Modal */}
