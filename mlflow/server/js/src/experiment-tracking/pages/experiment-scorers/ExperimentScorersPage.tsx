@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect, useRef } from 'react';
 import { useDesignSystemTheme, Empty, Spacer, SparkleIcon, Typography, Alert } from '@databricks/design-system';
 import { FormattedMessage, useIntl } from 'react-intl';
 import { ErrorBoundary } from 'react-error-boundary';
@@ -8,6 +8,7 @@ import { enableScorersUI } from '../../../common/utils/FeatureUtils';
 import { isExperimentEvalResultsMonitoringUIEnabled } from '../../../common/utils/FeatureUtils';
 import { usePrefetchTraces } from './useEvaluateTraces';
 import { DEFAULT_TRACE_COUNT } from './constants';
+import { useGlobalClaudeOptional } from '../../../shared/web-shared/claude-agent';
 
 const getProductionMonitoringDocUrl = () => {
   return 'https://mlflow.org/docs/latest/genai/eval-monitor/';
@@ -69,6 +70,29 @@ const ExperimentScorersPage: React.FC<ExperimentScorersPageProps> = () => {
 
   // Prefetch traces when the page loads
   usePrefetchTraces(prefetchParams);
+
+  // Set Claude context for judges page
+  const globalClaude = useGlobalClaudeOptional();
+  const setContext = globalClaude?.setContext;
+  const lastExperimentIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!setContext || !experimentId) return;
+
+    // Only update if experiment ID changed
+    if (lastExperimentIdRef.current !== experimentId) {
+      lastExperimentIdRef.current = experimentId;
+      setContext({
+        type: 'none',
+        summary: 'Judges',
+        data: null,
+        navigation: {
+          experimentId,
+          page: 'judges',
+        },
+      });
+    }
+  }, [setContext, experimentId]);
   return (
     <ErrorBoundary FallbackComponent={ErrorFallback}>
       {!isFeatureEnabled ? (
