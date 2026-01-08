@@ -38,10 +38,12 @@ import { useUpdateExperimentKind } from './hooks/useUpdateExperimentKind';
 import { canModifyExperiment } from './utils/experimentPage.common-utils';
 import { useInferExperimentKind } from './hooks/useInferExperimentKind';
 import { ExperimentViewInferredKindModal } from './components/header/ExperimentViewInferredKindModal';
+import { useGlobalClaudeOptional } from '../../../shared/web-shared/claude-agent/GlobalClaudeContext';
 
 export const ExperimentView = ({ showHeader = true }: { showHeader?: boolean }) => {
   const dispatch = useDispatch<ThunkDispatch>();
   const { theme } = useDesignSystemTheme();
+  const globalClaude = useGlobalClaudeOptional();
 
   const [searchFacets, experimentIds, isPreview] = useExperimentPageSearchFacets();
   const [viewMode] = useExperimentPageViewMode();
@@ -83,6 +85,20 @@ export const ExperimentView = ({ showHeader = true }: { showHeader?: boolean }) 
     }
     fetchExperiments(experimentIds);
   }, [fetchExperiments, experimentIds, experiments]);
+
+  // Update global Claude context when experiment data is loaded
+  useEffect(() => {
+    if (globalClaude && experimentIds.length === 1 && firstExperiment) {
+      globalClaude.setContext({
+        type: 'experiment',
+        summary: `Experiment ${firstExperiment.name || experimentIds[0]}`,
+        data: null,
+        navigation: {
+          experimentId: experimentIds[0],
+        },
+      });
+    }
+  }, [globalClaude, experimentIds, firstExperiment]);
 
   useEffect(() => {
     // Seed the initial UI state when the experiments and runs are loaded.

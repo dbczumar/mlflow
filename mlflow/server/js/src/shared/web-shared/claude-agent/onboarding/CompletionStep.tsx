@@ -2,11 +2,11 @@
  * Step 5: Completion - All set! Show summary and next steps.
  */
 
-import { useEffect, useState } from 'react';
 import { Button, CheckCircleIcon, Typography, useDesignSystemTheme } from '@databricks/design-system';
 import { FormattedMessage } from '@databricks/i18n';
 
 import { useOnboarding } from '../OnboardingWizard';
+import { useGlobalClaude } from '../GlobalClaudeContext';
 
 const COMPONENT_ID_PREFIX = 'mlflow.onboarding.completion';
 
@@ -16,25 +16,14 @@ const COMPONENT_ID_PREFIX = 'mlflow.onboarding.completion';
 export const CompletionStep = () => {
   const { theme } = useDesignSystemTheme();
   const { state, completeOnboarding } = useOnboarding();
+  const { closePanel } = useGlobalClaude();
 
   const enabledScorersCount = state.selectedScorers.filter((s) => s.enabled).length;
-  const [countdown, setCountdown] = useState(5);
 
-  // Auto-redirect after 5 seconds
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCountdown((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          completeOnboarding();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [completeOnboarding]);
+  const handleGoBack = () => {
+    completeOnboarding();
+    closePanel();
+  };
 
   return (
     <div
@@ -199,19 +188,15 @@ export const CompletionStep = () => {
         </ul>
       </div>
 
-      {/* Auto-redirect countdown */}
-      <Typography.Text color="secondary" size="sm" css={{ marginBottom: theme.spacing.md }}>
-        <FormattedMessage
-          defaultMessage="Opening assistant in {seconds}..."
-          description="Auto-redirect countdown message"
-          values={{ seconds: countdown }}
-        />
-      </Typography.Text>
-
-      {/* Action Button */}
-      <Button componentId={`${COMPONENT_ID_PREFIX}.open_assistant`} type="primary" onClick={completeOnboarding}>
-        <FormattedMessage defaultMessage="Open Assistant Now" description="Open assistant button" />
-      </Button>
+      {/* Action Buttons */}
+      <div css={{ display: 'flex', gap: theme.spacing.md }}>
+        <Button componentId={`${COMPONENT_ID_PREFIX}.go_back`} onClick={handleGoBack}>
+          <FormattedMessage defaultMessage="Go Back" description="Go back button" />
+        </Button>
+        <Button componentId={`${COMPONENT_ID_PREFIX}.open_assistant`} type="primary" onClick={completeOnboarding}>
+          <FormattedMessage defaultMessage="Open Assistant" description="Open assistant button" />
+        </Button>
+      </div>
     </div>
   );
 };

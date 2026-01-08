@@ -92,6 +92,8 @@ export const GlobalClaudeProvider = ({ children }: { children: ReactNode }) => {
 
   // Use ref to track current streaming message
   const streamingMessageRef = useRef<string>('');
+  // Use ref to track previous experiment ID for auto-opening panel
+  const previousExperimentIdRef = useRef<string | undefined>(undefined);
 
   const appendToStreamingMessage = useCallback((text: string) => {
     streamingMessageRef.current += text;
@@ -144,17 +146,15 @@ export const GlobalClaudeProvider = ({ children }: { children: ReactNode }) => {
   // Check Claude availability and setup status when context changes
   useEffect(() => {
     const experimentId = context.navigation?.experimentId;
-    // Check experiment-specific status if in experiment, otherwise check global
-    let storedStatus = loadSetupStatus(experimentId);
+    const previousExperimentId = previousExperimentIdRef.current;
 
-    // If not in experiment and experiment-specific is not configured, check global
-    // This ensures global configuration is respected outside experiments
-    if (!experimentId && storedStatus !== 'configured') {
-      const globalStatus = loadSetupStatus();
-      if (globalStatus === 'configured') {
-        storedStatus = 'configured';
-      }
-    }
+    // Check global status for button variant and backend availability
+    const globalStatus = loadSetupStatus();
+
+    // Check experiment-specific status for wizard visibility
+    // For experiments: check if THIS experiment's wizard is complete
+    // For non-experiments: use global status
+    const experimentSpecificStatus = experimentId ? loadSetupStatus(experimentId) : globalStatus;
 
     // Reset session when experiment changes (inline to avoid circular dependency)
     setSessionId(null);
@@ -164,29 +164,46 @@ export const GlobalClaudeProvider = ({ children }: { children: ReactNode }) => {
     streamingMessageRef.current = '';
     disconnectSSE();
 
-    // If already configured in localStorage, just verify backend is available
-    if (storedStatus === 'configured') {
+    // Button variant and availability based on GLOBAL backend configuration
+    if (globalStatus === 'configured') {
       checkHealth()
         .then((health) => {
           const isAvailable = health.claude_available === 'true' || health.claude_available === 'True';
           setIsClaudeAvailable(isAvailable);
           setSetupStatus('configured');
-          setShowSetupWizard(false); // Hide wizard if already configured
         })
         .catch(() => {
           setIsClaudeAvailable(false);
           setSetupStatus('configured'); // Keep configured status - user may just need to restart backend
-          setShowSetupWizard(false);
         });
     } else {
-      // Not configured yet - mark as not-configured
       setSetupStatus('not-configured');
       setIsClaudeAvailable(false);
-      // Show wizard if panel is open and not configured
+    }
+
+    // Auto-open panel when experiment is opened but not set up yet
+    if (experimentId && experimentId !== previousExperimentId) {
+      // Experiment changed to a new one
+      if (experimentSpecificStatus !== 'configured') {
+        // This experiment's wizard is not complete - auto-open panel
+        setIsPanelOpen(true);
+        setShowSetupWizard(true);
+      }
+    }
+
+    // Wizard visibility based on EXPERIMENT-SPECIFIC completion
+    if (experimentSpecificStatus === 'configured') {
+      // This experiment's wizard is fully complete
+      setShowSetupWizard(false);
+    } else {
+      // Wizard not complete for this experiment - show it if panel is open
       if (isPanelOpen) {
         setShowSetupWizard(true);
       }
     }
+
+    // Update ref with current experiment ID
+    previousExperimentIdRef.current = experimentId;
   }, [context.navigation?.experimentId, isPanelOpen, disconnectSSE]);
 
   // Actions

@@ -31,7 +31,7 @@ const COMPONENT_ID_PREFIX = 'mlflow.onboarding.experiment';
  */
 export const ExperimentSelectionStep = () => {
   const { theme } = useDesignSystemTheme();
-  const { goToNextStep, updateState, currentStep, isCheckingInitialStep } = useOnboarding();
+  const { goToNextStep, goToStep, updateState, currentStep, isCheckingInitialStep } = useOnboarding();
   const globalClaude = useGlobalClaudeOptional();
   const navigate = useNavigate();
 
@@ -133,6 +133,18 @@ export const ExperimentSelectionStep = () => {
     updateState({ experimentSelected: true });
     goToNextStep();
   }, [goToNextStep, updateState]);
+
+  const handleSkipToBackend = useCallback(() => {
+    // Skip directly to assistant backend configuration
+    // Set flags to bypass experiment, use-case, and judges
+    updateState({
+      experimentSelected: false, // No experiment selected
+      useCase: null, // Skip use case
+      judgesConfigured: true, // Mark judges as configured to skip those steps
+    });
+    // Jump directly to assistant-backend step
+    goToStep('assistant-backend');
+  }, [updateState, goToStep]);
 
   return (
     <div css={{ padding: theme.spacing.lg }}>
@@ -320,6 +332,18 @@ export const ExperimentSelectionStep = () => {
               </div>
               <ChevronRightIcon css={{ color: theme.colors.textSecondary, flexShrink: 0 }} />
             </button>
+          </div>
+
+          {/* Skip button */}
+          <div css={{ marginTop: theme.spacing.lg, display: 'flex', justifyContent: 'flex-end' }}>
+            <Button
+              componentId={`${COMPONENT_ID_PREFIX}.skip`}
+              size="small"
+              onClick={handleSkipToBackend}
+              css={{ opacity: 0.7 }}
+            >
+              <FormattedMessage defaultMessage="Skip this step" description="Skip experiment selection step" />
+            </Button>
           </div>
 
           {/* Show message if user selected to navigate to experiments page */}

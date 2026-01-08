@@ -8,7 +8,14 @@
  */
 
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
-import { Button, ChevronLeftIcon, Typography, useDesignSystemTheme } from '@databricks/design-system';
+import {
+  Button,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  Typography,
+  useDesignSystemTheme,
+  importantify,
+} from '@databricks/design-system';
 import { FormattedMessage } from '@databricks/i18n';
 
 import { ExperimentSelectionStep } from './onboarding/ExperimentSelectionStep';
@@ -86,6 +93,9 @@ export interface OnboardingState {
 
   // Assistant configuration (used conditionally in instrumentation step)
   assistantConfigured: boolean;
+
+  // Judge configuration status (used to skip scorer selection if already configured)
+  judgesConfigured: boolean;
 
   // Completion
   completedAt: Date | null;
@@ -174,6 +184,7 @@ const INITIAL_STATE: OnboardingState = {
   instrumentationApplied: false,
   tracingVerified: false,
   assistantConfigured: false,
+  judgesConfigured: false,
   completedAt: null,
 };
 
@@ -226,12 +237,15 @@ interface OnboardingWizardProps {
 
 /**
  * Determine the appropriate initial step based on current context.
- * Returns 'experiment-selection' if checking, or the determined step.
+ * Returns step and whether judges are configured.
  */
-const determineInitialStep = async (experimentId?: string): Promise<OnboardingStep> => {
-  // If no experiment, start with experiment selection
+const determineInitialStep = async (
+  experimentId?: string,
+  assistantConfigured?: boolean,
+): Promise<{ step: OnboardingStep; judgesConfigured: boolean }> => {
+  // If no experiment, always start with experiment selection
   if (!experimentId) {
-    return 'experiment-selection';
+    return { step: 'experiment-selection', judgesConfigured: false };
   }
 
   // Check if experiment has judges configured
@@ -241,7 +255,7 @@ const determineInitialStep = async (experimentId?: string): Promise<OnboardingSt
 
     // If no judges, skip experiment selection and go to use case
     if (!hasJudges) {
-      return 'use-case';
+      return { step: 'use-case', judgesConfigured: false };
     }
 
     // Check if experiment has traces
@@ -257,15 +271,18 @@ const determineInitialStep = async (experimentId?: string): Promise<OnboardingSt
 
     // If has judges but no traces, skip to instrumentation
     if (!hasTraces) {
-      return 'instrumentation';
+      return { step: 'instrumentation', judgesConfigured: true };
     }
 
     // If has both judges and traces, everything is set up!
-    return 'completion';
+    return { step: 'completion', judgesConfigured: true };
   } catch (error) {
     console.error('[OnboardingWizard] Error determining initial step:', error);
-    // On error, default to experiment selection
-    return 'experiment-selection';
+    // On error, default to experiment selection (or assistant-backend if not configured)
+    if (!assistantConfigured) {
+      return { step: 'assistant-backend', judgesConfigured: false };
+    }
+    return { step: 'experiment-selection', judgesConfigured: false };
   }
 };
 
@@ -299,19 +316,27 @@ export const OnboardingWizard = ({
       // so we need to check again when experimentId changes)
       const savedStep = loadWizardStep(currentExperimentId);
       if (savedStep) {
-        setCurrentStep(savedStep);
+        // If saved step is assistant-backend but assistant is already configured, skip it
+        if (savedStep === 'assistant-backend' && assistantAlreadyConfigured) {
+          const result = await determineInitialStep(currentExperimentId, assistantAlreadyConfigured);
+          setCurrentStep(result.step);
+          setState((prev) => ({ ...prev, judgesConfigured: result.judgesConfigured }));
+        } else {
+          setCurrentStep(savedStep);
+        }
         setIsCheckingInitialStep(false);
         return;
       }
 
       // No saved step - determine based on current state
-      const initialStep = await determineInitialStep(currentExperimentId);
-      setCurrentStep(initialStep);
+      const result = await determineInitialStep(currentExperimentId, assistantAlreadyConfigured);
+      setCurrentStep(result.step);
+      setState((prev) => ({ ...prev, judgesConfigured: result.judgesConfigured }));
       setIsCheckingInitialStep(false);
     };
 
     checkInitialStep();
-  }, [currentExperimentId]);
+  }, [currentExperimentId, assistantAlreadyConfigured]);
 
   // Save current step to localStorage whenever it changes
   // NOTE: We DON'T include currentExperimentId in dependencies to avoid saving the old step
@@ -329,16 +354,78 @@ export const OnboardingWizard = ({
   const goToNextStep = useCallback(() => {
     const currentIndex = STEP_ORDER.indexOf(currentStep);
     if (currentIndex < STEP_ORDER.length - 1) {
-      setCurrentStep(STEP_ORDER[currentIndex + 1]);
+      let nextIndex = currentIndex + 1;
+      let nextStep = STEP_ORDER[nextIndex];
+
+      // Skip completed steps and experiment-specific steps when not in experiment
+      while (nextIndex < STEP_ORDER.length) {
+        if (nextStep === 'experiment-selection' && state.experimentSelected) {
+          nextIndex += 1;
+          nextStep = STEP_ORDER[nextIndex];
+        } else if (nextStep === 'assistant-backend' && state.assistantConfigured) {
+          nextIndex += 1;
+          nextStep = STEP_ORDER[nextIndex];
+        } else if ((nextStep === 'use-case' || nextStep === 'scorer-selection') && state.judgesConfigured) {
+          nextIndex += 1;
+          nextStep = STEP_ORDER[nextIndex];
+        } else if (
+          !currentExperimentId &&
+          (nextStep === 'use-case' || nextStep === 'scorer-selection' || nextStep === 'instrumentation')
+        ) {
+          // Skip experiment-specific steps when not in an experiment
+          nextIndex += 1;
+          if (nextIndex < STEP_ORDER.length) {
+            nextStep = STEP_ORDER[nextIndex];
+          }
+        } else {
+          break;
+        }
+      }
+
+      setCurrentStep(nextStep);
     }
-  }, [currentStep]);
+  }, [currentStep, currentExperimentId, state.assistantConfigured, state.experimentSelected, state.judgesConfigured]);
 
   const goToPreviousStep = useCallback(() => {
     const currentIndex = STEP_ORDER.indexOf(currentStep);
     if (currentIndex > 0) {
-      setCurrentStep(STEP_ORDER[currentIndex - 1]);
+      let prevIndex = currentIndex - 1;
+      let prevStep = STEP_ORDER[prevIndex];
+
+      // Skip completed steps and experiment-specific steps when not in experiment
+      while (prevIndex >= 0) {
+        if (prevStep === 'experiment-selection' && state.experimentSelected) {
+          prevIndex -= 1;
+          if (prevIndex >= 0) {
+            prevStep = STEP_ORDER[prevIndex];
+          }
+        } else if (prevStep === 'assistant-backend' && state.assistantConfigured) {
+          prevIndex -= 1;
+          if (prevIndex >= 0) {
+            prevStep = STEP_ORDER[prevIndex];
+          }
+        } else if ((prevStep === 'use-case' || prevStep === 'scorer-selection') && state.judgesConfigured) {
+          prevIndex -= 1;
+          if (prevIndex >= 0) {
+            prevStep = STEP_ORDER[prevIndex];
+          }
+        } else if (
+          !currentExperimentId &&
+          (prevStep === 'use-case' || prevStep === 'scorer-selection' || prevStep === 'instrumentation')
+        ) {
+          // Skip experiment-specific steps when not in an experiment
+          prevIndex -= 1;
+          if (prevIndex >= 0) {
+            prevStep = STEP_ORDER[prevIndex];
+          }
+        } else {
+          break;
+        }
+      }
+
+      setCurrentStep(prevStep);
     }
-  }, [currentStep]);
+  }, [currentStep, currentExperimentId, state.assistantConfigured, state.experimentSelected, state.judgesConfigured]);
 
   const updateState = useCallback((updates: Partial<OnboardingState>) => {
     setState((prev) => ({ ...prev, ...updates }));
@@ -362,7 +449,32 @@ export const OnboardingWizard = ({
 
   const stepInfo = STEP_INFO[currentStep];
   const currentStepIndex = STEP_ORDER.indexOf(currentStep);
-  const showBackButton = currentStepIndex > 0 && currentStep !== 'completion';
+
+  // Calculate visible steps (skip completed steps and experiment-only steps when not in experiment)
+  const visibleSteps = STEP_ORDER.filter((step) => {
+    if (step === 'experiment-selection' && state.experimentSelected) {
+      return false; // Skip experiment selection if already in an experiment
+    }
+    if (step === 'assistant-backend' && state.assistantConfigured) {
+      return false; // Skip assistant-backend if configured
+    }
+    if ((step === 'use-case' || step === 'scorer-selection') && state.judgesConfigured) {
+      return false; // Skip judge setup steps if configured
+    }
+    // Skip experiment-specific steps when not in an experiment
+    if (!currentExperimentId && (step === 'use-case' || step === 'scorer-selection' || step === 'instrumentation')) {
+      return false;
+    }
+    return true;
+  });
+
+  // Find current step position in visible steps
+  const currentVisibleStepIndex = visibleSteps.indexOf(currentStep);
+  const showBackButton = currentVisibleStepIndex > 0 && currentStep !== 'completion';
+  const showForwardButton = currentVisibleStepIndex < visibleSteps.length - 1 && currentStep !== 'completion';
+
+  // Disable forward button if on experiment selection and no experiment selected
+  const isForwardButtonDisabled = currentStep === 'experiment-selection' && !state.experimentSelected;
 
   // Show loading state while checking initial step
   if (isCheckingInitialStep) {
@@ -407,35 +519,74 @@ export const OnboardingWizard = ({
             flexShrink: 0,
           }}
         >
-          {/* Back button and step counter */}
-          <div
-            css={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              marginBottom: theme.spacing.md,
-            }}
-          >
-            {showBackButton ? (
-              <Button
-                componentId={`${COMPONENT_ID_PREFIX}.back`}
-                size="small"
-                icon={<ChevronLeftIcon />}
-                onClick={goToPreviousStep}
-              >
-                <FormattedMessage defaultMessage="Back" description="Back button" />
-              </Button>
-            ) : (
-              <div />
-            )}
-            <Typography.Text color="secondary" size="sm">
-              <FormattedMessage
-                defaultMessage="Step {current} of {total}"
-                description="Step counter"
-                values={{ current: currentStepIndex + 1, total: STEP_ORDER.length }}
-              />
-            </Typography.Text>
-          </div>
+          {/* Navigation buttons */}
+          {(showBackButton || showForwardButton) && (
+            <div
+              css={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                marginBottom: theme.spacing.md,
+              }}
+            >
+              {showBackButton ? (
+                <button
+                  onClick={goToPreviousStep}
+                  aria-label="Previous step"
+                  css={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: 32,
+                    height: 32,
+                    padding: 0,
+                    backgroundColor: theme.colors.actionPrimaryBackgroundDefault,
+                    border: `1px solid ${theme.colors.actionPrimaryBackgroundDefault}`,
+                    borderRadius: theme.borders.borderRadiusMd,
+                    color: theme.colors.white,
+                    cursor: 'pointer',
+                    '&:hover': {
+                      backgroundColor: theme.colors.actionPrimaryBackgroundHover,
+                      borderColor: theme.colors.actionPrimaryBackgroundHover,
+                    },
+                  }}
+                >
+                  <ChevronLeftIcon css={{ color: theme.colors.white }} />
+                </button>
+              ) : (
+                <div />
+              )}
+              {showForwardButton && (
+                <button
+                  onClick={goToNextStep}
+                  disabled={isForwardButtonDisabled}
+                  aria-label="Next step"
+                  css={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: 32,
+                    height: 32,
+                    padding: 0,
+                    backgroundColor: theme.colors.actionPrimaryBackgroundDefault,
+                    border: `1px solid ${theme.colors.actionPrimaryBackgroundDefault}`,
+                    borderRadius: theme.borders.borderRadiusMd,
+                    color: theme.colors.white,
+                    cursor: 'pointer',
+                    '&:hover:not(:disabled)': {
+                      backgroundColor: theme.colors.actionPrimaryBackgroundHover,
+                      borderColor: theme.colors.actionPrimaryBackgroundHover,
+                    },
+                    '&:disabled': {
+                      opacity: 0.4,
+                      cursor: 'not-allowed',
+                    },
+                  }}
+                >
+                  <ChevronRightIcon css={{ color: theme.colors.white }} />
+                </button>
+              )}
+            </div>
+          )}
 
           {/* Step progress bar */}
           <div
@@ -445,7 +596,7 @@ export const OnboardingWizard = ({
               marginBottom: theme.spacing.lg,
             }}
           >
-            {STEP_ORDER.map((step, index) => (
+            {visibleSteps.map((step, index) => (
               <div
                 key={step}
                 css={{
@@ -453,7 +604,7 @@ export const OnboardingWizard = ({
                   height: 4,
                   borderRadius: 2,
                   backgroundColor:
-                    index <= currentStepIndex
+                    index <= currentVisibleStepIndex
                       ? theme.colors.actionPrimaryBackgroundDefault
                       : theme.colors.backgroundSecondary,
                   transition: 'background-color 0.2s',
@@ -471,7 +622,7 @@ export const OnboardingWizard = ({
 
         {/* Step content */}
         <div css={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
-          {!isCheckingInitialStep && <StepContent step={currentStep} />}
+          {!isCheckingInitialStep && <StepContent step={currentStep} currentExperimentId={currentExperimentId} />}
         </div>
       </div>
     </OnboardingContext.Provider>
@@ -481,7 +632,12 @@ export const OnboardingWizard = ({
 /**
  * Renders the content for the current step.
  */
-const StepContent = ({ step }: { step: OnboardingStep }) => {
+interface StepContentProps {
+  step: OnboardingStep;
+  currentExperimentId?: string;
+}
+
+const StepContent = ({ step, currentExperimentId }: StepContentProps) => {
   const { goToNextStep, updateState } = useOnboarding();
 
   const handleAssistantConfigured = () => {
@@ -502,7 +658,13 @@ const StepContent = ({ step }: { step: OnboardingStep }) => {
     case 'scorer-selection':
       return <ScorerSelectionStep />;
     case 'assistant-backend':
-      return <AssistantBackendStep onConfigured={handleAssistantConfigured} onSkip={handleAssistantSkipped} />;
+      // Only allow skipping assistant setup when in an experiment
+      return (
+        <AssistantBackendStep
+          onConfigured={handleAssistantConfigured}
+          onSkip={currentExperimentId ? handleAssistantSkipped : undefined}
+        />
+      );
     case 'instrumentation':
       return <InstrumentationStep />;
     case 'completion':

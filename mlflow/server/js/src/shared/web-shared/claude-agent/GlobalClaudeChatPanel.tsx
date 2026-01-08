@@ -178,7 +178,17 @@ export const GlobalClaudeChatPanel = () => {
             }}
           >
             <img src={AssistantSparklesLogo} width={18} height={18} alt="" aria-hidden />
-            <FormattedMessage defaultMessage="MLflow GenAI Setup" description="Title for the onboarding wizard panel" />
+            {currentExperimentId ? (
+              <FormattedMessage
+                defaultMessage="GenAI Experiment Setup"
+                description="Title for the onboarding wizard panel when in experiment"
+              />
+            ) : (
+              <FormattedMessage
+                defaultMessage="MLflow Setup"
+                description="Title for the onboarding wizard panel when not in experiment"
+              />
+            )}
           </span>
           <Button
             componentId={`${COMPONENT_ID}.close`}

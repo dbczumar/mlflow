@@ -17,6 +17,15 @@ import { FormattedMessage } from '@databricks/i18n';
 import { checkHealth } from '../ClaudeAgentService';
 import ClaudeLogo from '../../../../common/static/logos/claude.svg';
 
+// Save setup status to localStorage (global)
+const saveGlobalSetupStatus = (): void => {
+  try {
+    localStorage.setItem('mlflow.assistant.setupStatus.global', 'configured');
+  } catch {
+    // localStorage not available
+  }
+};
+
 const COMPONENT_ID_PREFIX = 'mlflow.onboarding.assistant';
 
 /**
@@ -82,6 +91,8 @@ export const AssistantBackendStep = ({ onConfigured, onSkip }: AssistantBackendS
 
       if (isAvailable) {
         setVerificationSuccess(true);
+        // Save global state immediately so button shows Claude variant everywhere
+        saveGlobalSetupStatus();
         // Call the callback after showing success
         setTimeout(() => {
           onConfigured?.();
