@@ -17,7 +17,7 @@ import { FormattedMessage } from '@databricks/i18n';
 import { useOnboarding, type ScorerConfig } from '../OnboardingWizard';
 import { EndpointSelector } from '../../../../experiment-tracking/components/EndpointSelector';
 import { EndpointSelectionModal } from './EndpointSelectionModal';
-import { createScheduledScorers } from '../../../../experiment-tracking/pages/experiment-scorers/api';
+import { registerScorer } from '../../../../experiment-tracking/pages/experiment-scorers/api';
 import type { ScorerConfig as APIScorerConfig } from '../../../../experiment-tracking/pages/experiment-scorers/types';
 import { useNavigate, generatePath } from '../../../../common/utils/RoutingUtils';
 import { RoutePaths } from '../../../../experiment-tracking/routes';
@@ -130,6 +130,7 @@ function convertToAPIScorerConfig(scorer: ScorerConfig, samplingRate: number, mo
       name: scorer.name,
       builtin_scorer_class: scorerClass,
       builtin_scorer_pydantic_data: builtinData,
+      sample_rate: samplingRate / 100, // Convert from percentage to float
     });
     config.builtin = { name: scorer.name };
   } else if (scorer.type === 'guidelines') {
@@ -149,12 +150,10 @@ function convertToAPIScorerConfig(scorer: ScorerConfig, samplingRate: number, mo
       name: scorer.name,
       builtin_scorer_class: 'Guidelines',
       builtin_scorer_pydantic_data: guidelinesData,
+      sample_rate: samplingRate / 100, // Convert from percentage to float
     });
     config.builtin = { name: 'Guidelines' };
   }
-
-  // Add sample_rate (convert from percentage 0-100 to float 0-1)
-  config.sample_rate = samplingRate / 100;
 
   return config;
 }
@@ -244,10 +243,15 @@ export const ScorerSelectionStep = () => {
         );
         console.log('API scorers payload:', JSON.stringify(apiScorers, null, 2));
 
-        // Create the scheduled scorers
-        console.log('Calling createScheduledScorers API...');
-        const response = await createScheduledScorers(experimentId, { scorers: apiScorers });
-        console.log('API response:', response);
+        // Register each scorer using the registerScorer API
+        console.log('Registering scorers...');
+        const registrationPromises = apiScorers.map((scorer) => {
+          console.log(`Registering scorer: ${scorer.name}`);
+          return registerScorer(experimentId, scorer);
+        });
+
+        const responses = await Promise.all(registrationPromises);
+        console.log('API responses:', responses);
 
         // Update state
         updateState({
