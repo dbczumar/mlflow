@@ -14,6 +14,8 @@ import { useGlobalClaudeOptional } from '@databricks/web-shared/claude-agent';
 import { useParams, useLocation } from '@mlflow/mlflow/src/common/utils/RoutingUtils';
 import invariant from 'invariant';
 import { useGetExperimentQuery } from '../../../hooks/useExperimentQuery';
+import { useExperiments } from '../../../components/experiment-page/hooks/useExperiments';
+import { getExperimentKindFromTags } from '../../../utils/ExperimentKindUtils';
 import { useCallback, useMemo, useRef, useState, useEffect } from 'react';
 import { TracesV3Toolbar } from '../../../components/experiment-page/components/traces-v3/TracesV3Toolbar';
 import type { ModelTrace } from '@databricks/web-shared/model-trace-explorer';
@@ -51,6 +53,11 @@ const ExperimentSingleChatSessionPageImpl = () => {
 
   invariant(experimentId, 'Experiment ID must be defined');
   invariant(sessionId, 'Session ID must be defined');
+
+  // Get experiment data to extract experimentKind
+  const experiments = useExperiments([experimentId]);
+  const experiment = experiments[0];
+  const experimentKind = experiment ? getExperimentKindFromTags(experiment.tags) : undefined;
 
   const selectedTraceIdFromUrl = useMemo(() => {
     const searchParams = new URLSearchParams(location.search);
@@ -138,11 +145,12 @@ const ExperimentSingleChatSessionPageImpl = () => {
         },
         navigation: {
           experimentId,
+          experimentKind,
           page: 'session-detail',
         },
       });
     }
-  }, [setContext, sessionId, experimentId, traces, isLoadingTraceDatas]);
+  }, [setContext, sessionId, experimentId, experimentKind, traces, isLoadingTraceDatas]);
 
   return (
     <div css={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
