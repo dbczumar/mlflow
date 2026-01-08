@@ -89,12 +89,14 @@ export const ExperimentView = ({ showHeader = true }: { showHeader?: boolean }) 
   // Update global Claude context when experiment data is loaded
   useEffect(() => {
     if (globalClaude && experimentIds.length === 1 && firstExperiment) {
+      const experimentKind = getExperimentKindFromTags(firstExperiment.tags);
       globalClaude.setContext({
         type: 'experiment',
         summary: `Experiment ${firstExperiment.name || experimentIds[0]}`,
         data: null,
         navigation: {
           experimentId: experimentIds[0],
+          experimentKind,
         },
       });
     }

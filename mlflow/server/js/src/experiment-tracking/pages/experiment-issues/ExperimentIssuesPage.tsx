@@ -8,6 +8,8 @@ import type { Issue, IssueState } from './types';
 import { IssuesListPanel } from './IssuesListPanel';
 import { IssueDetailPanel } from './IssueDetailPanel';
 import { useGlobalClaudeOptional } from '@mlflow/mlflow/src/shared/web-shared/claude-agent';
+import { useExperiments } from '../../components/experiment-page/hooks/useExperiments';
+import { getExperimentKindFromTags } from '../../utils/ExperimentKindUtils';
 
 const ErrorFallback = ({ error }: { error?: Error }) => {
   const { theme } = useDesignSystemTheme();
@@ -51,6 +53,11 @@ const ExperimentIssuesPageContent = ({ experimentId }: { experimentId: string })
   const [activeStateTab, setActiveStateTab] = useState<IssueState>('open');
   const [searchQuery, setSearchQuery] = useState('');
   const [urlIssueHandled, setUrlIssueHandled] = useState(false);
+
+  // Get experiment data to extract experimentKind
+  const experiments = useExperiments([experimentId]);
+  const experiment = experiments[0];
+  const experimentKind = experiment ? getExperimentKindFromTags(experiment.tags) : undefined;
 
   // Fetch all issues for the experiment (we'll filter client-side for state tabs)
   const { data: allIssues = [], isLoading, refetch } = useSearchIssues(experimentId);
@@ -110,6 +117,7 @@ const ExperimentIssuesPageContent = ({ experimentId }: { experimentId: string })
           },
           navigation: {
             experimentId,
+            experimentKind,
             page: 'issue-detail',
           },
         });
@@ -121,12 +129,13 @@ const ExperimentIssuesPageContent = ({ experimentId }: { experimentId: string })
           data: null,
           navigation: {
             experimentId,
+            experimentKind,
             page: 'issues',
           },
         });
       }
     }
-  }, [setContext, selectedIssue, experimentId, filteredIssues.length, isLoading]);
+  }, [setContext, selectedIssue, experimentId, experimentKind, filteredIssues.length, isLoading]);
 
   // Handle initial issue selection from URL query param (runs once when data loads)
   useEffect(() => {
