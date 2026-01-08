@@ -210,11 +210,12 @@ export const GlobalClaudeProvider = ({ children }: { children: ReactNode }) => {
   const openPanel = useCallback(() => {
     setIsPanelOpen(true);
     setError(null);
-    // Show setup wizard if not configured
-    if (setupStatus === 'not-configured' || setupStatus === 'unknown') {
+    // Show setup wizard if not configured OR if in an experiment context
+    // (The wizard itself will determine the appropriate starting step based on experiment state)
+    if (setupStatus === 'not-configured' || setupStatus === 'unknown' || context.navigation?.experimentId) {
       setShowSetupWizard(true);
     }
-  }, [setupStatus]);
+  }, [setupStatus, context.navigation?.experimentId]);
 
   const closePanel = useCallback(() => {
     setIsPanelOpen(false);
