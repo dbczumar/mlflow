@@ -196,53 +196,84 @@ export const ScorerSelectionStep = () => {
     setSelectedEndpoint(endpointName);
   }, []);
 
-  const handleEnableOnlineScoring = useCallback(async () => {
-    // Check if endpoint is selected - if not, open the modal
-    if (!selectedEndpoint) {
-      setIsEndpointModalOpen(true);
-      return;
-    }
+  const handleEnableOnlineScoring = useCallback(
+    /* eslint-disable no-console, no-alert */
+    async () => {
+      console.log('=== Enable Judges Button Clicked ===');
 
-    // Get experiment ID from global context
-    const experimentId = globalClaude?.context?.navigation?.experimentId;
-    if (!experimentId) {
-      console.error('No experiment ID found');
-      return;
-    }
+      // Check if endpoint is selected - if not, open the modal
+      if (!selectedEndpoint) {
+        console.log('No endpoint selected, opening modal');
+        setIsEndpointModalOpen(true);
+        return;
+      }
+      console.log('Selected endpoint:', selectedEndpoint);
 
-    setIsEnabling(true);
+      // Get experiment ID from global context
+      const experimentId = globalClaude?.context?.navigation?.experimentId;
+      console.log('Experiment ID:', experimentId);
+      console.log('Global Claude context:', globalClaude?.context);
 
-    try {
-      // Get only enabled scorers
-      const enabledScorers = scorers.filter((s) => s.enabled);
+      if (!experimentId) {
+        console.error('No experiment ID found in global context');
+        alert('No experiment ID found. Please ensure you are in an experiment.');
+        return;
+      }
 
-      // Determine sampling rate to use
-      const actualSamplingRate = samplingMode === 'all' ? 100 : samplingRate;
+      setIsEnabling(true);
 
-      // Convert onboarding scorers to API format
-      const apiScorers = enabledScorers.map((scorer) =>
-        convertToAPIScorerConfig(scorer, actualSamplingRate, selectedEndpoint),
-      );
+      try {
+        // Get only enabled scorers
+        const enabledScorers = scorers.filter((s) => s.enabled);
+        console.log('Enabled scorers:', enabledScorers);
 
-      // Create the scheduled scorers
-      await createScheduledScorers(experimentId, { scorers: apiScorers });
+        if (enabledScorers.length === 0) {
+          console.warn('No scorers enabled');
+          alert('Please enable at least one judge');
+          setIsEnabling(false);
+          return;
+        }
 
-      // Update state
-      updateState({
-        selectedScorers: scorers,
-        samplingMode,
-        samplingRate,
-        onlineScoringEnabled: true,
-        judgeEndpointName: selectedEndpoint,
-      });
+        // Determine sampling rate to use
+        const actualSamplingRate = samplingMode === 'all' ? 100 : samplingRate;
+        console.log('Sampling rate:', actualSamplingRate);
 
-      // Navigate to the judges tab
-      navigate(generatePath(RoutePaths.experimentPageTabScorers, { experimentId }));
-    } catch (error) {
-      console.error('Failed to create scheduled scorers:', error);
-      setIsEnabling(false);
-    }
-  }, [globalClaude, navigate, samplingMode, samplingRate, scorers, selectedEndpoint, updateState]);
+        // Convert onboarding scorers to API format
+        const apiScorers = enabledScorers.map((scorer) =>
+          convertToAPIScorerConfig(scorer, actualSamplingRate, selectedEndpoint),
+        );
+        console.log('API scorers payload:', JSON.stringify(apiScorers, null, 2));
+
+        // Create the scheduled scorers
+        console.log('Calling createScheduledScorers API...');
+        const response = await createScheduledScorers(experimentId, { scorers: apiScorers });
+        console.log('API response:', response);
+
+        // Update state
+        updateState({
+          selectedScorers: scorers,
+          samplingMode,
+          samplingRate,
+          onlineScoringEnabled: true,
+          judgeEndpointName: selectedEndpoint,
+        });
+
+        // Navigate to the judges tab
+        const judgesUrl = generatePath(RoutePaths.experimentPageTabScorers, { experimentId });
+        console.log('Navigating to:', judgesUrl);
+        navigate(judgesUrl);
+      } catch (error) {
+        console.error('Failed to create scheduled scorers:', error);
+        console.error('Error details:', {
+          message: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+        });
+        alert(`Failed to create judges: ${error instanceof Error ? error.message : String(error)}`);
+        setIsEnabling(false);
+      }
+    } /* eslint-enable no-console, no-alert */,
+    [globalClaude, navigate, samplingMode, samplingRate, scorers, selectedEndpoint, updateState],
+  );
 
   const enabledScorers = scorers.filter((s) => s.enabled);
   const availableToAdd = AVAILABLE_SCORERS.filter((available) => !scorers.some((s) => s.id === available.id));
