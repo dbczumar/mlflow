@@ -153,7 +153,7 @@ const STEP_INFO: Record<OnboardingStep, { title: string; subtitle: string }> = {
   },
   'use-case': {
     title: 'Select Use Case',
-    subtitle: 'Tell us about your agent or application so we can recommend the right judges.',
+    subtitle: 'Tell us about your agent or application, so that MLflow can help fix issues and make improvements',
   },
   'scorer-selection': {
     title: 'Configure Judges',
