@@ -146,7 +146,7 @@ const STEP_ORDER: OnboardingStep[] = [
 const STEP_INFO: Record<OnboardingStep, { title: string; subtitle: string }> = {
   'experiment-selection': {
     title: 'Select Experiment',
-    subtitle: 'Select or create an experiment to build an agent or model',
+    subtitle: 'Select an experiment to build an agent or model',
   },
   'use-case': {
     title: 'Select Use Case',
