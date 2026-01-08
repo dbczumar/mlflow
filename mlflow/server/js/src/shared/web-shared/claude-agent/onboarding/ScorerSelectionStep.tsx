@@ -17,6 +17,11 @@ import { FormattedMessage } from '@databricks/i18n';
 import { useOnboarding, type ScorerConfig } from '../OnboardingWizard';
 import { EndpointSelector } from '../../../../experiment-tracking/components/EndpointSelector';
 import { EndpointSelectionModal } from './EndpointSelectionModal';
+import { createScheduledScorers } from '../../../../experiment-tracking/pages/experiment-scorers/api';
+import type { ScorerConfig as APIScorerConfig } from '../../../../experiment-tracking/pages/experiment-scorers/types';
+import { useNavigate, generatePath } from '../../../../common/utils/RoutingUtils';
+import { RoutePaths } from '../../../../experiment-tracking/routes';
+import { useGlobalClaudeOptional } from '../GlobalClaudeContext';
 
 const COMPONENT_ID_PREFIX = 'mlflow.onboarding.scorers';
 
@@ -83,11 +88,64 @@ const AVAILABLE_SCORERS: ScorerConfig[] = [
 ];
 
 /**
+ * Convert onboarding ScorerConfig to API ScorerConfig format.
+ */
+function convertToAPIScorerConfig(scorer: ScorerConfig, samplingRate: number, model?: string): APIScorerConfig {
+  const config: APIScorerConfig = {
+    name: scorer.name,
+    serialized_scorer: '',
+  };
+
+  // Build the serialized_scorer JSON
+  if (scorer.type === 'builtin') {
+    const builtinData: any = {};
+
+    // Add model if provided
+    if (model) {
+      builtinData.model = model;
+    }
+
+    config.serialized_scorer = JSON.stringify({
+      name: scorer.name,
+      builtin_scorer_class: scorer.builtinType,
+      builtin_scorer_pydantic_data: builtinData,
+    });
+    config.builtin = { name: scorer.builtinType || scorer.name };
+  } else if (scorer.type === 'guidelines') {
+    const guidelinesData: any = {};
+
+    // Add guidelines if provided
+    if (scorer.guidelines) {
+      guidelinesData.guidelines = [scorer.guidelines];
+    }
+
+    // Add model if provided
+    if (model) {
+      guidelinesData.model = model;
+    }
+
+    config.serialized_scorer = JSON.stringify({
+      name: scorer.name,
+      builtin_scorer_class: 'Guidelines',
+      builtin_scorer_pydantic_data: guidelinesData,
+    });
+    config.builtin = { name: 'Guidelines' };
+  }
+
+  // Add sample_rate (convert from percentage 0-100 to float 0-1)
+  config.sample_rate = samplingRate / 100;
+
+  return config;
+}
+
+/**
  * Step 4: Review and configure scorers for online scoring.
  */
 export const ScorerSelectionStep = () => {
   const { theme } = useDesignSystemTheme();
   const { goToNextStep, updateState, state } = useOnboarding();
+  const navigate = useNavigate();
+  const globalClaude = useGlobalClaudeOptional();
 
   const [scorers, setScorers] = useState<ScorerConfig[]>(state.selectedScorers);
   const [showAddScorer, setShowAddScorer] = useState(false);
@@ -124,23 +182,46 @@ export const ScorerSelectionStep = () => {
       return;
     }
 
+    // Get experiment ID from global context
+    const experimentId = globalClaude?.context?.navigation?.experimentId;
+    if (!experimentId) {
+      console.error('No experiment ID found');
+      return;
+    }
+
     setIsEnabling(true);
 
-    // In a real implementation, this would call the API to create scheduled scorers
-    // For now, we simulate the API call
-    await new Promise((resolve) => setTimeout(resolve, 1500));
+    try {
+      // Get only enabled scorers
+      const enabledScorers = scorers.filter((s) => s.enabled);
 
-    updateState({
-      selectedScorers: scorers,
-      samplingMode,
-      samplingRate,
-      onlineScoringEnabled: true,
-      judgeEndpointName: selectedEndpoint,
-    });
+      // Determine sampling rate to use
+      const actualSamplingRate = samplingMode === 'all' ? 100 : samplingRate;
 
-    setIsEnabling(false);
-    goToNextStep();
-  }, [goToNextStep, samplingMode, samplingRate, scorers, selectedEndpoint, updateState]);
+      // Convert onboarding scorers to API format
+      const apiScorers = enabledScorers.map((scorer) =>
+        convertToAPIScorerConfig(scorer, actualSamplingRate, selectedEndpoint),
+      );
+
+      // Create the scheduled scorers
+      await createScheduledScorers(experimentId, { scorers: apiScorers });
+
+      // Update state
+      updateState({
+        selectedScorers: scorers,
+        samplingMode,
+        samplingRate,
+        onlineScoringEnabled: true,
+        judgeEndpointName: selectedEndpoint,
+      });
+
+      // Navigate to the judges tab
+      navigate(generatePath(RoutePaths.experimentPageTabScorers, { experimentId }));
+    } catch (error) {
+      console.error('Failed to create scheduled scorers:', error);
+      setIsEnabling(false);
+    }
+  }, [globalClaude, navigate, samplingMode, samplingRate, scorers, selectedEndpoint, updateState]);
 
   const enabledScorers = scorers.filter((s) => s.enabled);
   const availableToAdd = AVAILABLE_SCORERS.filter((available) => !scorers.some((s) => s.id === available.id));
