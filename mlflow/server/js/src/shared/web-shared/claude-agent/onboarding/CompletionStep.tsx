@@ -25,6 +25,8 @@ export const CompletionStep = () => {
     closePanel();
   };
 
+  const isAssistantConfigured = state.assistantConfigured;
+
   return (
     <div
       css={{
@@ -79,25 +81,27 @@ export const CompletionStep = () => {
             textAlign: 'left',
           }}
         >
-          {/* Assistant Configured */}
-          <div
-            css={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: theme.spacing.md,
-              padding: theme.spacing.md,
-              backgroundColor: theme.colors.backgroundSecondary,
-              borderRadius: theme.borders.borderRadiusMd,
-            }}
-          >
-            <CheckCircleIcon css={{ color: theme.colors.textValidationSuccess, flexShrink: 0 }} />
-            <Typography.Text>
-              <FormattedMessage
-                defaultMessage="AI Assistant configured"
-                description="Assistant configured summary item"
-              />
-            </Typography.Text>
-          </div>
+          {/* Assistant Configured - only show if actually configured */}
+          {isAssistantConfigured && (
+            <div
+              css={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: theme.spacing.md,
+                padding: theme.spacing.md,
+                backgroundColor: theme.colors.backgroundSecondary,
+                borderRadius: theme.borders.borderRadiusMd,
+              }}
+            >
+              <CheckCircleIcon css={{ color: theme.colors.textValidationSuccess, flexShrink: 0 }} />
+              <Typography.Text>
+                <FormattedMessage
+                  defaultMessage="AI Assistant configured"
+                  description="Assistant configured summary item"
+                />
+              </Typography.Text>
+            </div>
+          )}
 
           {/* Tracing Set Up */}
           <div
@@ -177,14 +181,16 @@ export const CompletionStep = () => {
               <FormattedMessage defaultMessage="View traces and scores in the Traces tab" description="Next step 2" />
             </Typography.Text>
           </li>
-          <li>
-            <Typography.Text color="secondary">
-              <FormattedMessage
-                defaultMessage="Ask the Assistant for help analyzing issues"
-                description="Next step 3"
-              />
-            </Typography.Text>
-          </li>
+          {isAssistantConfigured && (
+            <li>
+              <Typography.Text color="secondary">
+                <FormattedMessage
+                  defaultMessage="Ask the Assistant for help analyzing issues"
+                  description="Next step 3"
+                />
+              </Typography.Text>
+            </li>
+          )}
         </ul>
       </div>
 
@@ -193,9 +199,11 @@ export const CompletionStep = () => {
         <Button componentId={`${COMPONENT_ID_PREFIX}.go_back`} onClick={handleGoBack}>
           <FormattedMessage defaultMessage="Go Back" description="Go back button" />
         </Button>
-        <Button componentId={`${COMPONENT_ID_PREFIX}.open_assistant`} type="primary" onClick={completeOnboarding}>
-          <FormattedMessage defaultMessage="Open Assistant" description="Open assistant button" />
-        </Button>
+        {isAssistantConfigured && (
+          <Button componentId={`${COMPONENT_ID_PREFIX}.open_assistant`} type="primary" onClick={completeOnboarding}>
+            <FormattedMessage defaultMessage="Open Assistant" description="Open assistant button" />
+          </Button>
+        )}
       </div>
     </div>
   );
