@@ -260,7 +260,7 @@ export const ExperimentSelectionStep = () => {
                 </Typography.Text>
                 <Typography.Text color="secondary" size="sm">
                   <FormattedMessage
-                    defaultMessage="Choose from your existing experiments to track your traces."
+                    defaultMessage="Choose from your existing experiments."
                     description="Description for select existing experiment option"
                   />
                 </Typography.Text>
@@ -304,25 +304,12 @@ export const ExperimentSelectionStep = () => {
                 <PlusCircleIcon />
               </div>
               <div css={{ flex: 1 }}>
-                <div css={{ display: 'flex', alignItems: 'center', gap: theme.spacing.sm }}>
-                  <Typography.Text bold>
-                    <FormattedMessage
-                      defaultMessage="Create New Experiment"
-                      description="Option to create new experiment"
-                    />
-                  </Typography.Text>
-                  <span
-                    css={{
-                      fontSize: theme.typography.fontSizeSm,
-                      padding: `2px ${theme.spacing.xs}px`,
-                      backgroundColor: theme.colors.tagTurquoise,
-                      borderRadius: theme.borders.borderRadiusSm,
-                      color: theme.colors.textPrimary,
-                    }}
-                  >
-                    <FormattedMessage defaultMessage="Recommended" description="Recommended label" />
-                  </span>
-                </div>
+                <Typography.Text bold css={{ display: 'block', marginBottom: theme.spacing.xs }}>
+                  <FormattedMessage
+                    defaultMessage="Create New Experiment"
+                    description="Option to create new experiment"
+                  />
+                </Typography.Text>
                 <Typography.Text color="secondary" size="sm">
                   <FormattedMessage
                     defaultMessage="Create a new experiment to organize your GenAI traces."
