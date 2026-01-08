@@ -171,8 +171,6 @@ export const ScorerSelectionStep = () => {
 
   const [scorers, setScorers] = useState<ScorerConfig[]>(state.selectedScorers);
   const [showAddScorer, setShowAddScorer] = useState(false);
-  const [samplingMode, setSamplingMode] = useState<'all' | 'sample'>(state.samplingMode || 'all');
-  const [samplingRate, setSamplingRate] = useState(state.samplingRate || 25);
   const [isEnabling, setIsEnabling] = useState(false);
   const [selectedEndpoint, setSelectedEndpoint] = useState<string | undefined>(state.judgeEndpointName);
   const [isEndpointModalOpen, setIsEndpointModalOpen] = useState(false);
@@ -250,13 +248,13 @@ export const ScorerSelectionStep = () => {
           return;
         }
 
-        // Determine sampling rate to use
-        const actualSamplingRate = samplingMode === 'all' ? 100 : samplingRate;
-        console.log('Sampling rate:', actualSamplingRate);
+        // Always use 100% sampling rate
+        const samplingRate = 100;
+        console.log('Sampling rate:', samplingRate);
 
         // Convert onboarding scorers to API format
         const apiScorers = enabledScorers.map((scorer) =>
-          convertToAPIScorerConfig(scorer, actualSamplingRate, selectedEndpoint),
+          convertToAPIScorerConfig(scorer, samplingRate, selectedEndpoint),
         );
         console.log('API scorers payload:', JSON.stringify(apiScorers, null, 2));
 
@@ -273,8 +271,8 @@ export const ScorerSelectionStep = () => {
         // Update state
         updateState({
           selectedScorers: scorers,
-          samplingMode,
-          samplingRate,
+          samplingMode: 'all',
+          samplingRate: 100,
           onlineScoringEnabled: true,
           judgeEndpointName: selectedEndpoint,
           judgesConfigured: true,
@@ -298,7 +296,7 @@ export const ScorerSelectionStep = () => {
         setIsEnabling(false);
       }
     } /* eslint-enable no-console, no-alert */,
-    [globalClaude, samplingMode, samplingRate, scorers, selectedEndpoint, updateState],
+    [globalClaude, scorers, selectedEndpoint, updateState],
   );
 
   const enabledScorers = scorers.filter((s) => s.enabled);
@@ -439,80 +437,6 @@ export const ScorerSelectionStep = () => {
             </div>
           </div>
         )}
-      </div>
-
-      {/* Sampling Configuration */}
-      <div
-        css={{
-          padding: theme.spacing.lg,
-          backgroundColor: theme.colors.backgroundSecondary,
-          borderRadius: theme.borders.borderRadiusLg,
-          marginBottom: theme.spacing.lg,
-        }}
-      >
-        <Typography.Text bold css={{ display: 'block', marginBottom: theme.spacing.md }}>
-          <FormattedMessage defaultMessage="Scope" description="Sampling configuration label" />
-        </Typography.Text>
-
-        <div css={{ display: 'flex', flexDirection: 'column', gap: theme.spacing.sm }}>
-          <label
-            css={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: theme.spacing.sm,
-              cursor: 'pointer',
-            }}
-          >
-            <input
-              type="radio"
-              name="samplingMode"
-              checked={samplingMode === 'all'}
-              onChange={() => setSamplingMode('all')}
-            />
-            <Typography.Text>
-              <FormattedMessage defaultMessage="All traces" description="All traces option" />
-            </Typography.Text>
-          </label>
-
-          <label
-            css={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: theme.spacing.sm,
-              cursor: 'pointer',
-            }}
-          >
-            <input
-              type="radio"
-              name="samplingMode"
-              checked={samplingMode === 'sample'}
-              onChange={() => setSamplingMode('sample')}
-            />
-            <Typography.Text>
-              <FormattedMessage
-                defaultMessage="Sample (recommended for high-volume apps)"
-                description="Sample option"
-              />
-            </Typography.Text>
-          </label>
-
-          {samplingMode === 'sample' && (
-            <div css={{ marginLeft: theme.spacing.lg, display: 'flex', alignItems: 'center', gap: theme.spacing.sm }}>
-              <Input
-                componentId={`${COMPONENT_ID_PREFIX}.sampling_rate`}
-                type="number"
-                min={1}
-                max={100}
-                value={samplingRate}
-                onChange={(e) => setSamplingRate(parseInt(e.target.value, 10) || 25)}
-                css={{ width: 80 }}
-              />
-              <Typography.Text>
-                <FormattedMessage defaultMessage="% of traces" description="Sampling rate label" />
-              </Typography.Text>
-            </div>
-          )}
-        </div>
       </div>
 
       {/* Action Buttons */}
