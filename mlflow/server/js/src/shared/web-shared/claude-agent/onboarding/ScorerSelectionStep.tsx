@@ -181,9 +181,18 @@ export const ScorerSelectionStep = () => {
     if (!hasNavigatedRef.current) {
       const experimentId = globalClaude?.context?.navigation?.experimentId;
       if (experimentId) {
-        hasNavigatedRef.current = true;
+        // Only navigate if we're not already on the judges page for this experiment
+        const currentPath = window.location.hash;
         const judgesUrl = generatePath(RoutePaths.experimentPageTabScorers, { experimentId });
-        window.location.href = `/#${judgesUrl}`;
+        const targetHash = `#${judgesUrl}`;
+
+        if (currentPath !== targetHash) {
+          hasNavigatedRef.current = true;
+          window.location.href = targetHash;
+        } else {
+          // Already on the correct page
+          hasNavigatedRef.current = true;
+        }
       }
     }
     // Empty dependency array ensures this only runs once on mount

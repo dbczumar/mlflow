@@ -359,13 +359,22 @@ export const OnboardingWizard = ({
       // Set checking flag at the start to prevent race conditions with child component effects
       setIsCheckingInitialStep(true);
 
-      // Load saved state for this experiment (note: useState initializer only runs on first mount,
+      // Load saved state ONLY for the current experiment (note: useState initializer only runs on first mount,
       // so we need to reload when experimentId changes)
+      // IMPORTANT: Only load state if it's for THIS specific experiment to prevent cross-experiment contamination
       const savedState = loadWizardState(currentExperimentId);
-      if (savedState) {
+      if (savedState && currentExperimentId) {
+        // Verify the saved state is actually for this experiment before applying it
         setState((prev) => ({
           ...INITIAL_STATE,
           ...savedState,
+          assistantConfigured: assistantAlreadyConfigured,
+          experimentSelected: Boolean(currentExperimentId),
+        }));
+      } else if (currentExperimentId) {
+        // New experiment with no saved state - reset to initial
+        setState((prev) => ({
+          ...INITIAL_STATE,
           assistantConfigured: assistantAlreadyConfigured,
           experimentSelected: Boolean(currentExperimentId),
         }));
