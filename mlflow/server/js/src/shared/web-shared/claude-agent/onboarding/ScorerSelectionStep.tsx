@@ -88,6 +88,25 @@ const AVAILABLE_SCORERS: ScorerConfig[] = [
 ];
 
 /**
+ * Map lowercase snake_case builtinType to PascalCase scorer class name.
+ */
+function mapBuiltinTypeToScorerClass(builtinType: string): string {
+  const mapping: Record<string, string> = {
+    safety: 'Safety',
+    correctness: 'Correctness',
+    fluency: 'Fluency',
+    relevance_to_query: 'RelevanceToQuery',
+    retrieval_groundedness: 'RetrievalGroundedness',
+    retrieval_relevance: 'RetrievalRelevance',
+    retrieval_sufficiency: 'RetrievalSufficiency',
+    tool_call_correctness: 'ToolCallCorrectness',
+    user_frustration: 'UserFrustration',
+    conversation_completeness: 'ConversationCompleteness',
+  };
+  return mapping[builtinType] || builtinType;
+}
+
+/**
  * Convert onboarding ScorerConfig to API ScorerConfig format.
  */
 function convertToAPIScorerConfig(scorer: ScorerConfig, samplingRate: number, model?: string): APIScorerConfig {
@@ -105,12 +124,14 @@ function convertToAPIScorerConfig(scorer: ScorerConfig, samplingRate: number, mo
       builtinData.model = model;
     }
 
+    const scorerClass = mapBuiltinTypeToScorerClass(scorer.builtinType || '');
+
     config.serialized_scorer = JSON.stringify({
       name: scorer.name,
-      builtin_scorer_class: scorer.builtinType,
+      builtin_scorer_class: scorerClass,
       builtin_scorer_pydantic_data: builtinData,
     });
-    config.builtin = { name: scorer.builtinType || scorer.name };
+    config.builtin = { name: scorer.name };
   } else if (scorer.type === 'guidelines') {
     const guidelinesData: any = {};
 
