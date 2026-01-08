@@ -312,7 +312,7 @@ export const ExperimentSelectionStep = () => {
                 </Typography.Text>
                 <Typography.Text color="secondary" size="sm">
                   <FormattedMessage
-                    defaultMessage="Create a new experiment for your project."
+                    defaultMessage="Create a new experiment."
                     description="Description for create new experiment option"
                   />
                 </Typography.Text>
