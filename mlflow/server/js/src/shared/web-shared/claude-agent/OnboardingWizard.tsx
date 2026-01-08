@@ -351,6 +351,11 @@ export const OnboardingWizard = ({
     setCurrentStep(step);
   }, []);
 
+  const completeOnboarding = useCallback(() => {
+    setState((prev) => ({ ...prev, completedAt: new Date() }));
+    onComplete();
+  }, [onComplete]);
+
   const goToNextStep = useCallback(() => {
     const currentIndex = STEP_ORDER.indexOf(currentStep);
     if (currentIndex < STEP_ORDER.length - 1) {
@@ -448,11 +453,6 @@ export const OnboardingWizard = ({
   const updateState = useCallback((updates: Partial<OnboardingState>) => {
     setState((prev) => ({ ...prev, ...updates }));
   }, []);
-
-  const completeOnboarding = useCallback(() => {
-    setState((prev) => ({ ...prev, completedAt: new Date() }));
-    onComplete();
-  }, [onComplete]);
 
   const contextValue: OnboardingContextType = {
     state,
