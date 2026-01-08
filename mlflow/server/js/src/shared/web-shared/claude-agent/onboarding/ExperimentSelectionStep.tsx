@@ -312,7 +312,7 @@ export const ExperimentSelectionStep = () => {
                 </Typography.Text>
                 <Typography.Text color="secondary" size="sm">
                   <FormattedMessage
-                    defaultMessage="Create a new experiment to organize your GenAI traces."
+                    defaultMessage="Create a new experiment for your project."
                     description="Description for create new experiment option"
                   />
                 </Typography.Text>
