@@ -210,19 +210,19 @@ export const GlobalClaudeProvider = ({ children }: { children: ReactNode }) => {
   const openPanel = useCallback(() => {
     setIsPanelOpen(true);
     setError(null);
-    // Show setup wizard if not configured OR if in a GenAI experiment context
+    // Show setup wizard ONLY for GenAI experiments
     // (The wizard itself will determine the appropriate starting step based on experiment state)
     setContextState((currentContext) => {
       const isGenAIExp = currentContext.navigation?.experimentKind &&
         (currentContext.navigation.experimentKind === 'GENAI_DEVELOPMENT' ||
          currentContext.navigation.experimentKind === 'GENAI_DEVELOPMENT_INFERRED');
 
-      if (setupStatus === 'not-configured' || setupStatus === 'unknown' || isGenAIExp) {
+      if (isGenAIExp) {
         setShowSetupWizard(true);
       }
       return currentContext;
     });
-  }, [setupStatus]);
+  }, []);
 
   const closePanel = useCallback(() => {
     setIsPanelOpen(false);
