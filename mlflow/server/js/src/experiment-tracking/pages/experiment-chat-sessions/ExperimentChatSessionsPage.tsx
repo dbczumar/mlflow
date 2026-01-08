@@ -22,11 +22,18 @@ import { useGetExperimentQuery } from '../../hooks/useExperimentQuery';
 import { getChatSessionsFilter } from './utils';
 import { ExperimentChatSessionsPageWrapper } from './ExperimentChatSessionsPageWrapper';
 import { useGetDeleteTracesAction } from '../../components/experiment-page/components/traces-v3/hooks/useGetDeleteTracesAction';
+import { useExperiments } from '../../components/experiment-page/hooks/useExperiments';
+import { getExperimentKindFromTags } from '../../utils/ExperimentKindUtils';
 
 const ExperimentChatSessionsPageImpl = () => {
   const { experimentId } = useParams();
   const [searchQuery, setSearchQuery] = useState<string>('');
   invariant(experimentId, 'Experiment ID must be defined');
+
+  // Get experiment data to extract experimentKind
+  const experiments = useExperiments([experimentId]);
+  const experiment = experiments[0];
+  const experimentKind = experiment ? getExperimentKindFromTags(experiment.tags) : undefined;
 
   const [monitoringFilters] = useMonitoringFilters();
   const monitoringConfig = useMonitoringConfig();
@@ -104,11 +111,12 @@ const ExperimentChatSessionsPageImpl = () => {
         },
         navigation: {
           experimentId,
+          experimentKind,
           page: 'sessions',
         },
       });
     }
-  }, [setContext, experimentId, sessionRows, isLoading]);
+  }, [setContext, experimentId, experimentKind, sessionRows, isLoading]);
 
   return (
     <div css={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
