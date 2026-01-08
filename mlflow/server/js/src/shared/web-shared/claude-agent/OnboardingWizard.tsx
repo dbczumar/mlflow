@@ -99,6 +99,9 @@ export interface OnboardingState {
 
   // Completion
   completedAt: Date | null;
+
+  // Track which steps have been visited (for enabling forward navigation)
+  visitedSteps: OnboardingStep[];
 }
 
 /**
@@ -186,6 +189,7 @@ const INITIAL_STATE: OnboardingState = {
   assistantConfigured: false,
   judgesConfigured: false,
   completedAt: null,
+  visitedSteps: [],
 };
 
 /**
@@ -347,6 +351,16 @@ export const OnboardingWizard = ({
     }
   }, [currentStep, isCheckingInitialStep, currentExperimentId]);
 
+  // Track visited steps for forward navigation
+  useEffect(() => {
+    setState((prev) => {
+      if (!prev.visitedSteps.includes(currentStep)) {
+        return { ...prev, visitedSteps: [...prev.visitedSteps, currentStep] };
+      }
+      return prev;
+    });
+  }, [currentStep]);
+
   const goToStep = useCallback((step: OnboardingStep) => {
     setCurrentStep(step);
   }, []);
@@ -494,8 +508,13 @@ export const OnboardingWizard = ({
   const showBackButton = currentVisibleStepIndex > 0 && currentStep !== 'completion';
   const showForwardButton = currentVisibleStepIndex < visibleSteps.length - 1 && currentStep !== 'completion';
 
-  // Disable forward button if on experiment selection and no experiment selected
-  const isForwardButtonDisabled = currentStep === 'experiment-selection' && !state.experimentSelected;
+  // Disable forward button if:
+  // 1. On experiment selection and no experiment selected, OR
+  // 2. The next step hasn't been visited yet (can't skip ahead)
+  const nextVisibleStep = visibleSteps[currentVisibleStepIndex + 1];
+  const isForwardButtonDisabled =
+    (currentStep === 'experiment-selection' && !state.experimentSelected) ||
+    (nextVisibleStep && !state.visitedSteps.includes(nextVisibleStep));
 
   // Show loading state while checking initial step
   if (isCheckingInitialStep) {
