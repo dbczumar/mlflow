@@ -9,6 +9,8 @@ import { isExperimentEvalResultsMonitoringUIEnabled } from '../../../common/util
 import { usePrefetchTraces } from './useEvaluateTraces';
 import { DEFAULT_TRACE_COUNT } from './constants';
 import { useGlobalClaudeOptional } from '../../../shared/web-shared/claude-agent';
+import { useExperiments } from '../../components/experiment-page/hooks/useExperiments';
+import { getExperimentKindFromTags } from '../../utils/ExperimentKindUtils';
 
 const getProductionMonitoringDocUrl = () => {
   return 'https://mlflow.org/docs/latest/genai/eval-monitor/';
@@ -58,6 +60,11 @@ const ExperimentScorersPage: React.FC<ExperimentScorersPageProps> = () => {
   const { experimentId } = useParams();
   const isFeatureEnabled = enableScorersUI();
 
+  // Get experiment data to extract experimentKind
+  const experiments = useExperiments(experimentId ? [experimentId] : []);
+  const experiment = experiments[0];
+  const experimentKind = experiment ? getExperimentKindFromTags(experiment.tags) : undefined;
+
   const prefetchParams = useMemo(
     () => ({
       traceCount: DEFAULT_TRACE_COUNT,
@@ -88,11 +95,12 @@ const ExperimentScorersPage: React.FC<ExperimentScorersPageProps> = () => {
         data: null,
         navigation: {
           experimentId,
+          experimentKind,
           page: 'judges',
         },
       });
     }
-  }, [setContext, experimentId]);
+  }, [setContext, experimentId, experimentKind]);
   return (
     <ErrorBoundary FallbackComponent={ErrorFallback}>
       {!isFeatureEnabled ? (

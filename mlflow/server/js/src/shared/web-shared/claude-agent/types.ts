@@ -48,6 +48,7 @@ export interface ClaudeContext {
   navigation?: {
     experimentId?: string;
     experimentName?: string;
+    experimentKind?: string;
     page?: string;
     filters?: {
       searchQuery?: string;
