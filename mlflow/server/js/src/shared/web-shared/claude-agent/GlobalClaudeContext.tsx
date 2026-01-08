@@ -92,8 +92,9 @@ export const GlobalClaudeProvider = ({ children }: { children: ReactNode }) => {
 
   // Use ref to track current streaming message
   const streamingMessageRef = useRef<string>('');
-  // Use ref to track previous experiment ID for auto-opening panel
+  // Use ref to track previous experiment ID and kind for auto-opening panel
   const previousExperimentIdRef = useRef<string | undefined>(undefined);
+  const previousExperimentKindRef = useRef<string | undefined>(undefined);
 
   const appendToStreamingMessage = useCallback((text: string) => {
     streamingMessageRef.current += text;
@@ -148,6 +149,12 @@ export const GlobalClaudeProvider = ({ children }: { children: ReactNode }) => {
     const experimentId = context.navigation?.experimentId;
     const previousExperimentId = previousExperimentIdRef.current;
 
+    const experimentKind = context.navigation?.experimentKind;
+    const previousExperimentKind = previousExperimentKindRef.current;
+
+    // Check if experiment context actually changed
+    const experimentChanged = experimentId !== previousExperimentId || experimentKind !== previousExperimentKind;
+
     // Check global status for button variant and backend availability
     const globalStatus = loadSetupStatus();
 
@@ -156,39 +163,38 @@ export const GlobalClaudeProvider = ({ children }: { children: ReactNode }) => {
     // For non-experiments: use global status
     const experimentSpecificStatus = experimentId ? loadSetupStatus(experimentId) : globalStatus;
 
-    // Reset session when experiment changes (inline to avoid circular dependency)
-    setSessionId(null);
-    setMessages([]);
-    setIsStreaming(false);
-    setError(null);
-    streamingMessageRef.current = '';
-    disconnectSSE();
-
-    // Button variant and availability based on GLOBAL backend configuration
-    if (globalStatus === 'configured') {
-      checkHealth()
-        .then((health) => {
-          const isAvailable = health.claude_available === 'true' || health.claude_available === 'True';
-          setIsClaudeAvailable(isAvailable);
-          setSetupStatus('configured');
-        })
-        .catch(() => {
-          setIsClaudeAvailable(false);
-          setSetupStatus('configured'); // Keep configured status - user may just need to restart backend
-        });
-    } else {
-      setSetupStatus('not-configured');
-      setIsClaudeAvailable(false);
-    }
-
     // Check if this is a GenAI experiment
-    const experimentKind = context.navigation?.experimentKind;
     const isGenAIExp =
       experimentKind === 'GENAI_DEVELOPMENT' || experimentKind === 'GENAI_DEVELOPMENT_INFERRED';
 
-    // Auto-open panel when GenAI experiment is opened but not set up yet
-    if (experimentId && experimentId !== previousExperimentId) {
-      // Experiment changed to a new one
+    // Only process when experiment context actually changes
+    if (experimentChanged) {
+      // Reset session when experiment changes (inline to avoid circular dependency)
+      setSessionId(null);
+      setMessages([]);
+      setIsStreaming(false);
+      setError(null);
+      streamingMessageRef.current = '';
+      disconnectSSE();
+
+      // Button variant and availability based on GLOBAL backend configuration
+      if (globalStatus === 'configured') {
+        checkHealth()
+          .then((health) => {
+            const isAvailable = health.claude_available === 'true' || health.claude_available === 'True';
+            setIsClaudeAvailable(isAvailable);
+            setSetupStatus('configured');
+          })
+          .catch(() => {
+            setIsClaudeAvailable(false);
+            setSetupStatus('configured'); // Keep configured status - user may just need to restart backend
+          });
+      } else {
+        setSetupStatus('not-configured');
+        setIsClaudeAvailable(false);
+      }
+
+      // Auto-open panel when GenAI experiment is opened but not set up yet
       if (experimentSpecificStatus !== 'configured' && isGenAIExp) {
         // This GenAI experiment's wizard is not complete - auto-open panel
         setIsPanelOpen(true);
@@ -199,8 +205,9 @@ export const GlobalClaudeProvider = ({ children }: { children: ReactNode }) => {
       }
     }
 
-    // Update ref with current experiment ID
+    // Update refs with current experiment ID and kind
     previousExperimentIdRef.current = experimentId;
+    previousExperimentKindRef.current = experimentKind;
   }, [context.navigation?.experimentId, context.navigation?.experimentKind, disconnectSSE]);
 
   // Actions
