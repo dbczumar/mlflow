@@ -230,6 +230,44 @@ const saveWizardStep = (step: OnboardingStep, experimentId?: string): void => {
   }
 };
 
+/**
+ * Get localStorage key for wizard state.
+ */
+const getWizardStateKey = (experimentId?: string): string => {
+  if (experimentId) {
+    return `mlflow.assistant.wizardState.experiment.${experimentId}`;
+  }
+  return 'mlflow.assistant.wizardState.global';
+};
+
+/**
+ * Load saved wizard state from localStorage.
+ */
+const loadWizardState = (experimentId?: string): Partial<OnboardingState> | null => {
+  try {
+    const key = getWizardStateKey(experimentId);
+    const stored = localStorage.getItem(key);
+    if (stored) {
+      return JSON.parse(stored);
+    }
+  } catch {
+    // localStorage not available or invalid JSON
+  }
+  return null;
+};
+
+/**
+ * Save wizard state to localStorage.
+ */
+const saveWizardState = (state: OnboardingState, experimentId?: string): void => {
+  try {
+    const key = getWizardStateKey(experimentId);
+    localStorage.setItem(key, JSON.stringify(state));
+  } catch {
+    // localStorage not available
+  }
+};
+
 interface OnboardingWizardProps {
   /** Called when onboarding is complete */
   onComplete: () => void;
@@ -303,11 +341,16 @@ export const OnboardingWizard = ({
   const [currentStep, setCurrentStep] = useState<OnboardingStep>('experiment-selection');
   const [isCheckingInitialStep, setIsCheckingInitialStep] = useState(true);
 
-  const [state, setState] = useState<OnboardingState>({
-    ...INITIAL_STATE,
-    assistantConfigured: assistantAlreadyConfigured,
-    // If we have an experimentId, mark it as selected
-    experimentSelected: Boolean(currentExperimentId),
+  const [state, setState] = useState<OnboardingState>(() => {
+    // Load saved state from localStorage if available
+    const savedState = loadWizardState(currentExperimentId);
+    return {
+      ...INITIAL_STATE,
+      ...savedState,
+      assistantConfigured: assistantAlreadyConfigured,
+      // If we have an experimentId, mark it as selected
+      experimentSelected: Boolean(currentExperimentId),
+    };
   });
 
   // Determine initial step based on current context
@@ -315,6 +358,18 @@ export const OnboardingWizard = ({
     const checkInitialStep = async () => {
       // Set checking flag at the start to prevent race conditions with child component effects
       setIsCheckingInitialStep(true);
+
+      // Load saved state for this experiment (note: useState initializer only runs on first mount,
+      // so we need to reload when experimentId changes)
+      const savedState = loadWizardState(currentExperimentId);
+      if (savedState) {
+        setState((prev) => ({
+          ...INITIAL_STATE,
+          ...savedState,
+          assistantConfigured: assistantAlreadyConfigured,
+          experimentSelected: Boolean(currentExperimentId),
+        }));
+      }
 
       // Check for saved step (note: useState initializer only runs on first mount,
       // so we need to check again when experimentId changes)
@@ -350,6 +405,13 @@ export const OnboardingWizard = ({
       saveWizardStep(currentStep, currentExperimentId);
     }
   }, [currentStep, isCheckingInitialStep, currentExperimentId]);
+
+  // Save wizard state to localStorage whenever it changes
+  useEffect(() => {
+    if (!isCheckingInitialStep) {
+      saveWizardState(state, currentExperimentId);
+    }
+  }, [state, isCheckingInitialStep, currentExperimentId]);
 
   // Track visited steps for forward navigation
   useEffect(() => {
