@@ -150,7 +150,7 @@ const STEP_INFO: Record<OnboardingStep, { title: string; subtitle: string }> = {
   },
   'use-case': {
     title: 'Select Use Case',
-    subtitle: 'Tell us about your application so we can recommend the right judges.',
+    subtitle: 'Tell us about your agent or application so we can recommend the right judges.',
   },
   'scorer-selection': {
     title: 'Configure Judges',

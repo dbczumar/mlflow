@@ -349,7 +349,7 @@ export const UseCaseStep = () => {
         <div>
           <Typography.Text bold css={{ display: 'block', marginBottom: theme.spacing.md }}>
             <FormattedMessage
-              defaultMessage="What kind of agent are you building?"
+              defaultMessage="What kind of agent or application are you building?"
               description="Label for use case selection"
             />
           </Typography.Text>
