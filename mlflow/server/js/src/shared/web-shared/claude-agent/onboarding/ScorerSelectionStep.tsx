@@ -188,7 +188,8 @@ export const ScorerSelectionStep = () => {
         window.location.href = `/#${judgesUrl}`;
       }
     }
-  }, [globalClaude]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleToggleScorer = useCallback((scorerId: string) => {
     setScorers((prev) => prev.map((s) => (s.id === scorerId ? { ...s, enabled: !s.enabled } : s)));
