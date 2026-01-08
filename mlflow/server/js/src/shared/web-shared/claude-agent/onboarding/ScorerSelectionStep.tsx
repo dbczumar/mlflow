@@ -2,7 +2,7 @@
  * Step 4: Review and customize recommended scorers, configure online scoring.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
   Button,
   Checkbox,
@@ -176,20 +176,6 @@ export const ScorerSelectionStep = () => {
   const [isEnabling, setIsEnabling] = useState(false);
   const [selectedEndpoint, setSelectedEndpoint] = useState<string | undefined>(state.judgeEndpointName);
   const [isEndpointModalOpen, setIsEndpointModalOpen] = useState(false);
-  const hasNavigatedRef = useRef(false);
-
-  // Navigate to judges tab immediately when this step is entered
-  useEffect(() => {
-    if (!hasNavigatedRef.current) {
-      const experimentId = globalClaude?.context?.navigation?.experimentId;
-      if (experimentId) {
-        hasNavigatedRef.current = true;
-        const judgesUrl = generatePath(RoutePaths.experimentPageTabScorers, { experimentId });
-        window.location.href = `/#${judgesUrl}`;
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const handleToggleScorer = useCallback((scorerId: string) => {
     setScorers((prev) => prev.map((s) => (s.id === scorerId ? { ...s, enabled: !s.enabled } : s)));
