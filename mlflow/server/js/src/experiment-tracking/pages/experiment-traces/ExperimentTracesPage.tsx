@@ -18,12 +18,13 @@ const ExperimentTracesPage = () => {
   const experimentKind = experiment ? getExperimentKindFromTags(experiment.tags) : undefined;
 
   const globalClaude = useGlobalClaudeOptional();
+  const setClaudeContext = globalClaude?.setContext;
 
   // Update global Claude context when viewing an experiment's traces
   useEffect(() => {
-    if (globalClaude && experimentId) {
+    if (setClaudeContext && experimentId) {
       console.log('[ExperimentTracesPage] Setting context with experimentId:', experimentId);
-      globalClaude.setContext({
+      setClaudeContext({
         type: 'experiment',
         summary: `Experiment ${experimentId} traces`,
         data: null,
@@ -33,7 +34,7 @@ const ExperimentTracesPage = () => {
         },
       });
     }
-  }, [globalClaude, experimentId, experimentKind]);
+  }, [setClaudeContext, experimentId, experimentKind]);
 
   return <ExperimentViewTraces experimentIds={experimentIds} />;
 };

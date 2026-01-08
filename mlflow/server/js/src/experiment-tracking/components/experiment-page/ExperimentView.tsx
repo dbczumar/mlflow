@@ -87,10 +87,11 @@ export const ExperimentView = ({ showHeader = true }: { showHeader?: boolean }) 
   }, [fetchExperiments, experimentIds, experiments]);
 
   // Update global Claude context when experiment data is loaded
+  const setClaudeContext = globalClaude?.setContext;
   useEffect(() => {
-    if (globalClaude && experimentIds.length === 1 && firstExperiment) {
+    if (setClaudeContext && experimentIds.length === 1 && firstExperiment) {
       const experimentKind = getExperimentKindFromTags(firstExperiment.tags);
-      globalClaude.setContext({
+      setClaudeContext({
         type: 'experiment',
         summary: `Experiment ${firstExperiment.name || experimentIds[0]}`,
         data: null,
@@ -100,7 +101,7 @@ export const ExperimentView = ({ showHeader = true }: { showHeader?: boolean }) 
         },
       });
     }
-  }, [globalClaude, experimentIds, firstExperiment]);
+  }, [setClaudeContext, experimentIds, firstExperiment]);
 
   useEffect(() => {
     // Seed the initial UI state when the experiments and runs are loaded.
