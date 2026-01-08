@@ -52,6 +52,17 @@ const getContextTypeLabel = (type: string): string => {
 };
 
 /**
+ * Extract experiment ID from the current URL hash.
+ * Returns the experiment ID if found in the URL, otherwise undefined.
+ */
+const getExperimentIdFromUrl = (): string | undefined => {
+  const hash = window.location.hash;
+  // Match patterns like #/experiments/123/... or #/experiments/123
+  const match = hash.match(/#\/experiments\/([^\/]+)/);
+  return match ? match[1] : undefined;
+};
+
+/**
  * Global MLflow Assistant Chat Panel.
  * Shows the chat header with context badge and the chat interface.
  * Displays setup wizard when configuration is needed.
@@ -147,7 +158,8 @@ export const GlobalClaudeChatPanel = () => {
 
   // Show onboarding wizard if needed
   if (showSetupWizard) {
-    const currentExperimentId = context.navigation?.experimentId;
+    // Prefer experiment ID from URL (source of truth) over context (which may be stale)
+    const currentExperimentId = getExperimentIdFromUrl() || context.navigation?.experimentId;
 
     return (
       <div
