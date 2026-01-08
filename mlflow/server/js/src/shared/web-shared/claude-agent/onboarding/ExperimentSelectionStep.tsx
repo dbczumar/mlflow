@@ -208,13 +208,6 @@ export const ExperimentSelectionStep = () => {
       {/* If not in an experiment, show selection options */}
       {!currentExperimentId && (
         <div>
-          <Typography.Text bold css={{ display: 'block', marginBottom: theme.spacing.md }}>
-            <FormattedMessage
-              defaultMessage="Select or create an experiment to build an agent or model"
-              description="Label for experiment selection method"
-            />
-          </Typography.Text>
-
           <div css={{ display: 'flex', flexDirection: 'column', gap: theme.spacing.md }}>
             {/* Option A: Select Existing Experiment */}
             <button
