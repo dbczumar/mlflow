@@ -210,7 +210,7 @@ export const ExperimentSelectionStep = () => {
         <div>
           <Typography.Text bold css={{ display: 'block', marginBottom: theme.spacing.md }}>
             <FormattedMessage
-              defaultMessage="Choose how to set up your experiment:"
+              defaultMessage="Select or create an experiment to build an agent or model"
               description="Label for experiment selection method"
             />
           </Typography.Text>
