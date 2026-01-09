@@ -9,6 +9,7 @@ import type { AssistantSetupStatus, ChatMessage, ClaudeContext, GlobalClaudeAgen
 import { serializeContext } from './ContextSerializer';
 import { startAnalysis, sendMessageStream, checkHealth } from './ClaudeAgentService';
 import { useSSEStream } from './hooks/useSSEStream';
+import { ExperimentKind } from '../../../experiment-tracking/constants';
 
 const DEFAULT_CONTEXT: ClaudeContext = {
   type: 'none',
@@ -165,7 +166,8 @@ export const GlobalClaudeProvider = ({ children }: { children: ReactNode }) => {
 
     // Check if this is a GenAI experiment
     const isGenAIExp =
-      experimentKind === 'GENAI_DEVELOPMENT' || experimentKind === 'GENAI_DEVELOPMENT_INFERRED';
+      experimentKind === ExperimentKind.GENAI_DEVELOPMENT ||
+      experimentKind === ExperimentKind.GENAI_DEVELOPMENT_INFERRED;
 
     console.log('[GlobalClaudeContext] Context change:', {
       experimentId,
@@ -246,9 +248,10 @@ export const GlobalClaudeProvider = ({ children }: { children: ReactNode }) => {
     // Show setup wizard ONLY for GenAI experiments
     // (The wizard itself will determine the appropriate starting step based on experiment state)
     setContextState((currentContext) => {
-      const isGenAIExp = currentContext.navigation?.experimentKind &&
-        (currentContext.navigation.experimentKind === 'GENAI_DEVELOPMENT' ||
-         currentContext.navigation.experimentKind === 'GENAI_DEVELOPMENT_INFERRED');
+      const isGenAIExp =
+        currentContext.navigation?.experimentKind &&
+        (currentContext.navigation.experimentKind === ExperimentKind.GENAI_DEVELOPMENT ||
+          currentContext.navigation.experimentKind === ExperimentKind.GENAI_DEVELOPMENT_INFERRED);
 
       if (isGenAIExp) {
         setShowSetupWizard(true);
