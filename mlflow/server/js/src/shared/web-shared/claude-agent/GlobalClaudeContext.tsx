@@ -156,6 +156,9 @@ export const GlobalClaudeProvider = ({ children }: { children: ReactNode }) => {
     // Check if experiment context actually changed
     const experimentChanged = experimentId !== previousExperimentId || experimentKind !== previousExperimentKind;
 
+    // Check if this is initial mount with an experiment (previousExperimentId is undefined but current is set)
+    const isInitialMount = previousExperimentId === undefined && experimentId !== undefined;
+
     // Check global status for button variant and backend availability
     const globalStatus = loadSetupStatus();
 
@@ -169,8 +172,8 @@ export const GlobalClaudeProvider = ({ children }: { children: ReactNode }) => {
       experimentKind === ExperimentKind.GENAI_DEVELOPMENT ||
       experimentKind === ExperimentKind.GENAI_DEVELOPMENT_INFERRED;
 
-    // Only process when experiment context actually changes
-    if (experimentChanged) {
+    // Process when experiment context changes OR on initial mount
+    if (experimentChanged || isInitialMount) {
       // Reset session when experiment changes (inline to avoid circular dependency)
       setSessionId(null);
       setMessages([]);
@@ -249,22 +252,19 @@ export const GlobalClaudeProvider = ({ children }: { children: ReactNode }) => {
     disconnectSSE();
   }, [disconnectSSE]);
 
-  const setContext = useCallback(
-    (newContext: ClaudeContext) => {
-      setContextState(newContext);
+  const setContext = useCallback((newContext: ClaudeContext) => {
+    setContextState(newContext);
 
-      // If switching to global context (no experiment), close the setup wizard
-      if (!newContext.navigation?.experimentId) {
-        setShowSetupWizard((prev) => {
-          if (prev) {
-            return false;
-          }
-          return prev;
-        });
-      }
-    },
-    [],
-  );
+    // If switching to global context (no experiment), close the setup wizard
+    if (!newContext.navigation?.experimentId) {
+      setShowSetupWizard((prev) => {
+        if (prev) {
+          return false;
+        }
+        return prev;
+      });
+    }
+  }, []);
 
   const reset = useCallback(() => {
     setSessionId(null);

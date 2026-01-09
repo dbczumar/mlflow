@@ -339,8 +339,6 @@ export const OnboardingWizard = ({
 }: OnboardingWizardProps) => {
   const { theme } = useDesignSystemTheme();
 
-  console.log('[OnboardingWizard] Rendering with currentExperimentId:', currentExperimentId);
-
   const [currentStep, setCurrentStep] = useState<OnboardingStep>('experiment-selection');
   const [isCheckingInitialStep, setIsCheckingInitialStep] = useState(true);
 
@@ -481,6 +479,11 @@ export const OnboardingWizard = ({
         } else {
           break;
         }
+      }
+
+      // When advancing to completion step (in an experiment context), mark setup as complete
+      if (nextStep === 'completion') {
+        completeOnboarding();
       }
 
       setCurrentStep(nextStep);

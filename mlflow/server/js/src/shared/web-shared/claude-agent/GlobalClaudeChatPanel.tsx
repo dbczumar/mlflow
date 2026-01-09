@@ -58,7 +58,7 @@ const getContextTypeLabel = (type: string): string => {
 const getExperimentIdFromUrl = (): string | undefined => {
   const hash = window.location.hash;
   // Match patterns like #/experiments/123/... or #/experiments/123
-  const match = hash.match(/#\/experiments\/([^\/]+)/);
+  const match = hash.match(/#\/experiments\/([^/]+)/);
   return match ? match[1] : undefined;
 };
 
@@ -160,10 +160,6 @@ export const GlobalClaudeChatPanel = () => {
   if (showSetupWizard) {
     // Prefer experiment ID from URL (source of truth) over context (which may be stale)
     const currentExperimentId = getExperimentIdFromUrl() || context.navigation?.experimentId;
-    console.log('[GlobalClaudeChatPanel] Opening wizard with experimentId:', currentExperimentId, {
-      fromUrl: getExperimentIdFromUrl(),
-      fromContext: context.navigation?.experimentId,
-    });
 
     return (
       <div
@@ -176,7 +172,8 @@ export const GlobalClaudeChatPanel = () => {
       >
         {/* DEBUG: Show experimentId being used */}
         <div css={{ padding: theme.spacing.sm, backgroundColor: '#ff0', color: '#000', fontSize: '12px' }}>
-          DEBUG: URL ExpID={getExperimentIdFromUrl()} | Context ExpID={context.navigation?.experimentId} | Using={currentExperimentId}
+          DEBUG: URL ExpID={getExperimentIdFromUrl()} | Context ExpID={context.navigation?.experimentId} | Using=
+          {currentExperimentId}
         </div>
         {/* Header for onboarding */}
         <div
