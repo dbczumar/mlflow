@@ -26,6 +26,7 @@ import { InstrumentationStep } from './onboarding/InstrumentationStep';
 import { CompletionStep } from './onboarding/CompletionStep';
 import { listScheduledScorers } from '../../../experiment-tracking/pages/experiment-scorers/api';
 import { searchTracesV4 } from '../model-trace-explorer/api';
+import { ExperimentKind } from '../../../experiment-tracking/constants';
 
 const COMPONENT_ID_PREFIX = 'mlflow.onboarding';
 
@@ -274,6 +275,8 @@ interface OnboardingWizardProps {
   onComplete: () => void;
   /** Current experiment ID if viewing an experiment */
   currentExperimentId?: string;
+  /** Experiment kind (genai_development, machine_learning, etc.) */
+  currentExperimentKind?: string;
   /** Whether assistant is already configured (for instrumentation step) */
   assistantAlreadyConfigured?: boolean;
 }
@@ -337,6 +340,7 @@ const determineInitialStep = async (
 export const OnboardingWizard = ({
   onComplete,
   currentExperimentId,
+  currentExperimentKind,
   assistantAlreadyConfigured = false,
 }: OnboardingWizardProps) => {
   const { theme } = useDesignSystemTheme();
@@ -523,13 +527,17 @@ export const OnboardingWizard = ({
             prevStep = STEP_ORDER[prevIndex];
           }
         } else if (
-          !currentExperimentId &&
+          (!currentExperimentId ||
+            (currentExperimentKind !== ExperimentKind.GENAI_DEVELOPMENT &&
+              currentExperimentKind !== ExperimentKind.GENAI_DEVELOPMENT_INFERRED)) &&
           (prevStep === 'use-case' ||
             prevStep === 'scorer-selection' ||
             prevStep === 'instrumentation' ||
             prevStep === 'completion')
         ) {
-          // Skip experiment-specific steps when not in an experiment (including completion)
+          // Skip experiment-specific steps when:
+          // 1. Not in an experiment, OR
+          // 2. In an ML experiment (not GenAI)
           prevIndex -= 1;
           if (prevIndex >= 0) {
             prevStep = STEP_ORDER[prevIndex];
@@ -541,7 +549,14 @@ export const OnboardingWizard = ({
 
       setCurrentStep(prevStep);
     }
-  }, [currentStep, currentExperimentId, state.assistantConfigured, state.experimentSelected, state.judgesConfigured]);
+  }, [
+    currentStep,
+    currentExperimentId,
+    currentExperimentKind,
+    state.assistantConfigured,
+    state.experimentSelected,
+    state.judgesConfigured,
+  ]);
 
   const updateState = useCallback((updates: Partial<OnboardingState>) => {
     setState((prev) => ({ ...prev, ...updates }));

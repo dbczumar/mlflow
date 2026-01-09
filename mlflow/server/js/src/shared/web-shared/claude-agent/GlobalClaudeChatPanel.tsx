@@ -224,6 +224,7 @@ export const GlobalClaudeChatPanel = () => {
           <OnboardingWizard
             onComplete={completeSetup}
             currentExperimentId={currentExperimentId}
+            currentExperimentKind={context.navigation?.experimentKind}
             assistantAlreadyConfigured={isConfigured}
           />
         </div>
