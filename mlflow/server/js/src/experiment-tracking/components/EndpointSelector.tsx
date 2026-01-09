@@ -119,7 +119,7 @@ export const EndpointSelector: React.FC<EndpointSelectorProps> = ({
         type="warning"
         message={
           <FormattedMessage
-            defaultMessage="Unable to load endpoints. You can skip this step and configure judges later from the experiment's Judges tab."
+            defaultMessage="Unable to load endpoints. You can skip this step and configure judges later from the experiment's Judges tab"
             description="Warning message when endpoints fail to load"
           />
         }

@@ -328,7 +328,7 @@ export const ScorerSelectionStep = () => {
         </Typography.Text>
         <Typography.Text color="secondary" size="sm" css={{ display: 'block', marginBottom: theme.spacing.md }}>
           <FormattedMessage
-            defaultMessage="Select or create an LLM endpoint that will power your judges."
+            defaultMessage="Select or create an LLM endpoint that will power your judges"
             description="Help text for endpoint selection"
           />
         </Typography.Text>
