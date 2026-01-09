@@ -158,7 +158,7 @@ const STEP_INFO: Record<OnboardingStep, { title: string; subtitle: string }> = {
   },
   'scorer-selection': {
     title: 'Configure Judges',
-    subtitle: 'Select LLM judges to automatically evaluate your traces.',
+    subtitle: 'Select LLM judges that will automatically identify issues in your agent or application',
   },
   'assistant-backend': {
     title: 'Configure Assistant',
