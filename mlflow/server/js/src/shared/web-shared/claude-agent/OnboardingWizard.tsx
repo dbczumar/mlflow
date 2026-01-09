@@ -7,7 +7,7 @@
  * 4. Instrumenting their application with tracing
  */
 
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   Button,
   ChevronLeftIcon,
@@ -134,9 +134,66 @@ export const useOnboarding = (): OnboardingContextType => {
 };
 
 /**
- * Step order for navigation.
+ * Context type for determining which steps to show.
  */
-const STEP_ORDER: OnboardingStep[] = [
+type WizardContext = 'home' | 'genai-experiment' | 'ml-experiment';
+
+/**
+ * Determine wizard context based on experiment ID and kind.
+ */
+const determineContext = (experimentId?: string, experimentKind?: string): WizardContext => {
+  if (!experimentId) {
+    return 'home';
+  }
+  const isGenAI =
+    experimentKind === ExperimentKind.GENAI_DEVELOPMENT || experimentKind === ExperimentKind.GENAI_DEVELOPMENT_INFERRED;
+  return isGenAI ? 'genai-experiment' : 'ml-experiment';
+};
+
+/**
+ * Global steps that apply to all contexts.
+ */
+const GLOBAL_STEPS: OnboardingStep[] = ['assistant-backend'];
+
+/**
+ * GenAI experiment-specific steps (in addition to global steps).
+ */
+const GENAI_STEPS: OnboardingStep[] = [
+  'use-case',
+  'scorer-selection',
+  'assistant-backend',
+  'instrumentation',
+  'completion',
+];
+
+/**
+ * ML experiment-specific steps (currently same as global).
+ */
+const ML_STEPS: OnboardingStep[] = ['assistant-backend'];
+
+/**
+ * Build step order based on wizard context.
+ * Local steps always incorporate global steps.
+ */
+const buildStepOrder = (context: WizardContext): OnboardingStep[] => {
+  switch (context) {
+    case 'home':
+      return GLOBAL_STEPS;
+    case 'genai-experiment':
+      return GENAI_STEPS;
+    case 'ml-experiment':
+      return ML_STEPS;
+    default:
+      return GLOBAL_STEPS;
+  }
+};
+
+/**
+ * Full step order (for backward compatibility with saved state).
+ * NOTE: This should only be used for checking if saved step is valid.
+ * Use buildStepOrder() for actual navigation.
+ */
+const ALL_STEPS: OnboardingStep[] = [
   'experiment-selection',
   'use-case',
   'scorer-selection',
@@ -211,7 +268,7 @@ const loadWizardStep = (experimentId?: string): OnboardingStep | null => {
   try {
     const key = getWizardStepKey(experimentId);
     const stored = localStorage.getItem(key);
-    if (stored && STEP_ORDER.includes(stored as OnboardingStep)) {
+    if (stored && ALL_STEPS.includes(stored as OnboardingStep)) {
       return stored as OnboardingStep;
     }
   } catch {
@@ -287,51 +344,57 @@ interface OnboardingWizardProps {
  */
 const determineInitialStep = async (
   experimentId?: string,
+  experimentKind?: string,
   assistantConfigured?: boolean,
 ): Promise<{ step: OnboardingStep; judgesConfigured: boolean }> => {
-  // If no experiment, start with assistant-backend (for home page setup)
+  // Determine wizard context and build appropriate step order
+  const context = determineContext(experimentId, experimentKind);
+  const stepOrder = buildStepOrder(context);
+
+  // If no experiment (home page), start with first step in order
   if (!experimentId) {
-    // When opening from home page, go directly to assistant backend setup
-    // (skip experiment selection since user is not in an experiment context)
-    return { step: 'assistant-backend', judgesConfigured: false };
+    return { step: stepOrder[0], judgesConfigured: false };
   }
 
-  // Check if experiment has judges configured
-  try {
-    const judgesResponse = await listScheduledScorers(experimentId);
-    const hasJudges = judgesResponse.scorers && judgesResponse.scorers.length > 0;
+  // For GenAI experiments, check configuration status
+  if (context === 'genai-experiment') {
+    try {
+      // Check if experiment has judges configured
+      const judgesResponse = await listScheduledScorers(experimentId);
+      const hasJudges = judgesResponse.scorers && judgesResponse.scorers.length > 0;
 
-    // If no judges, skip experiment selection and go to use case
-    if (!hasJudges) {
-      return { step: 'use-case', judgesConfigured: false };
+      // If no judges, start at first GenAI-specific step (use-case)
+      if (!hasJudges) {
+        return { step: 'use-case', judgesConfigured: false };
+      }
+
+      // Check if experiment has traces
+      const tracesResponse = await searchTracesV4({
+        locations: [
+          {
+            type: 'MLFLOW_EXPERIMENT',
+            mlflow_experiment: { experiment_id: experimentId },
+          },
+        ],
+      });
+      const hasTraces = tracesResponse.length > 0;
+
+      // If has judges but no traces, skip to instrumentation
+      if (!hasTraces) {
+        return { step: 'instrumentation', judgesConfigured: true };
+      }
+
+      // If has both judges and traces, everything is set up!
+      return { step: 'completion', judgesConfigured: true };
+    } catch (error) {
+      console.error('[OnboardingWizard] Error determining initial step:', error);
+      // On error, start with first step in order
+      return { step: stepOrder[0], judgesConfigured: false };
     }
-
-    // Check if experiment has traces
-    const tracesResponse = await searchTracesV4({
-      locations: [
-        {
-          type: 'MLFLOW_EXPERIMENT',
-          mlflow_experiment: { experiment_id: experimentId },
-        },
-      ],
-    });
-    const hasTraces = tracesResponse.length > 0;
-
-    // If has judges but no traces, skip to instrumentation
-    if (!hasTraces) {
-      return { step: 'instrumentation', judgesConfigured: true };
-    }
-
-    // If has both judges and traces, everything is set up!
-    return { step: 'completion', judgesConfigured: true };
-  } catch (error) {
-    console.error('[OnboardingWizard] Error determining initial step:', error);
-    // On error, default to experiment selection (or assistant-backend if not configured)
-    if (!assistantConfigured) {
-      return { step: 'assistant-backend', judgesConfigured: false };
-    }
-    return { step: 'experiment-selection', judgesConfigured: false };
   }
+
+  // For ML experiments, start with first step (assistant-backend)
+  return { step: stepOrder[0], judgesConfigured: false };
 };
 
 /**
@@ -359,6 +422,15 @@ export const OnboardingWizard = ({
       experimentSelected: Boolean(currentExperimentId),
     };
   });
+
+  // Determine wizard context based on current experiment
+  const wizardContext = useMemo(
+    () => determineContext(currentExperimentId, currentExperimentKind),
+    [currentExperimentId, currentExperimentKind],
+  );
+
+  // Build step order based on context (global vs GenAI vs ML)
+  const stepOrder = useMemo(() => buildStepOrder(wizardContext), [wizardContext]);
 
   // Determine initial step based on current context
   useEffect(() => {
@@ -391,9 +463,23 @@ export const OnboardingWizard = ({
       // so we need to check again when experimentId changes)
       const savedStep = loadWizardStep(currentExperimentId);
       if (savedStep) {
-        // If saved step is assistant-backend but assistant is already configured, skip it
-        if (savedStep === 'assistant-backend' && assistantAlreadyConfigured) {
-          const result = await determineInitialStep(currentExperimentId, assistantAlreadyConfigured);
+        // Validate that saved step is in the current step order
+        if (!stepOrder.includes(savedStep)) {
+          // Saved step is not valid for current context - determine new step
+          const result = await determineInitialStep(
+            currentExperimentId,
+            currentExperimentKind,
+            assistantAlreadyConfigured,
+          );
+          setCurrentStep(result.step);
+          setState((prev) => ({ ...prev, judgesConfigured: result.judgesConfigured }));
+        } else if (savedStep === 'assistant-backend' && assistantAlreadyConfigured) {
+          // If saved step is assistant-backend but assistant is already configured, skip it
+          const result = await determineInitialStep(
+            currentExperimentId,
+            currentExperimentKind,
+            assistantAlreadyConfigured,
+          );
           setCurrentStep(result.step);
           setState((prev) => ({ ...prev, judgesConfigured: result.judgesConfigured }));
         } else {
@@ -404,14 +490,14 @@ export const OnboardingWizard = ({
       }
 
       // No saved step - determine based on current state
-      const result = await determineInitialStep(currentExperimentId, assistantAlreadyConfigured);
+      const result = await determineInitialStep(currentExperimentId, currentExperimentKind, assistantAlreadyConfigured);
       setCurrentStep(result.step);
       setState((prev) => ({ ...prev, judgesConfigured: result.judgesConfigured }));
       setIsCheckingInitialStep(false);
     };
 
     checkInitialStep();
-  }, [currentExperimentId, assistantAlreadyConfigured]);
+  }, [currentExperimentId, currentExperimentKind, assistantAlreadyConfigured, stepOrder]);
 
   // Save current step to localStorage whenever it changes
   // NOTE: We DON'T include currentExperimentId in dependencies to avoid saving the old step
@@ -449,54 +535,43 @@ export const OnboardingWizard = ({
   }, [onComplete]);
 
   const goToNextStep = useCallback(() => {
-    const currentIndex = STEP_ORDER.indexOf(currentStep);
-    if (currentIndex < STEP_ORDER.length - 1) {
+    const currentIndex = stepOrder.indexOf(currentStep);
+    if (currentIndex < stepOrder.length - 1) {
       let nextIndex = currentIndex + 1;
-      let nextStep = STEP_ORDER[nextIndex];
+      let nextStep = stepOrder[nextIndex];
 
-      // Skip completed steps and experiment-specific steps when not in experiment
-      while (nextIndex < STEP_ORDER.length) {
+      // Skip already completed steps
+      while (nextIndex < stepOrder.length) {
         if (nextStep === 'experiment-selection' && state.experimentSelected) {
           nextIndex += 1;
-          nextStep = STEP_ORDER[nextIndex];
+          nextStep = stepOrder[nextIndex];
         } else if (nextStep === 'assistant-backend' && state.assistantConfigured) {
           nextIndex += 1;
-          nextStep = STEP_ORDER[nextIndex];
+          nextStep = stepOrder[nextIndex];
         } else if ((nextStep === 'use-case' || nextStep === 'scorer-selection') && state.judgesConfigured) {
           nextIndex += 1;
-          nextStep = STEP_ORDER[nextIndex];
-        } else if (
-          !currentExperimentId &&
-          (nextStep === 'use-case' ||
-            nextStep === 'scorer-selection' ||
-            nextStep === 'instrumentation' ||
-            nextStep === 'completion')
-        ) {
-          // Skip experiment-specific steps when not in an experiment (including completion)
-          // When skipping completion from home page, just complete the onboarding
-          if (nextStep === 'completion') {
-            completeOnboarding();
-            return;
-          }
-          nextIndex += 1;
-          if (nextIndex < STEP_ORDER.length) {
-            nextStep = STEP_ORDER[nextIndex];
-          }
+          nextStep = stepOrder[nextIndex];
         } else {
           break;
         }
       }
 
-      // When advancing to completion step (in an experiment context), mark setup as complete
+      // When advancing to completion step, mark setup as complete
       if (nextStep === 'completion') {
         completeOnboarding();
+      } else if (nextIndex >= stepOrder.length) {
+        // Reached end of steps without completion step (e.g., home page, ML experiment)
+        completeOnboarding();
+      } else {
+        setCurrentStep(nextStep);
       }
-
-      setCurrentStep(nextStep);
+    } else {
+      // At last step - complete onboarding
+      completeOnboarding();
     }
   }, [
     currentStep,
-    currentExperimentId,
+    stepOrder,
     state.assistantConfigured,
     state.experimentSelected,
     state.judgesConfigured,
@@ -504,59 +579,38 @@ export const OnboardingWizard = ({
   ]);
 
   const goToPreviousStep = useCallback(() => {
-    const currentIndex = STEP_ORDER.indexOf(currentStep);
+    const currentIndex = stepOrder.indexOf(currentStep);
     if (currentIndex > 0) {
       let prevIndex = currentIndex - 1;
-      let prevStep = STEP_ORDER[prevIndex];
+      let prevStep = stepOrder[prevIndex];
 
-      // Skip completed steps and experiment-specific steps when not in experiment
+      // Skip already completed steps
       while (prevIndex >= 0) {
         if (prevStep === 'experiment-selection' && state.experimentSelected) {
           prevIndex -= 1;
           if (prevIndex >= 0) {
-            prevStep = STEP_ORDER[prevIndex];
+            prevStep = stepOrder[prevIndex];
           }
         } else if (prevStep === 'assistant-backend' && state.assistantConfigured) {
           prevIndex -= 1;
           if (prevIndex >= 0) {
-            prevStep = STEP_ORDER[prevIndex];
+            prevStep = stepOrder[prevIndex];
           }
         } else if ((prevStep === 'use-case' || prevStep === 'scorer-selection') && state.judgesConfigured) {
           prevIndex -= 1;
           if (prevIndex >= 0) {
-            prevStep = STEP_ORDER[prevIndex];
-          }
-        } else if (
-          (!currentExperimentId ||
-            (currentExperimentKind !== ExperimentKind.GENAI_DEVELOPMENT &&
-              currentExperimentKind !== ExperimentKind.GENAI_DEVELOPMENT_INFERRED)) &&
-          (prevStep === 'use-case' ||
-            prevStep === 'scorer-selection' ||
-            prevStep === 'instrumentation' ||
-            prevStep === 'completion')
-        ) {
-          // Skip experiment-specific steps when:
-          // 1. Not in an experiment, OR
-          // 2. In an ML experiment (not GenAI)
-          prevIndex -= 1;
-          if (prevIndex >= 0) {
-            prevStep = STEP_ORDER[prevIndex];
+            prevStep = stepOrder[prevIndex];
           }
         } else {
           break;
         }
       }
 
-      setCurrentStep(prevStep);
+      if (prevIndex >= 0) {
+        setCurrentStep(prevStep);
+      }
     }
-  }, [
-    currentStep,
-    currentExperimentId,
-    currentExperimentKind,
-    state.assistantConfigured,
-    state.experimentSelected,
-    state.judgesConfigured,
-  ]);
+  }, [currentStep, stepOrder, state.assistantConfigured, state.experimentSelected, state.judgesConfigured]);
 
   const updateState = useCallback((updates: Partial<OnboardingState>) => {
     setState((prev) => ({ ...prev, ...updates }));
@@ -575,10 +629,10 @@ export const OnboardingWizard = ({
   };
 
   const stepInfo = STEP_INFO[currentStep];
-  const currentStepIndex = STEP_ORDER.indexOf(currentStep);
+  const currentStepIndex = stepOrder.indexOf(currentStep);
 
-  // Calculate visible steps (skip completed steps and experiment-only steps when not in experiment)
-  const visibleSteps = STEP_ORDER.filter((step) => {
+  // Calculate visible steps (skip already completed steps)
+  const visibleSteps = stepOrder.filter((step) => {
     if (step === 'experiment-selection' && state.experimentSelected) {
       return false; // Skip experiment selection if already in an experiment
     }
@@ -587,13 +641,6 @@ export const OnboardingWizard = ({
     }
     if ((step === 'use-case' || step === 'scorer-selection') && state.judgesConfigured) {
       return false; // Skip judge setup steps if configured
-    }
-    // Skip experiment-specific steps when not in an experiment (including completion)
-    if (
-      !currentExperimentId &&
-      (step === 'use-case' || step === 'scorer-selection' || step === 'instrumentation' || step === 'completion')
-    ) {
-      return false;
     }
     return true;
   });
