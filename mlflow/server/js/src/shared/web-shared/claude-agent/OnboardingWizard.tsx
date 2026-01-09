@@ -250,7 +250,7 @@ const STEP_INFO: Record<OnboardingStep, { title: string; subtitle: string }> = {
     subtitle: 'Set up the AI assistant backend to help with tracing.',
   },
   'code-path-selection': {
-    title: 'Link Your Code',
+    title: 'Link Your Codebase',
     subtitle: 'Specify the path to your agent or application code for more accurate issue detection and detailed improvement recommendations.',
   },
   instrumentation: {

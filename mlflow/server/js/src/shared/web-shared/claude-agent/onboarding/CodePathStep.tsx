@@ -38,20 +38,6 @@ export const CodePathStep = () => {
 
   return (
     <div css={{ padding: theme.spacing.lg }}>
-      <Typography.Text bold css={{ display: 'block', marginBottom: theme.spacing.md }}>
-        <FormattedMessage
-          defaultMessage="Specify your code location"
-          description="Label for code path input section"
-        />
-      </Typography.Text>
-
-      <Typography.Text color="secondary" size="sm" css={{ display: 'block', marginBottom: theme.spacing.lg }}>
-        <FormattedMessage
-          defaultMessage="Provide the path to your main Python file or project directory. This helps MLflow understand your codebase and provide better assistance."
-          description="Help text for code path input"
-        />
-      </Typography.Text>
-
       <div css={{ marginBottom: theme.spacing.lg }}>
         <Typography.Text bold css={{ display: 'block', marginBottom: theme.spacing.sm }}>
           <FormattedMessage defaultMessage="Code Path" description="Code path input label" />

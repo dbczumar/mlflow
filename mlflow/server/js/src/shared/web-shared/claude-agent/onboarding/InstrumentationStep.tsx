@@ -226,8 +226,8 @@ mlflow.set_experiment("${experimentName}")
           </Typography.Text>
 
           <div css={{ display: 'flex', flexDirection: 'column', gap: theme.spacing.md }}>
-            {/* Option A: Let Assistant Do It - only show if assistant is configured */}
-            {isAssistantConfigured && (
+            {/* Option A: Let Assistant Do It - only show if code path was configured */}
+            {isAssistantConfigured && state.codePath && (
               <button
                 onClick={() => handleMethodSelect('assistant-direct')}
                 css={{
@@ -295,8 +295,9 @@ mlflow.set_experiment("${experimentName}")
               </button>
             )}
 
-            {/* Option B: Copy Instructions */}
-            <button
+            {/* Option B: Copy Instructions - only show if Claude Code is the selected backend */}
+            {state.selectedBackend === 'claude-code' && (
+              <button
               onClick={() => handleMethodSelect('copy-instructions')}
               css={{
                 display: 'flex',
@@ -346,6 +347,7 @@ mlflow.set_experiment("${experimentName}")
               </div>
               <ChevronRightIcon css={{ color: theme.colors.textSecondary, flexShrink: 0 }} />
             </button>
+            )}
 
             {/* Option C: Manual / Read the Docs - always available */}
             <button
@@ -398,6 +400,18 @@ mlflow.set_experiment("${experimentName}")
               </div>
               <ChevronRightIcon css={{ color: theme.colors.textSecondary, flexShrink: 0 }} />
             </button>
+          </div>
+
+          {/* Skip button */}
+          <div css={{ display: 'flex', justifyContent: 'flex-end', marginTop: theme.spacing.lg }}>
+            <Button
+              componentId={`${COMPONENT_ID_PREFIX}.skip_method_selection`}
+              size="small"
+              onClick={handleSkipToNext}
+              css={{ opacity: 0.7 }}
+            >
+              <FormattedMessage defaultMessage="Skip this step" description="Skip button" />
+            </Button>
           </div>
         </div>
       )}
