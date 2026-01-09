@@ -182,22 +182,31 @@ export const GlobalClaudeProvider = ({ children }: { children: ReactNode }) => {
       streamingMessageRef.current = '';
       disconnectSSE();
 
-      // Button variant and availability based on GLOBAL backend configuration
-      if (globalStatus === 'configured') {
-        checkHealth()
-          .then((health) => {
-            const isAvailable = health.claude_available === 'true' || health.claude_available === 'True';
-            setIsClaudeAvailable(isAvailable);
+      // Always check Claude availability, regardless of localStorage status
+      // This ensures we detect Claude on PATH even on fresh load
+      checkHealth()
+        .then((health) => {
+          const isAvailable = health.claude_available === 'true' || health.claude_available === 'True';
+          setIsClaudeAvailable(isAvailable);
+          if (isAvailable) {
+            // Claude is available - mark as configured and save to localStorage
             setSetupStatus('configured');
-          })
-          .catch(() => {
-            setIsClaudeAvailable(false);
+            saveSetupStatus('configured');
+          } else {
+            // Claude CLI installed but not authenticated or not working
+            setSetupStatus('not-configured');
+          }
+        })
+        .catch(() => {
+          // Backend not responding or Claude not available
+          setIsClaudeAvailable(false);
+          if (globalStatus === 'configured') {
+            // User had it configured before but it's not working now
             setSetupStatus('configured'); // Keep configured status - user may just need to restart backend
-          });
-      } else {
-        setSetupStatus('not-configured');
-        setIsClaudeAvailable(false);
-      }
+          } else {
+            setSetupStatus('not-configured');
+          }
+        });
 
       // Auto-open panel when navigating to a NEW GenAI experiment
       if (experimentId && experimentId !== previousExperimentId) {
@@ -232,15 +241,19 @@ export const GlobalClaudeProvider = ({ children }: { children: ReactNode }) => {
   const openPanel = useCallback(() => {
     setIsPanelOpen(true);
     setError(null);
-    // Show setup wizard ONLY for GenAI experiments
-    // (The wizard itself will determine the appropriate starting step based on experiment state)
+    // Show setup wizard for GenAI experiments, or if assistant not configured
     setContextState((currentContext) => {
       const isGenAIExp =
         currentContext.navigation?.experimentKind &&
         (currentContext.navigation.experimentKind === ExperimentKind.GENAI_DEVELOPMENT ||
           currentContext.navigation.experimentKind === ExperimentKind.GENAI_DEVELOPMENT_INFERRED);
 
-      if (isGenAIExp) {
+      // Check current setup status
+      const currentSetupStatus = loadSetupStatus();
+      const hasExperiment = !!currentContext.navigation?.experimentId;
+
+      // Show wizard if in GenAI experiment OR if not configured
+      if (isGenAIExp || (currentSetupStatus !== 'configured' && !hasExperiment)) {
         setShowSetupWizard(true);
       }
       return currentContext;

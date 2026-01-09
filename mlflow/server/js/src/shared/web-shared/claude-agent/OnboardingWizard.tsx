@@ -286,9 +286,11 @@ const determineInitialStep = async (
   experimentId?: string,
   assistantConfigured?: boolean,
 ): Promise<{ step: OnboardingStep; judgesConfigured: boolean }> => {
-  // If no experiment, always start with experiment selection
+  // If no experiment, start with assistant-backend (for home page setup)
   if (!experimentId) {
-    return { step: 'experiment-selection', judgesConfigured: false };
+    // When opening from home page, go directly to assistant backend setup
+    // (skip experiment selection since user is not in an experiment context)
+    return { step: 'assistant-backend', judgesConfigured: false };
   }
 
   // Check if experiment has judges configured
