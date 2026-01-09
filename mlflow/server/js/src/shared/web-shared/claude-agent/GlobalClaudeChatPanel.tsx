@@ -173,11 +173,6 @@ export const GlobalClaudeChatPanel = () => {
           overflow: 'hidden',
         }}
       >
-        {/* DEBUG: Show experimentId being used */}
-        <div css={{ padding: theme.spacing.sm, backgroundColor: '#ff0', color: '#000', fontSize: '12px' }}>
-          DEBUG: URL ExpID={getExperimentIdFromUrl()} | Context ExpID={context.navigation?.experimentId} | Using=
-          {currentExperimentId}
-        </div>
         {/* Header for onboarding */}
         <div
           css={{

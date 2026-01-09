@@ -7,7 +7,7 @@
  * 4. Instrumenting their application with tracing
  */
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   Button,
   ChevronLeftIcon,
@@ -432,8 +432,39 @@ export const OnboardingWizard = ({
   // Build step order based on context (global vs GenAI vs ML)
   const stepOrder = useMemo(() => buildStepOrder(wizardContext), [wizardContext]);
 
+  // Track if we've initialized the step for current experiment to prevent re-initialization
+  const initializedExperimentRef = useRef<{ experimentId?: string; experimentKind?: string } | null>(null);
+
+  // Track current experimentId and experimentKind in refs for save logic
+  const currentExperimentIdRef = useRef(currentExperimentId);
+  const currentExperimentKindRef = useRef(currentExperimentKind);
+
+  // Update refs when props change
+  useEffect(() => {
+    currentExperimentIdRef.current = currentExperimentId;
+    currentExperimentKindRef.current = currentExperimentKind;
+  }, [currentExperimentId, currentExperimentKind]);
+
   // Determine initial step based on current context
   useEffect(() => {
+    // CRITICAL: If we're in an experiment context and experimentKind hasn't loaded yet, WAIT!
+    // Don't initialize until we know the experimentKind, otherwise we'll validate the saved step
+    // against the wrong stepOrder (ML vs GenAI) and reject a valid saved step.
+    if (currentExperimentId && currentExperimentKind === undefined) {
+      return;
+    }
+
+    // Skip if we've already initialized for this experiment+kind combination
+    // (prevents re-running when stepOrder changes after experimentKind loads)
+    if (
+      initializedExperimentRef.current &&
+      initializedExperimentRef.current.experimentId === currentExperimentId &&
+      initializedExperimentRef.current.experimentKind === currentExperimentKind &&
+      currentExperimentKind !== undefined // Only skip if we have a known experimentKind
+    ) {
+      return;
+    }
+
     const checkInitialStep = async () => {
       // Set checking flag at the start to prevent race conditions with child component effects
       setIsCheckingInitialStep(true);
@@ -461,6 +492,7 @@ export const OnboardingWizard = ({
 
       // Check for saved step (note: useState initializer only runs on first mount,
       // so we need to check again when experimentId changes)
+      // Note: If this is first kind load and step was 'assistant-backend', we cleared it above
       const savedStep = loadWizardStep(currentExperimentId);
       if (savedStep) {
         // Validate that saved step is in the current step order
@@ -486,6 +518,8 @@ export const OnboardingWizard = ({
           setCurrentStep(savedStep);
         }
         setIsCheckingInitialStep(false);
+        // Mark as initialized (track experimentKind even if undefined)
+        initializedExperimentRef.current = { experimentId: currentExperimentId, experimentKind: currentExperimentKind };
         return;
       }
 
@@ -494,19 +528,30 @@ export const OnboardingWizard = ({
       setCurrentStep(result.step);
       setState((prev) => ({ ...prev, judgesConfigured: result.judgesConfigured }));
       setIsCheckingInitialStep(false);
+      // Mark as initialized (track experimentKind even if undefined)
+      initializedExperimentRef.current = { experimentId: currentExperimentId, experimentKind: currentExperimentKind };
     };
 
     checkInitialStep();
   }, [currentExperimentId, currentExperimentKind, assistantAlreadyConfigured, stepOrder]);
 
   // Save current step to localStorage whenever it changes
-  // NOTE: We DON'T include currentExperimentId in dependencies to avoid saving the old step
-  // to a new experiment key when navigating between experiments
+  // NOTE: We DON'T include currentExperimentId or currentExperimentKind in dependencies
+  // to avoid saving during context transitions (navigating between experiments or when experimentKind loads)
+  // The effect only runs when currentStep actually changes or when isCheckingInitialStep changes
+  // IMPORTANT: Don't save step for an experiment until we know its experimentKind (prevents race condition)
   useEffect(() => {
     if (!isCheckingInitialStep) {
-      saveWizardStep(currentStep, currentExperimentId);
+      // Use refs to get current values (not stale closure values)
+      const expId = currentExperimentIdRef.current;
+      const expKind = currentExperimentKindRef.current;
+      // Only save if either: no experiment (home), or experimentKind is known
+      const shouldSave = !expId || expKind !== undefined;
+      if (shouldSave) {
+        saveWizardStep(currentStep, expId);
+      }
     }
-  }, [currentStep, isCheckingInitialStep, currentExperimentId]);
+  }, [currentStep, isCheckingInitialStep]);
 
   // Save wizard state to localStorage whenever it changes
   useEffect(() => {
