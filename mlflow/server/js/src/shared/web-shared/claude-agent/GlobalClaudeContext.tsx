@@ -213,20 +213,22 @@ export const GlobalClaudeProvider = ({ children }: { children: ReactNode }) => {
           // This GenAI experiment's wizard is not complete - auto-open panel
           setIsPanelOpen(true);
           setShowSetupWizard(true);
-        } else if (!isGenAIExp) {
-          // Non-GenAI experiment - make sure wizard is hidden
+        } else if (!isGenAIExp && globalStatus === 'configured') {
+          // Non-GenAI experiment AND user is configured - hide wizard
           setShowSetupWizard(false);
         }
+        // If not configured, keep wizard visible (don't hide it)
       } else if (experimentKind !== previousExperimentKind) {
         // ExperimentKind changed (data loaded)
         if (isGenAIExp && experimentId && experimentSpecificStatus !== 'configured') {
           // Just learned it's a GenAI experiment that's not configured - auto-open
           setIsPanelOpen(true);
           setShowSetupWizard(true);
-        } else if (!isGenAIExp) {
-          // Not a GenAI experiment - hide wizard
+        } else if (!isGenAIExp && globalStatus === 'configured') {
+          // Not a GenAI experiment AND user is configured - hide wizard
           setShowSetupWizard(false);
         }
+        // If not configured, keep wizard visible (don't hide it)
       }
     }
 
@@ -250,10 +252,9 @@ export const GlobalClaudeProvider = ({ children }: { children: ReactNode }) => {
 
       // Check current setup status
       const currentSetupStatus = loadSetupStatus();
-      const hasExperiment = !!currentContext.navigation?.experimentId;
 
-      // Show wizard if in GenAI experiment OR if not configured
-      if (isGenAIExp || (currentSetupStatus !== 'configured' && !hasExperiment)) {
+      // Show wizard if in GenAI experiment OR if not configured (regardless of experiment type)
+      if (isGenAIExp || currentSetupStatus !== 'configured') {
         setShowSetupWizard(true);
       }
       return currentContext;
@@ -268,14 +269,13 @@ export const GlobalClaudeProvider = ({ children }: { children: ReactNode }) => {
   const setContext = useCallback((newContext: ClaudeContext) => {
     setContextState(newContext);
 
-    // If switching to global context (no experiment), close the setup wizard
+    // If switching to global context (no experiment), close wizard ONLY if configured
     if (!newContext.navigation?.experimentId) {
-      setShowSetupWizard((prev) => {
-        if (prev) {
-          return false;
-        }
-        return prev;
-      });
+      const globalStatus = loadSetupStatus();
+      if (globalStatus === 'configured') {
+        setShowSetupWizard(false);
+      }
+      // If not configured, keep wizard visible
     }
   }, []);
 
