@@ -89,10 +89,29 @@ export const InstrumentationStep = () => {
         setShowAssistantSetup(true);
         return;
       }
+
+      // For assistant-direct, immediately send message and continue
+      if (method === 'assistant-direct' && globalClaude && state.codePath) {
+        const prompt = `Please analyze and instrument the code at: ${state.codePath}
+
+${generateInstrumentationPrompt(trackingUri, experimentName)}`;
+
+        globalClaude.sendMessage(prompt);
+
+        updateState({
+          instrumentationMethod: method,
+          instrumentationApplied: true,
+        });
+
+        // Continue to next step
+        goToNextStep();
+        return;
+      }
+
       setSelectedMethod(method);
       updateState({ instrumentationMethod: method });
     },
-    [isAssistantConfigured, updateState],
+    [isAssistantConfigured, updateState, globalClaude, state.codePath, trackingUri, experimentName, goToNextStep],
   );
 
   const handleAssistantConfigured = useCallback((backendId: string) => {
