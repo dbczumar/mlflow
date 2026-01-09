@@ -167,6 +167,16 @@ export const GlobalClaudeProvider = ({ children }: { children: ReactNode }) => {
     const isGenAIExp =
       experimentKind === 'GENAI_DEVELOPMENT' || experimentKind === 'GENAI_DEVELOPMENT_INFERRED';
 
+    console.log('[GlobalClaudeContext] Context change:', {
+      experimentId,
+      experimentKind,
+      previousExperimentId,
+      previousExperimentKind,
+      experimentChanged,
+      isGenAIExp,
+      experimentSpecificStatus,
+    });
+
     // Only process when experiment context actually changes
     if (experimentChanged) {
       // Reset session when experiment changes (inline to avoid circular dependency)
@@ -196,22 +206,28 @@ export const GlobalClaudeProvider = ({ children }: { children: ReactNode }) => {
 
       // Auto-open panel when navigating to a NEW GenAI experiment
       if (experimentId && experimentId !== previousExperimentId) {
+        console.log('[GlobalClaudeContext] ExperimentId changed branch');
         // Experiment ID changed - user navigated to a different experiment
         if (experimentSpecificStatus !== 'configured' && isGenAIExp) {
+          console.log('[GlobalClaudeContext] AUTO-OPENING panel for GenAI experiment');
           // This GenAI experiment's wizard is not complete - auto-open panel
           setIsPanelOpen(true);
           setShowSetupWizard(true);
         } else if (!isGenAIExp) {
+          console.log('[GlobalClaudeContext] Hiding wizard for non-GenAI experiment');
           // Non-GenAI experiment - make sure wizard is hidden
           setShowSetupWizard(false);
         }
       } else if (experimentKind !== previousExperimentKind) {
+        console.log('[GlobalClaudeContext] ExperimentKind changed branch');
         // ExperimentKind changed (data loaded)
         if (isGenAIExp && experimentId && experimentSpecificStatus !== 'configured') {
+          console.log('[GlobalClaudeContext] AUTO-OPENING panel for GenAI experiment (kind loaded)');
           // Just learned it's a GenAI experiment that's not configured - auto-open
           setIsPanelOpen(true);
           setShowSetupWizard(true);
         } else if (!isGenAIExp) {
+          console.log('[GlobalClaudeContext] Hiding wizard for non-GenAI (kind loaded)');
           // Not a GenAI experiment - hide wizard
           setShowSetupWizard(false);
         }
