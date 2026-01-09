@@ -19,9 +19,10 @@ import { checkHealth } from '../ClaudeAgentService';
 import ClaudeLogo from '../../../../common/static/logos/claude.svg';
 
 // Save setup status to localStorage (global)
-const saveGlobalSetupStatus = (): void => {
+const saveGlobalSetupStatus = (backendId: string): void => {
   try {
     localStorage.setItem('mlflow.assistant.setupStatus.global', 'configured');
+    localStorage.setItem('mlflow.assistant.selectedBackend.global', backendId);
   } catch {
     // localStorage not available
   }
@@ -57,14 +58,10 @@ const BACKEND_OPTIONS: BackendOption[] = [
 type BackendSetupStep = 'select-backend' | 'install';
 
 interface AssistantBackendStepProps {
-  /** Called when assistant is successfully configured. If not provided, component is standalone. */
-  onConfigured?: () => void;
+  /** Called when assistant is successfully configured. Receives the backend ID. */
+  onConfigured?: (backendId: string) => void;
   /** Called when user skips setup. If not provided, skip button is not shown. */
   onSkip?: () => void;
-  /** Current code path value. */
-  codePath?: string;
-  /** Called when code path changes. */
-  onCodePathChange?: (codePath: string) => void;
 }
 
 /**
@@ -74,8 +71,6 @@ interface AssistantBackendStepProps {
 export const AssistantBackendStep = ({
   onConfigured,
   onSkip,
-  codePath,
-  onCodePathChange,
 }: AssistantBackendStepProps) => {
   const { theme } = useDesignSystemTheme();
 
@@ -84,7 +79,6 @@ export const AssistantBackendStep = ({
   const [isVerifying, setIsVerifying] = useState(false);
   const [verificationError, setVerificationError] = useState<string | null>(null);
   const [verificationSuccess, setVerificationSuccess] = useState(false);
-  const [localCodePath, setLocalCodePath] = useState(codePath || '');
 
   const handleBackendSelect = useCallback((backend: BackendOption) => {
     setSelectedBackend(backend);
@@ -103,10 +97,11 @@ export const AssistantBackendStep = ({
       if (isAvailable) {
         setVerificationSuccess(true);
         // Save global state immediately so button shows Claude variant everywhere
-        saveGlobalSetupStatus();
-        // Call the callback after showing success
+        const backendId = selectedBackend?.id || 'claude-code';
+        saveGlobalSetupStatus(backendId);
+        // Call the callback after showing success, passing the backend ID
         setTimeout(() => {
-          onConfigured?.();
+          onConfigured?.(backendId);
         }, 1500);
       } else {
         setVerificationError('Claude CLI is installed but not authenticated. Please run the authentication command.');
@@ -118,7 +113,7 @@ export const AssistantBackendStep = ({
     } finally {
       setIsVerifying(false);
     }
-  }, [onConfigured]);
+  }, [onConfigured, selectedBackend]);
 
   const handleBack = useCallback(() => {
     setCurrentSubStep('select-backend');
@@ -126,14 +121,6 @@ export const AssistantBackendStep = ({
     setVerificationError(null);
     setVerificationSuccess(false);
   }, []);
-
-  const handleCodePathChange = useCallback(
-    (newCodePath: string) => {
-      setLocalCodePath(newCodePath);
-      onCodePathChange?.(newCodePath);
-    },
-    [onCodePathChange],
-  );
 
   return (
     <div css={{ padding: theme.spacing.lg }}>
@@ -144,7 +131,7 @@ export const AssistantBackendStep = ({
             <FormattedMessage defaultMessage="Choose an assistant backend:" description="Label for backend selection" />
           </Typography.Text>
 
-          <div css={{ display: 'flex', flexDirection: 'column', gap: theme.spacing.md }}>
+          <div css={{ display: 'flex', flexDirection: 'column', gap: theme.spacing.md, marginBottom: theme.spacing.lg }}>
             {BACKEND_OPTIONS.map((backend) => (
               <button
                 key={backend.id}
@@ -178,6 +165,15 @@ export const AssistantBackendStep = ({
               </button>
             ))}
           </div>
+
+          {/* Skip button for select-backend sub-step */}
+          {onSkip && (
+            <div css={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <Button componentId={`${COMPONENT_ID_PREFIX}.skip_select`} size="small" onClick={onSkip} css={{ opacity: 0.7 }}>
+                <FormattedMessage defaultMessage="Skip this step" description="Skip backend selection button" />
+              </Button>
+            </div>
+          )}
         </div>
       )}
 
@@ -234,25 +230,6 @@ export const AssistantBackendStep = ({
           </div>
 
           <div css={{ marginBottom: theme.spacing.lg }}>
-            <Typography.Text bold css={{ display: 'block', marginBottom: theme.spacing.sm }}>
-              <FormattedMessage defaultMessage="Step 3: Provide Code Path" description="Code path step label" />
-            </Typography.Text>
-            <Input
-              componentId={`${COMPONENT_ID_PREFIX}.code_path`}
-              placeholder="/path/to/your/agent.py or /path/to/your/project"
-              value={localCodePath}
-              onChange={(e) => handleCodePathChange(e.target.value)}
-              css={{ marginBottom: theme.spacing.sm }}
-            />
-            <Typography.Text size="sm" color="secondary" css={{ display: 'block', marginBottom: theme.spacing.sm }}>
-              <FormattedMessage
-                defaultMessage="Enter the path to your main Python file or project directory."
-                description="Help text for code path input"
-              />
-            </Typography.Text>
-          </div>
-
-          <div css={{ marginBottom: theme.spacing.lg }}>
             <a
               href={selectedBackend.docsUrl}
               target="_blank"
@@ -278,7 +255,7 @@ export const AssistantBackendStep = ({
             }}
           >
             <Typography.Text bold css={{ display: 'block', marginBottom: theme.spacing.md }}>
-              <FormattedMessage defaultMessage="Step 4: Verify Setup" description="Verify step label" />
+              <FormattedMessage defaultMessage="Step 3: Verify Setup" description="Verify step label" />
             </Typography.Text>
 
             {verificationSuccess ? (

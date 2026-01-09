@@ -22,6 +22,7 @@ import { ExperimentSelectionStep } from './onboarding/ExperimentSelectionStep';
 import { UseCaseStep } from './onboarding/UseCaseStep';
 import { ScorerSelectionStep } from './onboarding/ScorerSelectionStep';
 import { AssistantBackendStep } from './onboarding/AssistantBackendStep';
+import { CodePathStep } from './onboarding/CodePathStep';
 import { InstrumentationStep } from './onboarding/InstrumentationStep';
 import { CompletionStep } from './onboarding/CompletionStep';
 import { listScheduledScorers } from '../../../experiment-tracking/pages/experiment-scorers/api';
@@ -38,6 +39,7 @@ export type OnboardingStep =
   | 'use-case'
   | 'scorer-selection'
   | 'assistant-backend'
+  | 'code-path-selection'
   | 'instrumentation'
   | 'completion';
 
@@ -85,15 +87,18 @@ export interface OnboardingState {
   onlineScoringEnabled: boolean;
   judgeEndpointName?: string;
 
-  // Step 4: Instrumentation
-  instrumentationMethod: 'assistant-direct' | 'copy-instructions' | 'manual' | null;
+  // Step 4: Assistant Backend
+  selectedBackend: string | null;
+  assistantConfigured: boolean;
+
+  // Step 5: Code Path (conditional - only for Claude Code)
   codePath?: string;
+
+  // Step 6: Instrumentation
+  instrumentationMethod: 'assistant-direct' | 'copy-instructions' | 'manual' | null;
   detectedFrameworks?: string[];
   instrumentationApplied: boolean;
   tracingVerified: boolean;
-
-  // Assistant configuration (used conditionally in instrumentation step)
-  assistantConfigured: boolean;
 
   // Judge configuration status (used to skip scorer selection if already configured)
   judgesConfigured: boolean;
@@ -172,20 +177,41 @@ const GENAI_STEPS: OnboardingStep[] = [
 const ML_STEPS: OnboardingStep[] = ['assistant-backend'];
 
 /**
- * Build step order based on wizard context.
+ * Build step order based on wizard context and current state.
  * Local steps always incorporate global steps.
+ * Some steps are conditionally included based on user choices.
  */
-const buildStepOrder = (context: WizardContext): OnboardingStep[] => {
+const buildStepOrder = (context: WizardContext, selectedBackend?: string | null): OnboardingStep[] => {
+  let baseSteps: OnboardingStep[];
+
   switch (context) {
     case 'home':
-      return GLOBAL_STEPS;
+      baseSteps = GLOBAL_STEPS;
+      break;
     case 'genai-experiment':
-      return GENAI_STEPS;
+      baseSteps = GENAI_STEPS;
+      break;
     case 'ml-experiment':
-      return ML_STEPS;
+      baseSteps = ML_STEPS;
+      break;
     default:
-      return GLOBAL_STEPS;
+      baseSteps = GLOBAL_STEPS;
   }
+
+  // Insert code-path-selection step after assistant-backend if Claude Code was selected
+  const shouldShowCodePath = selectedBackend === 'claude-code';
+
+  if (shouldShowCodePath) {
+    const assistantBackendIndex = baseSteps.indexOf('assistant-backend');
+    if (assistantBackendIndex !== -1) {
+      // Insert code-path-selection after assistant-backend
+      const withCodePath = [...baseSteps];
+      withCodePath.splice(assistantBackendIndex + 1, 0, 'code-path-selection');
+      return withCodePath;
+    }
+  }
+
+  return baseSteps;
 };
 
 /**
@@ -198,6 +224,7 @@ const ALL_STEPS: OnboardingStep[] = [
   'use-case',
   'scorer-selection',
   'assistant-backend',
+  'code-path-selection',
   'instrumentation',
   'completion',
 ];
@@ -222,6 +249,10 @@ const STEP_INFO: Record<OnboardingStep, { title: string; subtitle: string }> = {
     title: 'Configure Assistant',
     subtitle: 'Set up the AI assistant backend to help with tracing.',
   },
+  'code-path-selection': {
+    title: 'Link Your Code',
+    subtitle: 'Specify the path to your agent or application code for more accurate issue detection and detailed improvement recommendations.',
+  },
   instrumentation: {
     title: 'Add Tracing',
     subtitle: 'Instrument your GenAI application to capture traces.',
@@ -242,10 +273,11 @@ const INITIAL_STATE: OnboardingState = {
   samplingMode: 'all',
   samplingRate: 25,
   onlineScoringEnabled: false,
+  selectedBackend: null,
+  assistantConfigured: false,
   instrumentationMethod: null,
   instrumentationApplied: false,
   tracingVerified: false,
-  assistantConfigured: false,
   judgesConfigured: false,
   completedAt: null,
   visitedSteps: [],
@@ -327,6 +359,17 @@ const saveWizardState = (state: OnboardingState, experimentId?: string): void =>
   }
 };
 
+/**
+ * Load global selected backend from localStorage.
+ */
+const loadGlobalSelectedBackend = (): string | null => {
+  try {
+    return localStorage.getItem('mlflow.assistant.selectedBackend.global');
+  } catch {
+    return null;
+  }
+};
+
 interface OnboardingWizardProps {
   /** Called when onboarding is complete */
   onComplete: () => void;
@@ -349,7 +392,9 @@ const determineInitialStep = async (
 ): Promise<{ step: OnboardingStep; judgesConfigured: boolean }> => {
   // Determine wizard context and build appropriate step order
   const context = determineContext(experimentId, experimentKind);
-  const stepOrder = buildStepOrder(context);
+  // Load global backend if assistant is already configured
+  const selectedBackend = assistantConfigured ? loadGlobalSelectedBackend() : null;
+  const stepOrder = buildStepOrder(context, selectedBackend);
 
   // If no experiment (home page), start with first step in order
   if (!experimentId) {
@@ -414,10 +459,14 @@ export const OnboardingWizard = ({
   const [state, setState] = useState<OnboardingState>(() => {
     // Load saved state from localStorage if available
     const savedState = loadWizardState(currentExperimentId);
+    // Load globally selected backend if assistant is already configured
+    const globalBackend = assistantAlreadyConfigured ? loadGlobalSelectedBackend() : null;
     return {
       ...INITIAL_STATE,
       ...savedState,
       assistantConfigured: assistantAlreadyConfigured,
+      // Use global backend if available and not overridden by experiment-specific state
+      selectedBackend: savedState?.selectedBackend || globalBackend,
       // If we have an experimentId, mark it as selected
       experimentSelected: Boolean(currentExperimentId),
     };
@@ -429,8 +478,8 @@ export const OnboardingWizard = ({
     [currentExperimentId, currentExperimentKind],
   );
 
-  // Build step order based on context (global vs GenAI vs ML)
-  const stepOrder = useMemo(() => buildStepOrder(wizardContext), [wizardContext]);
+  // Build step order based on context (global vs GenAI vs ML) and selected backend
+  const stepOrder = useMemo(() => buildStepOrder(wizardContext, state.selectedBackend), [wizardContext, state.selectedBackend]);
 
   // Track if we've initialized the step for current experiment to prevent re-initialization
   const initializedExperimentRef = useRef<{ experimentId?: string; experimentKind?: string } | null>(null);
@@ -473,19 +522,24 @@ export const OnboardingWizard = ({
       // so we need to reload when experimentId changes)
       // IMPORTANT: Only load state if it's for THIS specific experiment to prevent cross-experiment contamination
       const savedState = loadWizardState(currentExperimentId);
+      // Load globally selected backend if assistant is already configured
+      const globalBackend = assistantAlreadyConfigured ? loadGlobalSelectedBackend() : null;
       if (savedState && currentExperimentId) {
         // Verify the saved state is actually for this experiment before applying it
         setState((prev) => ({
           ...INITIAL_STATE,
           ...savedState,
           assistantConfigured: assistantAlreadyConfigured,
+          // Use global backend if available and not overridden by experiment-specific state
+          selectedBackend: savedState.selectedBackend || globalBackend,
           experimentSelected: Boolean(currentExperimentId),
         }));
       } else if (currentExperimentId) {
-        // New experiment with no saved state - reset to initial
+        // New experiment with no saved state - reset to initial with global backend
         setState((prev) => ({
           ...INITIAL_STATE,
           assistantConfigured: assistantAlreadyConfigured,
+          selectedBackend: globalBackend,
           experimentSelected: Boolean(currentExperimentId),
         }));
       }
@@ -676,7 +730,17 @@ export const OnboardingWizard = ({
   const stepInfo = STEP_INFO[currentStep];
   const currentStepIndex = stepOrder.indexOf(currentStep);
 
-  // Calculate visible steps (skip already completed steps)
+  // Calculate steps to show in progress bar (ALL steps for visual continuity)
+  const progressSteps = stepOrder.filter((step) => {
+    // Only filter out experiment-selection if already in an experiment
+    if (step === 'experiment-selection' && state.experimentSelected) {
+      return false;
+    }
+    // Don't filter judge steps or assistant/code-path - show them all for progress tracking
+    return true;
+  });
+
+  // Calculate visible steps for navigation (skip already completed steps)
   const visibleSteps = stepOrder.filter((step) => {
     if (step === 'experiment-selection' && state.experimentSelected) {
       return false; // Skip experiment selection if already in an experiment
@@ -690,8 +754,11 @@ export const OnboardingWizard = ({
     return true;
   });
 
-  // Find current step position in visible steps
+  // Find current step position in visible steps (for navigation)
   const currentVisibleStepIndex = visibleSteps.indexOf(currentStep);
+
+  // Find current step position in progress steps (for progress bar)
+  const currentProgressStepIndex = progressSteps.indexOf(currentStep);
   const showBackButton = currentVisibleStepIndex > 0 && currentStep !== 'completion';
   const showForwardButton = currentVisibleStepIndex < visibleSteps.length - 1 && currentStep !== 'completion';
 
@@ -823,7 +890,7 @@ export const OnboardingWizard = ({
               marginBottom: theme.spacing.lg,
             }}
           >
-            {visibleSteps.map((step, index) => (
+            {progressSteps.map((step, index) => (
               <div
                 key={step}
                 css={{
@@ -831,7 +898,7 @@ export const OnboardingWizard = ({
                   height: 4,
                   borderRadius: 2,
                   backgroundColor:
-                    index <= currentVisibleStepIndex
+                    index <= currentProgressStepIndex
                       ? theme.colors.actionPrimaryBackgroundDefault
                       : theme.colors.backgroundSecondary,
                   transition: 'background-color 0.2s',
@@ -849,7 +916,13 @@ export const OnboardingWizard = ({
 
         {/* Step content */}
         <div css={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
-          {!isCheckingInitialStep && <StepContent step={currentStep} currentExperimentId={currentExperimentId} />}
+          {!isCheckingInitialStep && (
+            <StepContent
+              step={currentStep}
+              currentExperimentId={currentExperimentId}
+              currentExperimentKind={currentExperimentKind}
+            />
+          )}
         </div>
       </div>
     </OnboardingContext.Provider>
@@ -862,23 +935,29 @@ export const OnboardingWizard = ({
 interface StepContentProps {
   step: OnboardingStep;
   currentExperimentId?: string;
+  currentExperimentKind?: string;
 }
 
-const StepContent = ({ step, currentExperimentId }: StepContentProps) => {
-  const { goToNextStep, updateState, state } = useOnboarding();
+const StepContent = ({ step, currentExperimentId, currentExperimentKind }: StepContentProps) => {
+  const { goToNextStep, goToStep, updateState, state, currentStep } = useOnboarding();
 
-  const handleAssistantConfigured = () => {
-    updateState({ assistantConfigured: true });
-    goToNextStep();
+  const handleAssistantConfigured = (backendId: string) => {
+    updateState({ assistantConfigured: true, selectedBackend: backendId });
+
+    // Calculate what the step order will be AFTER the state update
+    // This ensures we navigate to the correct next step immediately
+    const wizardContext = determineContext(currentExperimentId, currentExperimentKind);
+    const newStepOrder = buildStepOrder(wizardContext, backendId);
+    const currentIndex = newStepOrder.indexOf(currentStep);
+    if (currentIndex < newStepOrder.length - 1) {
+      goToStep(newStepOrder[currentIndex + 1]);
+    }
   };
 
   const handleAssistantSkipped = () => {
-    // User skipped assistant setup - continue without marking as configured
+    // User skipped assistant setup - mark selectedBackend as null
+    updateState({ selectedBackend: null });
     goToNextStep();
-  };
-
-  const handleCodePathChange = (codePath: string) => {
-    updateState({ codePath });
   };
 
   switch (step) {
@@ -894,10 +973,10 @@ const StepContent = ({ step, currentExperimentId }: StepContentProps) => {
         <AssistantBackendStep
           onConfigured={handleAssistantConfigured}
           onSkip={currentExperimentId ? handleAssistantSkipped : undefined}
-          codePath={state.codePath}
-          onCodePathChange={handleCodePathChange}
         />
       );
+    case 'code-path-selection':
+      return <CodePathStep />;
     case 'instrumentation':
       return <InstrumentationStep />;
     case 'completion':

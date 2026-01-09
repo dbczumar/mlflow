@@ -97,7 +97,7 @@ export const GlobalClaudeChatPanel = () => {
     }
   };
 
-  const handleBackendConfigured = () => {
+  const handleBackendConfigured = (backendId: string) => {
     setShowBackendConfig(false);
     completeSetup();
   };

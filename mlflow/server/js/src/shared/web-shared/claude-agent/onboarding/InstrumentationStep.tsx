@@ -95,20 +95,12 @@ export const InstrumentationStep = () => {
     [isAssistantConfigured, updateState],
   );
 
-  const handleAssistantConfigured = useCallback(() => {
-    updateState({ assistantConfigured: true });
+  const handleAssistantConfigured = useCallback((backendId: string) => {
+    updateState({ assistantConfigured: true, selectedBackend: backendId });
     setShowAssistantSetup(false);
     setSelectedMethod('assistant-direct');
     updateState({ instrumentationMethod: 'assistant-direct' });
   }, [updateState]);
-
-  const handleCodePathChange = useCallback(
-    (newCodePath: string) => {
-      setCodePath(newCodePath);
-      updateState({ codePath: newCodePath });
-    },
-    [updateState],
-  );
 
   const handleBackFromAssistantSetup = useCallback(() => {
     setShowAssistantSetup(false);
@@ -210,8 +202,6 @@ mlflow.set_experiment("${experimentName}")
 
           <AssistantBackendStep
             onConfigured={handleAssistantConfigured}
-            codePath={codePath}
-            onCodePathChange={handleCodePathChange}
           />
 
           <Button
