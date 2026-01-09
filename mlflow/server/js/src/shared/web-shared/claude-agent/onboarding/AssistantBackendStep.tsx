@@ -8,6 +8,7 @@ import {
   Button,
   CheckCircleIcon,
   DangerIcon,
+  Input,
   Spinner,
   Typography,
   useDesignSystemTheme,
@@ -60,13 +61,22 @@ interface AssistantBackendStepProps {
   onConfigured?: () => void;
   /** Called when user skips setup. If not provided, skip button is not shown. */
   onSkip?: () => void;
+  /** Current code path value. */
+  codePath?: string;
+  /** Called when code path changes. */
+  onCodePathChange?: (codePath: string) => void;
 }
 
 /**
  * Configure the AI assistant backend.
  * Can be used embedded in InstrumentationStep (with onConfigured callback).
  */
-export const AssistantBackendStep = ({ onConfigured, onSkip }: AssistantBackendStepProps) => {
+export const AssistantBackendStep = ({
+  onConfigured,
+  onSkip,
+  codePath,
+  onCodePathChange,
+}: AssistantBackendStepProps) => {
   const { theme } = useDesignSystemTheme();
 
   const [currentSubStep, setCurrentSubStep] = useState<BackendSetupStep>('select-backend');
@@ -74,6 +84,7 @@ export const AssistantBackendStep = ({ onConfigured, onSkip }: AssistantBackendS
   const [isVerifying, setIsVerifying] = useState(false);
   const [verificationError, setVerificationError] = useState<string | null>(null);
   const [verificationSuccess, setVerificationSuccess] = useState(false);
+  const [localCodePath, setLocalCodePath] = useState(codePath || '');
 
   const handleBackendSelect = useCallback((backend: BackendOption) => {
     setSelectedBackend(backend);
@@ -115,6 +126,14 @@ export const AssistantBackendStep = ({ onConfigured, onSkip }: AssistantBackendS
     setVerificationError(null);
     setVerificationSuccess(false);
   }, []);
+
+  const handleCodePathChange = useCallback(
+    (newCodePath: string) => {
+      setLocalCodePath(newCodePath);
+      onCodePathChange?.(newCodePath);
+    },
+    [onCodePathChange],
+  );
 
   return (
     <div css={{ padding: theme.spacing.lg }}>
@@ -215,6 +234,25 @@ export const AssistantBackendStep = ({ onConfigured, onSkip }: AssistantBackendS
           </div>
 
           <div css={{ marginBottom: theme.spacing.lg }}>
+            <Typography.Text bold css={{ display: 'block', marginBottom: theme.spacing.sm }}>
+              <FormattedMessage defaultMessage="Step 3: Provide Code Path" description="Code path step label" />
+            </Typography.Text>
+            <Input
+              componentId={`${COMPONENT_ID_PREFIX}.code_path`}
+              placeholder="/path/to/your/agent.py or /path/to/your/project"
+              value={localCodePath}
+              onChange={(e) => handleCodePathChange(e.target.value)}
+              css={{ marginBottom: theme.spacing.sm }}
+            />
+            <Typography.Text size="sm" color="secondary" css={{ display: 'block', marginBottom: theme.spacing.sm }}>
+              <FormattedMessage
+                defaultMessage="Enter the path to your main Python file or project directory."
+                description="Help text for code path input"
+              />
+            </Typography.Text>
+          </div>
+
+          <div css={{ marginBottom: theme.spacing.lg }}>
             <a
               href={selectedBackend.docsUrl}
               target="_blank"
@@ -240,7 +278,7 @@ export const AssistantBackendStep = ({ onConfigured, onSkip }: AssistantBackendS
             }}
           >
             <Typography.Text bold css={{ display: 'block', marginBottom: theme.spacing.md }}>
-              <FormattedMessage defaultMessage="Step 3: Verify Setup" description="Verify step label" />
+              <FormattedMessage defaultMessage="Step 4: Verify Setup" description="Verify step label" />
             </Typography.Text>
 
             {verificationSuccess ? (

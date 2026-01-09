@@ -756,7 +756,7 @@ interface StepContentProps {
 }
 
 const StepContent = ({ step, currentExperimentId }: StepContentProps) => {
-  const { goToNextStep, updateState } = useOnboarding();
+  const { goToNextStep, updateState, state } = useOnboarding();
 
   const handleAssistantConfigured = () => {
     updateState({ assistantConfigured: true });
@@ -766,6 +766,10 @@ const StepContent = ({ step, currentExperimentId }: StepContentProps) => {
   const handleAssistantSkipped = () => {
     // User skipped assistant setup - continue without marking as configured
     goToNextStep();
+  };
+
+  const handleCodePathChange = (codePath: string) => {
+    updateState({ codePath });
   };
 
   switch (step) {
@@ -781,6 +785,8 @@ const StepContent = ({ step, currentExperimentId }: StepContentProps) => {
         <AssistantBackendStep
           onConfigured={handleAssistantConfigured}
           onSkip={currentExperimentId ? handleAssistantSkipped : undefined}
+          codePath={state.codePath}
+          onCodePathChange={handleCodePathChange}
         />
       );
     case 'instrumentation':

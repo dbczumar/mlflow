@@ -102,6 +102,14 @@ export const InstrumentationStep = () => {
     updateState({ instrumentationMethod: 'assistant-direct' });
   }, [updateState]);
 
+  const handleCodePathChange = useCallback(
+    (newCodePath: string) => {
+      setCodePath(newCodePath);
+      updateState({ codePath: newCodePath });
+    },
+    [updateState],
+  );
+
   const handleBackFromAssistantSetup = useCallback(() => {
     setShowAssistantSetup(false);
   }, []);
@@ -200,7 +208,11 @@ mlflow.set_experiment("${experimentName}")
             }
           />
 
-          <AssistantBackendStep onConfigured={handleAssistantConfigured} />
+          <AssistantBackendStep
+            onConfigured={handleAssistantConfigured}
+            codePath={codePath}
+            onCodePathChange={handleCodePathChange}
+          />
 
           <Button
             componentId={`${COMPONENT_ID_PREFIX}.back_from_assistant`}
@@ -403,29 +415,6 @@ mlflow.set_experiment("${experimentName}")
       {/* Assistant Direct Method */}
       {selectedMethod === 'assistant-direct' && (
         <div>
-          <Typography.Text bold css={{ display: 'block', marginBottom: theme.spacing.md }}>
-            <FormattedMessage
-              defaultMessage="Where is your application code?"
-              description="Label for code path input"
-            />
-          </Typography.Text>
-
-          <div css={{ marginBottom: theme.spacing.lg }}>
-            <Input
-              componentId={`${COMPONENT_ID_PREFIX}.code_path`}
-              placeholder="/path/to/your/agent.py or /path/to/your/project"
-              value={codePath}
-              onChange={(e) => setCodePath(e.target.value)}
-              css={{ marginBottom: theme.spacing.sm }}
-            />
-            <Typography.Text size="sm" color="secondary">
-              <FormattedMessage
-                defaultMessage="Enter the path to your main Python file or project directory."
-                description="Help text for code path input"
-              />
-            </Typography.Text>
-          </div>
-
           <div css={{ marginBottom: theme.spacing.lg }}>
             <Typography.Text bold css={{ display: 'block', marginBottom: theme.spacing.sm }}>
               <FormattedMessage defaultMessage="Experiment name" description="Label for experiment name input" />
