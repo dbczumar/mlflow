@@ -286,7 +286,7 @@ mlflow.set_experiment("${experimentName}")
                   </div>
                   <Typography.Text color="secondary" size="sm">
                     <FormattedMessage
-                      defaultMessage="Point to your code and the assistant will automatically add MLflow tracing."
+                      defaultMessage="The assistant will automatically analyze your code and add MLflow tracing."
                       description="Description for assistant instrumentation"
                     />
                   </Typography.Text>
