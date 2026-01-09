@@ -189,9 +189,13 @@ export const CompletionStep = () => {
 
       {/* Action Buttons */}
       <div css={{ display: 'flex', gap: theme.spacing.md }}>
-        {isAssistantConfigured && (
+        {isAssistantConfigured ? (
           <Button componentId={`${COMPONENT_ID_PREFIX}.open_assistant`} type="primary" onClick={completeOnboarding}>
             <FormattedMessage defaultMessage="Open Assistant" description="Open assistant button" />
+          </Button>
+        ) : (
+          <Button componentId={`${COMPONENT_ID_PREFIX}.done`} type="primary" onClick={completeOnboarding}>
+            <FormattedMessage defaultMessage="Done" description="Done button" />
           </Button>
         )}
       </div>

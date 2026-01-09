@@ -655,10 +655,8 @@ export const OnboardingWizard = ({
         }
       }
 
-      // When advancing to completion step, mark setup as complete
-      if (nextStep === 'completion') {
-        completeOnboarding();
-      } else if (nextIndex >= stepOrder.length) {
+      // Navigate to next step (including completion step)
+      if (nextIndex >= stepOrder.length) {
         // Reached end of steps without completion step (e.g., home page, ML experiment)
         completeOnboarding();
       } else {
