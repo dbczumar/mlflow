@@ -96,6 +96,8 @@ export const GlobalClaudeProvider = ({ children }: { children: ReactNode }) => {
   // Use ref to track previous experiment ID and kind for auto-opening panel
   const previousExperimentIdRef = useRef<string | undefined>(undefined);
   const previousExperimentKindRef = useRef<string | undefined>(undefined);
+  // Track if this is the very first mount (before any useEffect runs)
+  const isFirstMountRef = useRef<boolean>(true);
 
   const appendToStreamingMessage = useCallback((text: string) => {
     streamingMessageRef.current += text;
@@ -159,6 +161,9 @@ export const GlobalClaudeProvider = ({ children }: { children: ReactNode }) => {
     // Check if this is initial mount with an experiment (previousExperimentId is undefined but current is set)
     const isInitialMount = previousExperimentId === undefined && experimentId !== undefined;
 
+    // Check if this is the very first mount (home page or any page on load)
+    const isFirstMount = isFirstMountRef.current;
+
     // Check global status for button variant and backend availability
     const globalStatus = loadSetupStatus();
 
@@ -172,8 +177,8 @@ export const GlobalClaudeProvider = ({ children }: { children: ReactNode }) => {
       experimentKind === ExperimentKind.GENAI_DEVELOPMENT ||
       experimentKind === ExperimentKind.GENAI_DEVELOPMENT_INFERRED;
 
-    // Process when experiment context changes OR on initial mount
-    if (experimentChanged || isInitialMount) {
+    // Process when experiment context changes OR on initial mount OR on first mount
+    if (experimentChanged || isInitialMount || isFirstMount) {
       // Reset session when experiment changes (inline to avoid circular dependency)
       setSessionId(null);
       setMessages([]);
@@ -235,6 +240,8 @@ export const GlobalClaudeProvider = ({ children }: { children: ReactNode }) => {
     // Update refs with current experiment ID and kind
     previousExperimentIdRef.current = experimentId;
     previousExperimentKindRef.current = experimentKind;
+    // Mark that first mount is complete
+    isFirstMountRef.current = false;
   }, [context.navigation?.experimentId, context.navigation?.experimentKind, disconnectSSE]);
 
   // Actions
