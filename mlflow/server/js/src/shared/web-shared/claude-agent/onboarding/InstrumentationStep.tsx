@@ -268,7 +268,7 @@ mlflow.set_experiment("${experimentName}")
                   <div css={{ display: 'flex', alignItems: 'center', gap: theme.spacing.sm }}>
                     <Typography.Text bold>
                       <FormattedMessage
-                        defaultMessage="Let Assistant Do It"
+                        defaultMessage="Automatically Add Tracing"
                         description="Option to let assistant instrument code"
                       />
                     </Typography.Text>
@@ -419,18 +419,6 @@ mlflow.set_experiment("${experimentName}")
       {/* Assistant Direct Method */}
       {selectedMethod === 'assistant-direct' && (
         <div>
-          <div css={{ marginBottom: theme.spacing.lg }}>
-            <Typography.Text bold css={{ display: 'block', marginBottom: theme.spacing.sm }}>
-              <FormattedMessage defaultMessage="Experiment name" description="Label for experiment name input" />
-            </Typography.Text>
-            <Input
-              componentId={`${COMPONENT_ID_PREFIX}.experiment_name`}
-              placeholder="my-genai-app"
-              value={experimentName}
-              onChange={(e) => setExperimentName(e.target.value)}
-            />
-          </div>
-
           {analysisComplete ? (
             <div
               css={{
@@ -485,19 +473,6 @@ mlflow.set_experiment("${experimentName}")
       {/* Copy Instructions Method */}
       {selectedMethod === 'copy-instructions' && (
         <div>
-          <div css={{ marginBottom: theme.spacing.lg }}>
-            <Typography.Text bold css={{ display: 'block', marginBottom: theme.spacing.sm }}>
-              <FormattedMessage defaultMessage="Experiment name" description="Label for experiment name input" />
-            </Typography.Text>
-            <Input
-              componentId={`${COMPONENT_ID_PREFIX}.experiment_name_copy`}
-              placeholder="my-genai-app"
-              value={experimentName}
-              onChange={(e) => setExperimentName(e.target.value)}
-              css={{ marginBottom: theme.spacing.md }}
-            />
-          </div>
-
           <div
             css={{
               padding: theme.spacing.lg,
