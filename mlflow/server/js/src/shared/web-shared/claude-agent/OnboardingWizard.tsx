@@ -255,7 +255,7 @@ const STEP_INFO: Record<OnboardingStep, { title: string; subtitle: string }> = {
   },
   instrumentation: {
     title: 'Add Tracing',
-    subtitle: 'Instrument your GenAI application to capture traces.',
+    subtitle: 'Add tracing to your agent or application to identify and debug issues',
   },
   completion: {
     title: 'All Set!',
