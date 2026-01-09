@@ -189,28 +189,21 @@ export const GlobalClaudeProvider = ({ children }: { children: ReactNode }) => {
 
       // Always check Claude availability, regardless of localStorage status
       // This ensures we detect Claude on PATH even on fresh load
+      // NOTE: Claude availability ≠ assistant configured
+      // User must still complete setup wizard (provide code path, etc.)
       checkHealth()
         .then((health) => {
           const isAvailable = health.claude_available === 'true' || health.claude_available === 'True';
           setIsClaudeAvailable(isAvailable);
-          if (isAvailable) {
-            // Claude is available - mark as configured and save to localStorage
-            setSetupStatus('configured');
-            saveSetupStatus('configured');
-          } else {
-            // Claude CLI installed but not authenticated or not working
-            setSetupStatus('not-configured');
-          }
+          // Setup status comes from localStorage (user's actual configuration)
+          // Do NOT auto-mark as configured just because Claude is available!
+          setSetupStatus(globalStatus);
         })
         .catch(() => {
           // Backend not responding or Claude not available
           setIsClaudeAvailable(false);
-          if (globalStatus === 'configured') {
-            // User had it configured before but it's not working now
-            setSetupStatus('configured'); // Keep configured status - user may just need to restart backend
-          } else {
-            setSetupStatus('not-configured');
-          }
+          // Setup status still comes from localStorage
+          setSetupStatus(globalStatus);
         });
 
       // Auto-open panel when navigating to a NEW GenAI experiment

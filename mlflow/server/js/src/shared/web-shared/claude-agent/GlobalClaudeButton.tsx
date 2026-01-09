@@ -59,7 +59,7 @@ export const GlobalClaudeButton = () => {
     return null;
   }
 
-  const { openPanel, isPanelOpen, context, setupStatus } = globalClaude;
+  const { openPanel, isPanelOpen, context, setupStatus, isClaudeAvailable } = globalClaude;
 
   // Don't render if panel is already open
   if (isPanelOpen) {
@@ -73,6 +73,8 @@ export const GlobalClaudeButton = () => {
   };
 
   const borderRadius = 24; // More rounded for modern look
+  // Show Claude variant if Claude is available (even if not configured yet)
+  const showClaudeVariant = isClaudeAvailable === true;
   const isConfigured = setupStatus === 'configured';
 
   return (
@@ -109,7 +111,7 @@ export const GlobalClaudeButton = () => {
           <Button
             componentId={COMPONENT_ID}
             icon={
-              isConfigured ? (
+              showClaudeVariant ? (
                 <img src={ClaudeLogo} width={20} height={20} alt="" aria-hidden />
               ) : (
                 <img src={AssistantSparklesLogo} width={20} height={20} alt="" aria-hidden />
@@ -131,10 +133,10 @@ export const GlobalClaudeButton = () => {
               },
             }}
           >
-            {isConfigured ? (
+            {showClaudeVariant ? (
               <FormattedMessage
                 defaultMessage="Assistant (Claude)"
-                description="Label for Assistant button when configured with Claude"
+                description="Label for Assistant button when Claude is available"
               />
             ) : (
               <FormattedMessage defaultMessage="Assistant" description="Label for Assistant button" />

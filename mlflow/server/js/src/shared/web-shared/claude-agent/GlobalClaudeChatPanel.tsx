@@ -69,10 +69,13 @@ const getExperimentIdFromUrl = (): string | undefined => {
  */
 export const GlobalClaudeChatPanel = () => {
   const { theme } = useDesignSystemTheme();
-  const { closePanel, context, reset, showSetupWizard, completeSetup, openSetup, setupStatus } = useGlobalClaude();
+  const { closePanel, context, reset, showSetupWizard, completeSetup, openSetup, setupStatus, isClaudeAvailable } =
+    useGlobalClaude();
   const [showBackendConfig, setShowBackendConfig] = useState(false);
 
   const isConfigured = setupStatus === 'configured';
+  // Show Claude variant if Claude is available (even if not fully configured)
+  const showClaudeVariant = isClaudeAvailable === true;
 
   const contextLabel = getContextTypeLabel(context.type);
 
@@ -256,12 +259,12 @@ export const GlobalClaudeChatPanel = () => {
             fontWeight: theme.typography.typographyBoldFontWeight,
           }}
         >
-          {isConfigured ? (
+          {showClaudeVariant ? (
             <>
               <img src={ClaudeLogo} width={18} height={18} alt="" aria-hidden />
               <FormattedMessage
                 defaultMessage="Assistant (Claude)"
-                description="Title for the Assistant panel when configured with Claude"
+                description="Title for the Assistant panel when Claude is available"
               />
             </>
           ) : (
