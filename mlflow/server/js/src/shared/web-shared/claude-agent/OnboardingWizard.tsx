@@ -179,7 +179,7 @@ const ML_STEPS: OnboardingStep[] = ['assistant-backend'];
 /**
  * Build step order based on wizard context and current state.
  * Local steps always incorporate global steps.
- * Some steps are conditionally included based on user choices.
+ * Code path step is always included (for progress bar visibility) but skipped during navigation if not needed.
  */
 const buildStepOrder = (context: WizardContext, selectedBackend?: string | null): OnboardingStep[] => {
   let baseSteps: OnboardingStep[];
@@ -198,17 +198,13 @@ const buildStepOrder = (context: WizardContext, selectedBackend?: string | null)
       baseSteps = GLOBAL_STEPS;
   }
 
-  // Insert code-path-selection step after assistant-backend if Claude Code was selected
-  const shouldShowCodePath = selectedBackend === 'claude-code';
-
-  if (shouldShowCodePath) {
-    const assistantBackendIndex = baseSteps.indexOf('assistant-backend');
-    if (assistantBackendIndex !== -1) {
-      // Insert code-path-selection after assistant-backend
-      const withCodePath = [...baseSteps];
-      withCodePath.splice(assistantBackendIndex + 1, 0, 'code-path-selection');
-      return withCodePath;
-    }
+  // Always insert code-path-selection step after assistant-backend for consistent progress bar
+  const assistantBackendIndex = baseSteps.indexOf('assistant-backend');
+  if (assistantBackendIndex !== -1) {
+    // Insert code-path-selection after assistant-backend
+    const withCodePath = [...baseSteps];
+    withCodePath.splice(assistantBackendIndex + 1, 0, 'code-path-selection');
+    return withCodePath;
   }
 
   return baseSteps;
@@ -639,7 +635,7 @@ export const OnboardingWizard = ({
       let nextIndex = currentIndex + 1;
       let nextStep = stepOrder[nextIndex];
 
-      // Skip already completed steps
+      // Skip already completed steps or conditional steps
       while (nextIndex < stepOrder.length) {
         if (nextStep === 'experiment-selection' && state.experimentSelected) {
           nextIndex += 1;
@@ -648,6 +644,10 @@ export const OnboardingWizard = ({
           nextIndex += 1;
           nextStep = stepOrder[nextIndex];
         } else if ((nextStep === 'use-case' || nextStep === 'scorer-selection') && state.judgesConfigured) {
+          nextIndex += 1;
+          nextStep = stepOrder[nextIndex];
+        } else if (nextStep === 'code-path-selection' && state.selectedBackend !== 'claude-code') {
+          // Skip code path step if Claude Code is not selected
           nextIndex += 1;
           nextStep = stepOrder[nextIndex];
         } else {
@@ -672,6 +672,7 @@ export const OnboardingWizard = ({
     state.assistantConfigured,
     state.experimentSelected,
     state.judgesConfigured,
+    state.selectedBackend,
     completeOnboarding,
   ]);
 
@@ -681,7 +682,7 @@ export const OnboardingWizard = ({
       let prevIndex = currentIndex - 1;
       let prevStep = stepOrder[prevIndex];
 
-      // Skip already completed steps
+      // Skip already completed steps or conditional steps
       while (prevIndex >= 0) {
         if (prevStep === 'experiment-selection' && state.experimentSelected) {
           prevIndex -= 1;
@@ -698,6 +699,12 @@ export const OnboardingWizard = ({
           if (prevIndex >= 0) {
             prevStep = stepOrder[prevIndex];
           }
+        } else if (prevStep === 'code-path-selection' && state.selectedBackend !== 'claude-code') {
+          // Skip code path step if Claude Code is not selected
+          prevIndex -= 1;
+          if (prevIndex >= 0) {
+            prevStep = stepOrder[prevIndex];
+          }
         } else {
           break;
         }
@@ -707,7 +714,7 @@ export const OnboardingWizard = ({
         setCurrentStep(prevStep);
       }
     }
-  }, [currentStep, stepOrder, state.assistantConfigured, state.experimentSelected, state.judgesConfigured]);
+  }, [currentStep, stepOrder, state.assistantConfigured, state.experimentSelected, state.judgesConfigured, state.selectedBackend]);
 
   const updateState = useCallback((updates: Partial<OnboardingState>) => {
     setState((prev) => ({ ...prev, ...updates }));
