@@ -23,7 +23,7 @@ import { FormattedMessage } from '@databricks/i18n';
 import { useOnboarding } from '../OnboardingWizard';
 import { useGlobalClaudeOptional } from '../GlobalClaudeContext';
 import { AssistantBackendStep } from './AssistantBackendStep';
-import { CopyButton } from '../../../shared/building_blocks/CopyButton';
+import { CopyButton } from '../../../building_blocks/CopyButton';
 
 const COMPONENT_ID_PREFIX = 'mlflow.onboarding.instrumentation';
 
