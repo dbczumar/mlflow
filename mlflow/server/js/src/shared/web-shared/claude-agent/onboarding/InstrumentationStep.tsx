@@ -33,30 +33,7 @@ type InstrumentationMethod = 'assistant-direct' | 'copy-instructions' | 'manual'
  * Generate the Claude prompt for instrumenting an application.
  */
 const generateInstrumentationPrompt = (trackingUri: string, experimentName: string): string => {
-  return `Add MLflow tracing to my GenAI application.
-
-Requirements:
-1. Set tracking URI to: ${trackingUri}
-2. Create/set experiment named: "${experimentName}"
-3. Enable autologging for any supported frameworks (OpenAI, Anthropic, LangChain, LlamaIndex, etc.)
-4. If no supported frameworks are detected, add manual tracing with @mlflow.trace decorator on key functions
-
-Example of what the instrumentation should look like:
-\`\`\`python
-import mlflow
-
-mlflow.set_tracking_uri("${trackingUri}")
-mlflow.set_experiment("${experimentName}")
-
-# Enable autologging for detected frameworks
-mlflow.openai.autolog()  # if using OpenAI
-# mlflow.langchain.autolog()  # if using LangChain
-# mlflow.anthropic.autolog()  # if using Anthropic
-
-# Your existing code below...
-\`\`\`
-
-Please analyze my code and add the appropriate tracing instrumentation.`;
+  return `Add MLflow tracing to my GenAI application. Set tracking URI to ${trackingUri} and experiment to "${experimentName}".`;
 };
 
 /**
