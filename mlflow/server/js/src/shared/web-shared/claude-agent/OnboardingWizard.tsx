@@ -433,12 +433,7 @@ const determineInitialStep = async (
       return { step: 'completion', judgesConfigured: true };
     } catch (error) {
       console.error('[OnboardingWizard] Error determining initial step:', error);
-      // On error: if assistant is already configured, skip to completion
-      // (user has configured globally, assume they're done with this experiment too)
-      if (assistantConfigured) {
-        return { step: 'completion', judgesConfigured: false };
-      }
-      // Otherwise start with first step in order
+      // On error, start with first step in order
       return { step: stepOrder[0], judgesConfigured: false };
     }
   }
