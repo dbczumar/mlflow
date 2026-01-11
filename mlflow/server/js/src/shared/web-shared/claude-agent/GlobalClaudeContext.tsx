@@ -56,6 +56,18 @@ const loadSetupStatus = (experimentId?: string): AssistantSetupStatus => {
 };
 
 /**
+ * Load selected backend from localStorage (global only).
+ */
+const loadSelectedBackend = (): string | null => {
+  try {
+    return localStorage.getItem('mlflow.assistant.selectedBackend.global');
+  } catch {
+    // localStorage not available
+    return null;
+  }
+};
+
+/**
  * Save setup status to localStorage.
  * If experimentId provided, saves experiment-specific status.
  */
@@ -90,6 +102,7 @@ export const GlobalClaudeProvider = ({ children }: { children: ReactNode }) => {
   // Setup state
   const [setupStatus, setSetupStatus] = useState<AssistantSetupStatus>(loadSetupStatus);
   const [showSetupWizard, setShowSetupWizard] = useState(false);
+  const [selectedBackend, setSelectedBackend] = useState<string | null>(loadSelectedBackend);
 
   // Use ref to track current streaming message
   const streamingMessageRef = useRef<string>('');
@@ -297,6 +310,8 @@ export const GlobalClaudeProvider = ({ children }: { children: ReactNode }) => {
     if (experimentId) {
       saveSetupStatus('configured', experimentId);
     }
+    // Reload selected backend from localStorage (updated by wizard)
+    setSelectedBackend(loadSelectedBackend());
     setShowSetupWizard(false);
     setIsClaudeAvailable(true);
   }, [context.navigation?.experimentId]);
@@ -421,6 +436,7 @@ export const GlobalClaudeProvider = ({ children }: { children: ReactNode }) => {
     currentStatus,
     setupStatus,
     showSetupWizard,
+    selectedBackend,
     // Actions
     openPanel,
     closePanel,

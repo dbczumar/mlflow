@@ -59,7 +59,7 @@ export const GlobalClaudeButton = () => {
     return null;
   }
 
-  const { openPanel, isPanelOpen, context, setupStatus, isClaudeAvailable } = globalClaude;
+  const { openPanel, isPanelOpen, context, setupStatus, selectedBackend } = globalClaude;
 
   // Don't render if panel is already open
   if (isPanelOpen) {
@@ -73,8 +73,8 @@ export const GlobalClaudeButton = () => {
   };
 
   const borderRadius = 24; // More rounded for modern look
-  // Show Claude variant if Claude is available (even if not configured yet)
-  const showClaudeVariant = isClaudeAvailable === true;
+  // Show Claude variant ONLY if user configured Claude through the wizard
+  const showClaudeVariant = setupStatus === 'configured' && selectedBackend === 'claude-code';
   const isConfigured = setupStatus === 'configured';
 
   return (

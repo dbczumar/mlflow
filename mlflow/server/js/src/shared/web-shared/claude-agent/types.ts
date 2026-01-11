@@ -87,6 +87,8 @@ export interface GlobalClaudeAgentState {
   setupStatus: AssistantSetupStatus;
   /** Whether to show the setup wizard */
   showSetupWizard: boolean;
+  /** Selected backend (e.g., 'claude-code'), null if not configured */
+  selectedBackend: string | null;
 }
 
 /**
