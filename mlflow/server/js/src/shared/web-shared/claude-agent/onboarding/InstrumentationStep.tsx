@@ -353,7 +353,7 @@ mlflow.set_experiment("${experimentName}")
               <div css={{ flex: 1 }}>
                 <Typography.Text bold css={{ display: 'block', marginBottom: theme.spacing.xs }}>
                   <FormattedMessage
-                    defaultMessage="Get Instructions for Claude"
+                    defaultMessage="Get Instructions for Claude Code"
                     description="Option to copy instructions"
                   />
                 </Typography.Text>
@@ -406,13 +406,13 @@ mlflow.set_experiment("${experimentName}")
               <div css={{ flex: 1 }}>
                 <Typography.Text bold css={{ display: 'block', marginBottom: theme.spacing.xs }}>
                   <FormattedMessage
-                    defaultMessage="Manual / Read the Docs"
+                    defaultMessage="Set Up Manually"
                     description="Option to manually set up tracing"
                   />
                 </Typography.Text>
                 <Typography.Text color="secondary" size="sm">
                   <FormattedMessage
-                    defaultMessage="Follow our documentation to manually add MLflow tracing to your application."
+                    defaultMessage="Follow the MLflow documentation to manually add MLflow tracing to your application."
                     description="Description for manual setup option"
                   />
                 </Typography.Text>
