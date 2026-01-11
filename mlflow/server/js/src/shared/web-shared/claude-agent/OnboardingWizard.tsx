@@ -238,7 +238,7 @@ const STEP_INFO: Record<OnboardingStep, { title: string; subtitle: string }> = {
     subtitle: 'Add tracing to your agent or application to identify and debug issues',
   },
   completion: {
-    title: 'All Set!',
+    title: 'Experiment Setup Complete',
     subtitle: "You're ready to start improving your agent or application.",
   },
 };

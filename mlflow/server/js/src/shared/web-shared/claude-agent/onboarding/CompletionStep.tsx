@@ -1,5 +1,5 @@
 /**
- * Step 5: Completion - All set! Show summary and next steps.
+ * Step 5: Completion - Experiment setup complete! Show summary and next steps.
  */
 
 import { Button, CheckCircleIcon, Typography, useDesignSystemTheme } from '@databricks/design-system';
