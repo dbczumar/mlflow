@@ -54,7 +54,7 @@ export const CompletionStep = () => {
       <div
         css={{
           width: '100%',
-          maxWidth: 400,
+          maxWidth: 600,
           padding: theme.spacing.lg,
           backgroundColor: theme.colors.backgroundSecondary,
           borderRadius: theme.borders.borderRadiusLg,
