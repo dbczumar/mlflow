@@ -893,6 +893,8 @@ export const OnboardingWizard = ({
               display: 'flex',
               gap: theme.spacing.xs,
               marginBottom: theme.spacing.lg,
+              // Add top margin when navigation buttons are hidden (e.g., completion step)
+              marginTop: showBackButton || showForwardButton ? 0 : theme.spacing.md + 32, // 32px = button height
             }}
           >
             {progressSteps.map((step, index) => (
