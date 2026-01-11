@@ -112,6 +112,19 @@ export const GlobalClaudeProvider = ({ children }: { children: ReactNode }) => {
   // Track if this is the very first mount (before any useEffect runs)
   const isFirstMountRef = useRef<boolean>(true);
 
+  // Ensure selectedBackend is always loaded from localStorage on mount
+  // This is a safety net to handle edge cases like new tabs
+  useEffect(() => {
+    const backend = loadSelectedBackend();
+    if (backend !== selectedBackend) {
+      setSelectedBackend(backend);
+    }
+    const status = loadSetupStatus();
+    if (status !== setupStatus) {
+      setSetupStatus(status);
+    }
+  }, []); // Run once on mount
+
   const appendToStreamingMessage = useCallback((text: string) => {
     streamingMessageRef.current += text;
     setMessages((prev) => {
