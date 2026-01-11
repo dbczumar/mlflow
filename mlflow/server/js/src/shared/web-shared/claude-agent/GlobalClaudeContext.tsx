@@ -211,12 +211,16 @@ export const GlobalClaudeProvider = ({ children }: { children: ReactNode }) => {
           // Setup status comes from localStorage (user's actual configuration)
           // Do NOT auto-mark as configured just because Claude is available!
           setSetupStatus(globalStatus);
+          // Reload selected backend from localStorage
+          setSelectedBackend(loadSelectedBackend());
         })
         .catch(() => {
           // Backend not responding or Claude not available
           setIsClaudeAvailable(false);
           // Setup status still comes from localStorage
           setSetupStatus(globalStatus);
+          // Reload selected backend from localStorage
+          setSelectedBackend(loadSelectedBackend());
         });
 
       // Auto-open panel when navigating to a NEW GenAI experiment
