@@ -76,7 +76,7 @@ export const CompletionStep = () => {
         >
           <li>
             <Typography.Text color="secondary">
-              <FormattedMessage defaultMessage="Run your app to generate traces" description="Next step 1" />
+              <FormattedMessage defaultMessage="Run your agent or application to generate traces" description="Next step 1" />
             </Typography.Text>
           </li>
           <li>
