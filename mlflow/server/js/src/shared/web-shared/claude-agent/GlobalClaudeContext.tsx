@@ -242,7 +242,7 @@ export const GlobalClaudeProvider = ({ children }: { children: ReactNode }) => {
           setSelectedBackend(backend);
         });
 
-      // Auto-open panel when navigating to a NEW GenAI experiment
+      // Auto-open panel when navigating to a NEW GenAI experiment (only if not configured)
       if (experimentId && experimentId !== previousExperimentId) {
         // Experiment ID changed - user navigated to a different experiment
         if (isGenAIExp) {
@@ -251,8 +251,7 @@ export const GlobalClaudeProvider = ({ children }: { children: ReactNode }) => {
             setIsPanelOpen(true);
             setShowSetupWizard(true);
           } else if (globalStatus === 'configured') {
-            // GenAI experiment AND assistant is configured - auto-open panel with CHAT (not wizard)
-            setIsPanelOpen(true);
+            // GenAI experiment AND assistant is configured - don't auto-open, just hide wizard
             setShowSetupWizard(false);
           }
         } else if (!isGenAIExp && globalStatus === 'configured') {
@@ -268,8 +267,7 @@ export const GlobalClaudeProvider = ({ children }: { children: ReactNode }) => {
             setIsPanelOpen(true);
             setShowSetupWizard(true);
           } else if (globalStatus === 'configured') {
-            // Just learned it's a GenAI experiment AND assistant is configured - auto-open with CHAT
-            setIsPanelOpen(true);
+            // Just learned it's a GenAI experiment AND assistant is configured - don't auto-open, just hide wizard
             setShowSetupWizard(false);
           }
         } else if (!isGenAIExp && globalStatus === 'configured') {
