@@ -16,8 +16,6 @@ export const CompletionStep = () => {
   const { theme } = useDesignSystemTheme();
   const { state, completeOnboarding } = useOnboarding();
 
-  const enabledScorersCount = state.selectedScorers.filter((s) => s.enabled).length;
-
   const isAssistantConfigured = state.assistantConfigured;
 
   return (
@@ -50,87 +48,6 @@ export const CompletionStep = () => {
       <Typography.Title level={2} css={{ marginBottom: theme.spacing.lg * 2 }}>
         <FormattedMessage defaultMessage="You're all set!" description="Completion title" />
       </Typography.Title>
-
-      {/* Summary */}
-      <div
-        css={{
-          width: '100%',
-          maxWidth: 400,
-          marginBottom: theme.spacing.lg * 2,
-        }}
-      >
-        <div
-          css={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: theme.spacing.md,
-            textAlign: 'left',
-          }}
-        >
-          {/* Assistant Configured - only show if actually configured */}
-          {isAssistantConfigured && (
-            <div
-              css={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: theme.spacing.md,
-                padding: theme.spacing.md,
-                backgroundColor: theme.colors.backgroundSecondary,
-                borderRadius: theme.borders.borderRadiusMd,
-              }}
-            >
-              <CheckCircleIcon css={{ color: theme.colors.textValidationSuccess, flexShrink: 0 }} />
-              <Typography.Text>
-                <FormattedMessage
-                  defaultMessage="AI Assistant configured"
-                  description="Assistant configured summary item"
-                />
-              </Typography.Text>
-            </div>
-          )}
-
-          {/* Tracing Set Up */}
-          <div
-            css={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: theme.spacing.md,
-              padding: theme.spacing.md,
-              backgroundColor: theme.colors.backgroundSecondary,
-              borderRadius: theme.borders.borderRadiusMd,
-            }}
-          >
-            <CheckCircleIcon css={{ color: theme.colors.textValidationSuccess, flexShrink: 0 }} />
-            <Typography.Text>
-              <FormattedMessage
-                defaultMessage="Tracing instrumentation ready"
-                description="Tracing configured summary item"
-              />
-            </Typography.Text>
-          </div>
-
-          {/* Online Scoring Enabled */}
-          <div
-            css={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: theme.spacing.md,
-              padding: theme.spacing.md,
-              backgroundColor: theme.colors.backgroundSecondary,
-              borderRadius: theme.borders.borderRadiusMd,
-            }}
-          >
-            <CheckCircleIcon css={{ color: theme.colors.textValidationSuccess, flexShrink: 0 }} />
-            <Typography.Text>
-              <FormattedMessage
-                defaultMessage="{count} scorers running online"
-                description="Scorers configured summary item"
-                values={{ count: enabledScorersCount }}
-              />
-            </Typography.Text>
-          </div>
-        </div>
-      </div>
 
       {/* Next Steps */}
       <div
