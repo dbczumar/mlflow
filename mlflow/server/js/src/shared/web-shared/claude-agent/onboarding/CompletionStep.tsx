@@ -47,7 +47,7 @@ export const CompletionStep = () => {
 
       {/* Title */}
       <Typography.Title level={2} css={{ marginBottom: theme.spacing.lg * 2 }}>
-        <FormattedMessage defaultMessage="You're all set!" description="Completion title" />
+        <FormattedMessage defaultMessage="Experiment Setup Complete" description="Completion title" />
       </Typography.Title>
 
       {/* Next Steps */}
