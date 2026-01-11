@@ -32,8 +32,8 @@ type InstrumentationMethod = 'assistant-direct' | 'copy-instructions' | 'manual'
 /**
  * Generate the Claude prompt for instrumenting an application.
  */
-const generateInstrumentationPrompt = (trackingUri: string, experimentName: string): string => {
-  return `Add MLflow tracing to my GenAI application. Set tracking URI to ${trackingUri} and experiment to "${experimentName}".`;
+const generateInstrumentationPrompt = (codePath: string, trackingUri: string, experimentName: string): string => {
+  return `Add MLflow tracing to my code at: ${codePath}. Set tracking URI to ${trackingUri} and experiment to "${experimentName}".`;
 };
 
 /**
@@ -72,9 +72,7 @@ export const InstrumentationStep = () => {
 
       // For assistant-direct, immediately send message and continue
       if (method === 'assistant-direct' && globalClaude && state.codePath) {
-        const prompt = `Please analyze and instrument the code at: ${state.codePath}
-
-${generateInstrumentationPrompt(trackingUri, experimentName)}`;
+        const prompt = generateInstrumentationPrompt(state.codePath, trackingUri, experimentName);
 
         globalClaude.sendMessage(prompt);
 
@@ -112,9 +110,7 @@ ${generateInstrumentationPrompt(trackingUri, experimentName)}`;
 
     // Send the instrumentation request to Claude via the assistant
     if (globalClaude) {
-      const prompt = `Please analyze and instrument the code at: ${codePath}
-
-${generateInstrumentationPrompt(trackingUri, experimentName)}`;
+      const prompt = generateInstrumentationPrompt(codePath, trackingUri, experimentName);
 
       globalClaude.sendMessage(prompt);
     }
