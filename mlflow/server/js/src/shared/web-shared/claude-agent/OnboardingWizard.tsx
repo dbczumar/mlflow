@@ -231,7 +231,7 @@ const STEP_INFO: Record<OnboardingStep, { title: string; subtitle: string }> = {
   },
   'code-path-selection': {
     title: 'Link Your Codebase',
-    subtitle: 'Specify the path to your agent or application code for more accurate issue detection and detailed improvement recommendations.',
+    subtitle: 'Specify the path to your agent or application code for more accurate issue detection and improvement recommendations.',
   },
   instrumentation: {
     title: 'Add Tracing',

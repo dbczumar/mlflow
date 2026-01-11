@@ -23,6 +23,7 @@ import { FormattedMessage } from '@databricks/i18n';
 import { useOnboarding } from '../OnboardingWizard';
 import { useGlobalClaudeOptional } from '../GlobalClaudeContext';
 import { AssistantBackendStep } from './AssistantBackendStep';
+import { CodeSnippet, SnippetCopyAction } from '../../snippet';
 
 const COMPONENT_ID_PREFIX = 'mlflow.onboarding.instrumentation';
 
@@ -73,7 +74,6 @@ export const InstrumentationStep = () => {
   const [experimentName, setExperimentName] = useState('my-genai-app');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisComplete, setAnalysisComplete] = useState(state.instrumentationApplied);
-  const [copied, setCopied] = useState(false);
   const [showAssistantSetup, setShowAssistantSetup] = useState(false);
 
   // Default tracking URI (current MLflow server)
@@ -149,43 +149,6 @@ ${generateInstrumentationPrompt(trackingUri, experimentName)}`;
       });
     }, 2000);
   }, [codePath, experimentName, globalClaude, trackingUri, updateState]);
-
-  const handleCopyInstructions = useCallback(async () => {
-    const instructions = `# MLflow Tracing Setup Instructions
-
-## Option 1: Use Claude Code CLI
-Run this command in your project directory:
-
-\`\`\`bash
-claude "${generateInstrumentationPrompt(trackingUri, experimentName).replace(/"/g, '\\"')}"
-\`\`\`
-
-## Option 2: Manual Setup
-Add this to the top of your main Python file:
-
-\`\`\`python
-import mlflow
-
-mlflow.set_tracking_uri("${trackingUri}")
-mlflow.set_experiment("${experimentName}")
-
-# Enable autologging for your framework:
-# mlflow.openai.autolog()      # For OpenAI
-# mlflow.anthropic.autolog()   # For Anthropic
-# mlflow.langchain.autolog()   # For LangChain
-# mlflow.llama_index.autolog() # For LlamaIndex
-\`\`\`
-`;
-
-    try {
-      await navigator.clipboard.writeText(instructions);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // Fallback for older browsers
-      console.error('Failed to copy to clipboard');
-    }
-  }, [trackingUri, experimentName]);
 
   const handleSkipToNext = useCallback(() => {
     updateState({ instrumentationMethod: selectedMethod });
@@ -507,50 +470,26 @@ mlflow.set_experiment("${experimentName}")
               />
             </Typography.Text>
 
-            <code
+            <div
               css={{
-                display: 'block',
-                padding: theme.spacing.md,
                 backgroundColor: theme.colors.backgroundPrimary,
                 borderRadius: theme.borders.borderRadiusMd,
-                fontFamily: 'monospace',
-                fontSize: theme.typography.fontSizeSm,
-                overflowX: 'auto',
-                whiteSpace: 'pre-wrap',
-                wordBreak: 'break-word',
-                marginBottom: theme.spacing.md,
+                overflow: 'hidden',
+                border: `1px solid ${theme.colors.border}`,
+                position: 'relative',
               }}
             >
-              {`claude "Add MLflow tracing to my GenAI app. Set tracking URI to ${trackingUri} and experiment to '${experimentName}'. Enable autologging for any supported frameworks."`}
-            </code>
-
-            <Button
-              componentId={`${COMPONENT_ID_PREFIX}.copy`}
-              onClick={handleCopyInstructions}
-              icon={copied ? <CheckCircleIcon /> : <CopyIcon />}
-            >
-              {copied ? (
-                <FormattedMessage defaultMessage="Copied!" description="Copied confirmation" />
-              ) : (
-                <FormattedMessage defaultMessage="Copy Full Instructions" description="Copy button text" />
-              )}
-            </Button>
-          </div>
-
-          <div
-            css={{
-              padding: theme.spacing.md,
-              backgroundColor: theme.colors.tagTurquoise,
-              borderRadius: theme.borders.borderRadiusMd,
-              marginBottom: theme.spacing.lg,
-            }}
-          >
-            <Typography.Text size="sm">
-              <FormattedMessage
-                defaultMessage="After running the command, your code will be instrumented with MLflow tracing. Run your app and traces will appear in MLflow."
-                description="Post-copy instructions"
-              />
-            </Typography.Text>
+              <CodeSnippet
+                language="text"
+                actions={
+                  <SnippetCopyAction
+                    copyText={`claude "Add MLflow tracing to my GenAI app. Set tracking URI to ${trackingUri} and experiment to '${experimentName}'. Enable autologging for any supported frameworks."`}
+                  />
+                }
+              >
+                {`claude "Add MLflow tracing to my GenAI app. Set tracking URI to ${trackingUri} and experiment to '${experimentName}'. Enable autologging for any supported frameworks."`}
+              </CodeSnippet>
+            </div>
           </div>
 
           <div css={{ display: 'flex', justifyContent: 'space-between' }}>
