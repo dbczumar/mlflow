@@ -48,13 +48,16 @@ export const InstrumentationStep = () => {
     state.instrumentationMethod || null,
   );
   const [codePath, setCodePath] = useState(state.codePath || '');
-  const [experimentName, setExperimentName] = useState('my-genai-app');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisComplete, setAnalysisComplete] = useState(state.instrumentationApplied);
   const [showAssistantSetup, setShowAssistantSetup] = useState(false);
 
-  // Default tracking URI (current MLflow server)
-  const trackingUri = window.location.origin;
+  // Get tracking URI and experiment name from context
+  // In dev mode (port 3000), use the actual MLflow backend port (5000)
+  const trackingUri = window.location.port === '3000'
+    ? `${window.location.protocol}//${window.location.hostname}:5000`
+    : window.location.origin;
+  const experimentName = globalClaude?.context?.navigation?.experimentName || 'Default';
 
   // Check if assistant is configured
   const isAssistantConfigured = state.assistantConfigured || globalClaude?.isClaudeAvailable;
