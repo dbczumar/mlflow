@@ -470,7 +470,7 @@ export const ScorerSelectionStep = () => {
               <FormattedMessage defaultMessage="Enabling..." description="Enabling button text" />
             </>
           ) : (
-            <FormattedMessage defaultMessage="Enable Judges" description="Enable button text" />
+            <FormattedMessage defaultMessage="Continue" description="Continue button text" />
           )}
         </Button>
         <Button componentId={`${COMPONENT_ID_PREFIX}.skip`} size="small" onClick={goToNextStep} css={{ opacity: 0.7 }}>
