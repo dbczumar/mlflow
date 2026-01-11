@@ -158,7 +158,7 @@ const determineContext = (experimentId?: string, experimentKind?: string): Wizar
 /**
  * Global steps that apply to all contexts.
  */
-const GLOBAL_STEPS: OnboardingStep[] = ['assistant-backend'];
+const GLOBAL_STEPS: OnboardingStep[] = ['experiment-selection', 'assistant-backend'];
 
 /**
  * GenAI experiment-specific steps (in addition to global steps).
