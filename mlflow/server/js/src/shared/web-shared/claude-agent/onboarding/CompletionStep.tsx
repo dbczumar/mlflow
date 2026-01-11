@@ -17,6 +17,7 @@ export const CompletionStep = () => {
   const { state, completeOnboarding } = useOnboarding();
 
   const isAssistantConfigured = state.assistantConfigured;
+  const isChatbotUseCase = state.useCase === 'chatbot';
 
   return (
     <div
@@ -81,9 +82,22 @@ export const CompletionStep = () => {
           </li>
           <li>
             <Typography.Text color="secondary">
-              <FormattedMessage defaultMessage="View traces and scores in the Traces tab" description="Next step 2" />
+              <FormattedMessage
+                defaultMessage="View traces, judge results, and feedback in the Traces tab"
+                description="Next step 2"
+              />
             </Typography.Text>
           </li>
+          {isChatbotUseCase && (
+            <li>
+              <Typography.Text color="secondary">
+                <FormattedMessage
+                  defaultMessage="Monitor multi-turn conversations in the Sessions tab"
+                  description="Next step for chatbot - sessions"
+                />
+              </Typography.Text>
+            </li>
+          )}
           {isAssistantConfigured && (
             <li>
               <Typography.Text color="secondary">
