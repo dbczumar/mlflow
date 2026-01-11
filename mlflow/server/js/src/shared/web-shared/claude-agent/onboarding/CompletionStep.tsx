@@ -92,7 +92,7 @@ export const CompletionStep = () => {
             <li>
               <Typography.Text color="secondary">
                 <FormattedMessage
-                  defaultMessage="Monitor multi-turn conversations in the Sessions tab"
+                  defaultMessage="Analyze multi-turn conversations in the Sessions tab"
                   description="Next step for chatbot - sessions"
                 />
               </Typography.Text>
