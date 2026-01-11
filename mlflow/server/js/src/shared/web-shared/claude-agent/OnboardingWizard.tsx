@@ -239,7 +239,7 @@ const STEP_INFO: Record<OnboardingStep, { title: string; subtitle: string }> = {
   },
   completion: {
     title: 'All Set!',
-    subtitle: "You're ready to start monitoring your GenAI application.",
+    subtitle: "You're ready to start improving your agent or application.",
   },
 };
 
