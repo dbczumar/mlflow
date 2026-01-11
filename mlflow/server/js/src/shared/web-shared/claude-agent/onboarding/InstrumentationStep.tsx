@@ -480,6 +480,8 @@ ${generateInstrumentationPrompt(trackingUri, experimentName)}`;
                 }}
               >
                 <CopyButton
+                  showLabel={false}
+                  icon={<CopyIcon />}
                   copyText={`claude "Add MLflow tracing to my GenAI app. Set tracking URI to ${trackingUri} and experiment to '${experimentName}'. Enable autologging for any supported frameworks."`}
                 />
               </div>
@@ -487,7 +489,7 @@ ${generateInstrumentationPrompt(trackingUri, experimentName)}`;
                 css={{
                   display: 'block',
                   padding: theme.spacing.md,
-                  paddingRight: theme.spacing.lg * 2,
+                  paddingRight: theme.spacing.lg * 3,
                   backgroundColor: theme.colors.backgroundPrimary,
                   borderRadius: theme.borders.borderRadiusMd,
                   border: `1px solid ${theme.colors.border}`,
