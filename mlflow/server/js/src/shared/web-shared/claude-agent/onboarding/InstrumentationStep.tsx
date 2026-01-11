@@ -23,7 +23,7 @@ import { FormattedMessage } from '@databricks/i18n';
 import { useOnboarding } from '../OnboardingWizard';
 import { useGlobalClaudeOptional } from '../GlobalClaudeContext';
 import { AssistantBackendStep } from './AssistantBackendStep';
-import { CodeSnippet, SnippetCopyAction } from '../../snippet';
+import { CopyButton } from '../../../shared/building_blocks/CopyButton';
 
 const COMPONENT_ID_PREFIX = 'mlflow.onboarding.instrumentation';
 
@@ -470,25 +470,36 @@ ${generateInstrumentationPrompt(trackingUri, experimentName)}`;
               />
             </Typography.Text>
 
-            <div
-              css={{
-                backgroundColor: theme.colors.backgroundPrimary,
-                borderRadius: theme.borders.borderRadiusMd,
-                overflow: 'hidden',
-                border: `1px solid ${theme.colors.border}`,
-                position: 'relative',
-              }}
-            >
-              <CodeSnippet
-                language="text"
-                actions={
-                  <SnippetCopyAction
-                    copyText={`claude "Add MLflow tracing to my GenAI app. Set tracking URI to ${trackingUri} and experiment to '${experimentName}'. Enable autologging for any supported frameworks."`}
-                  />
-                }
+            <div css={{ position: 'relative' }}>
+              <div
+                css={{
+                  position: 'absolute',
+                  top: theme.spacing.sm,
+                  right: theme.spacing.sm,
+                  zIndex: 1,
+                }}
+              >
+                <CopyButton
+                  copyText={`claude "Add MLflow tracing to my GenAI app. Set tracking URI to ${trackingUri} and experiment to '${experimentName}'. Enable autologging for any supported frameworks."`}
+                />
+              </div>
+              <code
+                css={{
+                  display: 'block',
+                  padding: theme.spacing.md,
+                  paddingRight: theme.spacing.lg * 2,
+                  backgroundColor: theme.colors.backgroundPrimary,
+                  borderRadius: theme.borders.borderRadiusMd,
+                  border: `1px solid ${theme.colors.border}`,
+                  fontFamily: 'monospace',
+                  fontSize: theme.typography.fontSizeSm,
+                  overflowX: 'auto',
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-word',
+                }}
               >
                 {`claude "Add MLflow tracing to my GenAI app. Set tracking URI to ${trackingUri} and experiment to '${experimentName}'. Enable autologging for any supported frameworks."`}
-              </CodeSnippet>
+              </code>
             </div>
           </div>
 
