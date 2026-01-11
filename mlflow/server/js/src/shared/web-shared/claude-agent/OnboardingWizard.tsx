@@ -198,13 +198,17 @@ const buildStepOrder = (context: WizardContext, selectedBackend?: string | null)
       baseSteps = GLOBAL_STEPS;
   }
 
-  // Always insert code-path-selection step after assistant-backend for consistent progress bar
-  const assistantBackendIndex = baseSteps.indexOf('assistant-backend');
-  if (assistantBackendIndex !== -1) {
-    // Insert code-path-selection after assistant-backend
-    const withCodePath = [...baseSteps];
-    withCodePath.splice(assistantBackendIndex + 1, 0, 'code-path-selection');
-    return withCodePath;
+  // Insert code-path-selection step after assistant-backend for experiment contexts only
+  // (not for home page - code path is only relevant once experiment is selected)
+  const shouldIncludeCodePath = context === 'genai-experiment' || context === 'ml-experiment';
+  if (shouldIncludeCodePath) {
+    const assistantBackendIndex = baseSteps.indexOf('assistant-backend');
+    if (assistantBackendIndex !== -1) {
+      // Insert code-path-selection after assistant-backend
+      const withCodePath = [...baseSteps];
+      withCodePath.splice(assistantBackendIndex + 1, 0, 'code-path-selection');
+      return withCodePath;
+    }
   }
 
   return baseSteps;
