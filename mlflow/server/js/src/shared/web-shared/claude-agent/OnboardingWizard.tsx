@@ -167,6 +167,7 @@ const GENAI_STEPS: OnboardingStep[] = [
   'use-case',
   'scorer-selection',
   'assistant-backend',
+  'code-path-selection',
   'instrumentation',
   'completion',
 ];
@@ -174,44 +175,23 @@ const GENAI_STEPS: OnboardingStep[] = [
 /**
  * ML experiment-specific steps (currently same as global).
  */
-const ML_STEPS: OnboardingStep[] = ['assistant-backend'];
+const ML_STEPS: OnboardingStep[] = ['assistant-backend', 'code-path-selection'];
 
 /**
- * Build step order based on wizard context and current state.
- * Local steps always incorporate global steps.
- * Code path step is always included (for progress bar visibility) but skipped during navigation if not needed.
+ * Build step order based on wizard context.
+ * Code path step is included in experiment contexts and skipped during navigation if not needed.
  */
 const buildStepOrder = (context: WizardContext, selectedBackend?: string | null): OnboardingStep[] => {
-  let baseSteps: OnboardingStep[];
-
   switch (context) {
     case 'home':
-      baseSteps = GLOBAL_STEPS;
-      break;
+      return GLOBAL_STEPS;
     case 'genai-experiment':
-      baseSteps = GENAI_STEPS;
-      break;
+      return GENAI_STEPS;
     case 'ml-experiment':
-      baseSteps = ML_STEPS;
-      break;
+      return ML_STEPS;
     default:
-      baseSteps = GLOBAL_STEPS;
+      return GLOBAL_STEPS;
   }
-
-  // Insert code-path-selection step after assistant-backend for experiment contexts only
-  // (not for home page - code path is only relevant once experiment is selected)
-  const shouldIncludeCodePath = context === 'genai-experiment' || context === 'ml-experiment';
-  if (shouldIncludeCodePath) {
-    const assistantBackendIndex = baseSteps.indexOf('assistant-backend');
-    if (assistantBackendIndex !== -1) {
-      // Insert code-path-selection after assistant-backend
-      const withCodePath = [...baseSteps];
-      withCodePath.splice(assistantBackendIndex + 1, 0, 'code-path-selection');
-      return withCodePath;
-    }
-  }
-
-  return baseSteps;
 };
 
 /**
