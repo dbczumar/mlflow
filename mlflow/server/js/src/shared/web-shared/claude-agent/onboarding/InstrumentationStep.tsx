@@ -33,7 +33,7 @@ type InstrumentationMethod = 'assistant-direct' | 'copy-instructions' | 'manual'
  * Generate the Claude prompt for instrumenting an application.
  */
 const generateInstrumentationPrompt = (codePath: string, trackingUri: string, experimentName: string): string => {
-  return `Add MLflow tracing to my code at: ${codePath}. Set tracking URI to ${trackingUri} and experiment to "${experimentName}".`;
+  return `Add MLflow tracing to my code located at: ${codePath}. Set tracking URI to ${trackingUri} and experiment to "${experimentName}".`;
 };
 
 /**
