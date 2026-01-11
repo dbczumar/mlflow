@@ -47,16 +47,9 @@ export const CompletionStep = () => {
       </div>
 
       {/* Title */}
-      <Typography.Title level={2} css={{ marginBottom: theme.spacing.sm }}>
+      <Typography.Title level={2} css={{ marginBottom: theme.spacing.lg * 2 }}>
         <FormattedMessage defaultMessage="You're all set!" description="Completion title" />
       </Typography.Title>
-
-      <Typography.Text color="secondary" css={{ marginBottom: theme.spacing.lg * 2 }}>
-        <FormattedMessage
-          defaultMessage="Your MLflow GenAI setup is complete. Here's what's configured:"
-          description="Completion subtitle"
-        />
-      </Typography.Text>
 
       {/* Summary */}
       <div
