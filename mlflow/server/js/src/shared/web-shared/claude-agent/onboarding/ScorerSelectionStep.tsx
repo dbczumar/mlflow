@@ -306,6 +306,9 @@ export const ScorerSelectionStep = () => {
         // Navigate to judges tab
         const judgesUrl = generatePath(RoutePaths.experimentPageTabScorers, { experimentId: currentExperimentId });
         window.location.href = `/#${judgesUrl}`;
+
+        // Move to next step
+        goToNextStep();
       } catch (error) {
         console.error('Failed to register scorers:', error);
         console.error('Error details:', {
@@ -316,7 +319,7 @@ export const ScorerSelectionStep = () => {
         setIsEnabling(false);
       }
     } /* eslint-enable no-console, no-alert */,
-    [currentExperimentId, scorers, selectedEndpoint, updateState],
+    [currentExperimentId, scorers, selectedEndpoint, updateState, goToNextStep],
   );
 
   const enabledScorers = scorers.filter((s) => s.enabled);
