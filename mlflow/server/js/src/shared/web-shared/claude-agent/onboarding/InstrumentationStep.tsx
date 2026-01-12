@@ -5,7 +5,7 @@
  * - Copy instructions for Claude Code CLI
  */
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert,
   Button,
@@ -24,6 +24,8 @@ import { useOnboarding } from '../OnboardingWizard';
 import { useGlobalClaudeOptional } from '../GlobalClaudeContext';
 import { AssistantBackendStep } from './AssistantBackendStep';
 import { CopyButton } from '../../../building_blocks/CopyButton';
+import { generatePath } from '../../../../common/utils/RoutingUtils';
+import { RoutePaths } from '../../../../experiment-tracking/routes';
 
 const COMPONENT_ID_PREFIX = 'mlflow.onboarding.instrumentation';
 
@@ -41,7 +43,7 @@ const generateInstrumentationPrompt = (codePath: string, trackingUri: string, ex
  */
 export const InstrumentationStep = () => {
   const { theme } = useDesignSystemTheme();
-  const { goToNextStep, updateState, state } = useOnboarding();
+  const { goToNextStep, updateState, state, currentExperimentId } = useOnboarding();
   const globalClaude = useGlobalClaudeOptional();
 
   const [selectedMethod, setSelectedMethod] = useState<InstrumentationMethod | null>(
@@ -52,6 +54,7 @@ export const InstrumentationStep = () => {
   const [analysisComplete, setAnalysisComplete] = useState(state.instrumentationApplied);
   const [showAssistantSetup, setShowAssistantSetup] = useState(false);
   const [showAutomaticTracingMessage, setShowAutomaticTracingMessage] = useState(false);
+  const hasNavigatedRef = useRef(false);
 
   // Get tracking URI and experiment name from context
   // In dev mode (port 3000), use the actual MLflow backend port (5000)
@@ -63,6 +66,23 @@ export const InstrumentationStep = () => {
 
   // Check if assistant is configured
   const isAssistantConfigured = state.assistantConfigured || globalClaude?.isClaudeAvailable;
+
+  // Navigate to traces tab when this step is entered (only once)
+  useEffect(() => {
+    if (!hasNavigatedRef.current && currentExperimentId) {
+      const currentPath = window.location.hash;
+      const tracesUrl = generatePath(RoutePaths.experimentPageTabTraces, { experimentId: currentExperimentId });
+      const targetHash = `#${tracesUrl}`;
+
+      if (currentPath !== targetHash) {
+        hasNavigatedRef.current = true;
+        window.location.href = targetHash;
+      } else {
+        // Already on the correct page
+        hasNavigatedRef.current = true;
+      }
+    }
+  }, [currentExperimentId]);
 
   const handleMethodSelect = useCallback(
     (method: InstrumentationMethod) => {
