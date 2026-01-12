@@ -9,6 +9,8 @@ import {
   CheckCircleIcon,
   DangerIcon,
   Input,
+  SimpleSelect,
+  SimpleSelectOption,
   Spinner,
   Typography,
   useDesignSystemTheme,
@@ -19,16 +21,30 @@ import { checkHealth } from '../ClaudeAgentService';
 import ClaudeLogo from '../../../../common/static/logos/claude.svg';
 
 // Save setup status to localStorage (global)
-const saveGlobalSetupStatus = (backendId: string): void => {
+const saveGlobalSetupStatus = (backendId: string, model?: string): void => {
   try {
     localStorage.setItem('mlflow.assistant.setupStatus.global', 'configured');
     localStorage.setItem('mlflow.assistant.selectedBackend.global', backendId);
+    if (model) {
+      localStorage.setItem('mlflow.assistant.selectedModel.global', model);
+    } else {
+      localStorage.removeItem('mlflow.assistant.selectedModel.global');
+    }
   } catch {
     // localStorage not available
   }
 };
 
 const COMPONENT_ID_PREFIX = 'mlflow.onboarding.assistant';
+
+/**
+ * Available Claude models for selection.
+ */
+const MODEL_OPTIONS = [
+  { value: 'opus', label: 'Opus' },
+  { value: 'sonnet', label: 'Sonnet' },
+  { value: 'haiku', label: 'Haiku' },
+];
 
 /**
  * Available backend options for the assistant.
@@ -73,6 +89,7 @@ export const AssistantBackendStep = ({ onConfigured, onSkip }: AssistantBackendS
 
   const [currentSubStep, setCurrentSubStep] = useState<BackendSetupStep>('select-backend');
   const [selectedBackend, setSelectedBackend] = useState<BackendOption | null>(null);
+  const [selectedModel, setSelectedModel] = useState<string>('');
   const [isVerifying, setIsVerifying] = useState(false);
   const [verificationError, setVerificationError] = useState<string | null>(null);
   const [verificationSuccess, setVerificationSuccess] = useState(false);
@@ -95,7 +112,7 @@ export const AssistantBackendStep = ({ onConfigured, onSkip }: AssistantBackendS
         setVerificationSuccess(true);
         // Save global state immediately so button shows Claude variant everywhere
         const backendId = selectedBackend?.id || 'claude-code';
-        saveGlobalSetupStatus(backendId);
+        saveGlobalSetupStatus(backendId, selectedModel);
         // Call the callback after showing success, passing the backend ID
         setTimeout(() => {
           onConfigured?.(backendId);
@@ -110,11 +127,12 @@ export const AssistantBackendStep = ({ onConfigured, onSkip }: AssistantBackendS
     } finally {
       setIsVerifying(false);
     }
-  }, [onConfigured, selectedBackend]);
+  }, [onConfigured, selectedBackend, selectedModel]);
 
   const handleBack = useCallback(() => {
     setCurrentSubStep('select-backend');
     setSelectedBackend(null);
+    setSelectedModel('');
     setVerificationError(null);
     setVerificationSuccess(false);
   }, []);
@@ -249,6 +267,38 @@ export const AssistantBackendStep = ({ onConfigured, onSkip }: AssistantBackendS
             </a>
           </div>
 
+          {/* Model selection */}
+          <div css={{ marginBottom: theme.spacing.lg }}>
+            <Typography.Text bold css={{ display: 'block', marginBottom: theme.spacing.sm }}>
+              <FormattedMessage defaultMessage="Step 3: Select Model (Optional)" description="Model selection label" />
+            </Typography.Text>
+            <SimpleSelect
+              id={`${COMPONENT_ID_PREFIX}.model_select`}
+              componentId={`${COMPONENT_ID_PREFIX}.model_select`}
+              value={selectedModel}
+              onChange={({ target }) => setSelectedModel(target.value)}
+              placeholder="Select a model (default will be used if not specified)"
+              css={{ width: '100%' }}
+              contentProps={{
+                matchTriggerWidth: true,
+                maxHeight: 300,
+                style: { zIndex: 9999 },
+              }}
+            >
+              {MODEL_OPTIONS.map((option) => (
+                <SimpleSelectOption key={option.value} value={option.value}>
+                  {option.label}
+                </SimpleSelectOption>
+              ))}
+            </SimpleSelect>
+            <Typography.Text size="sm" color="secondary" css={{ display: 'block', marginTop: theme.spacing.sm }}>
+              <FormattedMessage
+                defaultMessage="Choose a specific Claude model or leave as default to use the system default."
+                description="Model selection help text"
+              />
+            </Typography.Text>
+          </div>
+
           {/* Verification section */}
           <div
             css={{
@@ -259,7 +309,7 @@ export const AssistantBackendStep = ({ onConfigured, onSkip }: AssistantBackendS
             }}
           >
             <Typography.Text bold css={{ display: 'block', marginBottom: theme.spacing.md }}>
-              <FormattedMessage defaultMessage="Step 3: Verify Setup" description="Verify step label" />
+              <FormattedMessage defaultMessage="Step 4: Verify Setup" description="Verify step label" />
             </Typography.Text>
 
             {verificationSuccess ? (
