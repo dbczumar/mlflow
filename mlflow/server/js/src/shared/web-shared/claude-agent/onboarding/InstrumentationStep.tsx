@@ -51,6 +51,7 @@ export const InstrumentationStep = () => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisComplete, setAnalysisComplete] = useState(state.instrumentationApplied);
   const [showAssistantSetup, setShowAssistantSetup] = useState(false);
+  const [showAutomaticTracingMessage, setShowAutomaticTracingMessage] = useState(false);
 
   // Get tracking URI and experiment name from context
   // In dev mode (port 3000), use the actual MLflow backend port (5000)
@@ -71,7 +72,7 @@ export const InstrumentationStep = () => {
         return;
       }
 
-      // For assistant-direct, immediately send message and continue
+      // For assistant-direct, send message and show confirmation before continuing
       if (method === 'assistant-direct' && globalClaude && state.codePath) {
         const prompt = generateInstrumentationPrompt(state.codePath, trackingUri, experimentName);
 
@@ -83,15 +84,15 @@ export const InstrumentationStep = () => {
           automaticTracingRequested: true,
         });
 
-        // Continue to next step
-        goToNextStep();
+        // Show message explaining automatic tracing will happen after setup
+        setShowAutomaticTracingMessage(true);
         return;
       }
 
       setSelectedMethod(method);
       updateState({ instrumentationMethod: method });
     },
-    [isAssistantConfigured, updateState, globalClaude, state.codePath, trackingUri, experimentName, goToNextStep],
+    [isAssistantConfigured, updateState, globalClaude, state.codePath, trackingUri, experimentName],
   );
 
   const handleAssistantConfigured = useCallback(
@@ -107,6 +108,10 @@ export const InstrumentationStep = () => {
   const handleBackFromAssistantSetup = useCallback(() => {
     setShowAssistantSetup(false);
   }, []);
+
+  const handleContinueFromAutomaticTracing = useCallback(() => {
+    goToNextStep();
+  }, [goToNextStep]);
 
   const handleAnalyzeAndInstrument = useCallback(async () => {
     if (!codePath.trim()) return;
@@ -176,8 +181,35 @@ export const InstrumentationStep = () => {
         </div>
       )}
 
+      {/* Show message when automatic tracing has been initiated */}
+      {showAutomaticTracingMessage && (
+        <div>
+          <Alert
+            type="info"
+            closable={false}
+            componentId={`${COMPONENT_ID_PREFIX}.automatic_tracing_initiated`}
+            css={{ marginBottom: theme.spacing.lg }}
+            message={
+              <FormattedMessage
+                defaultMessage="Your assistant will automatically add tracing to your code after you complete the setup wizard."
+                description="Message explaining automatic tracing will happen after setup"
+              />
+            }
+          />
+
+          <Button
+            componentId={`${COMPONENT_ID_PREFIX}.continue_from_automatic_tracing`}
+            type="primary"
+            onClick={handleContinueFromAutomaticTracing}
+            css={{ marginTop: theme.spacing.lg }}
+          >
+            <FormattedMessage defaultMessage="Continue" description="Continue button" />
+          </Button>
+        </div>
+      )}
+
       {/* Method selection */}
-      {!selectedMethod && !showAssistantSetup && (
+      {!selectedMethod && !showAssistantSetup && !showAutomaticTracingMessage && (
         <div>
           <Typography.Text bold css={{ display: 'block', marginBottom: theme.spacing.md }}>
             <FormattedMessage
