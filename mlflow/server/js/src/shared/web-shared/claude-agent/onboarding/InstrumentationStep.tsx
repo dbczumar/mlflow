@@ -191,7 +191,7 @@ export const InstrumentationStep = () => {
             css={{ marginBottom: theme.spacing.lg }}
             message={
               <FormattedMessage
-                defaultMessage="Your assistant will automatically add tracing to your code after you complete the setup wizard."
+                defaultMessage="The assistant will automatically add tracing to your code after the rest of the setup process is complete"
                 description="Message explaining automatic tracing will happen after setup"
               />
             }
