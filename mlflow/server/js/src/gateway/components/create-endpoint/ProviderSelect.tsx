@@ -247,13 +247,13 @@ const ProviderSelectCombobox = ({
       setViewMode('common');
       comboboxState.setInputValue('');
     }
-  }, [comboboxState.isOpen, comboboxState]);
+  }, [comboboxState.isOpen, comboboxState.setInputValue]);
 
   useEffect(() => {
     if (!comboboxState.isOpen) {
       comboboxState.setInputValue(selectedDisplayName);
     }
-  }, [selectedDisplayName, comboboxState.isOpen, comboboxState]);
+  }, [selectedDisplayName, comboboxState.isOpen, comboboxState.setInputValue]);
 
   const getItemKey = (item: MenuItem) => {
     if (item.type === 'group') return `group-${item.groupId}`;
