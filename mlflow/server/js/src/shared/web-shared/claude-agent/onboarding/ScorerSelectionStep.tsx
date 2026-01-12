@@ -180,6 +180,8 @@ export const ScorerSelectionStep = () => {
   const [isEndpointModalOpen, setIsEndpointModalOpen] = useState(false);
   const [isCreateJudgeModalOpen, setIsCreateJudgeModalOpen] = useState(false);
   const hasNavigatedRef = useRef(false);
+  const shouldAutoContinueRef = useRef(false);
+  const handleEnableOnlineScoringRef = useRef<(() => Promise<void>) | null>(null);
 
   // Navigate to judges tab when this step is entered (only once)
   useEffect(() => {
@@ -232,6 +234,16 @@ export const ScorerSelectionStep = () => {
 
   const handleEndpointSelect = useCallback((endpointName: string) => {
     setSelectedEndpoint(endpointName);
+    setIsEndpointModalOpen(false);
+
+    // If auto-continue is enabled, trigger judge creation after a short delay
+    // to allow state to update
+    if (shouldAutoContinueRef.current) {
+      shouldAutoContinueRef.current = false;
+      setTimeout(() => {
+        handleEnableOnlineScoringRef.current?.();
+      }, 100);
+    }
   }, []);
 
   const handleEnableOnlineScoring = useCallback(
@@ -243,6 +255,7 @@ export const ScorerSelectionStep = () => {
       if (!selectedEndpoint) {
         console.log('No endpoint selected, opening modal');
         setIsEndpointModalOpen(true);
+        shouldAutoContinueRef.current = true;
         return;
       }
       console.log('Selected endpoint:', selectedEndpoint);
@@ -326,6 +339,11 @@ export const ScorerSelectionStep = () => {
     } /* eslint-enable no-console, no-alert */,
     [currentExperimentId, scorers, selectedEndpoint, updateState, goToNextStep, queryClient],
   );
+
+  // Store the function in ref so it can be called from handleEndpointSelect
+  useEffect(() => {
+    handleEnableOnlineScoringRef.current = handleEnableOnlineScoring;
+  }, [handleEnableOnlineScoring]);
 
   const enabledScorers = scorers.filter((s) => s.enabled);
   const availableToAdd = AVAILABLE_SCORERS.filter((available) => !scorers.some((s) => s.id === available.id));
