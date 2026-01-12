@@ -13,6 +13,7 @@ import {
   useDesignSystemTheme,
 } from '@databricks/design-system';
 import { FormattedMessage } from '@databricks/i18n';
+import { useQueryClient } from '@databricks/web-shared/query-client';
 
 import { useOnboarding, type ScorerConfig } from '../OnboardingWizard';
 import { EndpointSelector } from '../../../../experiment-tracking/components/EndpointSelector';
@@ -170,6 +171,7 @@ export const ScorerSelectionStep = () => {
   const { theme } = useDesignSystemTheme();
   const { goToNextStep, updateState, state, currentExperimentId } = useOnboarding();
   const globalClaude = useGlobalClaudeOptional();
+  const queryClient = useQueryClient();
 
   const [scorers, setScorers] = useState<ScorerConfig[]>(state.selectedScorers);
   const [showAddScorer, setShowAddScorer] = useState(false);
@@ -301,7 +303,10 @@ export const ScorerSelectionStep = () => {
         // Reset loading state
         setIsEnabling(false);
 
-        console.log('Judges created successfully, navigating to judges tab');
+        console.log('Judges created successfully, invalidating judges cache and navigating to judges tab');
+
+        // Invalidate the judges cache to trigger a refetch and show the newly created judges
+        queryClient.invalidateQueries(['mlflow', 'scheduled-scorers', currentExperimentId]);
 
         // Navigate to judges tab
         const judgesUrl = generatePath(RoutePaths.experimentPageTabScorers, { experimentId: currentExperimentId });
@@ -319,7 +324,7 @@ export const ScorerSelectionStep = () => {
         setIsEnabling(false);
       }
     } /* eslint-enable no-console, no-alert */,
-    [currentExperimentId, scorers, selectedEndpoint, updateState, goToNextStep],
+    [currentExperimentId, scorers, selectedEndpoint, updateState, goToNextStep, queryClient],
   );
 
   const enabledScorers = scorers.filter((s) => s.enabled);
