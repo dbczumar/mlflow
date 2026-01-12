@@ -22,6 +22,8 @@ import type { ScorerConfig as APIScorerConfig } from '../../../../experiment-tra
 import { useGlobalClaudeOptional } from '../GlobalClaudeContext';
 import { generatePath } from '../../../../common/utils/RoutingUtils';
 import { RoutePaths } from '../../../../experiment-tracking/routes';
+import ScorerModalRenderer from '../../../../experiment-tracking/pages/experiment-scorers/ScorerModalRenderer';
+import { SCORER_FORM_MODE } from '../../../../experiment-tracking/pages/experiment-scorers/constants';
 
 const COMPONENT_ID_PREFIX = 'mlflow.onboarding.scorers';
 
@@ -174,6 +176,7 @@ export const ScorerSelectionStep = () => {
   const [isEnabling, setIsEnabling] = useState(false);
   const [selectedEndpoint, setSelectedEndpoint] = useState<string | undefined>(state.judgeEndpointName);
   const [isEndpointModalOpen, setIsEndpointModalOpen] = useState(false);
+  const [isCreateJudgeModalOpen, setIsCreateJudgeModalOpen] = useState(false);
   const hasNavigatedRef = useRef(false);
 
   // Navigate to judges tab when this step is entered (only once)
@@ -401,7 +404,7 @@ export const ScorerSelectionStep = () => {
           componentId={`${COMPONENT_ID_PREFIX}.add_scorer`}
           size="small"
           icon={<PlusIcon />}
-          onClick={() => setShowAddScorer(!showAddScorer)}
+          onClick={() => setIsCreateJudgeModalOpen(true)}
         >
           <FormattedMessage defaultMessage="Add Judge" description="Add judge button" />
         </Button>
@@ -485,6 +488,16 @@ export const ScorerSelectionStep = () => {
         onEndpointSelect={handleEndpointSelect}
         currentEndpointName={selectedEndpoint}
       />
+
+      {/* Create Judge Modal */}
+      {currentExperimentId && (
+        <ScorerModalRenderer
+          experimentId={currentExperimentId}
+          visible={isCreateJudgeModalOpen}
+          onClose={() => setIsCreateJudgeModalOpen(false)}
+          mode={SCORER_FORM_MODE.CREATE}
+        />
+      )}
     </div>
   );
 };
