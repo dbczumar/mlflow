@@ -99,6 +99,7 @@ export interface OnboardingState {
   detectedFrameworks?: string[];
   instrumentationApplied: boolean;
   tracingVerified: boolean;
+  automaticTracingRequested?: boolean;
 
   // Judge configuration status (used to skip scorer selection if already configured)
   judgesConfigured: boolean;
@@ -231,7 +232,8 @@ const STEP_INFO: Record<OnboardingStep, { title: string; subtitle: string }> = {
   },
   'code-path-selection': {
     title: 'Link Your Codebase',
-    subtitle: 'Specify the path to your agent or application code for more accurate issue detection and improvement recommendations.',
+    subtitle:
+      'Specify the path to your agent or application code for more accurate issue detection and improvement recommendations.',
   },
   instrumentation: {
     title: 'Add Tracing',
@@ -258,6 +260,7 @@ const INITIAL_STATE: OnboardingState = {
   instrumentationMethod: null,
   instrumentationApplied: false,
   tracingVerified: false,
+  automaticTracingRequested: false,
   judgesConfigured: false,
   completedAt: null,
   visitedSteps: [],
@@ -459,7 +462,10 @@ export const OnboardingWizard = ({
   );
 
   // Build step order based on context (global vs GenAI vs ML) and selected backend
-  const stepOrder = useMemo(() => buildStepOrder(wizardContext, state.selectedBackend), [wizardContext, state.selectedBackend]);
+  const stepOrder = useMemo(
+    () => buildStepOrder(wizardContext, state.selectedBackend),
+    [wizardContext, state.selectedBackend],
+  );
 
   // Track if we've initialized the step for current experiment to prevent re-initialization
   const initializedExperimentRef = useRef<{ experimentId?: string; experimentKind?: string } | null>(null);
@@ -698,7 +704,14 @@ export const OnboardingWizard = ({
         setCurrentStep(prevStep);
       }
     }
-  }, [currentStep, stepOrder, state.assistantConfigured, state.experimentSelected, state.judgesConfigured, state.selectedBackend]);
+  }, [
+    currentStep,
+    stepOrder,
+    state.assistantConfigured,
+    state.experimentSelected,
+    state.judgesConfigured,
+    state.selectedBackend,
+  ]);
 
   const updateState = useCallback((updates: Partial<OnboardingState>) => {
     setState((prev) => ({ ...prev, ...updates }));

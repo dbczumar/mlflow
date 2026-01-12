@@ -51,19 +51,10 @@ export const CodePathStep = () => {
       </div>
 
       <div css={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Button
-          componentId={`${COMPONENT_ID_PREFIX}.continue`}
-          type="primary"
-          onClick={handleContinue}
-        >
+        <Button componentId={`${COMPONENT_ID_PREFIX}.continue`} type="primary" onClick={handleContinue}>
           <FormattedMessage defaultMessage="Continue" description="Continue button" />
         </Button>
-        <Button
-          componentId={`${COMPONENT_ID_PREFIX}.skip`}
-          size="small"
-          onClick={handleSkip}
-          css={{ opacity: 0.7 }}
-        >
+        <Button componentId={`${COMPONENT_ID_PREFIX}.skip`} size="small" onClick={handleSkip} css={{ opacity: 0.7 }}>
           <FormattedMessage defaultMessage="Skip this step" description="Skip button" />
         </Button>
       </div>

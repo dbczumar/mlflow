@@ -68,10 +68,7 @@ interface AssistantBackendStepProps {
  * Configure the AI assistant backend.
  * Can be used embedded in InstrumentationStep (with onConfigured callback).
  */
-export const AssistantBackendStep = ({
-  onConfigured,
-  onSkip,
-}: AssistantBackendStepProps) => {
+export const AssistantBackendStep = ({ onConfigured, onSkip }: AssistantBackendStepProps) => {
   const { theme } = useDesignSystemTheme();
 
   const [currentSubStep, setCurrentSubStep] = useState<BackendSetupStep>('select-backend');
@@ -131,7 +128,9 @@ export const AssistantBackendStep = ({
             <FormattedMessage defaultMessage="Choose an assistant backend:" description="Label for backend selection" />
           </Typography.Text>
 
-          <div css={{ display: 'flex', flexDirection: 'column', gap: theme.spacing.md, marginBottom: theme.spacing.lg }}>
+          <div
+            css={{ display: 'flex', flexDirection: 'column', gap: theme.spacing.md, marginBottom: theme.spacing.lg }}
+          >
             {BACKEND_OPTIONS.map((backend) => (
               <button
                 key={backend.id}
@@ -169,7 +168,12 @@ export const AssistantBackendStep = ({
           {/* Skip button for select-backend sub-step */}
           {onSkip && (
             <div css={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <Button componentId={`${COMPONENT_ID_PREFIX}.skip_select`} size="small" onClick={onSkip} css={{ opacity: 0.7 }}>
+              <Button
+                componentId={`${COMPONENT_ID_PREFIX}.skip_select`}
+                size="small"
+                onClick={onSkip}
+                css={{ opacity: 0.7 }}
+              >
                 <FormattedMessage defaultMessage="Skip this step" description="Skip backend selection button" />
               </Button>
             </div>

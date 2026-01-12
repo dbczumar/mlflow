@@ -75,9 +75,22 @@ export const CompletionStep = () => {
             gap: theme.spacing.sm,
           }}
         >
+          {state.automaticTracingRequested && (
+            <li>
+              <Typography.Text color="secondary">
+                <FormattedMessage
+                  defaultMessage="Finish adding tracing to your agent or application"
+                  description="Next step for automatic tracing"
+                />
+              </Typography.Text>
+            </li>
+          )}
           <li>
             <Typography.Text color="secondary">
-              <FormattedMessage defaultMessage="Run your agent or application to generate traces" description="Next step 1" />
+              <FormattedMessage
+                defaultMessage="Run your agent or application to generate traces"
+                description="Next step 1"
+              />
             </Typography.Text>
           </li>
           <li>

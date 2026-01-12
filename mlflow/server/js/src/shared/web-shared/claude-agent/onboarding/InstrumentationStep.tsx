@@ -54,9 +54,10 @@ export const InstrumentationStep = () => {
 
   // Get tracking URI and experiment name from context
   // In dev mode (port 3000), use the actual MLflow backend port (5000)
-  const trackingUri = window.location.port === '3000'
-    ? `${window.location.protocol}//${window.location.hostname}:5000`
-    : window.location.origin;
+  const trackingUri =
+    window.location.port === '3000'
+      ? `${window.location.protocol}//${window.location.hostname}:5000`
+      : window.location.origin;
   const experimentName = globalClaude?.context?.navigation?.experimentName || 'Default';
 
   // Check if assistant is configured
@@ -79,6 +80,7 @@ export const InstrumentationStep = () => {
         updateState({
           instrumentationMethod: method,
           instrumentationApplied: true,
+          automaticTracingRequested: true,
         });
 
         // Continue to next step
@@ -92,12 +94,15 @@ export const InstrumentationStep = () => {
     [isAssistantConfigured, updateState, globalClaude, state.codePath, trackingUri, experimentName, goToNextStep],
   );
 
-  const handleAssistantConfigured = useCallback((backendId: string) => {
-    updateState({ assistantConfigured: true, selectedBackend: backendId });
-    setShowAssistantSetup(false);
-    setSelectedMethod('assistant-direct');
-    updateState({ instrumentationMethod: 'assistant-direct' });
-  }, [updateState]);
+  const handleAssistantConfigured = useCallback(
+    (backendId: string) => {
+      updateState({ assistantConfigured: true, selectedBackend: backendId });
+      setShowAssistantSetup(false);
+      setSelectedMethod('assistant-direct');
+      updateState({ instrumentationMethod: 'assistant-direct' });
+    },
+    [updateState],
+  );
 
   const handleBackFromAssistantSetup = useCallback(() => {
     setShowAssistantSetup(false);
@@ -158,9 +163,7 @@ export const InstrumentationStep = () => {
             }
           />
 
-          <AssistantBackendStep
-            onConfigured={handleAssistantConfigured}
-          />
+          <AssistantBackendStep onConfigured={handleAssistantConfigured} />
 
           <Button
             componentId={`${COMPONENT_ID_PREFIX}.back_from_assistant`}
@@ -256,55 +259,55 @@ export const InstrumentationStep = () => {
             {/* Option B: Copy Instructions - only show if Claude Code is the selected backend */}
             {state.selectedBackend === 'claude-code' && (
               <button
-              onClick={() => handleMethodSelect('copy-instructions')}
-              css={{
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: theme.spacing.md,
-                padding: theme.spacing.lg,
-                backgroundColor: theme.colors.backgroundSecondary,
-                border: `1px solid ${theme.colors.border}`,
-                borderRadius: theme.borders.borderRadiusLg,
-                cursor: 'pointer',
-                textAlign: 'left',
-                transition: 'border-color 0.2s, background-color 0.2s',
-                '&:hover': {
-                  borderColor: theme.colors.actionPrimaryBackgroundDefault,
-                  backgroundColor: theme.colors.backgroundPrimary,
-                },
-              }}
-            >
-              <div
+                onClick={() => handleMethodSelect('copy-instructions')}
                 css={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: theme.borders.borderRadiusMd,
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: theme.spacing.md,
+                  padding: theme.spacing.lg,
                   backgroundColor: theme.colors.backgroundSecondary,
                   border: `1px solid ${theme.colors.border}`,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0,
+                  borderRadius: theme.borders.borderRadiusLg,
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  transition: 'border-color 0.2s, background-color 0.2s',
+                  '&:hover': {
+                    borderColor: theme.colors.actionPrimaryBackgroundDefault,
+                    backgroundColor: theme.colors.backgroundPrimary,
+                  },
                 }}
               >
-                <CopyIcon />
-              </div>
-              <div css={{ flex: 1 }}>
-                <Typography.Text bold css={{ display: 'block', marginBottom: theme.spacing.xs }}>
-                  <FormattedMessage
-                    defaultMessage="Get Instructions for Claude Code"
-                    description="Option to copy instructions"
-                  />
-                </Typography.Text>
-                <Typography.Text color="secondary" size="sm">
-                  <FormattedMessage
-                    defaultMessage="Copy instructions to use with Claude Code CLI in your terminal."
-                    description="Description for copy instructions option"
-                  />
-                </Typography.Text>
-              </div>
-              <ChevronRightIcon css={{ color: theme.colors.textSecondary, flexShrink: 0 }} />
-            </button>
+                <div
+                  css={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: theme.borders.borderRadiusMd,
+                    backgroundColor: theme.colors.backgroundSecondary,
+                    border: `1px solid ${theme.colors.border}`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                  }}
+                >
+                  <CopyIcon />
+                </div>
+                <div css={{ flex: 1 }}>
+                  <Typography.Text bold css={{ display: 'block', marginBottom: theme.spacing.xs }}>
+                    <FormattedMessage
+                      defaultMessage="Get Instructions for Claude Code"
+                      description="Option to copy instructions"
+                    />
+                  </Typography.Text>
+                  <Typography.Text color="secondary" size="sm">
+                    <FormattedMessage
+                      defaultMessage="Copy instructions to use with Claude Code CLI in your terminal."
+                      description="Description for copy instructions option"
+                    />
+                  </Typography.Text>
+                </div>
+                <ChevronRightIcon css={{ color: theme.colors.textSecondary, flexShrink: 0 }} />
+              </button>
             )}
 
             {/* Option C: Manual / Read the Docs - always available */}
@@ -344,10 +347,7 @@ export const InstrumentationStep = () => {
               </div>
               <div css={{ flex: 1 }}>
                 <Typography.Text bold css={{ display: 'block', marginBottom: theme.spacing.xs }}>
-                  <FormattedMessage
-                    defaultMessage="Set Up Manually"
-                    description="Option to manually set up tracing"
-                  />
+                  <FormattedMessage defaultMessage="Set Up Manually" description="Option to manually set up tracing" />
                 </Typography.Text>
                 <Typography.Text color="secondary" size="sm">
                   <FormattedMessage
