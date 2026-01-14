@@ -1,6 +1,6 @@
 /**
- * Set up the AI assistant backend (Claude Code).
- * Can be used standalone or embedded in InstrumentationStep.
+ * Setup wizard component for MLflow Assistant.
+ * Guides users through configuring their preferred assistant backend.
  */
 
 import { useCallback, useState } from 'react';
@@ -8,41 +8,16 @@ import {
   Button,
   CheckCircleIcon,
   DangerIcon,
-  Input,
   Spinner,
   Typography,
   useDesignSystemTheme,
 } from '@databricks/design-system';
 import { FormattedMessage } from '@databricks/i18n';
 
-import { checkHealth } from '../ClaudeAgentService';
-import ClaudeLogo from '../../../../common/static/logos/claude.svg';
+import { checkHealth } from './ClaudeAgentService';
+import ClaudeLogo from '../../../common/static/logos/claude.svg';
 
-// Save setup status to localStorage (global)
-const saveGlobalSetupStatus = (backendId: string, model?: string): void => {
-  try {
-    localStorage.setItem('mlflow.assistant.setupStatus.global', 'configured');
-    localStorage.setItem('mlflow.assistant.selectedBackend.global', backendId);
-    if (model) {
-      localStorage.setItem('mlflow.assistant.selectedModel.global', model);
-    } else {
-      localStorage.removeItem('mlflow.assistant.selectedModel.global');
-    }
-  } catch {
-    // localStorage not available
-  }
-};
-
-const COMPONENT_ID_PREFIX = 'mlflow.onboarding.assistant';
-
-/**
- * Available Claude models for selection.
- */
-const MODEL_OPTIONS = [
-  { value: 'opus', label: 'Opus' },
-  { value: 'sonnet', label: 'Sonnet' },
-  { value: 'haiku', label: 'Haiku' },
-];
+const COMPONENT_ID_PREFIX = 'mlflow.assistant.setup';
 
 /**
  * Available backend options for the assistant.
@@ -69,32 +44,26 @@ const BACKEND_OPTIONS: BackendOption[] = [
   },
 ];
 
-type BackendSetupStep = 'select-backend' | 'install';
-
-interface AssistantBackendStepProps {
-  /** Called when assistant is successfully configured. Receives the backend ID. */
-  onConfigured?: (backendId: string) => void;
-  /** Called when user skips setup. If not provided, skip button is not shown. */
-  onSkip?: () => void;
+interface AssistantSetupWizardProps {
+  onSetupComplete: () => void;
 }
 
-/**
- * Configure the AI assistant backend.
- * Can be used embedded in InstrumentationStep (with onConfigured callback).
- */
-export const AssistantBackendStep = ({ onConfigured, onSkip }: AssistantBackendStepProps) => {
-  const { theme } = useDesignSystemTheme();
+type SetupStep = 'select-backend' | 'install' | 'verify';
 
-  const [currentSubStep, setCurrentSubStep] = useState<BackendSetupStep>('select-backend');
+/**
+ * Setup wizard that guides users through configuring the MLflow Assistant.
+ */
+export const AssistantSetupWizard = ({ onSetupComplete }: AssistantSetupWizardProps) => {
+  const { theme } = useDesignSystemTheme();
+  const [currentStep, setCurrentStep] = useState<SetupStep>('select-backend');
   const [selectedBackend, setSelectedBackend] = useState<BackendOption | null>(null);
-  const [selectedModel, setSelectedModel] = useState<string>('');
   const [isVerifying, setIsVerifying] = useState(false);
   const [verificationError, setVerificationError] = useState<string | null>(null);
   const [verificationSuccess, setVerificationSuccess] = useState(false);
 
   const handleBackendSelect = useCallback((backend: BackendOption) => {
     setSelectedBackend(backend);
-    setCurrentSubStep('install');
+    setCurrentStep('install');
   }, []);
 
   const handleVerify = useCallback(async () => {
@@ -108,12 +77,9 @@ export const AssistantBackendStep = ({ onConfigured, onSkip }: AssistantBackendS
 
       if (isAvailable) {
         setVerificationSuccess(true);
-        // Save global state immediately so button shows Claude variant everywhere
-        const backendId = selectedBackend?.id || 'claude-code';
-        saveGlobalSetupStatus(backendId, selectedModel);
-        // Call the callback after showing success, passing the backend ID
+        // Auto-complete after a short delay to show success state
         setTimeout(() => {
-          onConfigured?.(backendId);
+          onSetupComplete();
         }, 1500);
       } else {
         setVerificationError('Claude CLI is installed but not authenticated. Please run the authentication command.');
@@ -125,28 +91,53 @@ export const AssistantBackendStep = ({ onConfigured, onSkip }: AssistantBackendS
     } finally {
       setIsVerifying(false);
     }
-  }, [onConfigured, selectedBackend, selectedModel]);
+  }, [onSetupComplete]);
 
   const handleBack = useCallback(() => {
-    setCurrentSubStep('select-backend');
-    setSelectedBackend(null);
-    setSelectedModel('');
+    if (currentStep === 'install') {
+      setCurrentStep('select-backend');
+      setSelectedBackend(null);
+    } else if (currentStep === 'verify') {
+      setCurrentStep('install');
+    }
     setVerificationError(null);
     setVerificationSuccess(false);
-  }, []);
+  }, [currentStep]);
 
   return (
-    <div css={{ padding: theme.spacing.lg }}>
-      {/* Sub-step 1: Select Backend */}
-      {currentSubStep === 'select-backend' && (
-        <div>
+    <div
+      css={{
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100%',
+        padding: theme.spacing.lg,
+        overflow: 'auto',
+      }}
+    >
+      {/* Header */}
+      <div css={{ marginBottom: theme.spacing.lg }}>
+        <Typography.Title level={3} css={{ marginBottom: theme.spacing.sm }}>
+          <FormattedMessage
+            defaultMessage="Welcome to MLflow Assistant"
+            description="Title for assistant setup wizard"
+          />
+        </Typography.Title>
+        <Typography.Text color="secondary">
+          <FormattedMessage
+            defaultMessage="Let's set up your AI assistant to help you analyze traces and debug issues."
+            description="Subtitle for assistant setup wizard"
+          />
+        </Typography.Text>
+      </div>
+
+      {/* Step 1: Select Backend */}
+      {currentStep === 'select-backend' && (
+        <div css={{ flex: 1 }}>
           <Typography.Text bold css={{ display: 'block', marginBottom: theme.spacing.md }}>
             <FormattedMessage defaultMessage="Choose an assistant backend:" description="Label for backend selection" />
           </Typography.Text>
 
-          <div
-            css={{ display: 'flex', flexDirection: 'column', gap: theme.spacing.md, marginBottom: theme.spacing.lg }}
-          >
+          <div css={{ display: 'flex', flexDirection: 'column', gap: theme.spacing.md }}>
             {BACKEND_OPTIONS.map((backend) => (
               <button
                 key={backend.id}
@@ -180,26 +171,12 @@ export const AssistantBackendStep = ({ onConfigured, onSkip }: AssistantBackendS
               </button>
             ))}
           </div>
-
-          {/* Skip button for select-backend sub-step */}
-          {onSkip && (
-            <div css={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <Button
-                componentId={`${COMPONENT_ID_PREFIX}.skip_select`}
-                size="small"
-                onClick={onSkip}
-                css={{ opacity: 0.7 }}
-              >
-                <FormattedMessage defaultMessage="Skip this step" description="Skip backend selection button" />
-              </Button>
-            </div>
-          )}
         </div>
       )}
 
-      {/* Sub-step 2: Installation Instructions */}
-      {currentSubStep === 'install' && selectedBackend && (
-        <div>
+      {/* Step 2: Installation Instructions */}
+      {currentStep === 'install' && selectedBackend && (
+        <div css={{ flex: 1 }}>
           <div css={{ display: 'flex', alignItems: 'center', gap: theme.spacing.sm, marginBottom: theme.spacing.lg }}>
             <img src={selectedBackend.logo} width={24} height={24} alt="" aria-hidden />
             <Typography.Text bold>{selectedBackend.name}</Typography.Text>
@@ -261,48 +238,11 @@ export const AssistantBackendStep = ({ onConfigured, onSkip }: AssistantBackendS
                 '&:hover': { textDecoration: 'underline' },
               }}
             >
-              <FormattedMessage defaultMessage="View full documentation" description="Link to backend documentation" />
-            </a>
-          </div>
-
-          {/* Model selection */}
-          <div css={{ marginBottom: theme.spacing.lg }}>
-            <Typography.Text bold css={{ display: 'block', marginBottom: theme.spacing.sm }}>
-              <FormattedMessage defaultMessage="Step 3: Select Model (Optional)" description="Model selection label" />
-            </Typography.Text>
-            <select
-              id={`${COMPONENT_ID_PREFIX}.model_select`}
-              value={selectedModel}
-              onChange={(e) => setSelectedModel(e.target.value)}
-              css={{
-                width: '100%',
-                padding: theme.spacing.sm,
-                fontSize: theme.typography.fontSizeBase,
-                borderRadius: theme.borders.borderRadiusMd,
-                border: `1px solid ${theme.colors.border}`,
-                backgroundColor: theme.colors.backgroundPrimary,
-                color: theme.colors.textPrimary,
-                cursor: 'pointer',
-                '&:focus': {
-                  outline: 'none',
-                  borderColor: theme.colors.actionPrimaryBackgroundDefault,
-                  boxShadow: `0 0 0 2px ${theme.colors.actionPrimaryBackgroundHover}33`,
-                },
-              }}
-            >
-              <option value="">Select a model (default will be used if not specified)</option>
-              {MODEL_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-            <Typography.Text size="sm" color="secondary" css={{ display: 'block', marginTop: theme.spacing.sm }}>
               <FormattedMessage
-                defaultMessage="Choose a specific Claude model or leave as default to use the system default."
-                description="Model selection help text"
+                defaultMessage="View full documentation →"
+                description="Link to backend documentation"
               />
-            </Typography.Text>
+            </a>
           </div>
 
           {/* Verification section */}
@@ -315,7 +255,7 @@ export const AssistantBackendStep = ({ onConfigured, onSkip }: AssistantBackendS
             }}
           >
             <Typography.Text bold css={{ display: 'block', marginBottom: theme.spacing.md }}>
-              <FormattedMessage defaultMessage="Step 4: Verify Setup" description="Verify step label" />
+              <FormattedMessage defaultMessage="Step 3: Verify Setup" description="Verify step label" />
             </Typography.Text>
 
             {verificationSuccess ? (
@@ -330,7 +270,7 @@ export const AssistantBackendStep = ({ onConfigured, onSkip }: AssistantBackendS
                 <CheckCircleIcon />
                 <Typography.Text>
                   <FormattedMessage
-                    defaultMessage="Setup complete! Continuing to next step..."
+                    defaultMessage="Setup complete! Starting assistant..."
                     description="Setup success message"
                   />
                 </Typography.Text>
@@ -381,15 +321,10 @@ export const AssistantBackendStep = ({ onConfigured, onSkip }: AssistantBackendS
           </div>
 
           {/* Navigation */}
-          <div css={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div css={{ display: 'flex', justifyContent: 'flex-start' }}>
             <Button componentId={`${COMPONENT_ID_PREFIX}.back`} onClick={handleBack}>
               <FormattedMessage defaultMessage="Back" description="Back button" />
             </Button>
-            {onSkip && (
-              <Button componentId={`${COMPONENT_ID_PREFIX}.skip`} size="small" onClick={onSkip} css={{ opacity: 0.7 }}>
-                <FormattedMessage defaultMessage="Skip this step" description="Skip button" />
-              </Button>
-            )}
           </div>
         </div>
       )}
