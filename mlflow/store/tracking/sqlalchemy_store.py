@@ -71,6 +71,11 @@ from mlflow.entities.trace_metrics import (
 from mlflow.entities.trace_state import TraceState
 from mlflow.entities.trace_status import TraceStatus
 from mlflow.exceptions import MlflowException, MlflowTracingException
+from mlflow.genai.judges.instructions_judge import (
+    EXPECTATIONS_FIELD,
+    InstructionsJudge,
+)
+from mlflow.genai.scorers.base import Scorer
 from mlflow.genai.scorers.online.entities import (
     CompletedSession,
     OnlineScorer,
@@ -2545,6 +2550,25 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
                         f"Scorer '{scorer_name}' does not use a gateway model. "
                         "Automatic evaluation is only supported for scorers that use "
                         "gateway models.",
+                        INVALID_PARAMETER_VALUE,
+                    )
+
+                # Check if scorer requires expectations (ground truth data)
+                # Only perform this check if we can successfully deserialize the scorer
+                try:
+                    scorer_obj = Scorer.model_validate_json(latest_version.serialized_scorer)
+                except Exception:
+                    # If scorer deserialization fails, skip expectations validation
+                    # This can happen with older/incomplete serialized scorer formats
+                    scorer_obj = None
+
+                if (
+                    isinstance(scorer_obj, InstructionsJudge)
+                    and EXPECTATIONS_FIELD in scorer_obj.get_input_fields()
+                ):
+                    raise MlflowException(
+                        f"Scorer '{scorer_name}' requires expectations, but scorers with "
+                        "expectations are not currently supported for automatic evaluation.",
                         INVALID_PARAMETER_VALUE,
                     )
 
