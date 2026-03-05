@@ -9,6 +9,8 @@ export const SERVER_INFO_QUERY_KEY = 'serverInfo';
 interface ServerInfoResponse {
   store_type: string | null;
   workspaces_enabled: boolean;
+  gateway_enabled?: boolean;
+  is_databricks_backend?: boolean;
 }
 
 // Default response when the API call fails (e.g., older server without this endpoint)
@@ -114,6 +116,25 @@ export const getWorkspacesEnabledSync = (): boolean => {
   const cachedData = queryClientRef?.getQueryData<ServerInfoResponse>([SERVER_INFO_QUERY_KEY]);
   return cachedData?.workspaces_enabled ?? false;
 };
+
+/**
+ * Hook to check if the AI Gateway feature is enabled.
+ * Returns false when using a Databricks backend (gateway APIs are not supported).
+ * Returns undefined while loading.
+ */
+export function useIsGatewayEnabled(): boolean | undefined {
+  const { data } = useServerInfo();
+  return data ? (data.gateway_enabled ?? true) : undefined;
+}
+
+/**
+ * Hook to check if the backend is a Databricks store.
+ * Returns undefined while loading.
+ */
+export function useIsDatabricksBackend(): boolean | undefined {
+  const { data } = useServerInfo();
+  return data ? (data.is_databricks_backend ?? false) : undefined;
+}
 
 // For testing purposes - allows resetting the cached state
 export const resetServerInfoCache = (): void => {

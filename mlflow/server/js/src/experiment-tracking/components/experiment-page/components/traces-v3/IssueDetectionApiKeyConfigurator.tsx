@@ -21,6 +21,7 @@ import { formatCredentialFieldName, sortFieldsByProvider } from '../../../../../
 import type { ApiKeyConfiguration } from '../../../../../gateway/components/model-configuration/types';
 import type { AuthMode, SecretInfo } from '../../../../../gateway/types';
 import { useSecretsQuery } from '../../../../../gateway/hooks/useSecretsQuery';
+import { useIsGatewayEnabled } from '../../../../hooks/useServerInfo';
 
 interface ApiKeyOption {
   type: 'existing' | 'new';
@@ -74,7 +75,8 @@ export function IssueDetectionApiKeyConfigurator({
 }: IssueDetectionApiKeyConfiguratorProps) {
   const { theme } = useDesignSystemTheme();
   const intl = useIntl();
-  const { data: secrets } = useSecretsQuery({ provider });
+  const isGatewayEnabled = useIsGatewayEnabled();
+  const { data: secrets } = useSecretsQuery({ provider, enabled: isGatewayEnabled !== false });
 
   const filteredSecrets = useMemo(
     () => (provider ? secrets?.filter((s) => s.provider === provider) : secrets) ?? [],

@@ -9,6 +9,7 @@ import type { SortingState } from '@tanstack/react-table';
 import type { TagFilter } from './useTagsFilter';
 import { isDemoExperiment } from '../../../utils/isDemoExperiment';
 import { EXPERIMENT_IS_GATEWAY_TAG } from '../utils/experimentPage.common-utils';
+import { useIsGatewayEnabled } from '../../../hooks/useServerInfo';
 
 const STORE_KEY = {
   PAGE_SIZE: 'experiments_page.page_size',
@@ -20,7 +21,14 @@ const ExperimentListQueryKeyHeader = 'experiment_list';
 
 type ExperimentListQueryKey = [
   typeof ExperimentListQueryKeyHeader,
-  { searchFilter?: string; tagsFilter?: TagFilter[]; pageToken?: string; pageSize?: number; sorting?: SortingState },
+  {
+    searchFilter?: string;
+    tagsFilter?: TagFilter[];
+    pageToken?: string;
+    pageSize?: number;
+    sorting?: SortingState;
+    gatewayEnabled?: boolean;
+  },
 ];
 
 export const useInvalidateExperimentList = () => {
@@ -41,7 +49,11 @@ function tagFilterToSql(tagFilter: TagFilter) {
   }
 }
 
-function getFilters({ searchFilter, tagsFilter }: Pick<ExperimentListQueryKey['1'], 'searchFilter' | 'tagsFilter'>) {
+function getFilters({
+  searchFilter,
+  tagsFilter,
+  gatewayEnabled,
+}: Pick<ExperimentListQueryKey['1'], 'searchFilter' | 'tagsFilter' | 'gatewayEnabled'>) {
   const filters = [];
 
   if (searchFilter) {
@@ -52,14 +64,22 @@ function getFilters({ searchFilter, tagsFilter }: Pick<ExperimentListQueryKey['1
     filters.push(tagFilterToSql(tagFilter));
   }
 
-  // Exclude gateway experiments server-side to ensure consistent page sizes
-  filters.push(`tags.\`${EXPERIMENT_IS_GATEWAY_TAG}\` IS NULL`);
+  // Exclude gateway experiments server-side to ensure consistent page sizes.
+  // Skip this filter when gateway is not enabled (e.g. Databricks backend)
+  // since Databricks doesn't support IS NULL and gateway experiments don't exist there.
+  if (gatewayEnabled !== false) {
+    filters.push(`tags.\`${EXPERIMENT_IS_GATEWAY_TAG}\` IS NULL`);
+  }
+
+  if (filters.length === 0) {
+    return undefined;
+  }
 
   return ['filter', filters.join(' AND ')];
 }
 
 const queryFn = ({ queryKey }: QueryFunctionContext<ExperimentListQueryKey>) => {
-  const [, { searchFilter, tagsFilter, pageToken, pageSize, sorting }] = queryKey;
+  const [, { searchFilter, tagsFilter, pageToken, pageSize, sorting, gatewayEnabled }] = queryKey;
 
   // NOTE: REST API docs are not detailed enough, see: mlflow/store/tracking/abstract_store.py#search_experiments
   const orderBy = sorting?.map((column) => ['order_by', `${column.id} ${column.desc ? 'DESC' : 'ASC'}`]) ?? [];
@@ -67,7 +87,7 @@ const queryFn = ({ queryKey }: QueryFunctionContext<ExperimentListQueryKey>) => 
   const data: (string[] | undefined)[] = [['max_results', String(pageSize)], ...orderBy];
 
   // NOTE: undefined values are fine, they're filtered out by `getBigIntJson` inside `MlflowService`
-  data.push(getFilters({ searchFilter, tagsFilter }));
+  data.push(getFilters({ searchFilter, tagsFilter, gatewayEnabled }));
 
   if (pageToken) {
     data.push(['page_token', pageToken]);
@@ -81,6 +101,7 @@ export const useExperimentListQuery = ({
   tagsFilter,
 }: { searchFilter?: string; tagsFilter?: TagFilter[] } = {}) => {
   const previousPageTokens = useRef<(string | undefined)[]>([]);
+  const gatewayEnabled = useIsGatewayEnabled();
 
   const [currentPageToken, setCurrentPageToken] = useState<string | undefined>(undefined);
 
@@ -116,10 +137,16 @@ export const useExperimentListQuery = ({
     Error,
     SearchExperimentsApiResponse,
     ExperimentListQueryKey
-  >([ExperimentListQueryKeyHeader, { searchFilter, tagsFilter, pageToken: currentPageToken, pageSize, sorting }], {
-    queryFn,
-    retry: false,
-  });
+  >(
+    [
+      ExperimentListQueryKeyHeader,
+      { searchFilter, tagsFilter, pageToken: currentPageToken, pageSize, sorting, gatewayEnabled },
+    ],
+    {
+      queryFn,
+      retry: false,
+    },
+  );
 
   const onNextPage = useCallback(() => {
     previousPageTokens.current.push(currentPageToken);

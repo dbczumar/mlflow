@@ -1981,6 +1981,8 @@ def _search_datasets_handler():
         SearchDatasets(),
     )
     response_message = search_datasets_impl(request_message)
+    if isinstance(response_message, Response):
+        return response_message
     response = Response(mimetype="application/json")
     response.set_data(message_to_json(response_message))
     return response
@@ -5243,6 +5245,7 @@ def _list_budget_policies():
 
 @catch_mlflow_exception
 def _get_server_info():
+    from mlflow.store.tracking.databricks_rest_store import DatabricksTracingRestStore
     from mlflow.store.tracking.file_store import FileStore
     from mlflow.store.tracking.sqlalchemy_store import SqlAlchemyStore
 
@@ -5254,10 +5257,15 @@ def _get_server_info():
         store_type = "SqlStore"
     else:
         store_type = None
+
+    is_databricks_backend = isinstance(store, DatabricksTracingRestStore)
+
     return jsonify(
         {
             "store_type": store_type,
             "workspaces_enabled": MLFLOW_ENABLE_WORKSPACES.get(),
+            "gateway_enabled": not is_databricks_backend,
+            "is_databricks_backend": is_databricks_backend,
         }
     )
 

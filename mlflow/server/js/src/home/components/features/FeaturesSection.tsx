@@ -1,15 +1,23 @@
+import { useMemo } from 'react';
 import { ChevronDownIcon, ChevronRightIcon, Typography, useDesignSystemTheme } from '@databricks/design-system';
 import { FormattedMessage } from 'react-intl';
 import { featureDefinitions } from './feature-definitions';
 import { LaunchDemoCard } from './LaunchDemoCard';
 import { FeatureCard } from './FeatureCard';
 import { useLocalStorage } from '../../../shared/web-shared/hooks';
+import { useIsGatewayEnabled } from '../../../experiment-tracking/hooks/useServerInfo';
 
 const COLLAPSED_KEY = 'mlflow.home.getting-started.collapsed';
 const COLLAPSED_KEY_VERSION = 1;
 
 export const FeaturesSection = () => {
   const { theme } = useDesignSystemTheme();
+  const isGatewayEnabled = useIsGatewayEnabled();
+
+  const visibleFeatures = useMemo(
+    () => (isGatewayEnabled === false ? featureDefinitions.filter((f) => f.id !== 'ai-gateway') : featureDefinitions),
+    [isGatewayEnabled],
+  );
 
   const [isCollapsed, setIsCollapsed] = useLocalStorage({
     key: COLLAPSED_KEY,
@@ -60,7 +68,7 @@ export const FeaturesSection = () => {
               },
             }}
           >
-            {featureDefinitions.map((feature) => (
+            {visibleFeatures.map((feature) => (
               <FeatureCard key={feature.id} feature={feature} />
             ))}
           </div>

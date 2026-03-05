@@ -451,11 +451,13 @@ const TracesV3LogsImpl = React.memo(
             />
             {renderMainContent()}
           </div>
-          <IssueDetectionModal
-            visible={isIssueDetectionModalOpen}
-            onClose={() => setIsIssueDetectionModalOpen(false)}
-            experimentId={singleExperimentId}
-          />
+          {isIssueDetectionModalOpen && (
+            <IssueDetectionModal
+              visible={isIssueDetectionModalOpen}
+              onClose={() => setIsIssueDetectionModalOpen(false)}
+              experimentId={singleExperimentId}
+            />
+          )}
         </GenAITracesTableProvider>
       </ModelTraceExplorerContextProvider>
     );

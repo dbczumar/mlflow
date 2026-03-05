@@ -10,12 +10,13 @@ const queryFn = ({ queryKey }: QueryFunctionContext<SecretsQueryKey>) => {
 
 type SecretsQueryKey = ['gateway_secrets', { provider?: string }];
 
-export const useSecretsQuery = ({ provider }: { provider?: string } = {}) => {
+export const useSecretsQuery = ({ provider, enabled = true }: { provider?: string; enabled?: boolean } = {}) => {
   const queryResult = useQuery<ListSecretInfosResponse, Error, ListSecretInfosResponse, SecretsQueryKey>(
     ['gateway_secrets', { provider }],
     {
       queryFn,
       retry: false,
+      enabled,
     },
   );
 

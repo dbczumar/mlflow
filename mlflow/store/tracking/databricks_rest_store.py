@@ -323,6 +323,35 @@ class DatabricksTracingRestStore(RestStore):
             return
         return super().delete_trace_tag(trace_id, key)
 
+    @staticmethod
+    def _normalize_filter_string(filter_string: str | None) -> str | None:
+        """Normalize filter strings for Databricks API compatibility.
+
+        The Databricks traces API does not support ILIKE or LIKE operators.
+        This converts:
+        - `field ILIKE '%%'` -> `field IS NOT NULL` (existence check)
+        - `field ILIKE '%value%'` -> `field = 'value'` (exact match fallback)
+        - Other ILIKE patterns -> removes the unsupported clause
+        """
+        import re
+
+        if not filter_string or " ILIKE " not in filter_string:
+            return filter_string
+
+        def replace_ilike(match: re.Match) -> str:
+            field = match.group(1)
+            pattern = match.group(2)
+            if pattern == "%%":
+                return f"{field} IS NOT NULL"
+            if pattern.startswith("%") and pattern.endswith("%"):
+                value = pattern[1:-1]
+                if value:
+                    return f"{field} = '{value}'"
+                return f"{field} IS NOT NULL"
+            return f"{field} = '{pattern}'"
+
+        return re.sub(r"(\S+)\s+ILIKE\s+'([^']*)'", replace_ilike, filter_string)
+
     def search_traces(
         self,
         experiment_ids: list[str] | None = None,
@@ -333,6 +362,7 @@ class DatabricksTracingRestStore(RestStore):
         model_id: str | None = None,
         locations: list[str] | None = None,
     ) -> tuple[list[TraceInfo], str | None]:
+        filter_string = self._normalize_filter_string(filter_string)
         # This API is not client-facing, so we should always use `locations`.
         if experiment_ids is not None:
             raise MlflowException("`experiment_ids` is deprecated, use `locations` instead.")
@@ -820,16 +850,16 @@ class DatabricksTracingRestStore(RestStore):
         order_by: list[str] | None,
         experiment_ids: list[str] | None,
     ):
-        """Validate parameters for search_datasets and raise errors for unsupported ones."""
+        """Validate parameters for search_datasets and warn for unsupported ones."""
         if filter_string:
-            raise MlflowException(
-                "filter_string parameter is not supported by Databricks managed-evals API",
-                error_code=INVALID_PARAMETER_VALUE,
+            _logger.warning(
+                "filter_string parameter is not supported by Databricks managed-evals API "
+                "and will be ignored."
             )
         if order_by:
-            raise MlflowException(
-                "order_by parameter is not supported by Databricks managed-evals API",
-                error_code=INVALID_PARAMETER_VALUE,
+            _logger.warning(
+                "order_by parameter is not supported by Databricks managed-evals API "
+                "and will be ignored."
             )
         if experiment_ids and len(experiment_ids) > 1:
             raise MlflowException(

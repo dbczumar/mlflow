@@ -28,6 +28,7 @@ import { FormattedMessage } from 'react-intl';
 import { useLogTelemetryEvent } from '../../telemetry/hooks/useLogTelemetryEvent';
 import { useWorkflowType, WorkflowType } from '../contexts/WorkflowTypeContext';
 import { shouldEnableWorkflowBasedNavigation, shouldEnableWorkspaces } from '../utils/FeatureUtils';
+import { useIsGatewayEnabled } from '../../experiment-tracking/hooks/useServerInfo';
 import { AssistantSparkleIcon } from '../../assistant/AssistantIconButton';
 import { useAssistant } from '../../assistant/AssistantContext';
 import { extractWorkspaceFromSearchParams } from '../../workspaces/utils/WorkspaceUtils';
@@ -115,6 +116,7 @@ export function MlflowSidebar({
   const activeExperimentId = isInsideExperiment(location) ? experimentId : lastSelectedExperimentIdRef.current;
   const showNestedExperimentItems = Boolean(activeExperimentId) && shouldEnableWorkflowBasedNavigation();
 
+  const isGatewayEnabled = useIsGatewayEnabled();
   const { openPanel, closePanel, isPanelOpen, isLocalServer } = useAssistant();
   const [isAssistantHovered, setIsAssistantHovered] = useState(false);
 
@@ -197,7 +199,7 @@ export function MlflowSidebar({
             },
           ]
         : []),
-      ...(shouldShowGenAIFeatures(enableWorkflowBasedNavigation, workflowType)
+      ...(shouldShowGenAIFeatures(enableWorkflowBasedNavigation, workflowType) && isGatewayEnabled !== false
         ? [
             {
               key: 'gateway',
@@ -226,6 +228,7 @@ export function MlflowSidebar({
       enableWorkflowBasedNavigation,
       location,
       showSidebar,
+      isGatewayEnabled,
     ],
   );
 
