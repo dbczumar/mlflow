@@ -13,7 +13,7 @@ import {
   shouldEnableExperimentOverviewTab,
   shouldEnableWorkflowBasedNavigation,
 } from '@mlflow/mlflow/src/common/utils/FeatureUtils';
-import { useIsFileStore } from '../../hooks/useServerInfo';
+import { useIsFileStore, useIsDatabricksBackend } from '../../hooks/useServerInfo';
 import { useUpdateExperimentKind } from '../../components/experiment-page/hooks/useUpdateExperimentKind';
 import { ExperimentViewHeaderKindSelector } from '../../components/experiment-page/components/header/ExperimentViewHeaderKindSelector';
 import { useExperimentKind } from '../../utils/ExperimentKindUtils';
@@ -30,6 +30,7 @@ const ExperimentPageTabsImpl = () => {
   const { theme } = useDesignSystemTheme();
   const navigate = useNavigate();
   const isFileStore = useIsFileStore();
+  const isDatabricksBackend = useIsDatabricksBackend();
 
   const { tabName: activeTabByRoute } = useGetExperimentPageActiveTabByRoute();
   const activeTab = activeTabByRoute ?? coerceToEnum(ExperimentPageTabName, tabName, ExperimentPageTabName.Models);
@@ -123,7 +124,7 @@ const ExperimentPageTabsImpl = () => {
                   // If the experiment kind is GENAI_DEVELOPMENT, navigate to Overview tab if enabled
                   // and not using FileStore backend, otherwise Traces
                   const targetTab =
-                    shouldEnableExperimentOverviewTab() && isFileStore === false
+                    shouldEnableExperimentOverviewTab() && isFileStore === false && isDatabricksBackend === false
                       ? ExperimentPageTabName.Overview
                       : ExperimentPageTabName.Traces;
                   navigate(Routes.getExperimentPageTabRoute(experimentId, targetTab), {

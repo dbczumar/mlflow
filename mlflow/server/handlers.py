@@ -330,6 +330,7 @@ from mlflow.webhooks.types import (
 _logger = logging.getLogger(__name__)
 _tracking_store = None
 _model_registry_store = None
+_gateway_store = None
 _job_store = None
 _artifact_repo = None
 STATIC_PREFIX_ENV_VAR = "_MLFLOW_STATIC_PREFIX"
@@ -405,7 +406,11 @@ class ModelRegistryStoreRegistryWrapper(ModelRegistryStoreRegistry):
 
     @classmethod
     def _get_databricks_rest_store(cls, store_uri):
-        return ModelRegistryRestStore(partial(get_databricks_host_creds, store_uri))
+        from mlflow.store.model_registry.databricks_workspace_model_registry_rest_store import (
+            DatabricksWorkspaceModelRegistryRestStore,
+        )
+
+        return DatabricksWorkspaceModelRegistryRestStore(store_uri, store_uri)
 
     @classmethod
     def _get_databricks_uc_rest_store(cls, store_uri):
@@ -577,6 +582,28 @@ def _get_tracking_store(
         _tracking_store = _tracking_store_registry.get_store(store_uri, artifact_root)
         utils.set_tracking_uri(store_uri)
     return _tracking_store
+
+
+def _get_gateway_store():
+    global _gateway_store
+    if _gateway_store is not None:
+        return _gateway_store
+
+    from mlflow.tracking._tracking_service.utils import _get_store
+
+    tracking_store = _tracking_store or _get_store()
+
+    if not isinstance(tracking_store, DatabricksTracingRestStore):
+        # Non-Databricks: tracking store already supports gateway.
+        # Don't cache so that tracking URI changes (e.g. in tests) are respected.
+        return tracking_store
+
+    # Databricks backend: create local SqlAlchemy store for gateway
+    from mlflow.store.tracking.sqlalchemy_store import SqlAlchemyStore
+
+    gateway_uri = os.environ.get("MLFLOW_GATEWAY_STORE_URI", "sqlite:///mlflow_gateway.db")
+    _gateway_store = SqlAlchemyStore(gateway_uri, "mlartifacts")
+    return _gateway_store
 
 
 def _get_model_registry_store(registry_store_uri: str | None = None) -> AbstractModelRegistryStore:
@@ -3816,18 +3843,20 @@ def _fetch_trace_data_from_store(
 
     try:
         traces = store.batch_get_traces([request_id], None)
-        match traces:
-            case [trace]:
-                return trace.data.to_dict()
-            case _:
-                raise MlflowException(
-                    f"Trace with id={request_id} not found.",
-                    error_code=RESOURCE_DOES_NOT_EXIST,
-                )
     # For stores that don't support batch get traces, or if trace data is not in the store,
-    # return None to signal fallback to artifact repository
-    except (MlflowTracingException, MlflowNotImplementedException):
+    # return None to signal fallback to artifact repository. Also catch MlflowException for
+    # cases where the backend rejects the request (e.g., Databricks "Invalid trace_id").
+    except (MlflowTracingException, MlflowNotImplementedException, MlflowException):
         return None
+
+    match traces:
+        case [trace]:
+            return trace.data.to_dict()
+        case _:
+            raise MlflowException(
+                f"Trace with id={request_id} not found.",
+                error_code=RESOURCE_DOES_NOT_EXIST,
+            )
 
 
 @catch_mlflow_exception
@@ -4556,7 +4585,7 @@ def _create_gateway_secret():
     # Empty map means no auth_config was provided
     auth_config = dict(request_message.auth_config) or None
 
-    secret = _get_tracking_store().create_gateway_secret(
+    secret = _get_gateway_store().create_gateway_secret(
         secret_name=request_message.secret_name,
         secret_value=dict(request_message.secret_value),
         provider=request_message.provider or None,
@@ -4577,7 +4606,7 @@ def _get_gateway_secret_info():
             "secret_id": [_assert_required, _assert_string],
         },
     )
-    secret = _get_tracking_store().get_secret_info(request_message.secret_id)
+    secret = _get_gateway_store().get_secret_info(request_message.secret_id)
     response_message = GetGatewaySecretInfo.Response()
     response_message.secret.CopyFrom(secret.to_proto())
     return _wrap_response(response_message)
@@ -4599,7 +4628,7 @@ def _update_gateway_secret():
     # Empty map means no update to secret_value
     secret_value = dict(request_message.secret_value) or None
 
-    secret = _get_tracking_store().update_gateway_secret(
+    secret = _get_gateway_store().update_gateway_secret(
         secret_id=request_message.secret_id,
         secret_value=secret_value,
         auth_config=auth_config,
@@ -4619,7 +4648,7 @@ def _delete_gateway_secret():
             "secret_id": [_assert_required, _assert_string],
         },
     )
-    _get_tracking_store().delete_gateway_secret(request_message.secret_id)
+    _get_gateway_store().delete_gateway_secret(request_message.secret_id)
     response_message = DeleteGatewaySecret.Response()
     return _wrap_response(response_message)
 
@@ -4633,7 +4662,7 @@ def _list_gateway_secrets():
             "provider": [_assert_string],
         },
     )
-    secrets = _get_tracking_store().list_secret_infos(
+    secrets = _get_gateway_store().list_secret_infos(
         provider=request_message.provider or None,
     )
     response_message = ListGatewaySecretInfos.Response()
@@ -4687,7 +4716,7 @@ def _create_gateway_endpoint():
         request_message.usage_tracking if request_message.HasField("usage_tracking") else True
     )
 
-    endpoint = _get_tracking_store().create_gateway_endpoint(
+    endpoint = _get_gateway_store().create_gateway_endpoint(
         name=request_message.name or None,
         model_configs=model_configs,
         created_by=request_message.created_by or None,
@@ -4712,7 +4741,7 @@ def _get_gateway_endpoint():
             "endpoint_id": [_assert_required, _assert_string],
         },
     )
-    endpoint = _get_tracking_store().get_gateway_endpoint(request_message.endpoint_id)
+    endpoint = _get_gateway_store().get_gateway_endpoint(request_message.endpoint_id)
     response_message = GetGatewayEndpoint.Response()
     response_message.endpoint.CopyFrom(endpoint.to_proto())
     return _wrap_response(response_message)
@@ -4763,7 +4792,7 @@ def _update_gateway_endpoint():
         request_message.usage_tracking if request_message.HasField("usage_tracking") else None
     )
 
-    endpoint = _get_tracking_store().update_gateway_endpoint(
+    endpoint = _get_gateway_store().update_gateway_endpoint(
         endpoint_id=request_message.endpoint_id,
         name=request_message.name or None,
         model_configs=model_configs,
@@ -4789,7 +4818,7 @@ def _delete_gateway_endpoint():
             "endpoint_id": [_assert_required, _assert_string],
         },
     )
-    _get_tracking_store().delete_gateway_endpoint(request_message.endpoint_id)
+    _get_gateway_store().delete_gateway_endpoint(request_message.endpoint_id)
     response_message = DeleteGatewayEndpoint.Response()
     return _wrap_response(response_message)
 
@@ -4803,7 +4832,7 @@ def _list_gateway_endpoints():
             "provider": [_assert_string],
         },
     )
-    endpoints = _get_tracking_store().list_gateway_endpoints(
+    endpoints = _get_gateway_store().list_gateway_endpoints(
         provider=request_message.provider or None,
     )
     response_message = ListGatewayEndpoints.Response()
@@ -4829,7 +4858,7 @@ def _create_gateway_model_definition():
             "created_by": [_assert_string],
         },
     )
-    model_definition = _get_tracking_store().create_gateway_model_definition(
+    model_definition = _get_gateway_store().create_gateway_model_definition(
         name=request_message.name,
         secret_id=request_message.secret_id,
         provider=request_message.provider,
@@ -4850,7 +4879,7 @@ def _get_gateway_model_definition():
             "model_definition_id": [_assert_required, _assert_string],
         },
     )
-    model_definition = _get_tracking_store().get_gateway_model_definition(
+    model_definition = _get_gateway_store().get_gateway_model_definition(
         request_message.model_definition_id
     )
     response_message = GetGatewayModelDefinition.Response()
@@ -4868,7 +4897,7 @@ def _list_gateway_model_definitions():
             "secret_id": [_assert_string],
         },
     )
-    model_definitions = _get_tracking_store().list_gateway_model_definitions(
+    model_definitions = _get_gateway_store().list_gateway_model_definitions(
         provider=request_message.provider or None,
         secret_id=request_message.secret_id or None,
     )
@@ -4891,7 +4920,7 @@ def _update_gateway_model_definition():
             "provider": [_assert_string],
         },
     )
-    model_definition = _get_tracking_store().update_gateway_model_definition(
+    model_definition = _get_gateway_store().update_gateway_model_definition(
         model_definition_id=request_message.model_definition_id,
         name=request_message.name or None,
         secret_id=request_message.secret_id or None,
@@ -4913,7 +4942,7 @@ def _delete_gateway_model_definition():
             "model_definition_id": [_assert_required, _assert_string],
         },
     )
-    _get_tracking_store().delete_gateway_model_definition(request_message.model_definition_id)
+    _get_gateway_store().delete_gateway_model_definition(request_message.model_definition_id)
     response_message = DeleteGatewayModelDefinition.Response()
     return _wrap_response(response_message)
 
@@ -4937,7 +4966,7 @@ def _attach_model_to_gateway_endpoint():
 
     model_config = GatewayEndpointModelConfig.from_proto(request_message.model_config)
 
-    mapping = _get_tracking_store().attach_model_to_endpoint(
+    mapping = _get_gateway_store().attach_model_to_endpoint(
         endpoint_id=request_message.endpoint_id,
         model_config=model_config,
         created_by=request_message.created_by or None,
@@ -4957,7 +4986,7 @@ def _detach_model_from_gateway_endpoint():
             "model_definition_id": [_assert_required, _assert_string],
         },
     )
-    _get_tracking_store().detach_model_from_endpoint(
+    _get_gateway_store().detach_model_from_endpoint(
         endpoint_id=request_message.endpoint_id,
         model_definition_id=request_message.model_definition_id,
     )
@@ -4982,7 +5011,7 @@ def _create_gateway_endpoint_binding():
             "created_by": [_assert_string],
         },
     )
-    binding = _get_tracking_store().create_endpoint_binding(
+    binding = _get_gateway_store().create_endpoint_binding(
         endpoint_id=request_message.endpoint_id,
         resource_type=GatewayResourceType(request_message.resource_type),
         resource_id=request_message.resource_id,
@@ -5004,7 +5033,7 @@ def _delete_gateway_endpoint_binding():
             "resource_id": [_assert_required, _assert_string],
         },
     )
-    _get_tracking_store().delete_endpoint_binding(
+    _get_gateway_store().delete_endpoint_binding(
         endpoint_id=request_message.endpoint_id,
         resource_type=request_message.resource_type,
         resource_id=request_message.resource_id,
@@ -5024,7 +5053,7 @@ def _list_gateway_endpoint_bindings():
             "resource_id": [_assert_string],
         },
     )
-    bindings = _get_tracking_store().list_endpoint_bindings(
+    bindings = _get_gateway_store().list_endpoint_bindings(
         endpoint_id=request_message.endpoint_id or None,
         resource_type=request_message.resource_type or None,
         resource_id=request_message.resource_id or None,
@@ -5046,7 +5075,7 @@ def _set_gateway_endpoint_tag():
         },
     )
     tag = GatewayEndpointTag(request_message.key, request_message.value)
-    _get_tracking_store().set_gateway_endpoint_tag(request_message.endpoint_id, tag)
+    _get_gateway_store().set_gateway_endpoint_tag(request_message.endpoint_id, tag)
     response_message = SetGatewayEndpointTag.Response()
     response = Response(mimetype="application/json")
     response.set_data(message_to_json(response_message))
@@ -5063,7 +5092,7 @@ def _delete_gateway_endpoint_tag():
             "key": [_assert_required, _assert_string],
         },
     )
-    _get_tracking_store().delete_gateway_endpoint_tag(
+    _get_gateway_store().delete_gateway_endpoint_tag(
         request_message.endpoint_id, request_message.key
     )
     response_message = DeleteGatewayEndpointTag.Response()
@@ -5268,6 +5297,138 @@ def _get_server_info():
             "is_databricks_backend": is_databricks_backend,
         }
     )
+
+
+@catch_mlflow_exception
+def proxy_v4_traces_handler(subpath):
+    """
+    Proxy handler that forwards V4 trace API requests to Databricks.
+    This enables the frontend to use V4 trace APIs (which support UC schema-based
+    traces with full text search) when the backend is a Databricks workspace.
+    """
+    from mlflow.store.tracking.databricks_rest_store import DatabricksTracingRestStore
+
+    store = _get_tracking_store()
+    if not isinstance(store, DatabricksTracingRestStore):
+        raise MlflowException(
+            "V4 trace API proxy is only available with a Databricks backend store.",
+            error_code=INVALID_PARAMETER_VALUE,
+        )
+
+    host_creds = store.get_host_creds()
+    databricks_host = host_creds.host.rstrip("/")
+    endpoint = f"/api/4.0/mlflow/traces/{subpath}"
+
+    if request.args:
+        query_string = urllib.parse.urlencode(request.args, doseq=True)
+        endpoint = f"{endpoint}?{query_string}"
+
+    headers = {}
+    if host_creds.token:
+        headers["Authorization"] = f"Bearer {host_creds.token}"
+
+    json_body = (
+        request.get_json(silent=True) if request.method in ("POST", "PUT", "PATCH") else None
+    )
+
+    response = requests.request(
+        method=request.method,
+        url=f"{databricks_host}{endpoint}",
+        headers=headers,
+        json=json_body,
+    )
+
+    return Response(
+        response=response.content,
+        status=response.status_code,
+        content_type=response.headers.get("Content-Type", "application/json"),
+    )
+
+
+@catch_mlflow_exception
+def list_sql_warehouses_handler():
+    """
+    Lists available SQL warehouses from a Databricks workspace.
+    Proxies to the Databricks SQL Warehouses API so the frontend
+    can populate a warehouse selector for UC trace queries.
+    """
+    from mlflow.store.tracking.databricks_rest_store import DatabricksTracingRestStore
+
+    store = _get_tracking_store()
+    if not isinstance(store, DatabricksTracingRestStore):
+        raise MlflowException(
+            "SQL warehouses API is only available with a Databricks backend store.",
+            error_code=INVALID_PARAMETER_VALUE,
+        )
+
+    host_creds = store.get_host_creds()
+    databricks_host = host_creds.host.rstrip("/")
+
+    headers = {}
+    if host_creds.token:
+        headers["Authorization"] = f"Bearer {host_creds.token}"
+
+    response = requests.get(
+        f"{databricks_host}/api/2.0/sql/warehouses",
+        headers=headers,
+    )
+
+    if response.status_code == 200:
+        return jsonify(response.json())
+    else:
+        raise MlflowException(
+            f"Failed to list SQL warehouses: {response.text}",
+            error_code=response.status_code,
+        )
+
+
+@catch_mlflow_exception
+def get_experiment_trace_locations_handler():
+    """
+    Gets the linked UC trace locations for an experiment by reading
+    experiment tags. Returns the UC schema location if the experiment
+    has a databricksTraceDestinationPath tag, enabling the frontend
+    to use V4 trace APIs.
+    """
+    from mlflow.store.tracking.databricks_rest_store import (
+        DatabricksTracingRestStore,
+    )
+
+    store = _get_tracking_store()
+    if not isinstance(store, DatabricksTracingRestStore):
+        return jsonify({"locations": []})
+
+    experiment_id = request.args.get("experiment_id")
+    if not experiment_id:
+        raise MlflowException(
+            "experiment_id is required",
+            error_code=INVALID_PARAMETER_VALUE,
+        )
+
+    experiment = store.get_experiment(experiment_id)
+    tags = experiment.tags if experiment else {}
+
+    uc_dest_tag = "mlflow.experiment.databricksTraceDestinationPath"
+    uc_path = tags.get(uc_dest_tag)
+    if not uc_path:
+        return jsonify({"locations": []})
+
+    # Tag value is "catalog.schema" format
+    parts = uc_path.split(".", 1)
+    if len(parts) != 2:
+        return jsonify({"locations": []})
+
+    return jsonify({
+        "locations": [
+            {
+                "type": "UC_SCHEMA",
+                "uc_schema": {
+                    "catalog_name": parts[0],
+                    "schema_name": parts[1],
+                },
+            }
+        ],
+    })
 
 
 @catch_mlflow_exception

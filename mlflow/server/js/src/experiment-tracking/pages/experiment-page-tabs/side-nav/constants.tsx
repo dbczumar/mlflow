@@ -177,9 +177,11 @@ export const getExperimentPageSideNavSectionLabel = (
 export const useExperimentPageSideNavConfig = ({
   experimentKind,
   hasTrainingRuns = false,
+  isDatabricksBackend = false,
 }: {
   experimentKind: ExperimentKind;
   hasTrainingRuns?: boolean;
+  isDatabricksBackend?: boolean;
 }): ExperimentPageSideNavConfig => {
   if (
     experimentKind === ExperimentKind.GENAI_DEVELOPMENT ||
@@ -187,7 +189,7 @@ export const useExperimentPageSideNavConfig = ({
   ) {
     const baseConfig = {
       'top-level': [
-        ...(shouldEnableExperimentOverviewTab()
+        ...(shouldEnableExperimentOverviewTab() && !isDatabricksBackend
           ? [
               {
                 label: (

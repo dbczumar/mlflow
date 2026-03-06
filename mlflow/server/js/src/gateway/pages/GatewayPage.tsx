@@ -24,6 +24,7 @@ import ApiKeysPage from './ApiKeysPage';
 import GatewayUsagePage from './GatewayUsagePage';
 import GatewayRoutes from '../routes';
 import { shouldEnableWorkflowBasedNavigation } from '../../common/utils/FeatureUtils';
+import { useIsDatabricksBackend } from '../../experiment-tracking/hooks/useServerInfo';
 
 const GatewayPageTitle = () => {
   const { theme } = useDesignSystemTheme();
@@ -48,6 +49,7 @@ const GatewayPage = () => {
   const { theme } = useDesignSystemTheme();
   const location = useLocation();
   const { data: secretsConfig, isLoading: isLoadingConfig } = useSecretsConfigQuery();
+  const isDatabricksBackend = useIsDatabricksBackend();
 
   const activeTab: GatewayTab = useMemo(() => {
     if (location.pathname.includes('/api-keys')) {
@@ -152,7 +154,7 @@ const GatewayPage = () => {
                 </div>
               )}
               {isApiKeysRoute && <ApiKeysPage />}
-              {isUsageRoute && <GatewayUsagePage />}
+              {isUsageRoute && !isDatabricksBackend && <GatewayUsagePage />}
             </>
           )}
         </div>

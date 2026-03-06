@@ -41,13 +41,16 @@ from mlflow.server.handlers import (
     create_promptlab_run_handler,
     gateway_proxy_handler,
     get_artifact_handler,
+    get_experiment_trace_locations_handler,
     get_logged_model_artifact_handler,
     get_metric_history_bulk_handler,
     get_metric_history_bulk_interval_handler,
     get_model_version_artifact_handler,
     get_trace_artifact_handler,
     get_ui_telemetry_handler,
+    list_sql_warehouses_handler,
     post_ui_telemetry_handler,
+    proxy_v4_traces_handler,
     upload_artifact_handler,
 )
 from mlflow.server.workspace_helpers import (
@@ -175,6 +178,33 @@ def serve_get_ui_telemetry():
 @app.route(_add_static_prefix("/ajax-api/3.0/mlflow/ui-telemetry"), methods=["POST"])
 def serve_post_ui_telemetry():
     return post_ui_telemetry_handler()
+
+
+# Proxy V4 trace API requests to Databricks when using Databricks backend
+@app.route(
+    _add_static_prefix("/ajax-api/4.0/mlflow/traces/<path:subpath>"),
+    methods=["GET", "POST", "PATCH", "PUT", "DELETE"],
+)
+def _proxy_v4_traces(subpath):
+    return proxy_v4_traces_handler(subpath)
+
+
+# List SQL warehouses from Databricks workspace
+@app.route(
+    _add_static_prefix("/ajax-api/3.0/mlflow/sql-warehouses"),
+    methods=["GET"],
+)
+def _list_sql_warehouses():
+    return list_sql_warehouses_handler()
+
+
+# Get linked UC trace locations for an experiment
+@app.route(
+    _add_static_prefix("/ajax-api/3.0/mlflow/experiment-trace-locations"),
+    methods=["GET"],
+)
+def _get_experiment_trace_locations():
+    return get_experiment_trace_locations_handler()
 
 
 # We expect the react app to be built assuming it is hosted at /static-files, so that requests for

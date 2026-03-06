@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import {
   ChainIcon,
   ChartLineIcon,
@@ -8,6 +9,7 @@ import {
 } from '@databricks/design-system';
 import { FormattedMessage } from 'react-intl';
 import { Link } from '../../../common/utils/RoutingUtils';
+import { useIsDatabricksBackend } from '../../../experiment-tracking/hooks/useServerInfo';
 import GatewayRoutes from '../../routes';
 
 const SIDE_NAV_WIDTH = 160;
@@ -58,6 +60,11 @@ const navItems: Array<{
 
 export const GatewaySideNav = ({ activeTab }: GatewaySideNavProps) => {
   const { theme } = useDesignSystemTheme();
+  const isDatabricksBackend = useIsDatabricksBackend();
+  const filteredNavItems = useMemo(
+    () => (isDatabricksBackend ? navItems.filter((item) => item.tab !== 'usage') : navItems),
+    [isDatabricksBackend],
+  );
 
   return (
     <div
@@ -86,7 +93,7 @@ export const GatewaySideNav = ({ activeTab }: GatewaySideNavProps) => {
         },
       }}
     >
-      {navItems.map((item) => {
+      {filteredNavItems.map((item) => {
         const isActive = activeTab === item.tab;
 
         return (

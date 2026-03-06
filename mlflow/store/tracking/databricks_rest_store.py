@@ -1028,6 +1028,12 @@ class DatabricksTracingRestStore(RestStore):
 
         return PagedList(results_to_return, next_token)
 
+    def list_scorers(self, experiment_id: str):
+        _logger.warning(
+            "Scorers API is not supported by Databricks backend, returning empty list."
+        )
+        return []
+
     def _append_sql_warehouse_id_param(self, endpoint: str) -> str:
         if sql_warehouse_id := MLFLOW_TRACING_SQL_WAREHOUSE_ID.get():
             return f"{endpoint}?sql_warehouse_id={sql_warehouse_id}"

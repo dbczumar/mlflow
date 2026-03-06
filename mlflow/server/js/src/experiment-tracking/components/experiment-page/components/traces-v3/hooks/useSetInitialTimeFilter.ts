@@ -62,8 +62,9 @@ export const useSetInitialTimeFilter = ({
     );
   }
 
-  // Return loading state so component can show loading skeleton
-  const isInitialTimeFilterLoading = shouldFetchForEmptyCheck && emptyCheckLoading;
+  // Return loading state so component can show loading skeleton.
+  // When disabled, the hook is intentionally not doing any work so should never report as loading.
+  const isInitialTimeFilterLoading = !disabled && shouldFetchForEmptyCheck && emptyCheckLoading;
 
   return {
     isInitialTimeFilterLoading,

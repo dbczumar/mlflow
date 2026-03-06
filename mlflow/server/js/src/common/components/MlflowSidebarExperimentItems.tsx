@@ -19,6 +19,7 @@ import {
   getTimeRangeQueryString,
 } from '../../experiment-tracking/pages/experiment-page-tabs/side-nav/utils';
 import { Fragment } from 'react';
+import { useIsDatabricksBackend } from '../../experiment-tracking/hooks/useServerInfo';
 
 // pass a dummy function to avoid highlighting the experiment back link
 const isExperimentsActive = () => false;
@@ -41,9 +42,11 @@ export const MlflowSidebarExperimentItems = ({
     enabled: Boolean(experimentId) && workflowType === WorkflowType.GENAI,
     filter: '', // not important in this case, we show the runs tab if there are any training runs
   });
+  const isDatabricksBackend = useIsDatabricksBackend();
   const config = useExperimentPageSideNavConfig({
     experimentKind: getExperimentKindForWorkflowType(workflowType),
     hasTrainingRuns: (trainingRuns?.length ?? 0) > 0,
+    isDatabricksBackend: isDatabricksBackend === true,
   });
   const { tabName: activeTabByRoute } = useGetExperimentPageActiveTabByRoute();
   const { search } = useLocation();

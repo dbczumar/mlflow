@@ -186,12 +186,14 @@ export const searchTracesV4 = async ({
   locations,
   filter,
   pageSize,
+  sqlWarehouseId,
 }: {
   signal?: AbortSignal;
   orderBy?: string[];
   filter?: string;
   locations?: (ModelTraceLocationMlflowExperiment | ModelTraceLocationUcSchema)[];
   pageSize?: number;
+  sqlWarehouseId?: string;
 }) => {
   const payload: Record<string, any> = {
     locations,
@@ -199,6 +201,9 @@ export const searchTracesV4 = async ({
     max_results: pageSize ?? 1000,
     order_by: orderBy,
   };
+  if (sqlWarehouseId) {
+    payload['sql_warehouse_id'] = sqlWarehouseId;
+  }
   const queryResponse = await fetchAPI(getAjaxUrl('ajax-api/4.0/mlflow/traces/search'), 'POST', payload, signal);
 
   const json = queryResponse as { trace_infos: ModelTraceInfoV3[]; next_page_token?: string };

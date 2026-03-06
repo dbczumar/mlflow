@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import type { RowSelectionState } from '@tanstack/react-table';
 import { isEmpty as isEmptyFn } from 'lodash';
 import { Empty, ParagraphSkeleton, DangerIcon, Spacer, Drawer } from '@databricks/design-system';
@@ -64,6 +64,9 @@ import { useRegisterSelectedIds } from '@mlflow/mlflow/src/assistant';
 import { AssistantAwareDrawer } from '@mlflow/mlflow/src/common/components/AssistantAwareDrawer';
 import { useRunScorerInTracesViewConfiguration } from '../../../../pages/experiment-scorers/hooks/useRunScorerInTracesViewConfiguration';
 import { IssueDetectionModal } from './IssueDetectionModal';
+import { useExperimentTraceLocations } from '../../../../hooks/useExperimentTraceLocations';
+import { useSqlWarehouseSelector } from '../../../../hooks/useSqlWarehouseSelector';
+import { SqlWarehouseSelector } from './SqlWarehouseSelector';
 
 const JudgeContextProvider = ({ children }: { children: React.ReactNode }) => {
   const runJudgeConfiguration = useRunScorerInTracesViewConfiguration();
@@ -148,17 +151,40 @@ const TracesV3LogsImpl = React.memo(
     const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
     useRegisterSelectedIds('selectedTraceIds', rowSelection);
 
+    // Detect UC schema locations for V4 API support
+    const v4Enabled = shouldUseTracesV4API();
+
+    const { ucSchemaLocations, isLoading: isLocationsLoading } = useExperimentTraceLocations({
+      experimentId: singleExperimentId,
+      enabled: v4Enabled,
+    });
+
+    const hasUcSchema = ucSchemaLocations.length > 0;
+
+    // SQL warehouse selector for UC trace queries
+    const {
+      warehouses,
+      selectedId: sqlWarehouseId,
+      setSelectedId: setSqlWarehouseId,
+      isLoading: isWarehousesLoading,
+    } = useSqlWarehouseSelector({ enabled: v4Enabled && hasUcSchema });
+
     const traceSearchLocations = useMemo(
       () => {
+        // Use UC schema locations when available for V4 API support
+        if (v4Enabled && ucSchemaLocations.length > 0) {
+          return ucSchemaLocations;
+        }
         return experimentIds.map((id) => createTraceLocationForExperiment(id));
       },
       // prettier-ignore
       [
-        experimentIds,
+        experimentIds, v4Enabled, ucSchemaLocations,
       ],
     );
 
-    const isQueryDisabled = false;
+    // Don't fire searches while location detection is in progress
+    const isQueryDisabled = v4Enabled && isLocationsLoading;
     const usesV4APIs = true;
 
     const getTrace = getTraceV3;
@@ -178,6 +204,7 @@ const TracesV3LogsImpl = React.memo(
       timeRange,
       filterByLoggedModelId: loggedModelId,
       disabled: isQueryDisabled,
+      sqlWarehouseId,
     });
 
     // Setup table states
@@ -265,6 +292,7 @@ const TracesV3LogsImpl = React.memo(
       timeRange,
       filterByLoggedModelId: loggedModelId,
       tableSort,
+      sqlWarehouseId,
       disabled: isQueryDisabled,
     });
 
@@ -342,6 +370,7 @@ const TracesV3LogsImpl = React.memo(
               loggedModelId={loggedModelId}
               traceSearchLocations={traceSearchLocations}
               isCallDisabled={isQueryDisabled}
+              sqlWarehouseId={sqlWarehouseId}
             />
           </>
         );
@@ -443,7 +472,19 @@ const TracesV3LogsImpl = React.memo(
               isMetadataLoading={isMetadataLoading}
               metadataError={metadataError}
               usesV4APIs={usesV4APIs}
-              addons={toolbarAddons}
+              addons={
+                <>
+                  {v4Enabled && hasUcSchema && (
+                    <SqlWarehouseSelector
+                      warehouses={warehouses}
+                      selectedId={sqlWarehouseId}
+                      onSelect={setSqlWarehouseId}
+                      isLoading={isWarehousesLoading}
+                    />
+                  )}
+                  {toolbarAddons}
+                </>
+              }
               isGroupedBySession={forceGroupBySession || isGroupedBySession}
               forceGroupBySession={forceGroupBySession}
               onToggleSessionGrouping={onToggleSessionGrouping}

@@ -487,12 +487,17 @@ export const searchMlflowTracesQueryFn = async ({
   const usingV4APIs = locations?.some((location) => location.type === 'UC_SCHEMA') && shouldUseTracesV4API();
 
   if (usingV4APIs) {
+    // Wait for warehouse ID before making V4 search requests
+    if (!sqlWarehouseId) {
+      return [];
+    }
     return TracesServiceV4.searchTracesV4({
       signal,
       orderBy,
       locations,
       filter,
       pageSize: pageSizeProp,
+      sqlWarehouseId,
     });
   }
   let allTraces: ModelTraceInfoV3[] = [];
@@ -598,7 +603,7 @@ const useSearchMlflowTracesInner = ({
   // Standard synchronous search (only active when not using long-running API)
   const syncResult = useQuery<ModelTraceInfoV3[], NetworkRequestError>({
     ...queryCacheConfig,
-    enabled: enabled && !usingLongRunningAPI,
+    enabled: enabled && !usingLongRunningAPI && !(usingV4APIs && !sqlWarehouseId),
     queryKey: [
       SEARCH_MLFLOW_TRACES_QUERY_KEY,
       {

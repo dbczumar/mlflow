@@ -1,6 +1,7 @@
 import { ChainIcon, ChartLineIcon, CloudModelIcon, KeyIcon, useDesignSystemTheme } from '@databricks/design-system';
 import { FormattedMessage } from '@databricks/i18n';
 import GatewayRoutes from '../../gateway/routes';
+import { useIsDatabricksBackend } from '../../experiment-tracking/hooks/useServerInfo';
 import { matchPath } from '../utils/RoutingUtils';
 import type { Location } from '../utils/RoutingUtils';
 import { MlflowSidebarLink } from './MlflowSidebarLink';
@@ -12,6 +13,7 @@ const isApiKeysActive = (location: Location) => Boolean(matchPath('/gateway/api-
 
 export const MlflowSidebarGatewayItems = ({ collapsed }: { collapsed: boolean }) => {
   const { theme } = useDesignSystemTheme();
+  const isDatabricksBackend = useIsDatabricksBackend();
 
   return (
     <div css={{ display: 'flex', flexDirection: 'column' }}>
@@ -42,16 +44,18 @@ export const MlflowSidebarGatewayItems = ({ collapsed }: { collapsed: boolean })
       >
         <FormattedMessage defaultMessage="Endpoints" description="Sidebar link for gateway endpoints" />
       </MlflowSidebarLink>
-      <MlflowSidebarLink
-        css={{ paddingLeft: collapsed ? undefined : theme.spacing.lg }}
-        to={GatewayRoutes.usagePageRoute}
-        componentId="mlflow.sidebar.gateway_usage_tab_link"
-        isActive={isUsageActive}
-        icon={<ChartLineIcon />}
-        collapsed={collapsed}
-      >
-        <FormattedMessage defaultMessage="Usage" description="Sidebar link for gateway usage" />
-      </MlflowSidebarLink>
+      {!isDatabricksBackend && (
+        <MlflowSidebarLink
+          css={{ paddingLeft: collapsed ? undefined : theme.spacing.lg }}
+          to={GatewayRoutes.usagePageRoute}
+          componentId="mlflow.sidebar.gateway_usage_tab_link"
+          isActive={isUsageActive}
+          icon={<ChartLineIcon />}
+          collapsed={collapsed}
+        >
+          <FormattedMessage defaultMessage="Usage" description="Sidebar link for gateway usage" />
+        </MlflowSidebarLink>
+      )}
       <MlflowSidebarLink
         css={{ paddingLeft: collapsed ? undefined : theme.spacing.lg }}
         to={GatewayRoutes.apiKeysPageRoute}

@@ -1,3 +1,5 @@
+import { getIsDatabricksBackendSync } from '../../../experiment-tracking/hooks/useServerInfo';
+
 export const shouldBlockLargeTraceDisplay = () => {
   return false;
 };
@@ -9,10 +11,11 @@ export const getLargeTraceDisplaySizeThreshold = () => {
 };
 
 /**
- * Determines if traces V4 API should be used to fetch traces
+ * Determines if traces V4 API should be used to fetch traces.
+ * Enabled when using a Databricks backend that supports UC schema-based traces.
  */
 export const shouldUseTracesV4API = () => {
-  return false;
+  return getIsDatabricksBackendSync();
 };
 
 /**

@@ -26,8 +26,9 @@ export const TracesV3EmptyState = (props: {
   experimentIds: string[];
   loggedModelId?: string;
   isCallDisabled?: boolean;
+  sqlWarehouseId?: string;
 }) => {
-  const { experimentIds, traceSearchLocations, loggedModelId, isCallDisabled } = props;
+  const { experimentIds, traceSearchLocations, loggedModelId, isCallDisabled, sqlWarehouseId } = props;
 
   const intl = useIntl();
 
@@ -41,6 +42,7 @@ export const TracesV3EmptyState = (props: {
     limit: 1,
     ...(loggedModelId ? { filterByLoggedModelId: loggedModelId } : {}),
     disabled: isCallDisabled,
+    sqlWarehouseId,
   });
 
   // check experiment tags to see if it's genai or custom

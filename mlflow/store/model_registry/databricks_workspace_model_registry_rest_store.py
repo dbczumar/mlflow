@@ -71,9 +71,63 @@ def _raise_unsupported_method(method, message=None):
 
 
 class DatabricksWorkspaceModelRegistryRestStore(RestStore):
+    # Databricks workspace model registry limits max_results to 10,000
+    _DATABRICKS_MAX_RESULTS_LIMIT = 10_000
+
     def __init__(self, store_uri, tracking_uri):
         super().__init__(get_host_creds=partial(get_databricks_host_creds, store_uri))
         self.tracking_uri = tracking_uri
+
+    def search_model_versions(
+        self, filter_string=None, max_results=None, order_by=None, page_token=None
+    ):
+        from mlflow.store.entities.paged_list import PagedList
+
+        if max_results is not None and max_results > self._DATABRICKS_MAX_RESULTS_LIMIT:
+            _logger.warning(
+                "max_results=%d exceeds Databricks limit of %d, capping to %d.",
+                max_results,
+                self._DATABRICKS_MAX_RESULTS_LIMIT,
+                self._DATABRICKS_MAX_RESULTS_LIMIT,
+            )
+            max_results = self._DATABRICKS_MAX_RESULTS_LIMIT
+        try:
+            return super().search_model_versions(
+                filter_string=filter_string,
+                max_results=max_results,
+                order_by=order_by,
+                page_token=page_token,
+            )
+        except MlflowException as e:
+            if order_by:
+                _logger.warning(
+                    "order_by parameter not supported by Databricks model registry, "
+                    "retrying without order_by."
+                )
+                try:
+                    return super().search_model_versions(
+                        filter_string=filter_string,
+                        max_results=max_results,
+                        order_by=None,
+                        page_token=page_token,
+                    )
+                except MlflowException:
+                    _logger.warning(
+                        "model-versions/search failed for filter '%s': %s. "
+                        "Returning empty results.",
+                        filter_string,
+                        e.message,
+                    )
+                    return PagedList([], None)
+            if "MALFORMED_REQUEST" in str(e) or "INVALID_PARAMETER_VALUE" in str(e):
+                _logger.warning(
+                    "model-versions/search failed for filter '%s': %s. "
+                    "Returning empty results.",
+                    filter_string,
+                    e.message,
+                )
+                return PagedList([], None)
+            raise
 
     def set_registered_model_alias(self, name, alias, version):
         _raise_unsupported_method(method="set_registered_model_alias")

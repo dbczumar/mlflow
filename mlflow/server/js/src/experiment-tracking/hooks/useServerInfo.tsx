@@ -136,6 +136,15 @@ export function useIsDatabricksBackend(): boolean | undefined {
   return data ? (data.is_databricks_backend ?? false) : undefined;
 }
 
+/**
+ * Synchronous accessor for checking if the backend is Databricks.
+ * Returns the cached value from React Query or false if not yet loaded.
+ */
+export const getIsDatabricksBackendSync = (): boolean => {
+  const cachedData = queryClientRef?.getQueryData<ServerInfoResponse>([SERVER_INFO_QUERY_KEY]);
+  return cachedData?.is_databricks_backend ?? false;
+};
+
 // For testing purposes - allows resetting the cached state
 export const resetServerInfoCache = (): void => {
   queryClientRef?.removeQueries({ queryKey: [SERVER_INFO_QUERY_KEY] });

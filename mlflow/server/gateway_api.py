@@ -43,6 +43,7 @@ from mlflow.gateway.tracing_utils import aggregate_chat_stream_chunks, maybe_tra
 from mlflow.gateway.utils import safe_stream, to_sse_chunk, translate_http_exception
 from mlflow.protos.databricks_pb2 import RESOURCE_DOES_NOT_EXIST
 from mlflow.server.gateway_budget import check_budget_limit, make_budget_on_complete
+from mlflow.server.handlers import _get_gateway_store
 from mlflow.store.tracking.abstract_store import AbstractStore
 from mlflow.store.tracking.gateway.config_resolver import get_endpoint_config
 from mlflow.store.tracking.gateway.entities import (
@@ -54,7 +55,6 @@ from mlflow.store.tracking.sqlalchemy_store import SqlAlchemyStore
 from mlflow.telemetry.events import GatewayInvocationEvent, GatewayInvocationType
 from mlflow.telemetry.track import _record_event
 from mlflow.tracing.constant import TraceMetadataKey
-from mlflow.tracking._tracking_service.utils import _get_store
 from mlflow.utils.workspace_context import get_request_workspace
 
 _logger = logging.getLogger(__name__)
@@ -426,7 +426,7 @@ async def invocations(endpoint_name: str, request: Request):
     user_metadata = _get_user_metadata(request)
     headers = dict(request.headers)
 
-    store = _get_store()
+    store = _get_gateway_store()
     workspace = get_request_workspace()
 
     _validate_store(store)
@@ -523,7 +523,7 @@ async def chat_completions(request: Request):
     endpoint_name = _extract_endpoint_name_from_model(body)
     body.pop("model")
 
-    store = _get_store()
+    store = _get_gateway_store()
     workspace = get_request_workspace()
 
     _validate_store(store)
@@ -590,7 +590,7 @@ async def openai_passthrough_chat(request: Request):
 
     endpoint_name = _extract_endpoint_name_from_model(body)
     body.pop("model")
-    store = _get_store()
+    store = _get_gateway_store()
     workspace = get_request_workspace()
     _validate_store(store)
     check_budget_limit(store, workspace=workspace)
@@ -658,7 +658,7 @@ async def openai_passthrough_embeddings(request: Request):
 
     endpoint_name = _extract_endpoint_name_from_model(body)
     body.pop("model")
-    store = _get_store()
+    store = _get_gateway_store()
     workspace = get_request_workspace()
     _validate_store(store)
     check_budget_limit(store, workspace=workspace)
@@ -708,7 +708,7 @@ async def openai_passthrough_responses(request: Request):
 
     endpoint_name = _extract_endpoint_name_from_model(body)
     body.pop("model")
-    store = _get_store()
+    store = _get_gateway_store()
     workspace = get_request_workspace()
     _validate_store(store)
     check_budget_limit(store, workspace=workspace)
@@ -780,7 +780,7 @@ async def anthropic_passthrough_messages(request: Request):
 
     endpoint_name = _extract_endpoint_name_from_model(body)
     body.pop("model")
-    store = _get_store()
+    store = _get_gateway_store()
     workspace = get_request_workspace()
     _validate_store(store)
     check_budget_limit(store, workspace=workspace)
@@ -852,7 +852,7 @@ async def gemini_passthrough_generate_content(endpoint_name: str, request: Reque
     body = await _get_request_body(request)
     user_metadata = _get_user_metadata(request)
 
-    store = _get_store()
+    store = _get_gateway_store()
     workspace = get_request_workspace()
     _validate_store(store)
     check_budget_limit(store, workspace=workspace)
@@ -901,7 +901,7 @@ async def gemini_passthrough_stream_generate_content(endpoint_name: str, request
     body = await _get_request_body(request)
     user_metadata = _get_user_metadata(request)
 
-    store = _get_store()
+    store = _get_gateway_store()
     workspace = get_request_workspace()
     _validate_store(store)
     check_budget_limit(store, workspace=workspace)
