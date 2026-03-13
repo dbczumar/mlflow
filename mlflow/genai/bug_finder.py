@@ -96,7 +96,7 @@ and simulation_guidelines (a short list of behavioral instructions for the \
 simulated user).
 
 Cover a broad mix of the agent's stated capabilities. All test cases should \
-be realistic. Most should be challenging: ambiguous requests, multi-step \
+be realistic. Some should be challenging: ambiguous requests, multi-step \
 tasks, or requests near the agent's stated limitations.
 
 Example output for a weather assistant:
