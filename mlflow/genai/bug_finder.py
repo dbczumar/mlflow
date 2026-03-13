@@ -95,8 +95,9 @@ Each test case needs a goal (what the user wants), a persona (who they are), \
 and simulation_guidelines (a short list of behavioral instructions for the \
 simulated user).
 
-Cover a broad mix of the agent's stated capabilities. Keep goals concrete \
-and realistic.
+Cover a broad mix of the agent's stated capabilities. Most test cases should \
+be straightforward and realistic. A few should be challenging: ambiguous \
+requests, multi-step tasks, or requests near the agent's stated limitations.
 
 Example output for a weather assistant:
 
