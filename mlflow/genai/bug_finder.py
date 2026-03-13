@@ -87,6 +87,12 @@ You are an expert at analysing AI agents. Given conversation traces from an \
 AI agent, extract a structured description of what the agent does, its \
 capabilities, and its limitations."""
 
+_DEFAULT_TESTING_GUIDANCE = (
+    "Cover a broad mix of the agent's stated capabilities. All test cases should "
+    "be realistic. Some should be challenging: ambiguous requests, multi-step "
+    "tasks, or requests near the agent's stated limitations."
+)
+
 _GENERATE_TEST_CASES_SYSTEM_PROMPT = """\
 You are a QA engineer for AI agents. Given a description of an agent, \
 generate diverse test cases that exercise different capabilities.
@@ -95,27 +101,25 @@ Each test case needs a goal (what the user wants), a persona (who they are), \
 and simulation_guidelines (a short list of behavioral instructions for the \
 simulated user).
 
-Cover a broad mix of the agent's stated capabilities. All test cases should \
-be realistic. Some should be challenging: ambiguous requests, multi-step \
-tasks, or requests near the agent's stated limitations.
+{testing_guidance}
 
 Example output for a weather assistant:
 
 ```json
-{
+{{
   "test_cases": [
-    {
+    {{
       "goal": "Get a 7-day weather forecast for Seattle",
       "persona": "A traveler packing for a trip",
       "simulation_guidelines": ["Ask one follow-up about what to wear"]
-    },
-    {
+    }},
+    {{
       "goal": "Compare today's weather in Tokyo and London",
       "persona": "Someone scheduling an international call",
       "simulation_guidelines": ["Keep the conversation to 2-3 turns"]
-    }
+    }}
   ]
-}
+}}
 ```"""
 
 
@@ -262,12 +266,14 @@ def _generate_test_cases(
     agent_desc: _AgentDescription,
     model: str,
     num_test_cases: int | None = None,
+    testing_guidance: str | None = None,
 ) -> list[dict[str, Any]]:
     from mlflow.genai.judges.utils import (
         get_chat_completions_with_structured_output,
     )
     from mlflow.types.llm import ChatMessage
 
+    guidance = testing_guidance or _DEFAULT_TESTING_GUIDANCE
     count = num_test_cases or 7
     user_content = (
         f"Agent description: {agent_desc.description}\n\n"
@@ -278,8 +284,11 @@ def _generate_test_cases(
         + f"\n\nGenerate {count} diverse test cases."
     )
 
+    system_prompt = _GENERATE_TEST_CASES_SYSTEM_PROMPT.format(
+        testing_guidance=guidance,
+    )
     messages = [
-        ChatMessage(role="system", content=_GENERATE_TEST_CASES_SYSTEM_PROMPT),
+        ChatMessage(role="system", content=system_prompt),
         ChatMessage(role="user", content=user_content),
     ]
     result = get_chat_completions_with_structured_output(
@@ -329,6 +338,7 @@ def find_bugs(
     max_turns: int = 10,
     max_issues: int = 20,
     num_test_cases: int | None = None,
+    testing_guidance: str | None = None,
 ) -> FindBugsResult:
     """
     Automatically stress-test a conversational AI agent and discover bugs.
@@ -359,6 +369,11 @@ def find_bugs(
         max_issues: Maximum number of issues to report.
         num_test_cases: Number of test cases to generate. When ``None``
             the LLM decides (typically 5-10).
+        testing_guidance: Optional natural-language guidance for what
+            kinds of queries to test. For example,
+            ``"Focus on multi-step financial workflows"``.
+            When ``None``, uses a default that covers a broad,
+            realistic mix of the agent's capabilities.
 
     Returns:
         A :class:`FindBugsResult` containing discovered issues, generated
@@ -409,7 +424,7 @@ def find_bugs(
     # Step 2: Generate test cases
     # ------------------------------------------------------------------
     _logger.info("Step 2/4: Generating test cases")
-    test_cases = _generate_test_cases(agent_desc, model, num_test_cases)
+    test_cases = _generate_test_cases(agent_desc, model, num_test_cases, testing_guidance)
     _logger.info("Generated %d test cases", len(test_cases))
 
     # ------------------------------------------------------------------
