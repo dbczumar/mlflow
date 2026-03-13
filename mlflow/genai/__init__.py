@@ -3,6 +3,7 @@ from mlflow.genai import (
     judges,
     scorers,
 )
+from mlflow.genai.bug_finder import FindBugsResult, find_bugs
 from mlflow.genai.datasets import (
     create_dataset,
     delete_dataset,
@@ -49,6 +50,8 @@ from mlflow.genai.simulators import ConversationSimulator
 __all__ = [
     "datasets",
     "discover_issues",
+    "find_bugs",
+    "FindBugsResult",
     "evaluate",
     "to_predict_fn",
     "Scorer",
