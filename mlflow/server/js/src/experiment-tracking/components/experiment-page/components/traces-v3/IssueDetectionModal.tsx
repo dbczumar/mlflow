@@ -82,7 +82,7 @@ export const IssueDetectionModal: React.FC<IssueDetectionModalProps> = ({
 
     const { provider, model, apiKeyConfig, saveKey } = values;
 
-    const submitIssueDetection = () => {
+    const submitIssueDetection = (secretId: string) => {
       invokeIssueDetection(
         {
           experimentId,
@@ -90,6 +90,7 @@ export const IssueDetectionModal: React.FC<IssueDetectionModalProps> = ({
           categories: Array.from(selectedCategories),
           provider,
           model,
+          secretId,
         },
         {
           onSuccess: (response) => {
@@ -101,7 +102,7 @@ export const IssueDetectionModal: React.FC<IssueDetectionModalProps> = ({
       );
     };
 
-    if (saveKey && apiKeyConfig.mode === 'new') {
+    if (apiKeyConfig.mode === 'new') {
       const authConfig = { ...apiKeyConfig.newSecret.configFields } satisfies Record<string, string>;
       if (apiKeyConfig.newSecret.authMode) {
         authConfig['auth_mode'] = apiKeyConfig.newSecret.authMode;
@@ -109,19 +110,19 @@ export const IssueDetectionModal: React.FC<IssueDetectionModalProps> = ({
 
       createSecret(
         {
-          secret_name: apiKeyConfig.newSecret.name,
+          secret_name: apiKeyConfig.newSecret.name || `${provider}-key-${Date.now()}`,
           secret_value: apiKeyConfig.newSecret.secretFields,
           provider: provider,
           auth_config: Object.keys(authConfig).length > 0 ? authConfig : undefined,
         },
         {
-          onSuccess: () => {
-            submitIssueDetection();
+          onSuccess: (response) => {
+            submitIssueDetection(response.secret.secret_id);
           },
         },
       );
     } else {
-      submitIssueDetection();
+      submitIssueDetection(apiKeyConfig.existingSecretId);
     }
   };
 

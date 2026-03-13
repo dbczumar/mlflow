@@ -88,16 +88,34 @@ AI agent, extract a structured description of what the agent does, its \
 capabilities, and its limitations."""
 
 _GENERATE_TEST_CASES_SYSTEM_PROMPT = """\
-You are an expert QA engineer for AI agents. Given a description of an agent, \
-generate diverse test cases that will stress-test the agent and probe for bugs.
+You are a QA engineer for AI agents. Given a description of an agent, \
+generate diverse test cases that exercise different capabilities.
 
-Each test case should target a specific capability or limitation. Focus on:
-- Edge cases and boundary conditions
-- Error handling and graceful degradation
-- Multi-step reasoning that could go wrong
-- Ambiguous or conflicting requests
-- Attempts to exceed the agent's stated limitations
-- Unusual personas that might reveal bias or inconsistency"""
+Each test case needs a goal (what the user wants), a persona (who they are), \
+and simulation_guidelines (a short list of behavioral instructions for the \
+simulated user).
+
+Cover a broad mix of the agent's stated capabilities. Keep goals concrete \
+and realistic.
+
+Example output for a weather assistant:
+
+```json
+{
+  "test_cases": [
+    {
+      "goal": "Get a 7-day weather forecast for Seattle",
+      "persona": "A traveler packing for a trip",
+      "simulation_guidelines": ["Ask one follow-up about what to wear"]
+    },
+    {
+      "goal": "Compare today's weather in Tokyo and London",
+      "persona": "Someone scheduling an international call",
+      "simulation_guidelines": ["Keep the conversation to 2-3 turns"]
+    }
+  ]
+}
+```"""
 
 
 # ---------------------------------------------------------------------------
@@ -249,22 +267,14 @@ def _generate_test_cases(
     )
     from mlflow.types.llm import ChatMessage
 
-    count_instruction = ""
-    if num_test_cases is not None:
-        count_instruction = f"\n\nGenerate exactly {num_test_cases} test cases."
-    else:
-        count_instruction = (
-            "\n\nGenerate 5-10 diverse test cases that cover different "
-            "capabilities and potential failure modes."
-        )
-
+    count = num_test_cases or 7
     user_content = (
         f"Agent description: {agent_desc.description}\n\n"
         f"Capabilities:\n"
         + "\n".join(f"- {c}" for c in agent_desc.capabilities)
         + "\n\nLimitations:\n"
-        + "\n".join(f"- {l}" for l in agent_desc.limitations)
-        + count_instruction
+        + "\n".join(f"- {lim}" for lim in agent_desc.limitations)
+        + f"\n\nGenerate {count} diverse test cases."
     )
 
     messages = [

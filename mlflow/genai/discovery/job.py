@@ -1,3 +1,5 @@
+import os
+
 from mlflow.client import MlflowClient
 from mlflow.entities.run_status import RunStatus
 from mlflow.environment_variables import MLFLOW_SERVER_JUDGE_INVOKE_MAX_WORKERS
@@ -13,7 +15,11 @@ def invoke_issue_detection_job(
     provider: str,
     model: str,
     run_id: str,
+    api_key: str | None = None,
 ):
+    if api_key:
+        os.environ[f"{provider.upper()}_API_KEY"] = api_key.strip()
+
     client = MlflowClient()
     try:
         traces = client._tracing_client.batch_get_traces(trace_ids)

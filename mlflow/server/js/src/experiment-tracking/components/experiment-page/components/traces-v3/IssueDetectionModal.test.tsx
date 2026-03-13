@@ -85,7 +85,9 @@ describe('IssueDetectionModal', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockCreateSecret = jest.fn((_request, options) => {
-      (options as { onSuccess?: () => void })?.onSuccess?.();
+      (options as { onSuccess?: (response: { secret: { secret_id: string } }) => void })?.onSuccess?.({
+        secret: { secret_id: 'new-secret-456' },
+      });
     });
     mockResetCreateSecret = jest.fn();
     mockInvokeIssueDetection = jest.fn((_request, options) => {
@@ -408,7 +410,7 @@ describe('IssueDetectionModal', () => {
     });
   });
 
-  test('does not save secret when save key checkbox is not checked', async () => {
+  test('creates secret when save key checkbox is not checked with new key', async () => {
     const onClose = jest.fn();
 
     renderWithDesignSystem(
@@ -423,9 +425,16 @@ describe('IssueDetectionModal', () => {
     await userEvent.click(submitButton);
 
     await waitFor(() => {
+      expect(mockCreateSecret).toHaveBeenCalledWith(
+        expect.objectContaining({
+          secret_name: 'my-key',
+          secret_value: { api_key: 'sk-123' },
+          provider: 'openai',
+        }),
+        expect.any(Object),
+      );
       expect(onClose).toHaveBeenCalled();
     });
-    expect(mockCreateSecret).not.toHaveBeenCalled();
   });
 
   test('does not save secret when using existing key', async () => {

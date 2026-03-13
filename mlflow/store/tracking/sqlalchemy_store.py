@@ -4789,9 +4789,14 @@ class SqlAlchemyStore(SqlAlchemyGatewayStoreMixin, AbstractStore):
                 trace_info = sql_trace_info.to_mlflow_entity()
                 # batch_get_traces is depended by search_traces, so we need to return
                 # complete traces only
-                if spans := self._get_spans_with_trace_info(
-                    trace_info, sql_trace_info.spans, allow_partial=False
-                ):
+                try:
+                    spans = self._get_spans_with_trace_info(
+                        trace_info, sql_trace_info.spans, allow_partial=False
+                    )
+                except MlflowTracingException:
+                    # Trace data is stored in artifact repo, not tracking store — skip
+                    continue
+                if spans:
                     traces.append(Trace(info=trace_info, data=TraceData(spans=spans)))
 
             return traces

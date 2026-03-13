@@ -299,7 +299,7 @@ from mlflow.tracking._tracking_service.registry import TrackingStoreRegistry
 from mlflow.tracking.context.default_context import _get_user
 from mlflow.tracking.registry import UnsupportedModelRegistryStoreURIException
 from mlflow.utils import workspace_context
-from mlflow.utils.crypto import KEKManager
+from mlflow.utils.crypto import KEKManager, _decrypt_secret
 from mlflow.utils.databricks_utils import get_databricks_host_creds
 from mlflow.utils.file_utils import local_file_uri_to_path
 from mlflow.utils.mime_type_utils import _guess_mime_type
@@ -3560,9 +3560,20 @@ def _batch_get_traces() -> Response:
         BatchGetTraces(),
         schema={"trace_ids": [_assert_array, _assert_required, _assert_item_type_string]},
     )
-    traces = _get_tracking_store().batch_get_traces(request_message.trace_ids, None)
-    response_message = BatchGetTraces.Response()
-    response_message.traces.extend([t.to_proto() for t in traces])
+    trace_ids = request_message.trace_ids
+    _logger.info("batch_get_traces: received %d trace IDs", len(trace_ids))
+    try:
+        traces = _get_tracking_store().batch_get_traces(trace_ids, None)
+        _logger.info("batch_get_traces: store returned %d traces", len(traces))
+    except Exception:
+        _logger.exception("batch_get_traces: failed for %d trace IDs", len(trace_ids))
+        raise
+    try:
+        response_message = BatchGetTraces.Response()
+        response_message.traces.extend([t.to_proto() for t in traces])
+    except Exception:
+        _logger.exception("batch_get_traces: failed to serialize %d traces", len(traces))
+        raise
     return _wrap_response(response_message)
 
 
@@ -4141,6 +4152,7 @@ def _invoke_issue_detection_handler():
             "categories": [_assert_required, _assert_array],
             "provider": [_assert_required, _assert_string],
             "model": [_assert_required, _assert_string],
+            "secret_id": [_assert_required, _assert_string],
         }
     )
 
@@ -4149,6 +4161,32 @@ def _invoke_issue_detection_handler():
     categories = request_json.get("categories", [])
     provider = request_json.get("provider")
     model = request_json.get("model")
+    secret_id = request_json.get("secret_id")
+
+    # Decrypt the gateway secret to extract the API key
+    from mlflow.store.tracking.dbmodels.models import SqlGatewaySecret
+
+    store = _get_tracking_store()
+    with store.ManagedSessionMaker() as session:
+        sql_secret = store._get_entity_or_raise(
+            session,
+            SqlGatewaySecret,
+            {"secret_id": secret_id},
+            "GatewaySecret",
+        )
+        kek_manager = KEKManager()
+        decrypted = _decrypt_secret(
+            encrypted_value=sql_secret.encrypted_value,
+            wrapped_dek=sql_secret.wrapped_dek,
+            kek_manager=kek_manager,
+            secret_id=sql_secret.secret_id,
+            secret_name=sql_secret.secret_name,
+        )
+        api_key = (
+            decrypted["api_key"]
+            if isinstance(decrypted, dict)
+            else decrypted
+        ).strip()
 
     # Create the run upfront so we can return run_id immediately
     run = mlflow.start_run(
@@ -4173,6 +4211,7 @@ def _invoke_issue_detection_handler():
             "provider": provider,
             "model": model,
             "run_id": run_id,
+            "api_key": api_key,
         },
     )
     # Tag the run with job ID for later retrieval
