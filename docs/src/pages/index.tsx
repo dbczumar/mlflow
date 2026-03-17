@@ -63,7 +63,7 @@ export default function Home(): JSX.Element {
   return (
     <Layout
       title={siteConfig.title}
-      description="MLflow Documentation - Machine Learning and GenAI lifecycle management"
+      description="Official MLflow documentation for LLM tracing, agent evaluation, prompt management, AI governance, experiment tracking, model registry, and beyond."
     >
       <main className={styles.homeContainer}>
         <div className={styles.contentGrid}>
