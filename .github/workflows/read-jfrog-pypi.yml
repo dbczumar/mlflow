@@ -34,11 +34,15 @@ jobs:
         with:
           oidc-provider-name: jfrogtestingcoreyzumaroidc
 
-      - name: Configure uv to use JFrog as PyPI index
+      - name: Install mlflow from JFrog via uv
+        env:
+          # Override pyproject.toml exclude-newer so uv doesn't filter out packages
+          # whose upload timestamps aren't exposed by the JFrog simple index.
+          UV_EXCLUDE_NEWER: "2099-01-01T00:00:00Z"
         run: |
-          # Extract the OIDC-provisioned access token from the JFrog CLI config.
-          # Write credentials to ~/.netrc so uv can authenticate without embedding
-          # them in the URL (avoids percent-encoding issues with access tokens).
+          # Extract the OIDC-provisioned access token and percent-encode it for use
+          # in the index URL. Build and use the URL in the same step to avoid
+          # GitHub Actions masking the value in $GITHUB_ENV before uv can read it.
           ACCESS_TOKEN=$(jq -r '
             .servers[]
             | select(.accessToken != null and .accessToken != "")
@@ -48,10 +52,9 @@ jobs:
             echo "ERROR: could not find access token in JFrog CLI config"
             exit 1
           fi
+          ACCESS_TOKEN_ENC=$(python3 -c \
+            "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1],safe=''))" \
+            "$ACCESS_TOKEN")
           echo "::add-mask::$ACCESS_TOKEN"
-          printf 'machine databrickstemp.jfrog.io login token password %s\n' "$ACCESS_TOKEN" >> ~/.netrc
-          chmod 600 ~/.netrc
-          echo "UV_INDEX_URL=https://databrickstemp.jfrog.io/artifactory/api/pypi/db-pypi/simple" >> $GITHUB_ENV
-
-      - name: Install mlflow from JFrog
-        run: pip install --index-url "$UV_INDEX_URL" --no-deps mlflow 2>&1 | tail -10
+          INDEX_URL="https://token:${ACCESS_TOKEN_ENC}@databrickstemp.jfrog.io/artifactory/api/pypi/db-pypi/simple"
+          UV_INDEX_URL="$INDEX_URL" uv pip install --system mlflow
