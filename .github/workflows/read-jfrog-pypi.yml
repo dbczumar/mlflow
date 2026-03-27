@@ -36,17 +36,32 @@ jobs:
 
       - name: Configure uv to use JFrog as PyPI index
         run: |
-          # Configure pip to use JFrog's virtual PyPI repo, then pass the
-          # resulting index URL (with embedded auth token) to uv via UV_INDEX_URL.
-          jf pip-config --repo-resolve db-pypi
-          echo "--- pip config list output ---"
-          pip config list
-          echo "--- end pip config list ---"
-          INDEX_URL=$(pip config list | grep "index-url" | cut -d= -f2- | tr -d ' ' || true)
-          if [ -z "$INDEX_URL" ]; then
-            echo "ERROR: index-url not found in pip config"
-            exit 1
+          # Get access token from JFrog CLI config, then construct index URL for uv.
+          JF_CONF="$HOME/.jfrog/jfrog-cli.conf.v6"
+          echo "JFrog config file exists: $(test -f "$JF_CONF" && echo yes || echo no)"
+          if [ -f "$JF_CONF" ]; then
+            echo "--- JFrog config (redacted) ---"
+            python3 -c "
+import json
+with open('$JF_CONF') as f:
+    conf = json.load(f)
+for s in conf.get('servers', []):
+    print('server id:', s.get('url',''), 'has token:', bool(s.get('accessToken')))
+"
           fi
+          ACCESS_TOKEN=$(python3 -c "
+import json, sys
+with open('$HOME/.jfrog/jfrog-cli.conf.v6') as f:
+    conf = json.load(f)
+for s in conf.get('servers', []):
+    t = s.get('accessToken', '')
+    if t:
+        print(t)
+        sys.exit(0)
+sys.exit(1)
+")
+          INDEX_URL="https://${ACCESS_TOKEN}@databrickstemp.jfrog.io/artifactory/api/pypi/db-pypi/simple"
+          echo "::add-mask::$ACCESS_TOKEN"
           echo "::add-mask::$INDEX_URL"
           echo "UV_INDEX_URL=$INDEX_URL" >> $GITHUB_ENV
 
