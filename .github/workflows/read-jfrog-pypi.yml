@@ -54,4 +54,6 @@ jobs:
           echo "UV_INDEX_URL=https://databrickstemp.jfrog.io/artifactory/api/pypi/db-pypi/simple" >> $GITHUB_ENV
 
       - name: Install mlflow from JFrog
-        run: uv pip install --system --index-url "$UV_INDEX_URL" mlflow
+        env:
+          UV_EXCLUDE_NEWER: ""
+        run: uv pip install --system --verbose --index-url "$UV_INDEX_URL" mlflow
