@@ -53,6 +53,11 @@ jobs:
           chmod 600 ~/.netrc
           echo "UV_INDEX_URL=https://databrickstemp.jfrog.io/artifactory/api/pypi/db-pypi/simple" >> $GITHUB_ENV
 
+      - name: Check if mlflow is in JFrog index
+        run: |
+          echo "--- mlflow simple page from db-pypi ---"
+          jf rt curl -s "api/pypi/db-pypi/simple/mlflow/" | head -30
+
       - name: Install mlflow from JFrog
         run: |
           unset UV_EXCLUDE_NEWER
