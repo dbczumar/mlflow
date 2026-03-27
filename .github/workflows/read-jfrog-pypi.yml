@@ -36,27 +36,28 @@ jobs:
 
       - name: Configure uv to use JFrog as PyPI index
         run: |
-          # Extract the OIDC-provisioned access token from the JFrog CLI config and
-          # construct an authenticated index URL for uv.
+          # Extract the OIDC-provisioned access token (and user if present) from the
+          # JFrog CLI config and construct an authenticated index URL for uv.
+          # JFrog requires user:token URL format — use "token" as the username when
+          # no explicit user is configured (access tokens work with any non-empty user).
           ACCESS_TOKEN=$(jq -r '
             .servers[]
             | select(.accessToken != null and .accessToken != "")
             | .accessToken' \
             ~/.jfrog/jfrog-cli.conf.v6 | head -1)
+          USER=$(jq -r '
+            .servers[]
+            | select(.accessToken != null and .accessToken != "")
+            | (.user // "token")' \
+            ~/.jfrog/jfrog-cli.conf.v6 | head -1)
           if [ -z "$ACCESS_TOKEN" ]; then
             echo "ERROR: could not find access token in JFrog CLI config"
             exit 1
           fi
-          INDEX_URL="https://${ACCESS_TOKEN}@databrickstemp.jfrog.io/artifactory/api/pypi/db-pypi/simple"
+          INDEX_URL="https://${USER}:${ACCESS_TOKEN}@databrickstemp.jfrog.io/artifactory/api/pypi/db-pypi/simple"
           echo "::add-mask::$ACCESS_TOKEN"
           echo "::add-mask::$INDEX_URL"
           echo "UV_INDEX_URL=$INDEX_URL" >> $GITHUB_ENV
 
-      - name: Verify JFrog PyPI index and list available packages
-        run: |
-          echo "Querying db-pypi simple index via JFrog CLI..."
-          HTTP_CODE=$(jf rt curl -s -o /dev/null -w "%{http_code}" "api/pypi/db-pypi/simple/")
-          echo "HTTP response from db-pypi simple index: $HTTP_CODE"
-          [ "$HTTP_CODE" = "200" ]
-          echo "Listing available packages:"
-          jf rt curl -s "api/pypi/db-pypi/simple/" | grep -oP '(?<=href=")[^"]+' | head -20 || true
+      - name: Install mlflow from JFrog
+        run: uv pip install --system --index-url "$UV_INDEX_URL" mlflow
