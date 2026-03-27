@@ -30,9 +30,9 @@ jobs:
       - name: Set up JFrog CLI with OIDC
         uses: jfrog/setup-jfrog-cli@5a4fbe1e30dbb570cc62d2513421c4b9bc3c9959 # v4
         env:
-          JF_URL: https://a0jzim5zwqwgr.jfrog.io
+          JF_URL: https://databrickstemp.jfrog.io
         with:
-          oidc-provider-name: jfrogoidc
+          oidc-provider-name: jfrogtestingcoreyzumaroidc
 
       - name: Configure uv to use JFrog as PyPI index
         run: |
