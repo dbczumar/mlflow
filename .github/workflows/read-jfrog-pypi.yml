@@ -54,8 +54,11 @@ jobs:
             echo "ERROR: could not find access token in JFrog CLI config"
             exit 1
           fi
-          INDEX_URL="https://${USER}:${ACCESS_TOKEN}@databrickstemp.jfrog.io/artifactory/api/pypi/db-pypi/simple"
+          # Percent-encode the token so special characters don't break the URL.
+          ACCESS_TOKEN_ENC=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1],safe=''))" "$ACCESS_TOKEN")
+          INDEX_URL="https://${USER}:${ACCESS_TOKEN_ENC}@databrickstemp.jfrog.io/artifactory/api/pypi/db-pypi/simple"
           echo "::add-mask::$ACCESS_TOKEN"
+          echo "::add-mask::$ACCESS_TOKEN_ENC"
           echo "::add-mask::$INDEX_URL"
           echo "UV_INDEX_URL=$INDEX_URL" >> $GITHUB_ENV
 
