@@ -50,9 +50,9 @@ jobs:
 
       - name: Install mlflow from JFrog via uv
         run: |
-          # JFrog strips upload timestamps, so any value of UV_EXCLUDE_NEWER causes
-          # uv to exclude all packages (it treats missing-date packages as excluded).
-          # Unset it for this step by writing an empty-string override to the shell env.
-          export UV_EXCLUDE_NEWER=""
-          uv pip install --system --no-deps mlflow
+          # JFrog strips upload timestamps, so any UV_EXCLUDE_NEWER value causes uv to
+          # exclude all packages. Use --no-config to skip pyproject.toml's exclude-newer
+          # setting, and unset the env var. UV_DEFAULT_INDEX (env var) is still respected.
+          unset UV_EXCLUDE_NEWER
+          uv --no-config pip install --system --no-deps mlflow
           python -c "import importlib.metadata; print('mlflow', importlib.metadata.version('mlflow'), 'installed via uv + netrc')"
