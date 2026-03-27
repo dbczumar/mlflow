@@ -49,6 +49,10 @@ jobs:
           echo "UV_DEFAULT_INDEX=https://databrickstemp.jfrog.io/artifactory/api/pypi/db-pypi/simple" >> "$GITHUB_ENV"
 
       - name: Install mlflow from JFrog via uv
+        env:
+          # JFrog strips upload timestamps from package metadata, so UV_EXCLUDE_NEWER
+          # (set in setup-python) would exclude everything. Override it for JFrog installs.
+          UV_EXCLUDE_NEWER: "2099-01-01T00:00:00Z"
         run: |
           uv pip install --system --no-deps mlflow
           python -c "import importlib.metadata; print('mlflow', importlib.metadata.version('mlflow'), 'installed via uv + netrc')"
