@@ -54,8 +54,9 @@ jobs:
 
       - name: Verify JFrog PyPI index and list available packages
         run: |
-          echo "Querying db-pypi simple index..."
-          curl -s --fail "$UV_INDEX_URL/" | grep -oP '(?<=href=")[^"]+' | head -20 || true
-          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$UV_INDEX_URL/")
+          echo "Querying db-pypi simple index via JFrog CLI..."
+          HTTP_CODE=$(jf rt curl -s -o /dev/null -w "%{http_code}" "api/pypi/db-pypi/simple/")
           echo "HTTP response from db-pypi simple index: $HTTP_CODE"
           [ "$HTTP_CODE" = "200" ]
+          echo "Listing available packages:"
+          jf rt curl -s "api/pypi/db-pypi/simple/" | grep -oP '(?<=href=")[^"]+' | head -20 || true
