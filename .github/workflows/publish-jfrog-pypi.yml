@@ -1,0 +1,80 @@
+name: Publish to JFrog PyPI
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+    inputs:
+      package_type:
+        description: "Package type to publish (dev, skinny, or tracing)"
+        required: true
+        default: "dev"
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  publish:
+    if: github.repository == 'dbczumar/mlflow'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write # Required for JFrog OIDC authentication
+    strategy:
+      fail-fast: false
+      matrix:
+        type: ${{ github.event_name == 'workflow_dispatch' && fromJSON(format('["{0}"]', github.event.inputs.package_type)) || fromJSON('["dev", "skinny", "tracing"]') }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - uses: ./.github/actions/setup-python
+
+      - if: matrix.type == 'dev'
+        uses: ./.github/actions/setup-node
+
+      - name: Build UI
+        if: matrix.type == 'dev'
+        working-directory: mlflow/server/js
+        run: |
+          yarn install --immutable
+          yarn build
+
+      - name: Create placeholder UI
+        if: matrix.type != 'dev'
+        run: |
+          mkdir -p mlflow/server/js/build
+          echo "<html></html>" > mlflow/server/js/build/index.html
+
+      - name: Install build tools
+        run: |
+          uv pip install --system build setuptools twine wheel
+
+      - name: Build distribution files
+        env:
+          MATRIX_TYPE: ${{ matrix.type }}
+        run: |
+          python dev/build.py --package-type "$MATRIX_TYPE"
+          ls -lh dist
+
+      - name: Set up JFrog CLI with OIDC
+        uses: jfrog/setup-jfrog-cli@5a4fbe1e30dbb570cc62d2513421c4b9bc3c9959 # v4
+        env:
+          JF_URL: https://a0jzim5zwqwgr.jfrog.io
+        with:
+          oidc-provider-name: jfrogoidc
+
+      - name: Publish to JFrog PyPI
+        env:
+          BUILD_NAME: mlflow-${{ matrix.type }}
+          BUILD_NUMBER: ${{ github.run_number }}
+        run: |
+          jf rt u "dist/*.whl" db-pypi-local/ \
+            --build-name="$BUILD_NAME" \
+            --build-number="$BUILD_NUMBER"
+          jf rt u "dist/*.tar.gz" db-pypi-local/ \
+            --build-name="$BUILD_NAME" \
+            --build-number="$BUILD_NUMBER"
+          jf rt bp "$BUILD_NAME" "$BUILD_NUMBER"
