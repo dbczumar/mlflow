@@ -41,4 +41,4 @@ jobs:
           # Bearer auth internally via the JFrog CLI.
           jf pip-config --repo-resolve db-pypi
           jf pip install mlflow --no-deps
-          python -c "import mlflow; print('mlflow', mlflow.__version__, 'installed from JFrog')"
+          python -c "import importlib.metadata; print('mlflow', importlib.metadata.version('mlflow'), 'installed from JFrog')"
