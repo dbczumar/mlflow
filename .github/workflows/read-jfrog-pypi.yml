@@ -34,11 +34,23 @@ jobs:
         with:
           oidc-provider-name: jfrogtestingcoreyzumaroidc
 
-      - name: Install mlflow from JFrog
+      - name: Install mlflow from JFrog via jf pip
         run: |
-          # JFrog OIDC tokens only work as Bearer tokens (not Basic Auth), so uv's
-          # URL-embedded credentials won't work. Use jf pip install which handles
-          # Bearer auth internally via the JFrog CLI.
           jf pip-config --repo-resolve db-pypi
           jf pip install mlflow --no-deps
-          python -c "import importlib.metadata; print('mlflow', importlib.metadata.version('mlflow'), 'installed from JFrog')"
+          python -c "import importlib.metadata; print('mlflow', importlib.metadata.version('mlflow'), 'installed via jf pip')"
+
+      - name: Install mlflow from JFrog via uv
+        run: |
+          # Extract JFrog OIDC username + access token, then feed directly to uv.
+          # We use them inline (not via $GITHUB_ENV) to avoid the ::add-mask:: URL-replacement bug.
+          JFROG_USER=$(jq -r '.servers[0].user' ~/.jfrog/jfrog-cli.conf.v6)
+          JFROG_TOKEN=$(jq -r '.servers[0].accessToken' ~/.jfrog/jfrog-cli.conf.v6)
+          echo "::add-mask::$JFROG_TOKEN"
+          echo "JFrog user: $JFROG_USER"
+          JFROG_INDEX="https://${JFROG_USER}:${JFROG_TOKEN}@databrickstemp.jfrog.io/artifactory/api/pypi/db-pypi/simple"
+          uv pip install --system \
+            --index-url "$JFROG_INDEX" \
+            --no-deps \
+            mlflow
+          python -c "import importlib.metadata; print('mlflow', importlib.metadata.version('mlflow'), 'installed via uv')"
