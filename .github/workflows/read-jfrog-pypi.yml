@@ -50,8 +50,7 @@ jobs:
           INDEX_URL="https://${ACCESS_TOKEN}@databrickstemp.jfrog.io/artifactory/api/pypi/db-pypi/simple"
           echo "::add-mask::$ACCESS_TOKEN"
           echo "::add-mask::$INDEX_URL"
-          # Use as extra index so packages missing from JFrog fall back to PyPI.
-          echo "UV_EXTRA_INDEX_URL=$INDEX_URL" >> $GITHUB_ENV
+          echo "UV_INDEX_URL=$INDEX_URL" >> $GITHUB_ENV
 
-      - name: Install dependencies from JFrog
-        run: uv sync --locked
+      - name: Install a package from JFrog
+        run: uv pip install --index-url "$UV_INDEX_URL" requests
