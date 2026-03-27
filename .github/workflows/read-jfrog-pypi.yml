@@ -1,4 +1,4 @@
-name: JFrog PyPI mirror
+name: Read from JFrog PyPI
 
 on:
   workflow_dispatch:
