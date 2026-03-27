@@ -58,4 +58,4 @@ jobs:
           # Override pyproject.toml exclude-newer so uv doesn't filter out packages
           # whose upload timestamps aren't exposed by the JFrog simple index.
           UV_EXCLUDE_NEWER: "2099-01-01T00:00:00Z"
-        run: uv pip install --system --index-url "$UV_INDEX_URL" mlflow
+        run: uv pip install --system --verbose --index-url "$UV_INDEX_URL" mlflow 2>&1 | head -30; true
