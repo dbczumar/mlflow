@@ -53,12 +53,9 @@ jobs:
           chmod 600 ~/.netrc
           echo "UV_INDEX_URL=https://databrickstemp.jfrog.io/artifactory/api/pypi/db-pypi/simple" >> $GITHUB_ENV
 
-      - name: Check if mlflow is in JFrog index
-        run: |
-          echo "--- mlflow simple page from db-pypi ---"
-          jf rt curl -s "api/pypi/db-pypi/simple/mlflow/" | head -30
-
       - name: Install mlflow from JFrog
-        run: |
-          unset UV_EXCLUDE_NEWER
-          uv pip install --system --verbose --index-url "$UV_INDEX_URL" mlflow
+        env:
+          # Override pyproject.toml exclude-newer so uv doesn't filter out packages
+          # whose upload timestamps aren't exposed by the JFrog simple index.
+          UV_EXCLUDE_NEWER: "2099-01-01T00:00:00Z"
+        run: uv pip install --system --index-url "$UV_INDEX_URL" mlflow
