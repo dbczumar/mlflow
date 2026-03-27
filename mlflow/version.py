@@ -2,7 +2,7 @@
 import importlib.metadata
 import re
 
-VERSION = "3.11.1.dev0"
+VERSION = "3.11.1.dev0"  # CI trigger test
 
 
 def is_release_version():
