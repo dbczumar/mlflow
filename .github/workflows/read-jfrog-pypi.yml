@@ -57,4 +57,13 @@ jobs:
             "$ACCESS_TOKEN")
           echo "::add-mask::$ACCESS_TOKEN"
           INDEX_URL="https://token:${ACCESS_TOKEN_ENC}@databrickstemp.jfrog.io/artifactory/api/pypi/db-pypi/simple"
-          RUST_LOG=uv_client=debug UV_INDEX_URL="$INDEX_URL" uv pip install --system --verbose mlflow 2>&1 | head -40
+          echo "--- Testing Basic Auth with curl ---"
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+            -u "token:${ACCESS_TOKEN}" \
+            "https://databrickstemp.jfrog.io/artifactory/api/pypi/db-pypi/simple/mlflow/")
+          echo "HTTP status with Basic Auth: $HTTP_CODE"
+          echo "--- Testing Bearer Auth with curl ---"
+          HTTP_CODE2=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+            "https://databrickstemp.jfrog.io/artifactory/api/pypi/db-pypi/simple/mlflow/")
+          echo "HTTP status with Bearer Auth: $HTTP_CODE2"
