@@ -1,0 +1,14 @@
+name: Sync fork
+
+on:
+  schedule:
+    - cron: "0 */6 * * *" # Every 6 hours
+  workflow_dispatch: # Manual trigger
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - run: gh repo sync ${{ github.repository }} --branch master
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
