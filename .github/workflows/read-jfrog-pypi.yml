@@ -34,25 +34,21 @@ jobs:
         with:
           oidc-provider-name: jfrogtestingcoreyzumaroidc
 
-      - name: Install mlflow from JFrog via jf pip
+      - name: Configure JFrog credentials for uv via netrc
         run: |
-          jf pip-config --repo-resolve db-pypi
-          jf pip install mlflow --no-deps
-          python -c "import importlib.metadata; print('mlflow', importlib.metadata.version('mlflow'), 'installed via jf pip')"
-
-      - name: Install mlflow from JFrog via uv
-        run: |
-          # Extract JFrog OIDC username + access token, then feed directly to uv.
-          # We use them inline (not via $GITHUB_ENV) to avoid the ::add-mask:: URL-replacement bug.
-          # Percent-encode both fields so uv's URL parser accepts them (tokens contain special chars).
+          # Write OIDC credentials to ~/.netrc so uv authenticates automatically.
+          # File writes bypass ::add-mask:: log-output substitution, so the raw
+          # token is stored correctly. UV_DEFAULT_INDEX (credential-free URL) is
+          # safe to write to $GITHUB_ENV.
           JFROG_USER=$(jq -r '.servers[0].user' ~/.jfrog/jfrog-cli.conf.v6)
           JFROG_TOKEN=$(jq -r '.servers[0].accessToken' ~/.jfrog/jfrog-cli.conf.v6)
           echo "::add-mask::$JFROG_TOKEN"
-          JFROG_USER_ENC=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1],safe=''))" "$JFROG_USER")
-          JFROG_TOKEN_ENC=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1],safe=''))" "$JFROG_TOKEN")
-          JFROG_INDEX="https://${JFROG_USER_ENC}:${JFROG_TOKEN_ENC}@databrickstemp.jfrog.io/artifactory/api/pypi/db-pypi/simple"
-          uv pip install --system \
-            --index-url "$JFROG_INDEX" \
-            --no-deps \
-            mlflow
-          python -c "import importlib.metadata; print('mlflow', importlib.metadata.version('mlflow'), 'installed via uv')"
+          printf 'machine databrickstemp.jfrog.io\nlogin %s\npassword %s\n' \
+            "$JFROG_USER" "$JFROG_TOKEN" >> ~/.netrc
+          chmod 600 ~/.netrc
+          echo "UV_DEFAULT_INDEX=https://databrickstemp.jfrog.io/artifactory/api/pypi/db-pypi/simple" >> "$GITHUB_ENV"
+
+      - name: Install mlflow from JFrog via uv
+        run: |
+          uv pip install --system --no-deps mlflow
+          python -c "import importlib.metadata; print('mlflow', importlib.metadata.version('mlflow'), 'installed via uv + netrc')"
