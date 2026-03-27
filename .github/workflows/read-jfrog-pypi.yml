@@ -36,31 +36,22 @@ jobs:
 
       - name: Configure uv to use JFrog as PyPI index
         run: |
-          # Extract the OIDC-provisioned access token (and user if present) from the
-          # JFrog CLI config and construct an authenticated index URL for uv.
-          # JFrog requires user:token URL format — use "token" as the username when
-          # no explicit user is configured (access tokens work with any non-empty user).
+          # Extract the OIDC-provisioned access token from the JFrog CLI config.
+          # Write credentials to ~/.netrc so uv can authenticate without embedding
+          # them in the URL (avoids percent-encoding issues with access tokens).
           ACCESS_TOKEN=$(jq -r '
             .servers[]
             | select(.accessToken != null and .accessToken != "")
             | .accessToken' \
             ~/.jfrog/jfrog-cli.conf.v6 | head -1)
-          USER=$(jq -r '
-            .servers[]
-            | select(.accessToken != null and .accessToken != "")
-            | (.user // "token")' \
-            ~/.jfrog/jfrog-cli.conf.v6 | head -1)
           if [ -z "$ACCESS_TOKEN" ]; then
             echo "ERROR: could not find access token in JFrog CLI config"
             exit 1
           fi
-          # Percent-encode the token so special characters don't break the URL.
-          ACCESS_TOKEN_ENC=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1],safe=''))" "$ACCESS_TOKEN")
-          INDEX_URL="https://${USER}:${ACCESS_TOKEN_ENC}@databrickstemp.jfrog.io/artifactory/api/pypi/db-pypi/simple"
           echo "::add-mask::$ACCESS_TOKEN"
-          echo "::add-mask::$ACCESS_TOKEN_ENC"
-          echo "::add-mask::$INDEX_URL"
-          echo "UV_INDEX_URL=$INDEX_URL" >> $GITHUB_ENV
+          printf 'machine databrickstemp.jfrog.io login token password %s\n' "$ACCESS_TOKEN" >> ~/.netrc
+          chmod 600 ~/.netrc
+          echo "UV_INDEX_URL=https://databrickstemp.jfrog.io/artifactory/api/pypi/db-pypi/simple" >> $GITHUB_ENV
 
       - name: Install mlflow from JFrog
         run: uv pip install --system --index-url "$UV_INDEX_URL" mlflow
