@@ -34,36 +34,11 @@ jobs:
         with:
           oidc-provider-name: jfrogtestingcoreyzumaroidc
 
-      - name: Install mlflow from JFrog via uv
-        env:
-          # Override pyproject.toml exclude-newer so uv doesn't filter out packages
-          # whose upload timestamps aren't exposed by the JFrog simple index.
-          UV_EXCLUDE_NEWER: "2099-01-01T00:00:00Z"
+      - name: Install mlflow from JFrog
         run: |
-          # Extract the OIDC-provisioned access token and percent-encode it for use
-          # in the index URL. Build and use the URL in the same step to avoid
-          # GitHub Actions masking the value in $GITHUB_ENV before uv can read it.
-          ACCESS_TOKEN=$(jq -r '
-            .servers[]
-            | select(.accessToken != null and .accessToken != "")
-            | .accessToken' \
-            ~/.jfrog/jfrog-cli.conf.v6 | head -1)
-          if [ -z "$ACCESS_TOKEN" ]; then
-            echo "ERROR: could not find access token in JFrog CLI config"
-            exit 1
-          fi
-          ACCESS_TOKEN_ENC=$(python3 -c \
-            "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1],safe=''))" \
-            "$ACCESS_TOKEN")
-          echo "::add-mask::$ACCESS_TOKEN"
-          INDEX_URL="https://token:${ACCESS_TOKEN_ENC}@databrickstemp.jfrog.io/artifactory/api/pypi/db-pypi/simple"
-          echo "--- Testing Basic Auth with curl ---"
-          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
-            -u "token:${ACCESS_TOKEN}" \
-            "https://databrickstemp.jfrog.io/artifactory/api/pypi/db-pypi/simple/mlflow/")
-          echo "HTTP status with Basic Auth: $HTTP_CODE"
-          echo "--- Testing Bearer Auth with curl ---"
-          HTTP_CODE2=$(curl -s -o /dev/null -w "%{http_code}" \
-            -H "Authorization: Bearer ${ACCESS_TOKEN}" \
-            "https://databrickstemp.jfrog.io/artifactory/api/pypi/db-pypi/simple/mlflow/")
-          echo "HTTP status with Bearer Auth: $HTTP_CODE2"
+          # JFrog OIDC tokens only work as Bearer tokens (not Basic Auth), so uv's
+          # URL-embedded credentials won't work. Use jf pip install which handles
+          # Bearer auth internally via the JFrog CLI.
+          jf pip-config --repo-resolve db-pypi
+          jf pip install mlflow --no-deps
+          python -c "import mlflow; print('mlflow', mlflow.__version__, 'installed from JFrog')"
