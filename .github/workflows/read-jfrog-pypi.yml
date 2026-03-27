@@ -39,7 +39,14 @@ jobs:
           # Configure pip to use JFrog's virtual PyPI repo, then pass the
           # resulting index URL (with embedded auth token) to uv via UV_INDEX_URL.
           jf pip-config --repo-resolve db-pypi
-          INDEX_URL=$(pip config list | grep "global.index-url" | cut -d= -f2- | tr -d ' ')
+          echo "--- pip config list output ---"
+          pip config list
+          echo "--- end pip config list ---"
+          INDEX_URL=$(pip config list | grep "index-url" | cut -d= -f2- | tr -d ' ' || true)
+          if [ -z "$INDEX_URL" ]; then
+            echo "ERROR: index-url not found in pip config"
+            exit 1
+          fi
           echo "::add-mask::$INDEX_URL"
           echo "UV_INDEX_URL=$INDEX_URL" >> $GITHUB_ENV
 
