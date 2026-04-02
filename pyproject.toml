@@ -69,7 +69,8 @@ name = "Databricks"
 email = "mlflow-oss-maintainers@googlegroups.com"
 
 [project.license]
-file = "LICENSE.txt"
+license = "Apache-2.0"
+license-files = ["LICENSE.txt"]
 
 [project.optional-dependencies]
 extras = [
