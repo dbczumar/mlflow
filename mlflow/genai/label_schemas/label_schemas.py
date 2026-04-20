@@ -18,6 +18,21 @@ DatabricksInputType = TypeVar("DatabricksInputType")
 _InputType = TypeVar("_InputType", bound="InputType")
 
 
+@dataclass
+class CategoricalOption:
+    """
+    An option for a categorical label schema, with an optional description.
+
+    Args:
+        value: The option value (what gets recorded as the assessment).
+        description: Optional human-readable description shown to labelers
+            explaining what this option means.
+    """
+
+    value: str
+    description: str | None = None
+
+
 class InputType(ABC):
     """Base class for all input types."""
 
@@ -33,50 +48,116 @@ class InputType(ABC):
 
 @dataclass
 class InputCategorical(InputType):
-    """A single-select dropdown for collecting assessments from stakeholders.
+    """
+    A single-select dropdown for collecting assessments from stakeholders.
+
+    Options can be plain strings or :class:`CategoricalOption` instances with descriptions::
+
+        # Without descriptions (existing behavior):
+        InputCategorical(options=["Yes", "No"])
+
+        # With descriptions:
+        InputCategorical(options=[
+            CategoricalOption("Correct", "Response fully answers the question"),
+            CategoricalOption("Partial", "Response addresses the question but has gaps"),
+            CategoricalOption("Incorrect", "Response is wrong or irrelevant"),
+        ])
 
     .. note::
         This functionality is only available in Databricks. Please run
         `pip install mlflow[databricks]` to use it.
     """
 
-    options: list[str]
+    options: list[str | CategoricalOption]
     """List of available options for the categorical selection."""
 
     def _to_databricks_input(self) -> "_InputCategorical":
         """Convert to the internal Databricks input type."""
         from databricks.agents.review_app import label_schemas as _label_schemas
 
-        return _label_schemas.InputCategorical(options=self.options)
+        plain_options = [
+            o.value if isinstance(o, CategoricalOption) else o for o in self.options
+        ]
+        descriptions = {
+            o.value: o.description
+            for o in self.options
+            if isinstance(o, CategoricalOption) and o.description is not None
+        }
+        return _label_schemas.InputCategorical(
+            options=plain_options,
+            option_descriptions=descriptions or None,
+        )
 
     @classmethod
     def _from_databricks_input(cls, input_obj: "_InputCategorical") -> "InputCategorical":
         """Create from the internal Databricks input type."""
-        return cls(options=input_obj.options)
+        descriptions = getattr(input_obj, "option_descriptions", None) or {}
+        if descriptions:
+            options: list[str | CategoricalOption] = [
+                CategoricalOption(value=o, description=descriptions.get(o))
+                for o in input_obj.options
+            ]
+        else:
+            options = input_obj.options
+        return cls(options=options)
 
 
 @dataclass
 class InputCategoricalList(InputType):
-    """A multi-select dropdown for collecting assessments from stakeholders.
+    """
+    A multi-select dropdown for collecting assessments from stakeholders.
+
+    Options can be plain strings or :class:`CategoricalOption` instances with descriptions::
+
+        # Without descriptions (existing behavior):
+        InputCategoricalList(options=["Tag A", "Tag B", "Tag C"])
+
+        # With descriptions:
+        InputCategoricalList(options=[
+            CategoricalOption("PII", "Contains personally identifiable information"),
+            CategoricalOption("Harmful", "Contains harmful or dangerous content"),
+            CategoricalOption("Off-topic", "Does not address the user's question"),
+        ])
 
     .. note::
         This functionality is only available in Databricks. Please run
         `pip install mlflow[databricks]` to use it.
     """
 
-    options: list[str]
+    options: list[str | CategoricalOption]
     """List of available options for the multi-select categorical (dropdown)."""
 
     def _to_databricks_input(self) -> "_InputCategoricalList":
         """Convert to the internal Databricks input type."""
         from databricks.agents.review_app import label_schemas as _label_schemas
 
-        return _label_schemas.InputCategoricalList(options=self.options)
+        plain_options = [
+            o.value if isinstance(o, CategoricalOption) else o for o in self.options
+        ]
+        descriptions = {
+            o.value: o.description
+            for o in self.options
+            if isinstance(o, CategoricalOption) and o.description is not None
+        }
+        return _label_schemas.InputCategoricalList(
+            options=plain_options,
+            option_descriptions=descriptions or None,
+        )
 
     @classmethod
-    def _from_databricks_input(cls, input_obj: "_InputCategoricalList") -> "InputCategoricalList":
+    def _from_databricks_input(
+        cls, input_obj: "_InputCategoricalList"
+    ) -> "InputCategoricalList":
         """Create from the internal Databricks input type."""
-        return cls(options=input_obj.options)
+        descriptions = getattr(input_obj, "option_descriptions", None) or {}
+        if descriptions:
+            options: list[str | CategoricalOption] = [
+                CategoricalOption(value=o, description=descriptions.get(o))
+                for o in input_obj.options
+            ]
+        else:
+            options = input_obj.options
+        return cls(options=options)
 
 
 @dataclass

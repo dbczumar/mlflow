@@ -9,6 +9,7 @@ The API docs can be found here:
 from typing import TYPE_CHECKING, Literal
 
 from mlflow.genai.label_schemas.label_schemas import (
+    CategoricalOption,
     InputCategorical,
     InputCategoricalList,
     InputNumeric,
@@ -120,6 +121,7 @@ __all__ = [
     "EXPECTED_FACTS",
     "GUIDELINES",
     "EXPECTED_RESPONSE",
+    "CategoricalOption",
     "LabelSchemaType",
     "LabelSchema",
     "InputCategorical",
